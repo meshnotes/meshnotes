@@ -50,7 +50,7 @@ abstract class DbHelper {
 class RealDbHelper implements DbHelper {
   late Database _database;
   DbScript dbScript = DbVersion1();
-  static const dbFileName = 'brainmap.db';
+  static const dbFileName = 'mesh_notes.db';
   static final Map<int, DbUpgradeInfo> _upgradeStrategy = {
     1: DbUpgradeInfo(2, DbFake().upgradeDb),
   };
@@ -72,19 +72,19 @@ class RealDbHelper implements DbHelper {
     open.overrideFor(OperatingSystem.windows, _openOnWindows);
     final directory = await getApplicationDocumentsDirectory();
     final dbFile = join(directory.path, dbFileName);
-    MyLogger.debug('Start opening db: $dbFile');
+    MyLogger.debug('MeshNotesDB: start opening mesh_notes db: $dbFile');
     final db = sqlite3.open(dbFile);
-    MyLogger.debug('Finish loading sqlite3');
+    MyLogger.debug('MeshNotesDB: finish loading sqlite3');
     _database = db;
 
     _upgradeDbIfNecessary(_database);
     _createDbIfNecessary(_database);
     _setVersion(db, dbScript.version);
-    MyLogger.info('Finish initializing db');
+    MyLogger.info('MeshNotesDB: finish initializing db');
   }
 
   void _createDbIfNecessary(Database db) {
-    MyLogger.info('Creating db if necessary...');
+    MyLogger.info('MeshNotesDB: creating tables if necessary...');
     dbScript.initDb(db);
   }
 
@@ -94,7 +94,7 @@ class RealDbHelper implements DbHelper {
   static int? _getVersion(Database db) {
     const versionKey = 'user_version';
     final result = db.select('PRAGMA $versionKey');
-    MyLogger.verbose('PRAGMA user_version=$result');
+    MyLogger.verbose('MeshNotesDB: PRAGMA user_version=$result');
     for(final row in result) {
       if(row.containsKey(versionKey)) {
         return row[versionKey];
@@ -105,9 +105,9 @@ class RealDbHelper implements DbHelper {
 
   void _upgradeDbIfNecessary(Database db) {
     var version = dbScript.version;
-    MyLogger.debug('Checking for db upgrade...');
+    MyLogger.debug('MeshNotesDB: checking for db upgrade...');
     final oldVersion = _getVersion(db);
-    MyLogger.debug('efantest: oldVersion=$oldVersion, targetVersion=$version');
+    MyLogger.debug('MeshNotesDB: oldVersion=$oldVersion, targetVersion=$version');
     if(oldVersion != null && oldVersion > 0 && oldVersion < version) {
       for(int ver = oldVersion; ver < version;) {
         if(!_upgradeStrategy.containsKey(ver)) {
@@ -116,23 +116,11 @@ class RealDbHelper implements DbHelper {
         }
         var info = _upgradeStrategy[ver]!;
         var nextVersion = info.targetVersion;
-        MyLogger.info('Upgrading from version $ver to version $nextVersion...');
+        MyLogger.info('MeshNotesDB: upgrading from version $ver to version $nextVersion...');
         info.upgradeFunc(db);
         ver = nextVersion;
       }
     }
-  }
-
-  String getDocTitleById(String docId) {
-    const sql = 'SELECT data FROM blocks WHERE doc_id=? AND id=?';
-    final resultSet = _database.select(sql, [docId, Constants.keyTitleId]);
-    MyLogger.debug('efantest: getDocTitleById result=$resultSet');
-    if(resultSet.isEmpty) {
-      MyLogger.warn('Document(id=$docId) title not found!');
-    } else if(resultSet.length != 1) { // 不可能发生
-      MyLogger.warn('Document(id=$docId) has more than 1 title: $resultSet');
-    }
-    return resultSet.first['data'];
   }
 
   @override

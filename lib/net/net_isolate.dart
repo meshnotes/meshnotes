@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:isolate';
+import 'package:flutter/services.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/villager_node.dart';
 import 'package:my_log/my_log.dart';
@@ -14,16 +15,26 @@ Village? _village;
 SendPort? _sendPort;
 Timer? _timer;
 
-void netIsolateRunner(SendPort sendPort) {
+class IsolateData {
+  SendPort sendPort;
+  RootIsolateToken token;
+
+  IsolateData({
+    required this.sendPort,
+    required this.token,
+  });
+}
+void netIsolateRunner(IsolateData _data) {
   // Init MyLogger in the separated isolate
   MyLogger.init(name: 'network');
   MyLogger.info('Running network isolate');
 
+  BackgroundIsolateBinaryMessenger.ensureInitialized(_data.token);
   // Exchange communication port
   var receivePort = ReceivePort();
   MyLogger.info('Sending SendPort to main isolate');
-  sendPort.send(receivePort.sendPort);
-  _sendPort = sendPort;
+  _data.sendPort.send(receivePort.sendPort);
+  _sendPort = _data.sendPort;
 
   // Handle messages from main isolate
   MyLogger.info('Start village protocol and listening');

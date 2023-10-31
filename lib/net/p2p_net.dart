@@ -1,5 +1,7 @@
+import 'package:flutter/services.dart';
 import 'package:libp2p/application/application.dart';
 import 'package:libp2p/application/application_api.dart';
+import 'package:libp2p/dal/village_db.dart';
 import 'package:libp2p/libp2p.dart';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:libp2p/overlay/villager_node.dart';
@@ -14,6 +16,9 @@ runServer() {
 }
 
 Future<Village> startVillage(String localPort, String serverList, String deviceId, Function(VillagerNode) connectedCallback, OnDataType handleData) async {
+  VillageDbHelper db = VillageDbHelper();
+  db.init();
+
   int _localPort = int.tryParse(localPort)?? 0;
   var sponsors = _parseSponsors(serverList);
   final _overlay = VillageOverlay(

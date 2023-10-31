@@ -5,6 +5,7 @@ import 'package:sqlite3/sqlite3.dart';
 abstract class DbScript {
   int version;
   Map<String, String> createSql;
+
   DbScript({
     required this.version,
     required this.createSql,
@@ -12,7 +13,7 @@ abstract class DbScript {
 
   void initDb(Database db) {
     for(var k in createSql.keys) {
-      MyLogger.info('Executing init script: $k');
+      MyLogger.info('MeshNotesDB: executing db init script: $k');
       var sql = createSql[k];
       if(sql != null && sql.isNotEmpty) {
         MyLogger.debug('sql=$sql');
