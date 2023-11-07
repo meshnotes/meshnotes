@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+import 'village_data.dart';
+import 'package:libp2p/dal/village_db.dart';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:libp2p/overlay/overlay_controller.dart';
 import 'package:libp2p/overlay/villager_node.dart';
@@ -17,6 +20,8 @@ class Village implements ApplicationController {
   VillageMode _mode;
   int localPort;
   OnDataType? handleData;
+  VillageDbHelper _db;
+  Map<String, VillageObject> _villageObjectCache = {};
 
   // Villager properties
   String _userId;
@@ -28,7 +33,8 @@ class Village implements ApplicationController {
     this.handleData,
     VillageMode mode = VillageMode.loneWolf,
     required VillageOverlay overlay,
-  }): _mode = mode, _userId = userId, _overlay = overlay {
+    required VillageDbHelper db,
+  }): _mode = mode, _userId = userId, _overlay = overlay, _db = db {
     MyLogger.info('${logPrefix} register app=$_appName');
     _overlay.registerApplication(_appName, this);
   }
@@ -41,7 +47,11 @@ class Village implements ApplicationController {
   @override
   void onData(VillagerNode node, String app, String type, String data) {
     MyLogger.info('efantest: receive village data: $data of type($type)');
-    handleData?.call(type, data);
+    switch(type) {
+      case VersionTreeAppType:
+        _onVersionTree(data);
+        break;
+    }
   }
 
   void sendVersionTree(String versionTree) {
@@ -77,5 +87,30 @@ class Village implements ApplicationController {
   }
   void _syncDataToWarehouse(List<String> nodeIds, List<int> data) {
     // TODO Sync data to warehouses indicated by nodeIds
+  }
+
+  void _onVersionTree(String data) {
+    final versionChain = VersionChain.fromJson(jsonDecode(data));
+    final versionHash = versionChain.versionHash;
+    final versionStr = versionChain.versionStr;
+    final parents = versionChain.parents;
+    final requiredObjects = versionChain.requiredObjects;
+
+    int now = DateTime.now().millisecondsSinceEpoch;
+    _db.storeObject(versionHash, versionStr);
+    _db.storeNewVersion(versionHash, parents.join(','), now);
+    for(final e in requiredObjects.entries) {
+      var objHash = e.key;
+      var objData = e.value;
+      if(!_villageObjectCache.containsKey(objHash)) {
+        var object = VillageObject(objHash: objHash);
+        if(objData.isNotEmpty) {
+          object.setData(objData);
+          _db.storeObject(e.key, e.value);
+        }
+        _villageObjectCache[objHash] = object;
+      }
+    }
+    handleData?.call(VersionTreeAppType, data);
   }
 }

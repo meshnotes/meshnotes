@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:my_log/my_log.dart';
-import '../document/paragraph_desc.dart';
-import 'controller.dart';
 
 class DocControlNode {
   // 结构性成员

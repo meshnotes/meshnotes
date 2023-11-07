@@ -14,7 +14,7 @@ import '../setting/constants.dart';
 class DocumentManager {
   bool _hasModified = false;
   final DbHelper _db;
-  Document? document;
+  final Map<String, Document> _documents = {};
   String? currentDocId;
   List<DocData> _docTitles = [];
   String _currentVersion = '';
@@ -25,7 +25,8 @@ class DocumentManager {
   }): _db = db;
 
   Document? getCurrentDoc() {
-    return document;
+    if(currentDocId == null) return null;
+    return _documents[currentDocId];
   }
 
   List<DocData> getAllDocuments() {
@@ -39,15 +40,29 @@ class DocumentManager {
     _docTitles = data;
     return _docTitles;
   }
-  
+
+  /// Open document with docId to be current document
   void openDocument(String docId) {
-    document?.closeDocument();
+    if(docId == currentDocId) return;
+
+    if(currentDocId != null) {
+      _documents[currentDocId]?.closeDocument();
+    }
     // If modified, sync it before opening new document
     if(hasModified()) {
       Controller.instance.syncDocuments();
     }
+
+    // If the document was not open, load it from db
+    if(!_documents.containsKey(docId)) {
+      var document = _getDocFromDb(docId);
+      if(document != null) {
+        _documents[docId] = document;
+      } else { // Load failed
+        return;
+      }
+    }
     currentDocId = docId;
-    document = _getDocFromDb();
   }
 
   String newDocument() {
@@ -58,21 +73,20 @@ class DocumentManager {
     return id;
   }
 
-  DocTreeVersion? genAndSaveNewVersion() {
-    if(!hasModified()) return null;
+  /// Generate version and returns version and required objects
+  ///
+  /// returns version and required objects
+  (DocTreeVersion?, Map<String, String>) genAndSaveNewVersion() {
+    if(!hasModified()) return (null, {});
 
-    List<Document> modifiedDocuments = _findModifiedDocuments();
-    Map<String, String> newHashes = _genAndSaveDocuments(modifiedDocuments);
+    // generate and save version
     final now = Util.getTimeStamp();
-    _updateDocumentHashes(newHashes, now);
-    var docTable = _genDocTreeNodeList(_docTitles);
-    var version = DocTreeVersion(table: docTable, timestamp: now, parentsHash: [_currentVersion]);
-    final versionHash = _saveVersion(version, now);
-    _currentVersionTimestamp = now;
-    _currentVersion = versionHash;
+    var version = _genVersionAndClearModified(now);
+    _saveVersion(version, now);
 
-    _clearModified(modifiedDocuments);
-    return version;
+    // generate required objects list
+    var requiredObjects = _genRequiredObjects();
+    return (version, requiredObjects);
   }
 
   void assembleVersionTree(String versionHash, DocTreeVersion version, List<String> parents, Map<String, String> requiredObjects) {
@@ -169,7 +183,7 @@ class DocumentManager {
     return (ver, timestamp?? 0);
   }
 
-  String _saveVersion(DocTreeVersion version, int now) {
+  void _saveVersion(DocTreeVersion version, int now) {
     final hash = version.getHash();
     final jsonStr = jsonEncode(version);
     // Save version object, version tree, current_version flag, and current_version_timestamp flag
@@ -177,7 +191,9 @@ class DocumentManager {
     _db.storeVersion(hash, _currentVersion, now);
     _db.setFlag(Constants.flagNameCurrentVersion, hash);
     _db.setFlag(Constants.flagNameCurrentVersionTimestamp, now.toString());
-    return hash;
+
+    _currentVersionTimestamp = now;
+    _currentVersion = hash;
   }
 
   void updateDocTitle(String docId, String title, int timestamp) {
@@ -205,6 +221,40 @@ class DocumentManager {
     return null;
   }
 
+  DocTreeVersion _genVersionAndClearModified(int now) {
+    List<Document> modifiedDocuments = _findModifiedDocuments();
+    Map<String, String> newHashes = _genAndSaveDocuments(modifiedDocuments);
+    _updateDocumentHashes(newHashes, now);
+    var docTable = _genDocTreeNodeList(_docTitles);
+    var version = DocTreeVersion(table: docTable, timestamp: now, parentsHash: [_currentVersion]);
+    _clearModified(modifiedDocuments);
+    return version;
+  }
+
+  Map<String, String> _genRequiredObjects() {
+    Map<String, String> result = {};
+
+    for(var item in _docTitles) {
+      var docId = item.docId;
+      var docHash = item.hash;
+      var docStr = _db.getObject(docHash);
+      MyLogger.info('_genRequiredObjects: docHash=$docHash, docStr=$docStr');
+      result[docHash] = docStr;
+
+      var doc = _documents[docId];
+      doc ??= _getDocFromDb(docId);
+      if(doc == null) continue;
+
+      _documents[docId] = doc;
+      var map = _documents[docId]?.getRequiredBlocks();
+      if(map != null) {
+        result.addAll(map);
+      }
+    }
+
+    return result;
+  }
+
   static List<DocTreeNode> _genDocTreeNodeList(List<DocData> list) {
     List<DocTreeNode> result = [];
     for(var item in list) {
@@ -214,8 +264,8 @@ class DocumentManager {
     return result;
   }
 
-  Document? _getDocFromDb() {
-    var docNode = _getDocTreeNode(currentDocId!);
+  Document? _getDocFromDb(String docId) {
+    var docNode = _getDocTreeNode(docId);
     if(docNode == null) return null;
 
     return Document.loadByNode(docNode, this);
@@ -223,13 +273,14 @@ class DocumentManager {
 
   List<Document> _findModifiedDocuments() {
     // TODO Load all documents whose timestamp greater than current_version_timestamp
-    List<DocData> result = [];
-    for(var d in _docTitles) {
-      if(d.timestamp > _currentVersionTimestamp) {
-        result.add(d);
+    List<Document> result = [];
+    for(var e in _documents.entries) {
+      final doc = e.value;
+      if(doc.getModified()) {
+        result.add(doc);
       }
     }
-    return [document!];
+    return result;
   }
 
   Map<String, String> _genAndSaveDocuments(List<Document> documents) {

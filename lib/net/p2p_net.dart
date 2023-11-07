@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:libp2p/application/application.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/dal/village_db.dart';
@@ -33,6 +32,7 @@ Future<Village> startVillage(String localPort, String serverList, String deviceI
     sponsors: sponsors,
     overlay: _overlay,
     handleData: handleData,
+    db: db,
   );
   await village.start();
   return village;

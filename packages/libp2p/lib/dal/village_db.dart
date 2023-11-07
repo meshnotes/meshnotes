@@ -88,4 +88,14 @@ class VillageDbHelper {
       }
     }
   }
+
+  void storeObject(String objectHash, String data) {
+    const sql = 'INSERT INTO objects(obj_hash, data) VALUES(?, ?) ON CONFLICT(obj_hash) DO UPDATE SET data=excluded.data';
+    _database.execute(sql, [objectHash, data]);
+  }
+  void storeNewVersion(String versionHash, String parents, int timestamp) {
+    const sql = 'INSERT INTO versions(version_hash, parents, created_at) VALUES(?, ?, ?) '
+        'ON CONFLICT(version_hash) DO UPDATE SET parents=excluded.parents, created_at=excluded.created_at';
+    _database.execute(sql, [versionHash, parents, timestamp]);
+  }
 }

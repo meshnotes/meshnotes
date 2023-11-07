@@ -38,7 +38,7 @@ class MindToolBar extends StatelessWidget {
       iconSize: 18,
       size: 36,
       fillColor: Theme.of(context).canvasColor,
-      hoverColor: Theme.of(context).backgroundColor,
+      hoverColor: Theme.of(context).colorScheme.background,
     );
     var buttons = <Widget>[
       IconAndTextButton(

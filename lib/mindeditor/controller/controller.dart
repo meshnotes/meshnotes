@@ -137,13 +137,13 @@ class Controller {
   }
 
   // Document
-  void openDocumentForUi() {
+  void _refreshDocumentView() {
     CallbackRegistry.resetTitleBar(document!.getTitlePath());
     CallbackRegistry.openDocument(document!);
   }
   void openDocument(String docId) {
     _docManager!.openDocument(docId);
-    openDocumentForUi();
+    _refreshDocumentView();
   }
   void newDocument() {
     var docId = _docManager!.newDocument();
@@ -168,19 +168,20 @@ class Controller {
   }
 
   bool syncDocuments() {
-    //TODO: Add syncing code here
     // If there is any modification, generate a new version tree, and try to sync this version
     if(!docManager.hasModified()) return false;
-    var version = docManager.genAndSaveNewVersion();
+    var (version, requiredObjects) = docManager.genAndSaveNewVersion();
     if(version == null) {
       return false;
     }
-
     String versionJson = jsonEncode(version);
     MyLogger.info('syncDocuments: versionJson=$versionJson');
-
-    final parents = version.parentsHash;
     String versionHash = version.getHash();
+
+    // Construct parents
+    final parents = version.parentsHash;
+
+    // Construct required objects
     final objects = <String, String>{};
     for(var item in version.table) {
       var docHash = item.docHash;

@@ -5,7 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 import 'package:keygen/keygen.dart';
-import 'package:libp2p/overlay/overlay_api.dart';
+import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:my_log/my_log.dart';
 import '../mindeditor/controller/callback_registry.dart';
@@ -44,7 +44,7 @@ class NetworkController {
   }
 
   void syncNewVersionTree(String versionHash, String versionJson, List<String> parents, Map<String, String> requiredObjects) {
-    OverlayVersion overlayVersion = OverlayVersion(
+    VersionChain overlayVersion = VersionChain(
         versionHash: versionHash,
         versionStr: versionJson,
         parents: parents,
@@ -116,7 +116,7 @@ class NetworkController {
   }
 
   void _handleOverlayVersion(String data) {
-    final overlayVersion = OverlayVersion.fromJson(jsonDecode(data));
+    final overlayVersion = VersionChain.fromJson(jsonDecode(data));
     final hash = overlayVersion.versionHash;
     final versionStr = overlayVersion.versionStr;
     final parents = overlayVersion.parents;

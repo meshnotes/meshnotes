@@ -4,7 +4,6 @@ import 'package:mesh_note/page/resizable_view.dart';
 import 'package:mesh_note/page/title_bar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:my_log/my_log.dart';
 import '../mindeditor/controller/controller.dart';
 
 class DocumentView extends StatelessWidget with ResizableViewMixin {

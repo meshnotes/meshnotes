@@ -20,6 +20,7 @@ class NodeInfo {
     required this.status,
   });
 
+  @override
   String toString() {
     return '$id:$name';
   }

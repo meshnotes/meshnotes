@@ -203,6 +203,18 @@ class Document {
     return docHash;
   }
 
+  Map<String, String> getRequiredBlocks() {
+    Map<String, String> result = {};
+    //TODO should be optimize here to avoid duplicated call to _generateDocContent
+    var docContent = _generateDocContent();
+    for(var b in docContent.contents) {
+      var blockHash = b.blockHash;
+      var blockStr = _db.getObject(blockHash);
+      result[blockHash] = blockStr;
+    }
+    return result;
+  }
+
   void setModified() {
     _hasModified = true;
     parent.setModified();

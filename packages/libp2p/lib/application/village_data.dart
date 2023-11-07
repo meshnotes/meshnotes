@@ -15,3 +15,23 @@ class VillageData {
     required this.data,
   });
 }
+
+enum VillageObjectStatus {
+  waiting,
+  ready,
+}
+
+class VillageObject {
+  String objHash;
+  String? objData;
+  VillageObjectStatus status;
+
+  VillageObject({
+    required this.objHash,
+    this.status = VillageObjectStatus.waiting,
+  });
+
+  void setData(String data) {
+    objData = data;
+  }
+}
