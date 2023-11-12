@@ -64,7 +64,7 @@ void _handleMessage(Message msg) async {
         return;
       }
       final parameter = msg.parameter as StartVillageParameter;
-      _village = await startVillage(parameter.localPort, parameter.serverList, parameter.deviceId, _nodeChanged, _handleData);
+      _village = await startVillage(parameter.localPort, parameter.serverList, parameter.deviceId, _nodeChanged, _handleNewVersionTree);
       _sendPort?.send(Message(cmd: Command.networkStatus, parameter: NetworkStatus.running,));
       break;
     case Command.terminateOk:
@@ -96,13 +96,11 @@ void _nodeChanged(VillagerNode node) {
   final nodeInfo = NodeInfo(id: id, name: info, status: _status);
   _nodes[id] = nodeInfo;
 }
-void _handleData(String type, String data) {
-  if(type == VersionTreeAppType) {
-    _sendPort?.send(Message(
-      cmd: Command.receiveVersionTree,
-      parameter: data,
-    ));
-  }
+void _handleNewVersionTree(String versionHash, String versionStr, Map<String, String> objects) {
+  _sendPort?.send(Message(
+    cmd: Command.receiveVersionTree,
+    parameter: NewVersionTreeParameter(versionHash: versionHash, versionStr: versionStr, requiredObjects: objects),
+  ));
 }
 
 void _timerHandler(Timer _t) {

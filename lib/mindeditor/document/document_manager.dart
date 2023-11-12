@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/dal/doc_data.dart';
@@ -98,33 +99,34 @@ class DocumentManager {
   }
 
   void _updateDoc(DocTreeNode node, Map<String, String> objects) {
-    DocData? find;
+    var docId = node.docId;
+    DocData? found;
     for(var i in _docTitles) {
-      if(i.docId == node.docId) {
-        find = i;
+      if(i.docId == docId) {
+        found = i;
         break;
       }
     }
     // If not found, insert it
     // If found and identical, ignore it
     // If found and not identical, update it, and restore doc content
-    if(find != null && find.hash == node.docHash && find.timestamp == node.updatedAt) return;
+    if(found != null && found.hash == node.docHash && found.timestamp == node.updatedAt) return;
 
-    if(find == null) {
-      find = DocData(docId: node.docId, title: node.title, hash: node.docHash, timestamp: node.updatedAt);
-      _docTitles.add(find);
+    if(found == null) {
+      found = DocData(docId: docId, title: node.title, hash: node.docHash, timestamp: node.updatedAt);
+      _docTitles.add(found);
     } else {
-      find..title = node.title
-          ..hash = node.docHash
-          ..timestamp = node.updatedAt;
+      found..title = node.title
+        ..hash = node.docHash
+        ..timestamp = node.updatedAt;
     }
     // Restore doc list
-    _db.insertOrUpdateDoc(find.docId, find.title, find.hash, find.timestamp);
+    _db.insertOrUpdateDoc(docId, found.title, found.hash, found.timestamp);
 
     // Restore doc content
-    var docContentStr = objects[find.hash]!;
+    var docContentStr = objects[found.hash]!;
     MyLogger.info('efantest: docContent=$docContentStr');
-    _db.storeObject(find.docId, docContentStr);
+    _db.storeObject(found.hash, docContentStr);
     var docContent = DocContent.fromJson(jsonDecode(docContentStr));
     var root = BlockStructure(blockId: Constants.keyRootBlockId, children: []);
     for(var content in docContent.contents) {
@@ -134,13 +136,30 @@ class DocumentManager {
       String blockStr = objects[blockHash]!;
       MyLogger.info('efantest: blockId=$blockId, blockHash=$blockHash, blockStr=$blockStr');
       _db.storeObject(blockHash, blockStr);
-      _db.storeDocBlock(find.docId, blockId, blockStr, find.timestamp);
+      _db.storeDocBlock(docId, blockId, blockStr, found.timestamp);
 
       var b = BlockStructure(blockId: blockId);
       root.children!.add(b);
     }
     // Restore docs
-    _db.storeDocStructure(find.docId, jsonEncode(root), find.timestamp);
+    _db.storeDocStructure(docId, jsonEncode(root), found.timestamp);
+
+    // If document was loaded, update it
+    var openingDocument = _documents[docId];
+    if(openingDocument != null) {
+      var newDocument = _getDocFromDb(docId);
+      if(newDocument != null) {
+        openingDocument.updateBlocks(newDocument);
+      }
+    }
+    // If document is currently opening, refresh it
+    if(currentDocId == docId) {
+      MyLogger.info('efantest: refresh current document');
+      var blockState = Controller.instance.getEditingBlockState();
+      var currentBlockId = blockState?.widget.texts.getBlockId();
+      var position = blockState?.widget.texts.getTextSelection()?.extentOffset;
+      CallbackRegistry.refreshDoc(activeBlockId: currentBlockId, position: position?? 0);
+    }
   }
 
   Future<InspiredSeed> getInspiredSeed() async {
@@ -238,7 +257,7 @@ class DocumentManager {
       var docId = item.docId;
       var docHash = item.hash;
       var docStr = _db.getObject(docHash);
-      MyLogger.info('_genRequiredObjects: docHash=$docHash, docStr=$docStr');
+      MyLogger.info('_genRequiredObjects: docId=$docId, docHash=$docHash, docStr=$docStr');
       result[docHash] = docStr;
 
       var doc = _documents[docId];
@@ -280,6 +299,7 @@ class DocumentManager {
         result.add(doc);
       }
     }
+    MyLogger.debug('_findModifiedDocuments: document modified list: $result');
     return result;
   }
 

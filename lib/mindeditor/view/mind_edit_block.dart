@@ -11,13 +11,15 @@ import '../setting/constants.dart';
 import 'mind_edit_block_impl.dart';
 
 class MindEditBlock extends StatefulWidget {
-  const MindEditBlock({
+  MindEditBlock({
     Key? key,
     required this.texts,
     required this.controller,
     this.readOnly = false,
     this.ignoreLevel = false,
-  }): super(key: key);
+  }): super(key: key) {
+    MyLogger.info('efantest: new MindEditBlock for block(id=${texts.getBlockId()})');
+  }
 
   final ParagraphDesc texts;
   final Controller controller;
@@ -45,14 +47,14 @@ class MindEditBlockState extends State<MindEditBlock> {
   void initState() {
     super.initState();
     if(!widget.readOnly) {
-      MyLogger.debug('efantest: initializing MindEditBlockState');
+      MyLogger.info('efantest: initializing MindEditBlockState for block(id=${widget.texts.getBlockId()})');
       widget.controller.setBlockStateToTreeNode(widget.texts.getBlockId(), this);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    MyLogger.debug('efantest: build MindEditBlockState');
+    MyLogger.info('efantest: build MindEditBlockState for block(id=${widget.texts.getBlockId()})');
     if(!widget.readOnly) {
       var myId = widget.texts.getBlockId();
       if(widget.texts.getTextSelection() != null) {
@@ -617,7 +619,7 @@ class MindEditBlockState extends State<MindEditBlock> {
         // 记下上一block的文本长度，光标要定位在这里
         var length = previousBlock.getTotalLength();
         previousBlockState!.mergeParagraph(widget.texts.getBlockId());
-        CallbackRegistry.refreshDoc(activeId: previousBlock.getBlockId(), position: length);
+        CallbackRegistry.refreshDoc(activeBlockId: previousBlock.getBlockId(), position: length);
       }
     }
     _updateNavigatorViewIfNeeded();
@@ -658,7 +660,7 @@ class MindEditBlockState extends State<MindEditBlock> {
         return;
       } else {
         mergeParagraph(nextBlockId);
-        CallbackRegistry.refreshDoc(activeId: widget.texts.getBlockId(), position: currentTextPos);
+        CallbackRegistry.refreshDoc(activeBlockId: widget.texts.getBlockId(), position: currentTextPos);
       }
     }
     _updateNavigatorViewIfNeeded();
@@ -869,7 +871,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     var doc = widget.controller.document!;
     var newItem = doc.insertNewParagraphAfterId(currentBlockId, ParagraphDesc(texts: newTexts, listing: _getCurrentListing(), level: _getCurrentLevel()));
 
-    CallbackRegistry.refreshDoc(activeId: newItem.getBlockId());
+    CallbackRegistry.refreshDoc(activeBlockId: newItem.getBlockId());
     _triggerBlockModified();
   }
 

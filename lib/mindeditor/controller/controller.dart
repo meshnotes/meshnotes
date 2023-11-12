@@ -182,28 +182,28 @@ class Controller {
     final parents = version.parentsHash;
 
     // Construct required objects
-    final objects = <String, String>{};
-    for(var item in version.table) {
-      var docHash = item.docHash;
-      var docStr = dbHelper.getObject(docHash);
-      MyLogger.info('syncDocuments: docHash=$docHash, docStr=$docStr');
-      objects[docHash] = docStr;
-
-      var docContent = DocContent.fromJson(jsonDecode(docStr));
-      for(var b in docContent.contents) {
-        var blockHash = b.blockHash;
-        var blockStr = dbHelper.getObject(blockHash);
-        objects[blockHash] = blockStr;
-      }
-    }
-    network.syncNewVersionTree(versionHash, versionJson, parents, objects);
+    // final objects = <String, String>{};
+    // for(var item in version.table) {
+    //   var docHash = item.docHash;
+    //   var docStr = dbHelper.getObject(docHash);
+    //   MyLogger.info('syncDocuments: docHash=$docHash, docStr=$docStr');
+    //   objects[docHash] = docStr;
+    //
+    //   var docContent = DocContent.fromJson(jsonDecode(docStr));
+    //   for(var b in docContent.contents) {
+    //     var blockHash = b.blockHash;
+    //     var blockStr = dbHelper.getObject(blockHash);
+    //     objects[blockHash] = blockStr;
+    //   }
+    // }
+    network.syncNewVersionTree(versionHash, versionJson, parents, requiredObjects);
     return true;
   }
 
-  void receiveVersionTree(String hash, String versionStr, List<String> parents, Map<String, String> requiredObjects) {
+  void receiveVersionTree(String hash, String versionStr, Map<String, String> requiredObjects) {
     MyLogger.info('efantest: receive version: $versionStr');
 
     var version = DocTreeVersion.fromJson(jsonDecode(versionStr));
-    docManager.assembleVersionTree(hash, version, parents, requiredObjects);
+    docManager.assembleVersionTree(hash, version, version.parentsHash, requiredObjects);
   }
 }

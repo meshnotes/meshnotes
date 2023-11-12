@@ -29,3 +29,15 @@ class StartVillageParameter {
     required this.deviceId,
   });
 }
+
+class NewVersionTreeParameter {
+  String versionHash;
+  String versionStr;
+  Map<String, String> requiredObjects;
+
+  NewVersionTreeParameter({
+    required this.versionHash,
+    required this.versionStr,
+    required this.requiredObjects
+  });
+}

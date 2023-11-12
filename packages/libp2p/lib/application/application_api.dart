@@ -1,4 +1,4 @@
-typedef OnDataType = Function(String type, String data);
+typedef OnHandleNewVersion = Function(String versionHash, String versionStr, Map<String, String> objects);
 
 const String VersionTreeAppType = 'version_tree';
 

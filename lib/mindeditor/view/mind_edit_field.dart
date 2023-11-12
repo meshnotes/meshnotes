@@ -226,13 +226,13 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   Widget _buildBlockFromDesc(ParagraphDesc paragraph, bool readOnly) {
-    var view = MindEditBlock(
+    var blockView = MindEditBlock(
       texts: paragraph,
       controller: widget.controller,
       key: ValueKey(paragraph.getBlockId()),
       readOnly: readOnly,
     );
-    return view;
+    return blockView;
   }
 
   List<Widget> getReadOnlyBlocks() {
@@ -340,11 +340,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     widget.document.clearEditingBlock();
     widget.document.clearTextSelection();
   }
-  void refreshDoc({String? activeId, int position = 0}) {
+  void refreshDoc({String? activeBlockId, int position = 0}) {
     setState(() {
       initDocAndControlBlock();
-      if(activeId != null) { // 如果提供了activeId，就将光标置于该id下的block首位
-        var node = widget.document.getParagraph(activeId);
+      if(activeBlockId != null) { // If activeId is not null, make the cursor appear on the block with activeId
+        var node = widget.document.getParagraph(activeBlockId);
         node?.newTextSelection(position);
       }
     });

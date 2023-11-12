@@ -53,7 +53,7 @@ class BlockListingButton extends StatelessWidget {
           if(block.getTextSelection() != null) {
             pos = block.getTextSelection()!.extentOffset;
           }
-          CallbackRegistry.refreshDoc(activeId: blockId, position: pos);
+          CallbackRegistry.refreshDoc(activeBlockId: blockId, position: pos);
         }
       },
       buttonKey: listing,

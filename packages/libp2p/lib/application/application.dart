@@ -19,7 +19,7 @@ class Village implements ApplicationController {
   VillageOverlay _overlay;
   VillageMode _mode;
   int localPort;
-  OnDataType? handleData;
+  OnHandleNewVersion? handleNewVersion;
   VillageDbHelper _db;
   Map<String, VillageObject> _villageObjectCache = {};
 
@@ -30,7 +30,7 @@ class Village implements ApplicationController {
     required String userId,
     required List<String> sponsors,
     this.localPort = 0,
-    this.handleData,
+    this.handleNewVersion,
     VillageMode mode = VillageMode.loneWolf,
     required VillageOverlay overlay,
     required VillageDbHelper db,
@@ -111,6 +111,6 @@ class Village implements ApplicationController {
         _villageObjectCache[objHash] = object;
       }
     }
-    handleData?.call(VersionTreeAppType, data);
+    handleNewVersion?.call(versionHash, versionStr, requiredObjects);
   }
 }

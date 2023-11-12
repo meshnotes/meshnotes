@@ -12,7 +12,7 @@ import 'document_manager.dart';
 
 class Document {
   List<ParagraphDesc> paragraphs;
-  final Map<String, ParagraphDesc> _mapOfParagraphs = {};
+  Map<String, ParagraphDesc> _mapOfParagraphs = {};
   String id;
   bool _hasModified = false;
   int _lastUpdate;
@@ -58,6 +58,32 @@ class Document {
       doc.insertEmptyLineAfterTitle();
     }
     return doc;
+  }
+
+  void updateBlocks(Document newDoc) {
+    var _oldMap = _mapOfParagraphs;
+    paragraphs = newDoc.paragraphs;
+    _mapOfParagraphs = newDoc._mapOfParagraphs;
+    id = newDoc.id;
+    _hasModified = newDoc._hasModified;
+    _lastUpdate = newDoc._lastUpdate;
+
+    // Set saved state and position
+    for(var entry in _mapOfParagraphs.entries) {
+      var blockId = entry.key;
+      var block = entry.value;
+      block.setDocDesc(this);
+      var oldBlock = _oldMap[blockId];
+      var oldEditState = oldBlock?.getEditState();
+      if(oldEditState != null) {
+        block.setEditState(oldEditState);
+      }
+
+      var oldPosition = oldBlock?.getTextSelection();
+      if(oldPosition != null) {
+        block.setTextSelection(oldPosition);
+      }
+    }
   }
 
   ParagraphDesc getTitle() {

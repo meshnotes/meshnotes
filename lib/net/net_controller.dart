@@ -98,8 +98,8 @@ class NetworkController {
         }
         break;
       case Command.receiveVersionTree:
-        final data = msg.parameter as String;
-        _handleOverlayVersion(data);
+        final data = msg.parameter as NewVersionTreeParameter;
+        Controller.instance.receiveVersionTree(data.versionHash, data.versionStr, data.requiredObjects);
         break;
     }
   }
@@ -113,14 +113,5 @@ class NetworkController {
         deviceId: deviceId,
       ),
     ));
-  }
-
-  void _handleOverlayVersion(String data) {
-    final overlayVersion = VersionChain.fromJson(jsonDecode(data));
-    final hash = overlayVersion.versionHash;
-    final versionStr = overlayVersion.versionStr;
-    final parents = overlayVersion.parents;
-    final requiredObjects = overlayVersion.requiredObjects;
-    Controller.instance.receiveVersionTree(hash, versionStr, parents, requiredObjects);
   }
 }

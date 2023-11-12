@@ -35,7 +35,7 @@ class CallbackRegistry {
     if(_editorState == _s) _editorState = null;
   }
   static void openDocument(Document doc) {
-    _editorState?.refresh(doc);
+    _editorState?.open(doc);
   }
 
   static void registerEditFieldState(MindEditFieldState _s) {
@@ -44,8 +44,8 @@ class CallbackRegistry {
   static void refreshTextEditingValue() {
     _editFieldState?.refreshTextEditingValue();
   }
-  static void refreshDoc({String? activeId, int position = 0}) {
-    _editFieldState?.refreshDoc(activeId: activeId, position: position);
+  static void refreshDoc({String? activeBlockId, int position = 0}) {
+    _editFieldState?.refreshDoc(activeBlockId: activeBlockId, position: position);
   }
   static TextEditingValue? getLastEditingValue() {
     return _editFieldState?.getLastEditingValue();

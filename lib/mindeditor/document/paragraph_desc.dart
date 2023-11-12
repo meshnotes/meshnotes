@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/rendering.dart';
 import 'package:mesh_note/mindeditor/document/doc_tree.dart';
@@ -52,7 +51,6 @@ class ParagraphDesc {
   TextSelection? _editingPosition;
   MindEditBlockState? _state;
   int _lastUpdate = 0;
-  Timer? _idleTimer;
 
   ParagraphDesc({
     List<TextDesc>? texts,
@@ -141,7 +139,7 @@ class ParagraphDesc {
   // 要保存入库必须调用updateTexts
   void updateTexts(List<TextDesc> _t) {
     _updateTexts(_t);
-    _storeBlockWhenIdle();
+    _storeBlock();
   }
 
   void newTextSelection(int pos) {
@@ -171,7 +169,7 @@ class ParagraphDesc {
   }
 
   void flushDb() {
-    _storeBlockWhenIdle(); // Save immediately
+    _storeBlock(); // Save immediately
   }
 
   void storeObject() {
@@ -333,10 +331,6 @@ class ParagraphDesc {
 
   // If timer is still counting, stop it and save to database immediately
   void close() {
-    if(_idleTimer != null) {
-      _idleTimer!.cancel();
-      _storeBlock();
-    }
   }
 
   void _updateTexts(List<TextDesc> _t) {
@@ -377,14 +371,6 @@ class ParagraphDesc {
     }
   }
 
-  // Save text to database when idle
-  void _storeBlockWhenIdle() {
-    _idleTimer?.cancel();
-    _idleTimer = Timer(const Duration(seconds: Constants.timeoutInputIdle), () {
-      _storeBlock();
-      _idleTimer = null;
-    });
-  }
   // Save text to database immediately
   void _storeBlock() {
     var dbHelper = Controller.instance.dbHelper;
@@ -444,7 +430,7 @@ class ParagraphDesc {
   void _updateBlockType(_BlockType newType) {
     if(newType != _type) {
       _type = newType;
-      _storeBlockWhenIdle();
+      _storeBlock();
     }
   }
   static _BlockType _parseBlockType(String str) {
@@ -481,7 +467,7 @@ class ParagraphDesc {
   void _updateBlockListing(_BlockListing newListing) {
     if(newListing != _listing) {
       _listing = newListing;
-      _storeBlockWhenIdle();
+      _storeBlock();
     }
   }
   static _BlockListing _parseBlockListing(String str) {

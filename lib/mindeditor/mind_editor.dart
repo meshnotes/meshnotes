@@ -111,7 +111,7 @@ class MindEditorState extends State<MindEditor> {
     return expanded;
   }
 
-  void refresh(Document doc) {
+  void open(Document doc) {
     MyLogger.debug('efantest: refresh document');
     setState(() {
       document = doc;
