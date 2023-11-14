@@ -2,7 +2,6 @@ import 'dart:ffi';
 import 'dart:io';
 import 'package:mesh_note/mindeditor/document/dal/block_data.dart';
 import 'package:mesh_note/mindeditor/document/dal/dal_version/db_script.dart';
-import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -40,8 +39,8 @@ abstract class DbHelper {
   String newDocument(String title, int timestamp);
   void insertOrUpdateDoc(String docId, String title, String docHash, int timestamp);
   //Card
-  List<String> getAllBlocks();
-  BlockData? getRawBlockById(String id);
+  List<(String, String)> getAllBlocks();
+  BlockItem? getRawBlockById(String docId, String blockId);
   //Setting
   Map<String, String> getSettings();
   bool saveSettings(Map<String, String> settings);
@@ -284,44 +283,38 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  List<String> getAllBlocks() {
-    const sql = 'SELECT id FROM blocks WHERE id!=? AND data!=""';
-    final resultSet = _database.select(sql, [Constants.keyTitleId]);
+  List<(String, String)> getAllBlocks() {
+    const sql = 'SELECT doc_id, block_id FROM blocks WHERE data!=""';
+    final resultSet = _database.select(sql);
     MyLogger.debug('efantest: getAllBlocks result=$resultSet');
     if(resultSet.isEmpty) {
       MyLogger.warn('Blocks not found!');
       return [];
     }
-    var result = <String>[];
+    var result = <(String, String)>[];
     for(final row in resultSet) {
-      String blockId = row['id'];
-      result.add(blockId);
+      var docId = row['doc_id'];
+      var blockId = row['block_id'];
+      result.add((docId, blockId));
     }
     return result;
   }
   @override
-  BlockData? getRawBlockById(String id) {
-    const sql = 'SELECT doc_id, type, listing, level, data FROM blocks WHERE id=?';
-    final resultSet = _database.select(sql, [id]);
+  BlockItem? getRawBlockById(String docId, String blockId) {
+    const sql = 'SELECT data FROM blocks, updated_at WHERE doc_id=? AND block_id=?';
+    final resultSet = _database.select(sql, [docId, blockId]);
     MyLogger.debug('getRawBlockById result=$resultSet');
     if(resultSet.length != 1) {
-      MyLogger.warn('Block with id($id) not unique!');
+      MyLogger.warn('Block(doc_id=$docId, block_id=$blockId) not unique!');
       return null;
     }
     final row = resultSet.first;
-    String docId = row['doc_id'];
     String data = row['data'];
-    String type = row['type'];
-    String listing = row['listing'];
-    int level = row['level'];
-    return BlockData(
-        docId: docId,
-        id: id,
-        nextId: null,
-        type: type,
-        listing: listing,
-        level: level,
-        data: data
+    int updatedAt = row['updated_at'];
+    return BlockItem(
+      blockId: blockId,
+      data: data,
+      updatedAt: updatedAt,
     );
   }
 

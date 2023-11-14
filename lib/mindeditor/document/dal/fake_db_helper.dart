@@ -45,9 +45,9 @@ class FakeDbHelper implements DbHelper {
   @override
   void insertOrUpdateDoc(String docId, String title, String docHash, int timestamp) {}
   @override
-  List<String> getAllBlocks() { return []; }
+  List<(String, String)> getAllBlocks() { return []; }
   @override
-  BlockData? getRawBlockById(String id) { return null; }
+  BlockItem? getRawBlockById(String docId, String blockId) { return null; }
   @override
   Map<String, String> getSettings() { return {}; }
   @override

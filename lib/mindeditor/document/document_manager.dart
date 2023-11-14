@@ -172,20 +172,20 @@ class DocumentManager {
     if(index < 0 || seed.ids.length <= index) {
       return null;
     }
-    final blockId = seed.ids[index];
+    final (docId, blockId) = seed.ids[index];
     if(seed.cache.containsKey(blockId) && seed.cache[blockId] != null) {
       return seed.cache[blockId];
     }
-    var data = _db.getRawBlockById(blockId);
+    var data = _db.getRawBlockById(docId, blockId);
     if(data != null) {
-      var para = ParagraphDesc.fromStringList(data.id, data.type, data.data, data.listing, data.level);
+      var para = ParagraphDesc.buildFromJson(id: data.blockId, jsonStr: data.data, time: data.updatedAt);
       seed.cache[blockId] = para;
       return para;
     }
     return null;
   }
 
-  void _randomSort(List<String> list) {
+  void _randomSort(List<(String, String)> list) {
     final maxIndex = list.length;
     for(var idx = 0; idx < maxIndex; idx++) {
       var newIdx = Util.getRandom(maxIndex);

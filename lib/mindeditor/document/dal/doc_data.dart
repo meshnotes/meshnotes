@@ -41,3 +41,15 @@ class BlockStructure {
     return result;
   }
 }
+
+class VersionData {
+  String versionHash;
+  String parents;
+  int createdAt;
+
+  VersionData({
+    required this.versionHash,
+    required this.parents,
+    required this.createdAt,
+  });
+}
