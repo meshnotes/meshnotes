@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:mesh_note/mindeditor/document/doc_tree.dart';
+import 'package:mesh_note/mindeditor/document/doc_content.dart';
+import 'package:my_log/my_log.dart';
 import '../view/mind_edit_block.dart';
 import '../../util/util.dart';
 import '../controller/controller.dart';
@@ -272,22 +273,22 @@ class Document {
   }
 
   static List<ParagraphDesc> _loadBlocks(String docId) {
-    String data = _db.getDocStructure(docId);
-    if(data.isEmpty) {
+    var data = _db.getDoc(docId);
+    if(data == null) {
       return [];
     }
-    BlockStructure root = BlockStructure.fromJson(jsonDecode(data));
-    if(root.blockId != Constants.keyRootBlockId || root.children == null || root.children!.isEmpty) {
-      return [];
-    }
+    DocContent docContent = DocContent.fromJson(jsonDecode(data.docContent));
 
     List<ParagraphDesc> result = [];
     var blocks = _db.getBlockMapOfDoc(docId);
-    for(var b in root.children!) {
+    for(var b in docContent.contents) {
       final blockId = b.blockId;
       var blockData = blocks[blockId];
-      if(blockData == null) continue;
-      var p = ParagraphDesc.buildFromJson(id: blockData.blockId, jsonStr: blockData.data, time: blockData.updatedAt);
+      if(blockData == null) {
+        MyLogger.warn('_loadBlocks: could not find block(id=$blockId) in block map of document(id=$docId)');
+        continue;
+      }
+      var p = ParagraphDesc.buildFromJson(id: blockData.blockId, jsonStr: blockData.blockData, time: blockData.updatedAt);
       result.add(p);
     }
     return result;
@@ -295,21 +296,16 @@ class Document {
 
   void _flushDocStructure() {
     final now = Util.getTimeStamp();
-    var root = BlockStructure(blockId: Constants.keyRootBlockId, children: []);
-    for(var p in paragraphs) {
-      if(p.isTitle()) continue;
-      var b = BlockStructure(blockId: p.getBlockId());
-      root.children!.add(b);
-    }
-    final jsonStr = jsonEncode(root);
-    Controller.instance.dbHelper.storeDocStructure(id, jsonStr, now);
+    var docContent = _generateDocContent();
+    final jsonStr = jsonEncode(docContent);
+    Controller.instance.dbHelper.storeDocContent(id, jsonStr, now);
   }
 
   DocContent _generateDocContent() {
     List<DocContentItem> list = [];
     for(var p in paragraphs) {
       if(p.isTitle()) continue;
-      final block = p.getContentBlock();
+      final block = p.getBlockContent();
       var hash = block.getHash();
       var item = DocContentItem(
         blockId: p.getBlockId(),

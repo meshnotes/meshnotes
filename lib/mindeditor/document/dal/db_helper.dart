@@ -1,6 +1,5 @@
 import 'dart:ffi';
 import 'dart:io';
-import 'package:mesh_note/mindeditor/document/dal/block_data.dart';
 import 'package:mesh_note/mindeditor/document/dal/dal_version/db_script.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -21,16 +20,16 @@ abstract class DbHelper {
   //Doc
   void storeDocTitle(String docId, String title, int timestamp);
   void storeDocHash(String docId, String hash, int timestamp);
-  void storeDocStructure(String docId, String data, int timestamp);
+  void storeDocContent(String docId, String docContent, int timestamp);
   void storeDocBlock(String docId, String blockId, String data, int timestamp);
   void dropDocBlock(String docId, String blockId);
-  String getDocStructure(String docId);
-  Map<String, BlockItem> getBlockMapOfDoc(String docId);
+  DocContentData? getDoc(String docId);
+  Map<String, BlockData> getBlockMapOfDoc(String docId);
   Future<void> updateParagraphType(String docId, String id, String type);
   Future<void> updateParagraphListing(String docId, String id, String listing);
   Future<void> updateParagraphLevel(String docId, String id, int level);
   Future<void> updateDoc(String docId, int timestamp);
-  List<DocData> getAllDocumentList();
+  List<DocData> getAllDocuments();
   String getObject(String hash);
   void storeObject(String hash, String data);
   void storeVersion(String hash, String parents, int timestamp);
@@ -40,7 +39,7 @@ abstract class DbHelper {
   void insertOrUpdateDoc(String docId, String title, String docHash, int timestamp);
   //Card
   List<(String, String)> getAllBlocks();
-  BlockItem? getRawBlockById(String docId, String blockId);
+  BlockData? getRawBlockById(String docId, String blockId);
   //Setting
   Map<String, String> getSettings();
   bool saveSettings(Map<String, String> settings);
@@ -153,10 +152,10 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  void storeDocStructure(String docId, String data, int timestamp) {
-    const sql = 'INSERT INTO docs(doc_id, data, updated_at) VALUES(?, ?, ?) '
-        'ON CONFLICT(doc_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at';
-    _database.execute(sql, [docId, data, timestamp]);
+  void storeDocContent(String docId, String docContent, int timestamp) {
+    const sql = 'INSERT INTO doc_contents(doc_id, doc_content, updated_at) VALUES(?, ?, ?) '
+        'ON CONFLICT(doc_id) DO UPDATE SET doc_content=excluded.doc_content, updated_at=excluded.updated_at';
+    _database.execute(sql, [docId, docContent, timestamp]);
   }
 
   @override
@@ -173,31 +172,31 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  String getDocStructure(String docId) {
-    const sql = 'SELECT data FROM docs WHERE doc_id=?';
-    final resultSet = _database.select(sql, [docId]);
-    MyLogger.debug('efantest: getDocStructure result=$resultSet');
-    if(resultSet.isEmpty) {
-      return '';
-    }
-    return resultSet.first['data'];
+  DocContentData? getDoc(String docId) {
+    const sql = 'SELECT doc_content, updated_at FROM doc_contents WHERE doc_id=?';
+    var resultSet = _database.select(sql, [docId]);
+    MyLogger.debug('efantest: getDoc result=$resultSet');
+
+    if(resultSet.isEmpty) return null;
+    final row = resultSet.first;
+    return DocContentData(docId: docId, docContent: row['doc_content'], timestamp: row['updated_at']);
   }
 
   @override
-  Map<String, BlockItem> getBlockMapOfDoc(String docId) {
+  Map<String, BlockData> getBlockMapOfDoc(String docId) {
     const sql = 'SELECT block_id, data, updated_at FROM blocks WHERE doc_id=?';
     final resultSet = _database.select(sql, [docId]);
     MyLogger.debug('efantest: getBlockMapOfDoc result=$resultSet');
 
-    var result = <String, BlockItem>{};
+    var result = <String, BlockData>{};
     for(final row in resultSet) {
       MyLogger.debug('efantest: row=$row');
       String blockId = row['block_id'];
       String data = row['data'];
       int updatedAt = row['updated_at'];
-      result[blockId] = BlockItem(
+      result[blockId] = BlockData(
         blockId: blockId,
-        data: data,
+        blockData: data,
         updatedAt: updatedAt,
       );
     }
@@ -211,7 +210,7 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  List<DocData> getAllDocumentList() {
+  List<DocData> getAllDocuments() {
     const sql = 'SELECT doc_id, title, doc_hash, updated_at FROM doc_list';
     final resultSet = _database.select(sql, []);
     MyLogger.debug('efantest: getAllDocumentList result=$resultSet');
@@ -300,7 +299,7 @@ class RealDbHelper implements DbHelper {
     return result;
   }
   @override
-  BlockItem? getRawBlockById(String docId, String blockId) {
+  BlockData? getRawBlockById(String docId, String blockId) {
     const sql = 'SELECT data FROM blocks, updated_at WHERE doc_id=? AND block_id=?';
     final resultSet = _database.select(sql, [docId, blockId]);
     MyLogger.debug('getRawBlockById result=$resultSet');
@@ -311,9 +310,9 @@ class RealDbHelper implements DbHelper {
     final row = resultSet.first;
     String data = row['data'];
     int updatedAt = row['updated_at'];
-    return BlockItem(
+    return BlockData(
       blockId: blockId,
-      data: data,
+      blockData: data,
       updatedAt: updatedAt,
     );
   }

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/rendering.dart';
-import 'package:mesh_note/mindeditor/document/doc_tree.dart';
+import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/document/text_desc.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:my_log/my_log.dart';
@@ -98,7 +98,7 @@ class ParagraphDesc {
     required String jsonStr,
     required int time,
   }) {
-    ContentBlock block = ContentBlock.fromJson(jsonDecode(jsonStr));
+    BlockContent block = BlockContent.fromJson(jsonDecode(jsonStr));
     return ParagraphDesc(
       id: id,
       type: block.type,
@@ -173,7 +173,7 @@ class ParagraphDesc {
   }
 
   void storeObject() {
-    var block = getContentBlock();
+    var block = getBlockContent();
     var hash = block.getHash();
     Controller.instance.dbHelper.storeObject(hash, jsonEncode(block));
   }
@@ -182,8 +182,8 @@ class ParagraphDesc {
     Controller.instance.dbHelper.dropDocBlock(parent.id, getBlockId());
   }
 
-  ContentBlock getContentBlock() {
-    return _convertToContentBlock();
+  BlockContent getBlockContent() {
+    return _convertToBlockContent();
   }
 
   int getLastUpdated() {
@@ -379,7 +379,7 @@ class ParagraphDesc {
       parent.updateTitle(getPlainText());
     } else {
       MyLogger.verbose('Save to blocks: id=${getBlockId()}');
-      var block = _convertToContentBlock();
+      var block = _convertToBlockContent();
       _lastUpdate = Util.getTimeStamp();
       dbHelper.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
     }
@@ -387,8 +387,8 @@ class ParagraphDesc {
     parent.setModified();
   }
 
-  ContentBlock _convertToContentBlock() {
-    var block = ContentBlock(
+  BlockContent _convertToBlockContent() {
+    var block = BlockContent(
       type: _convertBlockType(_type),
       listing: _convertBlockListing(_listing),
       level: _level,

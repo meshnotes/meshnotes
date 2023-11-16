@@ -1,5 +1,3 @@
-
-import 'block_data.dart';
 import 'db_helper.dart';
 import 'doc_data.dart';
 
@@ -11,15 +9,15 @@ class FakeDbHelper implements DbHelper {
   @override
   void storeDocHash(String docId, String hash, int timestamp) {}
   @override
-  void storeDocStructure(String docId, String data, int timestamp) {}
+  void storeDocContent(String docId, String docContent, int timestamp) {}
   @override
   void storeDocBlock(String docId, String blockId, String data, int timestamp) {}
   @override
   Future<void> dropDocBlock(String docId, String id) async {}
   @override
-  String getDocStructure(String docId) { return ''; }
+  DocContentData? getDoc(String docId) { return null; }
   @override
-  Map<String, BlockItem> getBlockMapOfDoc(String docId) { return {}; }
+  Map<String, BlockData> getBlockMapOfDoc(String docId) { return {}; }
   @override
   Future<void> updateParagraphType(String docId, String id, String type) async {}
   @override
@@ -29,7 +27,7 @@ class FakeDbHelper implements DbHelper {
   @override
   Future<void> updateDoc(String docId, int timestamp) async {}
   @override
-  List<DocData> getAllDocumentList() { return <DocData>[]; }
+  List<DocData> getAllDocuments() { return <DocData>[]; }
   @override
   String getObject(String hash) { return ''; }
   @override
@@ -47,7 +45,7 @@ class FakeDbHelper implements DbHelper {
   @override
   List<(String, String)> getAllBlocks() { return []; }
   @override
-  BlockItem? getRawBlockById(String docId, String blockId) { return null; }
+  BlockData? getRawBlockById(String docId, String blockId) { return null; }
   @override
   Map<String, String> getSettings() { return {}; }
   @override

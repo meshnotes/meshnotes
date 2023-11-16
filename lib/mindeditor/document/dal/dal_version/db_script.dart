@@ -27,14 +27,10 @@ abstract class DbScript {
 class DbVersion1 extends DbScript {
   static int ver = 1;
   static Map<String, String> sql = {
-    // 'Create docs': 'CREATE TABLE IF NOT EXISTS docs(id TEXT PRIMARY KEY, created_at INTEGER, updated_at INTEGER, deleted_at INTEGER)',
-    // 'Create blocks': 'CREATE TABLE IF NOT EXISTS blocks(doc_id TEXT, id TEXT, next_id TEXT, type TEXT, listing TEXT, level INTEGER, data TEXT, CONSTRAINT blocks_pk PRIMARY KEY (doc_id, id))',
     'Create settings': 'CREATE TABLE IF NOT EXISTS settings(name TEXT PRIMARY KEY, value TEXT)',
-    // 'Create versions': 'CREATE TABLE IF NOT EXISTS versions(hash TEXT PRIMARY KEY, timestamp INTEGER, parents TEXT, data TEXT)',
     'Create objects': 'CREATE TABLE IF NOT EXISTS objects(obj_hash TEXT PRIMARY KEY, data TEXT)',
-    // 'Create doc_trees': 'CREATE TABLE IF NOT EXISTS doc_trees(tree_hash TEXT PRIMARY KEY, data TEXT, created_at INTEGER, based_versions TEXT)',
-    'Create doc_list': 'CREATE TABLE IF NOT EXISTS doc_list(doc_id TEXT PRIMARY KEY, title TEXT, doc_hash TEXT, updated_at INTEGER)',
-    'Create docs': 'CREATE TABLE IF NOT EXISTS docs(doc_id TEXT PRIMARY KEY, data TEXT, updated_at INTEGER)',
+    'Create docs': 'CREATE TABLE IF NOT EXISTS doc_list(doc_id TEXT PRIMARY KEY, title TEXT, doc_hash TEXT, updated_at INTEGER)',
+    'Create doc_contents': 'CREATE TABLE IF NOT EXISTS doc_contents(doc_id TEXT PRIMARY KEY, doc_content TEXT, updated_at INTEGER)',
     'Create blocks': 'CREATE TABLE IF NOT EXISTS blocks(doc_id TEXT, block_id TEXT, data TEXT, updated_at INTEGER, CONSTRAINT blocks_pk PRIMARY KEY(doc_id, block_id))',
     'Create versions': 'CREATE TABLE IF NOT EXISTS versions(tree_hash TEXT PRIMARY KEY, parents TEXT, created_at INTEGER)',
     'Create flags': 'CREATE TABLE IF NOT EXISTS flags(name TEXT PRIMARY KEY, value TEXT)',

@@ -5,7 +5,7 @@ import 'package:keygen/keygen.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/environment.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
-import 'package:mesh_note/mindeditor/document/doc_tree.dart';
+import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/document_manager.dart';
 import 'package:mesh_note/net/net_controller.dart';
@@ -203,7 +203,7 @@ class Controller {
   void receiveVersionTree(String hash, String versionStr, Map<String, String> requiredObjects) {
     MyLogger.info('efantest: receive version: $versionStr');
 
-    var version = DocTreeVersion.fromJson(jsonDecode(versionStr));
+    var version = VersionContent.fromJson(jsonDecode(versionStr));
     docManager.assembleVersionTree(hash, version, version.parentsHash, requiredObjects);
   }
 }

@@ -1,10 +1,9 @@
 import 'dart:convert';
-
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/dal/doc_data.dart';
-import 'package:mesh_note/mindeditor/document/doc_tree.dart';
+import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
@@ -34,7 +33,7 @@ class DocumentManager {
     if(_docTitles.isNotEmpty) {
       return _docTitles;
     }
-    var data = _db.getAllDocumentList();
+    var data = _db.getAllDocuments();
     var (_version, _time) = _getCurrentVersionAndTimestamp();
     _currentVersion = _version;
     _currentVersionTimestamp = _time;
@@ -77,7 +76,7 @@ class DocumentManager {
   /// Generate version and returns version and required objects
   ///
   /// returns version and required objects
-  (DocTreeVersion?, Map<String, String>) genAndSaveNewVersion() {
+  (VersionContent?, Map<String, String>) genAndSaveNewVersion() {
     if(!hasModified()) return (null, {});
 
     // generate and save version
@@ -90,7 +89,7 @@ class DocumentManager {
     return (version, requiredObjects);
   }
 
-  void assembleVersionTree(String versionHash, DocTreeVersion version, List<String> parents, Map<String, String> requiredObjects) {
+  void assembleVersionTree(String versionHash, VersionContent version, List<String> parents, Map<String, String> requiredObjects) {
     for(var item in version.table) {
       _updateDoc(item, requiredObjects);
     }
@@ -98,7 +97,7 @@ class DocumentManager {
     Controller.instance.refreshDocNavigator();
   }
 
-  void _updateDoc(DocTreeNode node, Map<String, String> objects) {
+  void _updateDoc(VersionContentItem node, Map<String, String> objects) {
     var docId = node.docId;
     DocData? found;
     for(var i in _docTitles) {
@@ -123,12 +122,13 @@ class DocumentManager {
     // Restore doc list
     _db.insertOrUpdateDoc(docId, found.title, found.hash, found.timestamp);
 
-    // Restore doc content
+    // Store doc content into objects
     var docContentStr = objects[found.hash]!;
     MyLogger.info('efantest: docContent=$docContentStr');
     _db.storeObject(found.hash, docContentStr);
     var docContent = DocContent.fromJson(jsonDecode(docContentStr));
-    var root = BlockStructure(blockId: Constants.keyRootBlockId, children: []);
+
+    // Store blocks into objects
     for(var content in docContent.contents) {
       var blockId = content.blockId;
       var blockHash = content.blockHash;
@@ -137,12 +137,9 @@ class DocumentManager {
       MyLogger.info('efantest: blockId=$blockId, blockHash=$blockHash, blockStr=$blockStr');
       _db.storeObject(blockHash, blockStr);
       _db.storeDocBlock(docId, blockId, blockStr, found.timestamp);
-
-      var b = BlockStructure(blockId: blockId);
-      root.children!.add(b);
     }
-    // Restore docs
-    _db.storeDocStructure(docId, jsonEncode(root), found.timestamp);
+    // Update doc content
+    _db.storeDocContent(docId, docContentStr, found.timestamp);
 
     // If document was loaded, update it
     var openingDocument = _documents[docId];
@@ -178,7 +175,7 @@ class DocumentManager {
     }
     var data = _db.getRawBlockById(docId, blockId);
     if(data != null) {
-      var para = ParagraphDesc.buildFromJson(id: data.blockId, jsonStr: data.data, time: data.updatedAt);
+      var para = ParagraphDesc.buildFromJson(id: data.blockId, jsonStr: data.blockData, time: data.updatedAt);
       seed.cache[blockId] = para;
       return para;
     }
@@ -202,7 +199,7 @@ class DocumentManager {
     return (ver, timestamp?? 0);
   }
 
-  void _saveVersion(DocTreeVersion version, int now) {
+  void _saveVersion(VersionContent version, int now) {
     final hash = version.getHash();
     final jsonStr = jsonEncode(version);
     // Save version object, version tree, current_version flag, and current_version_timestamp flag
@@ -240,12 +237,12 @@ class DocumentManager {
     return null;
   }
 
-  DocTreeVersion _genVersionAndClearModified(int now) {
+  VersionContent _genVersionAndClearModified(int now) {
     List<Document> modifiedDocuments = _findModifiedDocuments();
     Map<String, String> newHashes = _genAndSaveDocuments(modifiedDocuments);
     _updateDocumentHashes(newHashes, now);
     var docTable = _genDocTreeNodeList(_docTitles);
-    var version = DocTreeVersion(table: docTable, timestamp: now, parentsHash: [_currentVersion]);
+    var version = VersionContent(table: docTable, timestamp: now, parentsHash: [_currentVersion]);
     _clearModified(modifiedDocuments);
     return version;
   }
@@ -274,10 +271,10 @@ class DocumentManager {
     return result;
   }
 
-  static List<DocTreeNode> _genDocTreeNodeList(List<DocData> list) {
-    List<DocTreeNode> result = [];
+  static List<VersionContentItem> _genDocTreeNodeList(List<DocData> list) {
+    List<VersionContentItem> result = [];
     for(var item in list) {
-      var node = DocTreeNode(docId: item.docId, docHash: item.hash, title: item.title, updatedAt: item.timestamp);
+      var node = VersionContentItem(docId: item.docId, docHash: item.hash, title: item.title, updatedAt: item.timestamp);
       result.add(node);
     }
     return result;

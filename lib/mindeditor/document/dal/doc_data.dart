@@ -1,3 +1,15 @@
+class BlockData {
+  final String blockId;
+  final String blockData;
+  final int updatedAt;
+
+  BlockData({
+    required this.blockId,
+    required this.blockData,
+    required this.updatedAt,
+  });
+}
+
 class DocData {
   String docId;
   String title;
@@ -12,34 +24,16 @@ class DocData {
   });
 }
 
-class BlockStructure {
-  String blockId;
-  List<BlockStructure>? children;
+class DocContentData {
+  String docId;
+  String docContent;
+  int timestamp;
 
-  BlockStructure({
-    required this.blockId,
-    this.children,
+  DocContentData({
+    required this.docId,
+    required this.docContent,
+    required this.timestamp,
   });
-
-  Map<String, dynamic> toJson() {
-    return {
-      'block_id': blockId,
-      'children': children,
-    };
-  }
-  BlockStructure.fromJson(Map<String, dynamic> map): blockId = map['block_id'], children = recursiveBuild(map['children']);
-
-  static List<BlockStructure>? recursiveBuild(List<dynamic>? list) {
-    if(list == null) {
-      return null;
-    }
-    var result = <BlockStructure>[];
-    for(final item in list) {
-      BlockStructure block = BlockStructure.fromJson(item);
-      result.add(block);
-    }
-    return result;
-  }
 }
 
 class VersionData {

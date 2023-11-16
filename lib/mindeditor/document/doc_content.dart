@@ -13,12 +13,12 @@ class VersionTreeItem {
   });
 }
 
-class DocTreeVersion {
-  List<DocTreeNode> table;
+class VersionContent {
+  List<VersionContentItem> table;
   int timestamp;
   List<String> parentsHash;
 
-  DocTreeVersion({
+  VersionContent({
     required this.table,
     required this.timestamp,
     required this.parentsHash,
@@ -31,7 +31,7 @@ class DocTreeVersion {
       'parents': parentsHash,
     };
   }
-  DocTreeVersion.fromJson(Map<String, dynamic> map):
+  VersionContent.fromJson(Map<String, dynamic> map):
         table = _recursiveNodes(map['doc_table']),
         timestamp = map['timestamp'],
         parentsHash = _recursiveStrings(map['parents']);
@@ -40,11 +40,11 @@ class DocTreeVersion {
     var jsonStr = jsonEncode(this);
     return HashUtil.hashText(jsonStr);
   }
-  static List<DocTreeNode> _recursiveNodes(List<dynamic> list) {
+  static List<VersionContentItem> _recursiveNodes(List<dynamic> list) {
     if(list.isEmpty) return [];
-    List<DocTreeNode> result = [];
+    List<VersionContentItem> result = [];
     for(var l in list) {
-      var item = DocTreeNode.fromJson(l);
+      var item = VersionContentItem.fromJson(l);
       result.add(item);
     }
     return result;
@@ -60,13 +60,13 @@ class DocTreeVersion {
   }
 }
 
-class DocTreeNode {
+class VersionContentItem {
   String docId;
   String docHash;
   String title;
   int updatedAt;
 
-  DocTreeNode({
+  VersionContentItem({
     required this.docId,
     required this.docHash,
     required this.title,
@@ -81,7 +81,7 @@ class DocTreeNode {
       'updated_at': updatedAt,
     };
   }
-  DocTreeNode.fromJson(Map<String, dynamic> map):
+  VersionContentItem.fromJson(Map<String, dynamic> map):
         docId = map['doc_id'],
         docHash = map['doc_hash'],
         title = map['title'],
@@ -156,13 +156,13 @@ class DocContentItem {
   }
 }
 
-class ContentBlock {
+class BlockContent {
   String type;
   String listing;
   int level;
   List<TextDesc> text;
 
-  ContentBlock({
+  BlockContent({
     required this.type,
     required this.listing,
     required this.level,
@@ -177,7 +177,7 @@ class ContentBlock {
       'text': text,
     };
   }
-  ContentBlock.fromJson(Map<String, dynamic> map):
+  BlockContent.fromJson(Map<String, dynamic> map):
         type = map['type'],
         listing = map['listing'],
         level = map['level'],
