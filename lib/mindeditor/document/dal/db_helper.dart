@@ -29,6 +29,7 @@ abstract class DbHelper {
   Future<void> updateParagraphListing(String docId, String id, String listing);
   Future<void> updateParagraphLevel(String docId, String id, int level);
   Future<void> updateDoc(String docId, int timestamp);
+  List<VersionData> getAllVersions();
   List<DocData> getAllDocuments();
   String getObject(String hash);
   void storeObject(String hash, String data);
@@ -209,6 +210,20 @@ class RealDbHelper implements DbHelper {
     _database.execute(sqlUpdateDoc, [timestamp, docId]);
   }
 
+  @override
+  List<VersionData> getAllVersions() {
+    const sql = 'SELECT tree_hash, parents, created_at FROM versions';
+    final resultSet = _database.select(sql);
+    List<VersionData> result = [];
+    for(final row in resultSet) {
+      MyLogger.verbose('getAllVersions: row=$row');
+      String versionHash = row['tree_hash'];
+      String parents = row['parents'];
+      int timestamp = row['created_at'];
+      result.add(VersionData(versionHash: versionHash, parents: parents, createdAt: timestamp));
+    }
+    return result;
+  }
   @override
   List<DocData> getAllDocuments() {
     const sql = 'SELECT doc_id, title, doc_hash, updated_at FROM doc_list';

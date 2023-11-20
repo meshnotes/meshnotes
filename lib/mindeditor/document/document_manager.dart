@@ -93,7 +93,8 @@ class DocumentManager {
     for(var item in version.table) {
       _updateDoc(item, requiredObjects);
     }
-    _currentVersion = versionHash;
+    var now = Util.getTimeStamp();
+    _saveVersion(version, now);
     Controller.instance.refreshDocNavigator();
   }
 
@@ -208,6 +209,7 @@ class DocumentManager {
     _db.setFlag(Constants.flagNameCurrentVersion, hash);
     _db.setFlag(Constants.flagNameCurrentVersionTimestamp, now.toString());
 
+    MyLogger.info('Save new version(hash=$hash), parent hash=$_currentVersion');
     _currentVersionTimestamp = now;
     _currentVersion = hash;
   }
