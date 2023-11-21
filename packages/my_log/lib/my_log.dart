@@ -7,6 +7,8 @@ class MyLogger {
   static const _defaultLogLevel = Level.INFO;
 
   static void init({bool usePrint=false, bool debug=false, bool verbose=false, required String name}) {
+    logger?.clearListeners();
+
     prefix = name;
     Logger.root.level = _defaultLogLevel;
     if(debug) {
@@ -24,7 +26,7 @@ class MyLogger {
       Logger.root.onRecord.listen((record) {
         log('${record.level.name}: ${record.time}: [$prefix] ${record.message}', level: record.level.value);
       });
-      }
+    }
     logger = Logger(name);
   }
 
@@ -34,6 +36,11 @@ class MyLogger {
 
   static void initForConsoleTest({bool debug=true, required String name}) {
     init(usePrint: true, debug: debug, name: name);
+  }
+
+  static void shutdown() {
+    logger?.clearListeners();
+    logger = null;
   }
 
   static void verbose(String msg) {
