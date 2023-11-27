@@ -1,25 +1,8 @@
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
-import 'package:mesh_note/mindeditor/document/dal/doc_data.dart';
 import 'package:my_log/my_log.dart';
 
 class VersionManager {
   static const String _tags = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-  final DbHelper? _db;
-
-  VersionManager({
-    DbHelper? db,
-  }): _db = db;
-
-  String recursiveGetAncestors(String version1, String version2) {
-    var _versionMap = _genVersionMap();
-    var verNode1 = _versionMap[version1];
-    var verNode2 = _versionMap[version2];
-    if(verNode1 == null || verNode2 == null) {
-      return '';
-    }
-    DagNode? resultNode = findNearestCommonAncestor([verNode1, verNode2], _versionMap);
-    return resultNode?.versionHash??'';
-  }
 
   /// Find the nearest common ancestor
   /// 1. clear visited tag of all nodes
@@ -73,33 +56,6 @@ class VersionManager {
       MyLogger.info('findNearestCommonAncestor: find multiple results: $resultSet, try again');
       nodes = resultSet.toList();
     }
-  }
-
-  Map<String, DagNode> _genVersionMap() {
-    List<VersionData> _allVersions = _db!.getAllVersions();
-    // Generate version map
-    Map<String, DagNode> _map = {};
-    for(var item in _allVersions) {
-      final versionHash = item.versionHash;
-      var ver = DagNode(versionHash: versionHash, parents: []);
-      _map[versionHash] = ver;
-    }
-    // Generate version parents pointer
-    for(var item in _allVersions) {
-      final versionHash = item.versionHash;
-      final parents = _splitParents(item.parents);
-      final currentNode = _map[versionHash]!;
-      for(var item in parents) {
-        var parentNode = _map[item];
-        if(parentNode == null) continue;
-        currentNode.parents.add(parentNode);
-      }
-    }
-    return _map;
-  }
-  List<String> _splitParents(String parents) {
-    List<String> _sp = parents.split(',');
-    return _sp;
   }
 
   void _visitNode(DagNode root, String tag) {

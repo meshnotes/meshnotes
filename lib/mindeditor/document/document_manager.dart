@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/dal/doc_data.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
@@ -10,11 +11,14 @@ import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:my_log/my_log.dart';
 import '../../util/util.dart';
 import '../setting/constants.dart';
+import 'collaborate/diff_manager.dart';
 
 class DocumentManager {
   bool _hasModified = false;
   final DbHelper _db;
   final Map<String, Document> _documents = {};
+  VersionManager vm = VersionManager();
+  DiffManager dm = DiffManager();
   String? currentDocId;
   List<DocData> _docTitles = [];
   String _currentVersion = '';
@@ -90,6 +94,11 @@ class DocumentManager {
   }
 
   void assembleVersionTree(String versionHash, VersionContent version, List<String> parents, Map<String, String> requiredObjects) {
+    _storeAllObjects(requiredObjects);
+    String ancestorVersion = _getCommonAncestor(_currentVersion, versionHash);
+    var (operationSet1, operationSet2) = _findDiffs(_currentVersion, versionHash, ancestorVersion);
+    VersionContent mergedVersion = _merge(operationSet1, operationSet2, ancestorVersion);
+
     for(var item in version.table) {
       _updateDoc(item, requiredObjects);
     }
@@ -326,5 +335,58 @@ class DocumentManager {
       doc.clearModified();
     }
     _hasModified = false;
+  }
+
+  void _storeAllObjects(Map<String, String> objects) {
+    for(var entry in objects.entries) {
+      var hash = entry.key;
+      var value = entry.value;
+      _db.storeObject(hash, value);
+    }
+  }
+  String _getCommonAncestor(String version1, String version2) {
+    var _versionMap = _genVersionMap();
+    var verNode1 = _versionMap[version1];
+    var verNode2 = _versionMap[version2];
+    if(verNode1 == null || verNode2 == null) {
+      return '';
+    }
+    DagNode? resultNode = vm.findNearestCommonAncestor([verNode1, verNode2], _versionMap);
+    return resultNode?.versionHash??'';
+  }
+  Map<String, DagNode> _genVersionMap() {
+    var _allVersions = _db.getAllVersions();
+
+    // Generate version map
+    Map<String, DagNode> _map = {};
+    for(var item in _allVersions) {
+      final versionHash = item.versionHash;
+      var ver = DagNode(versionHash: versionHash, parents: []);
+      _map[versionHash] = ver;
+    }
+    // Generate version parents pointer
+    for(var item in _allVersions) {
+      final versionHash = item.versionHash;
+      final parents = _splitParents(item.parents);
+      final currentNode = _map[versionHash]!;
+      for(var item in parents) {
+        var parentNode = _map[item];
+        if(parentNode == null) continue;
+        currentNode.parents.add(parentNode);
+      }
+    }
+    return _map;
+  }
+  List<String> _splitParents(String parents) {
+    List<String> _sp = parents.split(',');
+    return _sp;
+  }
+  (DiffOperation, DiffOperation) _findDiffs(String version1, String version2, String commonVersion) {
+    DiffOperation op1 = dm.findDifferentOperation(version1, commonVersion);
+    DiffOperation op2 = dm.findDifferentOperation(version2, commonVersion);
+    return (op1, op2);
+  }
+  VersionContent _merge(DiffOperation op1, DiffOperation op2, String baseVersion) {
+    return VersionContent(table: [], timestamp: 123, parentsHash: []);
   }
 }

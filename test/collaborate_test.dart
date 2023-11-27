@@ -1,6 +1,6 @@
 import 'package:my_log/my_log.dart';
 import 'package:test/test.dart';
-import 'package:mesh_note/mindeditor/document/collaborate/merge.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';
 
 const String _versionTag1 = 'n1';
 const String _versionTag2 = 'n2';
