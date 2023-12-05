@@ -14,7 +14,7 @@ runServer() {
   MyLogger.info('Run as server');
 }
 
-Future<Village> startVillage(String localPort, String serverList, String deviceId, Function(VillagerNode) connectedCallback, OnHandleNewVersion handleData) async {
+Future<Village> startVillage(String localPort, String serverList, String deviceId, Function(VillagerNode) connectedCallback, VillageMessageHandler messageHandler) async {
   VillageDbHelper db = VillageDbHelper();
   db.init();
 
@@ -31,7 +31,7 @@ Future<Village> startVillage(String localPort, String serverList, String deviceI
     localPort: _localPort,
     sponsors: sponsors,
     overlay: _overlay,
-    handleNewVersion: handleData,
+    messageHandler: messageHandler,
     db: db,
   );
   await village.start();

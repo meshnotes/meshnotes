@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:keygen/keygen.dart';
+import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/environment.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
@@ -167,43 +168,39 @@ class Controller {
     CallbackRegistry.triggerEditingBlockFormatEvent(type, listing, level);
   }
 
-  bool syncDocuments() {
+  bool sendVersionTree() {
     // If there is any modification, generate a new version tree, and try to sync this version
     if(!docManager.hasModified()) return false;
-    var (version, requiredObjects) = docManager.genAndSaveNewVersion();
-    if(version == null) {
+    var versionData = docManager.genAndSaveNewVersionTree();
+    if(versionData.isEmpty) {
       return false;
     }
-    String versionJson = jsonEncode(version);
-    MyLogger.info('syncDocuments: versionJson=$versionJson');
-    String versionHash = version.getHash();
-
-    // Construct parents
-    final parents = version.parentsHash;
-
-    // Construct required objects
-    // final objects = <String, String>{};
-    // for(var item in version.table) {
-    //   var docHash = item.docHash;
-    //   var docStr = dbHelper.getObject(docHash);
-    //   MyLogger.info('syncDocuments: docHash=$docHash, docStr=$docStr');
-    //   objects[docHash] = docStr;
-    //
-    //   var docContent = DocContent.fromJson(jsonDecode(docStr));
-    //   for(var b in docContent.contents) {
-    //     var blockHash = b.blockHash;
-    //     var blockStr = dbHelper.getObject(blockHash);
-    //     objects[blockHash] = blockStr;
-    //   }
-    // }
-    network.syncNewVersionTree(versionHash, versionJson, parents, requiredObjects);
+    MyLogger.info('syncVersionTree: $versionData');
+    network.sendNewVersionTree(versionData);
     return true;
   }
 
-  void receiveVersionTree(String hash, String versionStr, Map<String, String> requiredObjects) {
+  void sendRequireVersions(List<String> missingVersions) {
+    network.sendRequireVersions(missingVersions);
+  }
+
+  void receiveVersionTree(List<VersionNode> dag) {
+    MyLogger.info('efantest: receive version tree: $dag');
+    docManager.assembleVersionTree(dag);
+  }
+  void receiveRequireVersions(List<String> requiredVersions) {
+    MyLogger.info('efantest: receive require versions message: $requiredVersions');
+    var versions = docManager.assembleRequireVersions(requiredVersions);
+    MyLogger.info('efantest: preparing to send versions: $versions');
+    network.sendVersions(versions);
+  }
+  void receiveVersions(List<SendVersionsNode> versions) {
+    MyLogger.info('efantest: receive versions message: $versions');
+    docManager.assembleVersions(versions);
+  }
+  void receiveVersion(String hash, String versionStr, Map<String, String> requiredObjects) {
     MyLogger.info('efantest: receive version: $versionStr');
 
-    var version = VersionContent.fromJson(jsonDecode(versionStr));
-    docManager.assembleVersionTree(hash, version, version.parentsHash, requiredObjects);
+    // docManager.assembleVersion(hash, versionStr, requiredObjects);
   }
 }

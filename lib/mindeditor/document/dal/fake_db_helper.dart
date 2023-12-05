@@ -27,7 +27,11 @@ class FakeDbHelper implements DbHelper {
   @override
   Future<void> updateDoc(String docId, int timestamp) async {}
   @override
+  VersionData? getVersionData(String versionHash) { return null; }
+  @override
   List<VersionData> getAllVersions() { return <VersionData>[]; }
+  @override
+  List<String> getAllValidVersionHashes() { return []; }
   @override
   List<DocData> getAllDocuments() { return <DocData>[]; }
   @override

@@ -29,7 +29,9 @@ abstract class DbHelper {
   Future<void> updateParagraphListing(String docId, String id, String listing);
   Future<void> updateParagraphLevel(String docId, String id, int level);
   Future<void> updateDoc(String docId, int timestamp);
+  VersionData? getVersionData(String versionHash);
   List<VersionData> getAllVersions();
+  List<String> getAllValidVersionHashes();
   List<DocData> getAllDocuments();
   String getObject(String hash);
   void storeObject(String hash, String data);
@@ -211,6 +213,19 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
+  VersionData? getVersionData(String versionHash) {
+    const sql = 'SELECT parents, created_at FROM versions WHERE tree_hash=?';
+    final resultSet = _database.select(sql, [versionHash]);
+    if(resultSet.isEmpty) {
+      return null;
+    }
+    final row = resultSet.first;
+    String parents = row['parents'];
+    int createdAt = row['created_at'];
+    return VersionData(versionHash: versionHash, parents: parents, createdAt: createdAt);
+  }
+
+  @override
   List<VersionData> getAllVersions() {
     const sql = 'SELECT tree_hash, parents, created_at FROM versions';
     final resultSet = _database.select(sql);
@@ -221,6 +236,17 @@ class RealDbHelper implements DbHelper {
       String parents = row['parents'];
       int timestamp = row['created_at'];
       result.add(VersionData(versionHash: versionHash, parents: parents, createdAt: timestamp));
+    }
+    return result;
+  }
+  @override
+  List<String> getAllValidVersionHashes() {
+    const sql = 'SELECT tree_hash FROM versions';
+    final resultSet = _database.select(sql);
+    List<String> result = [];
+    for(final row in resultSet) {
+      String versionHash = row['tree_hash'];
+      result.add(versionHash);
     }
     return result;
   }

@@ -51,7 +51,7 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
               //TODO add search code here
               break;
             case syncKey:
-              Controller.instance.syncDocuments();
+              Controller.instance.sendVersionTree();
               break;
           }
         },

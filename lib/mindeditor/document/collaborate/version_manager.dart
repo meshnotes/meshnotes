@@ -90,12 +90,14 @@ class VersionManager {
 
 class DagNode {
   String versionHash;
+  int createdAt;
   List<DagNode> parents;
   bool _hasTaggedChild = false;
   String _visitedTag = '';
 
   DagNode({
     required this.versionHash,
+    required this.createdAt,
     required this.parents,
   });
 

@@ -6,6 +6,10 @@ enum Command {
   nodeStatus,
   sendVersionTree, // Send version tree
   receiveVersionTree, // Receive version tree
+  sendRequireVersions,
+  receiveRequiredVersions,
+  sendVersions,
+  receiveVersions,
 }
 
 class Message {
@@ -30,12 +34,12 @@ class StartVillageParameter {
   });
 }
 
-class NewVersionTreeParameter {
+class NewVersionParameter {
   String versionHash;
   String versionStr;
   Map<String, String> requiredObjects;
 
-  NewVersionTreeParameter({
+  NewVersionParameter({
     required this.versionHash,
     required this.versionStr,
     required this.requiredObjects
