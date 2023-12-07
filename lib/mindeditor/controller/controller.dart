@@ -17,7 +17,7 @@ import '../document/paragraph_desc.dart';
 import '../setting/setting.dart';
 import 'device.dart';
 import 'gesture_handler.dart';
-import 'package:platform_device_id_v3/platform_device_id.dart';
+// import 'package:platform_device_id_v3/platform_device_id.dart';
 
 
 class Controller {
@@ -80,7 +80,8 @@ class Controller {
   }
 
   Future<void> _genDeviceId() async {
-    deviceId = (await PlatformDeviceId.getDeviceId??'').trim();
+    // deviceId = (await PlatformDeviceId.getDeviceId??'').trim();
+    deviceId = 'xxx';
 
     // simpleDeviceId is composed of first 8 character of deviceId and first 8 character of SHA256 of deviceId
     var len = deviceId.length > 8? 8: deviceId.length;
