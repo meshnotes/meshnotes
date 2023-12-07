@@ -4,7 +4,6 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   flutter_window_close
-  platform_device_id_linux
   sqlite3_flutter_libs
 )
 

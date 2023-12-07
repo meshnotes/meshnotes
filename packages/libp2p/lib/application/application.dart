@@ -19,7 +19,7 @@ class Village implements ApplicationController {
   VillageOverlay _overlay;
   VillageMode _mode;
   int localPort;
-  OnHandleNewVersion? handleNewVersion;
+  VillageMessageHandler messageHandler;
   VillageDbHelper _db;
   Map<String, VillageObject> _villageObjectCache = {};
 
@@ -30,7 +30,7 @@ class Village implements ApplicationController {
     required String userId,
     required List<String> sponsors,
     this.localPort = 0,
-    this.handleNewVersion,
+    required this.messageHandler,
     VillageMode mode = VillageMode.loneWolf,
     required VillageOverlay overlay,
     required VillageDbHelper db,
@@ -51,12 +51,32 @@ class Village implements ApplicationController {
       case VersionTreeAppType:
         _onVersionTree(data);
         break;
+      case RequireVersionsAppType:
+        _onRequiredVersions(data);
+        break;
+      case SendVersionsAppType:
+        _onSendVersions(data);
+        break;
+      default:
+        MyLogger.info('onData: receive unrecognized app type: $type, data=$data');
+        break;
     }
   }
 
   void sendVersionTree(String versionTree) {
-    MyLogger.info('efantest: Preparing to send version tree: $versionTree');
+    MyLogger.info('efantest: Preparing to send version_tree: $versionTree');
+    //TODO Optimize the code below to only send message to selected nodes
     _overlay.sendToAllNodesOfUser(this, _userId, VersionTreeAppType, versionTree);
+  }
+
+  void sendRequireVersions(String requiredVersions) {
+    MyLogger.info('efantest: Preparing to send require_versions: $requiredVersions');
+    _overlay.sendToAllNodesOfUser(this, _userId, RequireVersionsAppType, requiredVersions);
+  }
+
+  void sendVersions(String sendVersions) {
+    MyLogger.info('efantest: Preparing to send send_versions: $sendVersions');
+    _overlay.sendToAllNodesOfUser(this, _userId, SendVersionsAppType, sendVersions);
   }
 
   void _timerHandler(Timer _t) {
@@ -91,26 +111,42 @@ class Village implements ApplicationController {
 
   void _onVersionTree(String data) {
     final versionChain = VersionChain.fromJson(jsonDecode(data));
-    final versionHash = versionChain.versionHash;
-    final versionStr = versionChain.versionStr;
-    final parents = versionChain.parents;
-    final requiredObjects = versionChain.requiredObjects;
+    final versionDag = versionChain.versionDag;
+    messageHandler.handleNewVersionTree?.call(versionDag);
+  }
 
-    int now = DateTime.now().millisecondsSinceEpoch;
-    _db.storeObject(versionHash, versionStr);
-    _db.storeNewVersion(versionHash, parents.join(','), now);
-    for(final e in requiredObjects.entries) {
-      var objHash = e.key;
-      var objData = e.value;
-      if(!_villageObjectCache.containsKey(objHash)) {
-        var object = VillageObject(objHash: objHash);
-        if(objData.isNotEmpty) {
-          object.setData(objData);
-          _db.storeObject(e.key, e.value);
-        }
-        _villageObjectCache[objHash] = object;
-      }
-    }
-    handleNewVersion?.call(versionHash, versionStr, requiredObjects);
+  void _onRequiredVersions(String data) {
+    var requiredVersions = RequireVersions.fromJson(jsonDecode(data));
+    messageHandler.handleRequireVersions?.call(requiredVersions.requiredVersions);
+  }
+
+  void _onSendVersions(String data) {
+    var sendVersions = SendVersions.fromJson(jsonDecode(data));
+    messageHandler.handleSendVersions?.call(sendVersions.versions);
+  }
+
+  void _onVersions(String data) {
+    // final versionChain = VersionChain.fromJson(jsonDecode(data));
+    // final versionHash = versionChain.versionHash;
+    // final versionStr = versionChain.versionStr;
+    // final parents = versionChain.parents;
+    // final requiredObjects = versionChain.requiredObjects;
+    //
+    // int now = DateTime.now().millisecondsSinceEpoch;
+    // _db.storeObject(versionHash, versionStr);
+    // _db.storeNewVersion(versionHash, parents.join(','), now);
+    // for(final e in requiredObjects.entries) {
+    //   var objHash = e.key;
+    //   var objData = e.value;
+    //   if(!_villageObjectCache.containsKey(objHash)) {
+    //     var object = VillageObject(objHash: objHash);
+    //     if(objData.isNotEmpty) {
+    //       object.setData(objData);
+    //       _db.storeObject(e.key, e.value);
+    //     }
+    //     _villageObjectCache[objHash] = object;
+    //   }
+    // }
+    // messageHandler.handleNewVersion?.call(versionHash, versionStr, requiredObjects);
   }
 }

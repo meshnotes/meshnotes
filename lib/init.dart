@@ -6,7 +6,11 @@ import 'mindeditor/controller/controller.dart';
 
 Future<void> appInit({bool test=false}) async {
   WidgetsFlutterBinding.ensureInitialized();
-  MyLogger.init(name: 'main', debug: false);
+  if(test) {
+    MyLogger.init(name: 'test', debug: false, usePrint: true);
+  } else {
+    MyLogger.init(name: 'main', debug: false);
+  }
   Controller.init(test: test);
   var networkController = await initNet();
   await Controller.instance.initAll(networkController, test: test);
@@ -18,5 +22,9 @@ Future<void> appInit({bool test=false}) async {
 }
 
 void serverInit({bool test=false}) {
-  MyLogger.init(name: 'main');
+  if(test) {
+    MyLogger.init(name: 'test', usePrint: true);
+  } else {
+    MyLogger.init(name: 'main');
+  }
 }

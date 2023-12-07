@@ -64,18 +64,33 @@ void _handleMessage(Message msg) async {
         return;
       }
       final parameter = msg.parameter as StartVillageParameter;
-      _village = await startVillage(parameter.localPort, parameter.serverList, parameter.deviceId, _nodeChanged, _handleNewVersionTree);
+      VillageMessageHandler handler = VillageMessageHandler()
+        ..handleNewVersionTree = _handleNewVersionTree
+        ..handleRequireVersions = _handleRequireVersions
+        ..handleSendVersions = _handleSendVersions;
+      _village = await startVillage(parameter.localPort, parameter.serverList, parameter.deviceId, _nodeChanged, handler);
       _sendPort?.send(Message(cmd: Command.networkStatus, parameter: NetworkStatus.running,));
       break;
     case Command.terminateOk:
     case Command.networkStatus:
     case Command.nodeStatus:
     case Command.receiveVersionTree:
+    case Command.receiveRequiredVersions:
+    case Command.receiveVersions:
       // Do nothing, these part is in net_controller
       break;
     case Command.sendVersionTree:
       final versionTreeJson = msg.parameter as String;
       _village?.sendVersionTree(versionTreeJson);
+      break;
+    case Command.sendRequireVersions:
+      final requiredVersions = msg.parameter as String;
+      _village?.sendRequireVersions(requiredVersions);
+      break;
+    case Command.sendVersions:
+      //TODO implement it
+      final sendVersions = msg.parameter as String;
+      _village?.sendVersions(sendVersions);
       break;
   }
 }
@@ -96,10 +111,22 @@ void _nodeChanged(VillagerNode node) {
   final nodeInfo = NodeInfo(id: id, name: info, status: _status);
   _nodes[id] = nodeInfo;
 }
-void _handleNewVersionTree(String versionHash, String versionStr, Map<String, String> objects) {
+void _handleNewVersionTree(List<VersionNode> dag) {
   _sendPort?.send(Message(
     cmd: Command.receiveVersionTree,
-    parameter: NewVersionTreeParameter(versionHash: versionHash, versionStr: versionStr, requiredObjects: objects),
+    parameter: dag,
+  ));
+}
+void _handleRequireVersions(List<String> requiredVersions) {
+  _sendPort?.send(Message(
+    cmd: Command.receiveRequiredVersions,
+    parameter: requiredVersions,
+  ));
+}
+void _handleSendVersions(List<SendVersionsNode> versions) {
+  _sendPort?.send(Message(
+    cmd: Command.receiveVersions,
+    parameter: versions,
   ));
 }
 

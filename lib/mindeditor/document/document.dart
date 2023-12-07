@@ -267,7 +267,7 @@ class Document {
   void setIdle() {
     _idleTimer?.cancel();
     _idleTimer = Timer(const Duration(seconds: Constants.timeoutSyncIdle), () {
-      Controller.instance.syncDocuments();
+      Controller.instance.sendVersionTree();
       _idleTimer = null;
     });
   }
