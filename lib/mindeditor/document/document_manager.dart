@@ -624,8 +624,8 @@ class DocumentManager {
 
     final commonVersionContent = _loadVersionContent(commonVersion);
 
-    DiffOperation op1 = dm.findDifferentOperation(versionContent1!, commonVersionContent);
-    DiffOperation op2 = dm.findDifferentOperation(versionContent2!, commonVersionContent);
+    DiffOperations op1 = dm.findDifferentOperation(versionContent1!, commonVersionContent);
+    DiffOperations op2 = dm.findDifferentOperation(versionContent2!, commonVersionContent);
     var mm = MergeManager(baseVersion: commonVersionContent);
     mm.merge(op1, op2);
     return versionContent2;
