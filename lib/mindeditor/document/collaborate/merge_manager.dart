@@ -201,11 +201,11 @@ class MergeManager {
         case ContentOperationType.add:
           int idx = _findIndexOf(table, op.previousId);
           var newNode = VersionContentItem(docId: op.targetId, docHash: op.data!, title: op.title!, updatedAt: now);
-          table.insert(idx, newNode);
+          table.insert(idx + 1, newNode);
           break;
         case ContentOperationType.del:
           int idx = _findIndexOf(table, op.targetId);
-          table.removeAt(idx);
+          table.removeAt(idx + 1);
           break;
         case ContentOperationType.move:
           int idx = _findIndexOf(table, op.targetId);
@@ -233,7 +233,7 @@ class MergeManager {
 
   int _findIndexOf(List<VersionContentItem> table, String? contentId) {
     if(contentId == null) {
-      return 0;
+      return -1;
     }
     for(int idx = 0; idx < table.length; idx++) {
       if(table[idx].docId == contentId) {

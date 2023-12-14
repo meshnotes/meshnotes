@@ -627,8 +627,7 @@ class DocumentManager {
     DiffOperations op1 = dm.findDifferentOperation(versionContent1!, commonVersionContent);
     DiffOperations op2 = dm.findDifferentOperation(versionContent2!, commonVersionContent);
     var mm = MergeManager(baseVersion: commonVersionContent);
-    mm.merge(op1, op2);
-    return versionContent2;
+    return mm.merge(op1, op2);
   }
   VersionContent? _loadVersionContent(String versionHash) {
     var data = _db.getObject(versionHash);
