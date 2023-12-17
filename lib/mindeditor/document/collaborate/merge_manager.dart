@@ -1,16 +1,21 @@
+import 'dart:convert';
+
 import 'package:mesh_note/mindeditor/document/collaborate/diff_manager.dart';
+import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 
 class MergeManager {
+  DbHelper? db;
   VersionContent? baseVersion;
 
   MergeManager({
     required this.baseVersion,
+    this.db,
   });
 
-  /// Merge two operations and solve the conflicts
+  /// Merge two operations and return the conflicts
   /// 1. Generate operations map to accelerate computation, the key is the id
   /// 2. Traverse operations set 1
   ///   2.1. find all operations based on the key
@@ -44,16 +49,17 @@ class MergeManager {
   ///       2.6.2.1 use the latest one
   ///     2.6.3 compatible to move/rename operations
   ///     2.6.4 add is not possible
-  VersionContent merge(DiffOperations op1, DiffOperations op2) {
+  /// 3. Return all operations and conflicts
+  (List<ContentOperation>, List<ContentConflict>) mergeOperations(DiffOperations op1, DiffOperations op2) {
     var totalOperations = <ContentOperation>[...op1.operations, ...op2.operations];
     var opMap = _buildOperationsMap(totalOperations);
 
-    _mergeOperations(totalOperations, opMap);
-    var versionContent = _buildVersionContentFromOperations(baseVersion, totalOperations, [op1.versionHash, op2.versionHash]);
-    return versionContent;
+    List<ContentConflict> conflicts = [];
+    _mergeOperations(totalOperations, opMap, conflicts);
+    return (totalOperations, conflicts);
   }
 
-  void _mergeOperations(List<ContentOperation> totalOperations, Map<String, List<ContentOperation>> opMap) {
+  void _mergeOperations(List<ContentOperation> totalOperations, Map<String, List<ContentOperation>> opMap, List<ContentConflict> conflicts) {
     for(var thisOp in totalOperations) {
       if(!thisOp.isValid()) continue;
 
@@ -143,12 +149,35 @@ class MergeManager {
             }
             break;
           case ContentOperationType.modify:
+            if(thisOp.data == null) {
+              thisOp.setInvalid();
+              continue;
+            }
             switch(thatOp.operation) {
               case ContentOperationType.modify:
-                if(thisOp.data != thatOp.data) {
-                  MyLogger.warn('Conflict operations! Modify($thisOp) <==> Modify($thatOp)');
+                if(thatOp.data == null) {
+                  thatOp.setInvalid();
+                  continue;
                 }
-                _leaveLatestOperation(thisOp, thatOp); // TODO: Should be fixed here!!! Should merge content instead of using latest one
+                if(thisOp.data != thatOp.data) {
+                  MyLogger.warn('Find conflicts between $thisOp and $thatOp');
+                  var baseHash = _findBaseHash(targetId);
+                  if(baseHash == null) {
+                    MyLogger.warn('Data incorrect! base hash should not be null if there are modification conflict!! target_id=$targetId, base_version=$baseVersion');
+                    continue;
+                  }
+                  var conflict = ContentConflict(
+                      targetId: targetId,
+                      originalHash: baseHash,
+                      conflictHash1: thisOp.data!,
+                      conflictHash2: thatOp.data!,
+                  );
+                  conflicts.add(conflict);
+                  thisOp.setInvalid();
+                  thatOp.setInvalid();
+                } else {
+                  _leaveLatestOperation(thisOp, thatOp); // If two operations' data are identical, leave any one shall be OK
+                }
                 break;
               case ContentOperationType.del:
                 MyLogger.warn('Conflict operations! Modify($thisOp) <==> Del($thatOp)');
@@ -191,7 +220,7 @@ class MergeManager {
     }
   }
 
-  VersionContent _buildVersionContentFromOperations(VersionContent? baseVersion, List<ContentOperation> operations, List<String> parents) {
+  VersionContent mergeVersions(List<ContentOperation> operations, List<String> parents) {
     var table = baseVersion?.table?? [];
     int now = Util.getTimeStamp();
     for(var op in operations) {
@@ -242,4 +271,29 @@ class MergeManager {
     }
     return 0;
   }
+
+  String? _findBaseHash(String targetId) {
+    if(baseVersion == null) return null;
+
+    for(var item in baseVersion!.table) {
+      if(item.docId == targetId) {
+        return item.docHash;
+      }
+    }
+    return null;
+  }
+}
+
+class ContentConflict {
+  String targetId;
+  String originalHash;
+  String conflictHash1;
+  String conflictHash2;
+
+  ContentConflict({
+    required this.targetId,
+    required this.originalHash,
+    required this.conflictHash1,
+    required this.conflictHash2,
+  });
 }

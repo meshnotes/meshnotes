@@ -98,12 +98,6 @@ class DiffOperations {
   }
 }
 
-const int _operationNone = 0;
-const int _operationAdd = 1;
-const int _operationDel = 2;
-const int _operationMove = 4;
-const int _operationRename = 8;
-const int _operationModify = 16;
 
 class ContentNode {
   String contentId;
@@ -112,7 +106,6 @@ class ContentNode {
   String? parentId;
   String? previousId;
   int updatedAt;
-  int operation = _operationNone;
 
   ContentNode({
     required this.contentId,

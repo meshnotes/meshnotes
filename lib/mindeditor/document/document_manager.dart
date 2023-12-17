@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/conflict_manager.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/merge_manager.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
@@ -225,12 +226,19 @@ class DocumentManager {
     return result;
   }
   void _mergeCurrentAndSave(String targetVersion, String commonVersion) {
-    var content = _merge(_currentVersion, targetVersion, commonVersion);
+    // Make sure to get the fix order in every machine
+    String v1 = _currentVersion, v2 = targetVersion;
+    if(v1.compareTo(v2) > 0) {
+      v2 = _currentVersion;
+      v1 = targetVersion;
+    }
+    var content = _merge(v1, v2, commonVersion);
     if(content == null) {
       return;
     }
     var newVersionHash = content.getHash();
     if(newVersionHash == _currentVersion) {
+      MyLogger.info('_mergeCurrentAndSave: merge result is current version($_currentVersion), do nothing');
       return;
     }
 
@@ -626,8 +634,12 @@ class DocumentManager {
 
     DiffOperations op1 = dm.findDifferentOperation(versionContent1!, commonVersionContent);
     DiffOperations op2 = dm.findDifferentOperation(versionContent2!, commonVersionContent);
-    var mm = MergeManager(baseVersion: commonVersionContent);
-    return mm.merge(op1, op2);
+    var mm = MergeManager(baseVersion: commonVersionContent, db: _db);
+    var (operations, conflicts) = mm.mergeOperations(op1, op2);
+    var solvedOperations = _solveConflicts(conflicts);
+    operations.addAll(solvedOperations);
+    var contentVersion = mm.mergeVersions(operations, [op1.versionHash, op2.versionHash]);
+    return contentVersion;
   }
   VersionContent? _loadVersionContent(String versionHash) {
     var data = _db.getObject(versionHash);
@@ -651,5 +663,44 @@ class DocumentManager {
       list[idx] = list[newIdx];
       list[newIdx] = tmp;
     }
+  }
+
+  List<ContentOperation> _solveConflicts(List<ContentConflict> operations) {
+    List<ContentOperation> resolvedOperations = [];
+    for(var item in operations) {
+      var targetId = item.targetId;
+      var baseHash = item.originalHash;
+      var docHash1 = item.conflictHash1;
+      var docHash2 = item.conflictHash2;
+      var baseDoc = _loadDocContent(baseHash);
+      if(baseDoc == null) {
+        MyLogger.info('_solveConflicts: error while loading document $baseHash');
+        continue;
+      }
+      var doc1 = _loadDocContent(docHash1);
+      if(doc1 == null) {
+        MyLogger.info('_solveConflicts: error while loading document $docHash1');
+        continue;
+      }
+      var doc2 = _loadDocContent(docHash2);
+      if(doc2 == null) {
+        MyLogger.info('_solveConflicts: error while loading document $docHash2');
+        continue;
+      }
+      ConflictManager cm = ConflictManager(baseDoc: baseDoc);
+      var newDoc = cm.genNewDocument(doc1, doc2);
+      var newDocHash = newDoc.getHash();
+      _db.storeObject(newDocHash, jsonEncode(newDoc));
+      var now = Util.getTimeStamp();
+      var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: newDocHash, timestamp: now);
+      resolvedOperations.add(op);
+    }
+    return resolvedOperations;
+  }
+
+  DocContent? _loadDocContent(String docHash) {
+    String str = _db.getObject(docHash);
+    if(str.isEmpty) return null;
+    return DocContent.fromJson(jsonDecode(str));
   }
 }
