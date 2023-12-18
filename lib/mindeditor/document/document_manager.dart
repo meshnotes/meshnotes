@@ -232,24 +232,24 @@ class DocumentManager {
       v2 = _currentVersion;
       v1 = targetVersion;
     }
-    var content = _merge(v1, v2, commonVersion);
-    if(content == null) {
+    var contentVersion = _merge(v1, v2, commonVersion);
+    if(contentVersion == null) {
       return;
     }
-    var newVersionHash = content.getHash();
+    var newVersionHash = contentVersion.getHash();
     if(newVersionHash == _currentVersion) {
       MyLogger.info('_mergeCurrentAndSave: merge result is current version($_currentVersion), do nothing');
       return;
     }
 
-    for(var item in content.table) {
+    for(var item in contentVersion.table) {
       _updateDoc(item, {});
     }
 
     bool fastForward = newVersionHash == _currentVersion || newVersionHash == targetVersion;
-    var now = fastForward? content.timestamp: Util.getTimeStamp();
+    var now = fastForward? contentVersion.timestamp: Util.getTimeStamp();
     var parents = fastForward? '': '$_currentVersion,$targetVersion'; // Ignore parents if fast_forward
-    _saveVersion(content, parents, now, fastForward: fastForward);
+    _saveVersion(contentVersion, parents, now, fastForward: fastForward);
   }
   void _updateDoc(VersionContentItem node, Map<String, String> objects) {
     var docId = node.docId;
@@ -348,7 +348,7 @@ class DocumentManager {
   void _saveVersion(VersionContent version, String parents, int now, {bool fastForward = false}) {
     final hash = version.getHash();
     if(fastForward) {
-      MyLogger.info('Fast forward to version(hash=$hash)');
+      MyLogger.info('Fast forward to version($hash)');
       _db.setFlag(Constants.flagNameCurrentVersion, hash);
       _currentVersionTimestamp = now;
       _currentVersion = hash;
@@ -360,7 +360,7 @@ class DocumentManager {
       _db.setFlag(Constants.flagNameCurrentVersion, hash);
       _db.setFlag(Constants.flagNameCurrentVersionTimestamp, now.toString());
 
-      MyLogger.info('Save new version(hash=$hash), parent=$parents');
+      MyLogger.info('Save new version($hash), parent=$parents');
       _currentVersionTimestamp = now;
       _currentVersion = hash;
     }
@@ -634,11 +634,14 @@ class DocumentManager {
 
     DiffOperations op1 = dm.findDifferentOperation(versionContent1!, commonVersionContent);
     DiffOperations op2 = dm.findDifferentOperation(versionContent2!, commonVersionContent);
-    var mm = MergeManager(baseVersion: commonVersionContent, db: _db);
+    var mm = MergeManager(baseVersion: commonVersionContent);
     var (operations, conflicts) = mm.mergeOperations(op1, op2);
     var solvedOperations = _solveConflicts(conflicts);
     operations.addAll(solvedOperations);
-    var contentVersion = mm.mergeVersions(operations, [op1.versionHash, op2.versionHash]);
+    var contentVersion = mm.mergeVersions(operations, [version1, version2]);
+    MyLogger.info('Merge version($version1) and version($version2) based on version($commonVersion) '
+        'with ${operations.length} operations(including ${conflicts.length} conflicts), '
+        'generate new version(${contentVersion.getHash()})');
     return contentVersion;
   }
   VersionContent? _loadVersionContent(String versionHash) {
@@ -672,27 +675,35 @@ class DocumentManager {
       var baseHash = item.originalHash;
       var docHash1 = item.conflictHash1;
       var docHash2 = item.conflictHash2;
+      var timestamp1 = item.timestamp1;
+      var timestamp2 = item.timestamp2;
       var baseDoc = _loadDocContent(baseHash);
       if(baseDoc == null) {
-        MyLogger.info('_solveConflicts: error while loading document $baseHash');
+        MyLogger.warn('_solveConflicts: error while loading document $baseHash');
         continue;
       }
       var doc1 = _loadDocContent(docHash1);
       if(doc1 == null) {
-        MyLogger.info('_solveConflicts: error while loading document $docHash1');
+        MyLogger.warn('_solveConflicts: error while loading document $docHash1');
         continue;
       }
       var doc2 = _loadDocContent(docHash2);
       if(doc2 == null) {
-        MyLogger.info('_solveConflicts: error while loading document $docHash2');
+        MyLogger.warn('_solveConflicts: error while loading document $docHash2');
         continue;
       }
       ConflictManager cm = ConflictManager(baseDoc: baseDoc);
-      var newDoc = cm.genNewDocument(doc1, doc2);
+      var (totalOperations, conflicts) = cm.mergeOperations(doc1, timestamp1, doc2, timestamp2);
+      //TODO ignore conflicts now, should be optimized here if a better solution is found
+      if(conflicts.isNotEmpty) {
+        MyLogger.warn('mergeOperations: should not have any conflict here!');
+      }
+      var newDoc = cm.mergeDocument(totalOperations);
       var newDocHash = newDoc.getHash();
       _db.storeObject(newDocHash, jsonEncode(newDoc));
       var now = Util.getTimeStamp();
       var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: newDocHash, timestamp: now);
+      MyLogger.info('Solve conflict of document($docHash1) and document($docHash2) based on document($baseHash), generate new document($newDocHash)');
       resolvedOperations.add(op);
     }
     return resolvedOperations;

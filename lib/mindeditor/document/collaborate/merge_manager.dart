@@ -7,12 +7,10 @@ import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 
 class MergeManager {
-  DbHelper? db;
   VersionContent? baseVersion;
 
   MergeManager({
     required this.baseVersion,
-    this.db,
   });
 
   /// Merge two operations and return the conflicts
@@ -85,7 +83,7 @@ class MergeManager {
               case ContentOperationType.rename:
               case ContentOperationType.modify:
                 MyLogger.warn('Impossible operations! Add($thisOp) <==> $thatOp');
-                _leaveLatestOperation(thisOp, thatOp);
+                thatOp.setInvalid();
                 break;
             }
             break;
@@ -167,10 +165,12 @@ class MergeManager {
                     continue;
                   }
                   var conflict = ContentConflict(
-                      targetId: targetId,
-                      originalHash: baseHash,
-                      conflictHash1: thisOp.data!,
-                      conflictHash2: thatOp.data!,
+                    targetId: targetId,
+                    originalHash: baseHash,
+                    conflictHash1: thisOp.data!,
+                    conflictHash2: thatOp.data!,
+                    timestamp1: thisOp.timestamp,
+                    timestamp2: thatOp.timestamp,
                   );
                   conflicts.add(conflict);
                   thisOp.setInvalid();
@@ -234,14 +234,14 @@ class MergeManager {
           break;
         case ContentOperationType.del:
           int idx = _findIndexOf(table, op.targetId);
-          table.removeAt(idx + 1);
+          table.removeAt(idx);
           break;
         case ContentOperationType.move:
           int idx = _findIndexOf(table, op.targetId);
           var node = table.removeAt(idx);
           int newIdx = _findIndexOf(table, op.previousId);
           node.updatedAt = now;
-          table.insert(newIdx, node);
+          table.insert(newIdx + 1, node);
           break;
         case ContentOperationType.rename:
           int idx = _findIndexOf(table, op.targetId);
@@ -269,7 +269,7 @@ class MergeManager {
         return idx;
       }
     }
-    return 0;
+    return -1;
   }
 
   String? _findBaseHash(String targetId) {
@@ -289,11 +289,15 @@ class ContentConflict {
   String originalHash;
   String conflictHash1;
   String conflictHash2;
+  int timestamp1;
+  int timestamp2;
 
   ContentConflict({
     required this.targetId,
     required this.originalHash,
     required this.conflictHash1,
     required this.conflictHash2,
+    required this.timestamp1,
+    required this.timestamp2,
   });
 }
