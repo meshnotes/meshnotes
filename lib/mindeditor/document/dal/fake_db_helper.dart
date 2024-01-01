@@ -5,8 +5,6 @@ class FakeDbHelper implements DbHelper {
   @override
   Future<void> init() async {}
   @override
-  void storeDocTitle(String docId, String title, int timestamp) {}
-  @override
   void storeDocHash(String docId, String hash, int timestamp) {}
   @override
   void storeDocContent(String docId, String docContent, int timestamp) {}
@@ -33,6 +31,8 @@ class FakeDbHelper implements DbHelper {
   @override
   List<String> getAllValidVersionHashes() { return []; }
   @override
+  Map<String, String> getAllTitles() { return <String, String>{}; }
+  @override
   List<DocData> getAllDocuments() { return <DocData>[]; }
   @override
   String getObject(String hash) { return ''; }
@@ -45,9 +45,9 @@ class FakeDbHelper implements DbHelper {
   @override
   void setFlag(String name, String value) {}
   @override
-  String newDocument(String title, int timestamp) { return ''; }
+  String newDocument(int timestamp) { return ''; }
   @override
-  void insertOrUpdateDoc(String docId, String title, String docHash, int timestamp) {}
+  void insertOrUpdateDoc(String docId, String docHash, int timestamp) {}
   @override
   List<(String, String)> getAllBlocks() { return []; }
   @override

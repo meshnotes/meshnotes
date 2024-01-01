@@ -12,7 +12,7 @@ class GestureHandler {
   });
 
   void onTapDown(TapDownDetails details, String blockId) {
-    MyLogger.debug('efantest: onTapDown');
+    MyLogger.debug('efantest: onTapDown, blockId=$blockId');
     var offset = details.localPosition;
     final block = controller.getBlockState(blockId)!;
     int pos = block.getRender()!.getPositionByOffset(offset);

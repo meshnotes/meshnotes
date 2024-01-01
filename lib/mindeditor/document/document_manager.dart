@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:ffi';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
@@ -12,6 +11,7 @@ import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
+import 'package:mesh_note/mindeditor/document/text_desc.dart';
 import 'package:my_log/my_log.dart';
 import '../../util/util.dart';
 import '../setting/constants.dart';
@@ -27,6 +27,7 @@ class DocumentManager {
   List<DocData> _docTitles = [];
   String _currentVersion = '';
   int _currentVersionTimestamp = 0;
+  bool _syncing = false;
 
   DocumentManager({
     required DbHelper db,
@@ -41,7 +42,7 @@ class DocumentManager {
     if(_docTitles.isNotEmpty) {
       return _docTitles;
     }
-    var data = _db.getAllDocuments();
+    var data = _getAllDocumentAndTitles();
     var (_version, _time) = _getCurrentVersionAndTimestamp();
     _currentVersion = _version;
     _currentVersionTimestamp = _time;
@@ -67,6 +68,7 @@ class DocumentManager {
       if(document != null) {
         _documents[docId] = document;
       } else { // Load failed
+        //TODO Show error message here
         return;
       }
     }
@@ -76,9 +78,15 @@ class DocumentManager {
   String newDocument() {
     var title = Constants.newDocumentTitle;
     var now = Util.getTimeStamp();
-    var id = _db.newDocument(title, now);
-    _docTitles.add(DocData(docId: id, title: title, hash: '', timestamp: now));
-    return id;
+    var docId = _db.newDocument(now);
+
+    const blockId = Constants.keyTitleId;
+    var block = _genDefaultTitleBlock(title);
+    _db.storeDocBlock(docId, blockId, jsonEncode(block), now);
+    var docContent = _genDocContentWithTitle(docId, blockId, block);
+    _db.storeDocContent(docId, jsonEncode(docContent), now);
+    _docTitles.add(DocData(docId: docId, title: title, hash: '', timestamp: now));
+    return docId;
   }
 
   List<VersionData> genAndSaveNewVersionTree() {
@@ -107,7 +115,9 @@ class DocumentManager {
   /// Generate new version tree by merging local and remote version tree.
   /// If missing any version, require it from remote nodes.
   /// If no missing version, merge versions.
+  /// Once assembling, set syncing status to stop other nodes sending version_tree concurrently.
   void assembleVersionTree(List<VersionNode> versionDag) {
+    setSyncing();
     Map<String, DagNode> remoteDagMap = _buildRemoteVersionTreeMap(versionDag);
     Map<String, DagNode> localDagMap = _genVersionMap();
     Map<String, DagNode> newMap = _mergeLocalAndRemoteMap(localDagMap, remoteDagMap);
@@ -181,6 +191,14 @@ class DocumentManager {
     _tryToMergeVersionTree(_versionMap);
   }
 
+  bool isSyncing() => _syncing;
+  void setSyncing() {
+    _syncing = true;
+  }
+  void clearSyncing() {
+    _syncing = false;
+  }
+
   /// Try to merge entire version tree, called after receiving new version_tree or receiving missing versions.
   /// 1. If some versions are still missing, send require_versions request to other nodes
   /// 2. If all versions are ready, merge versions
@@ -210,15 +228,13 @@ class DocumentManager {
       _mergeCurrentAndSave(leafHash, commonVersionHash);
     }
     Controller.instance.refreshDocNavigator();
+    clearSyncing();
   }
+  /// Find all nodes that is not parent of any other node
   Set<String> _findLeafNodesInDag(Map<String, DagNode> map) {
-    Set<String> result = {};
-    var entries = map.entries;
-    for(var e in entries) {
-      result.add(e.key);
-    }
-    for(var e in entries) {
-      var parents = e.value.parents;
+    Set<String> result = map.keys.toSet();
+    for(var e in map.values) {
+      var parents = e.parents;
       for(var p in parents) {
         result.remove(p.versionHash);
       }
@@ -274,7 +290,7 @@ class DocumentManager {
         ..timestamp = node.updatedAt;
     }
     // Restore doc list
-    _db.insertOrUpdateDoc(docId, found.title, found.hash, found.timestamp);
+    _db.insertOrUpdateDoc(docId, found.hash, found.timestamp);
 
     // Store doc content into objects
     // var docContentStr = objects[found.hash]!;
@@ -713,5 +729,30 @@ class DocumentManager {
     String str = _db.getObject(docHash);
     if(str.isEmpty) return null;
     return DocContent.fromJson(jsonDecode(str));
+  }
+
+  List<DocData> _getAllDocumentAndTitles() {
+    var data = _db.getAllDocuments();
+    var titleMap = _db.getAllTitles();
+    for(var doc in data) {
+      var blockStr = titleMap[doc.docId]!;
+      var block = BlockContent.fromJson(jsonDecode(blockStr));
+      doc.title = block.text[0].text;
+    }
+    return data;
+  }
+
+  static BlockContent _genDefaultTitleBlock(String title) {
+    var blockContent = BlockContent(
+      type: Constants.blockTypeTitleTag,
+      listing: Constants.blockListTypeNone,
+      level: Constants.blockLevelDefault,
+      text: [TextDesc()..text = title],
+    );
+    return blockContent;
+  }
+  static DocContent _genDocContentWithTitle(String docId, String blockId, BlockContent blockContent) {
+    DocContentItem block = DocContentItem(blockId: blockId, blockHash: '');
+    return DocContent(contents: [block]);
   }
 }

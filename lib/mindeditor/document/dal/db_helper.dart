@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'package:mesh_note/mindeditor/document/dal/dal_version/db_script.dart';
+import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -18,7 +19,6 @@ class DbUpgradeInfo {
 abstract class DbHelper {
   Future<void> init();
   //Doc
-  void storeDocTitle(String docId, String title, int timestamp);
   void storeDocHash(String docId, String hash, int timestamp);
   void storeDocContent(String docId, String docContent, int timestamp);
   void storeDocBlock(String docId, String blockId, String data, int timestamp);
@@ -32,14 +32,15 @@ abstract class DbHelper {
   VersionData? getVersionData(String versionHash);
   List<VersionData> getAllVersions();
   List<String> getAllValidVersionHashes();
+  Map<String, String> getAllTitles();
   List<DocData> getAllDocuments();
   String getObject(String hash);
   void storeObject(String hash, String data);
   void storeVersion(String hash, String parents, int timestamp);
   String getFlag(String name);
   void setFlag(String name, String value);
-  String newDocument(String title, int timestamp);
-  void insertOrUpdateDoc(String docId, String title, String docHash, int timestamp);
+  String newDocument(int timestamp);
+  void insertOrUpdateDoc(String docId, String docHash, int timestamp);
   //Card
   List<(String, String)> getAllBlocks();
   BlockData? getRawBlockById(String docId, String blockId);
@@ -140,12 +141,6 @@ class RealDbHelper implements DbHelper {
   Future<void> updateParagraphLevel(String docId, String id, int level) async {
     const sqlParagraph = 'UPDATE blocks SET level=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [level, docId, id]);
-  }
-
-  @override
-  Future<void> storeDocTitle(String docId, String title, int timestamp) async {
-    const sql = 'UPDATE doc_list SET title=?, updated_at=? WHERE doc_id=?';
-    _database.execute(sql, [title, timestamp, docId]);
   }
 
   @override
@@ -250,21 +245,33 @@ class RealDbHelper implements DbHelper {
     }
     return result;
   }
+
+  @override
+  Map<String, String> getAllTitles() {
+    const sql = 'SELECT doc_id, data FROM blocks WHERE block_id=?';
+    final resultSet = _database.select(sql, [Constants.keyTitleId]);
+    MyLogger.debug('efantest: getAllTitles result=$resultSet');
+    var result = <String, String>{};
+    for(final row in resultSet) {
+      String docId = row['doc_id'];
+      String data = row['data'];
+      result[docId] = data;
+    }
+    return result;
+  }
   @override
   List<DocData> getAllDocuments() {
-    const sql = 'SELECT doc_id, title, doc_hash, updated_at FROM doc_list';
+    const sql = 'SELECT doc_id, doc_hash, updated_at FROM doc_list';
     final resultSet = _database.select(sql, []);
     MyLogger.debug('efantest: getAllDocumentList result=$resultSet');
     var result = <DocData>[];
     for(final row in resultSet) {
       MyLogger.verbose('efantest: row=$row');
       String docId = row['doc_id'];
-      String title = row['title'];
       String docHash = row['doc_hash'];
       int updatedAt = row['updated_at'];
-      result.add(DocData(docId: docId, title: title, hash: docHash, timestamp: updatedAt));
+      result.add(DocData(docId: docId, title: '', hash: docHash, timestamp: updatedAt));
     }
-
     return result;
   }
 
@@ -307,19 +314,19 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  String newDocument(String title, int timestamp) {
+  String newDocument(int timestamp) {
     var docId = IdGen.getUid();
-    const sql = 'INSERT INTO doc_list(doc_id, title, doc_hash, updated_at) VALUES(?, ?, ?, ?)';
-    _database.execute(sql, [docId, title, '', timestamp]);
+    const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?)';
+    _database.execute(sql, [docId, '', timestamp]);
 
     return docId;
   }
 
   @override
-  void insertOrUpdateDoc(String docId, String title, String docHash, int timestamp) {
-    const sql = 'INSERT INTO doc_list(doc_id, title, doc_hash, updated_at) VALUES(?, ?, ?, ?)  '
-        'ON CONFLICT(doc_id) DO UPDATE SET title=excluded.title, doc_hash=excluded.doc_hash, updated_at=excluded.updated_at';
-    _database.execute(sql, [docId, title, docHash, timestamp]);
+  void insertOrUpdateDoc(String docId, String docHash, int timestamp) {
+    const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?, ?)  '
+        'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at';
+    _database.execute(sql, [docId, docHash, timestamp]);
   }
 
   @override

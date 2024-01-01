@@ -377,12 +377,11 @@ class ParagraphDesc {
     if(isTitle()) {
       MyLogger.verbose('Save to title');
       parent.updateTitle(getPlainText());
-    } else {
-      MyLogger.verbose('Save to blocks: id=${getBlockId()}');
-      var block = _convertToBlockContent();
-      _lastUpdate = Util.getTimeStamp();
-      dbHelper.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
     }
+    MyLogger.verbose('Save to blocks: id=${getBlockId()}');
+    var block = _convertToBlockContent();
+    _lastUpdate = Util.getTimeStamp();
+    dbHelper.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
     // dbHelper.updateDoc(parent.doc.id, Util.getTimeStamp());
     parent.setModified();
   }
