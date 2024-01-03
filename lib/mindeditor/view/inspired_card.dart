@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:my_log/my_log.dart';
 import '../controller/controller.dart';
 import '../document/inspired_seed.dart';
@@ -29,6 +30,7 @@ class _InspiredCardViewState extends State<InspiredCardView> {
   @override
   void initState() {
     itemIndex = 0;
+    CallbackRegistry.hideKeyboard();
     super.initState();
   }
 
