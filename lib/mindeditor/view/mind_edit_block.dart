@@ -873,6 +873,18 @@ class MindEditBlockState extends State<MindEditBlock> {
 
     CallbackRegistry.refreshDoc(activeBlockId: newItem.getBlockId());
     _triggerBlockModified();
+
+    // Scroll list if this block is on the bottom of view
+    //TODO should scroll after drawing the new block
+    var render = getRender()!;
+    final blockOffset = render.localToGlobal(Offset.zero);
+    final currentSize = Rect.fromLTWH(blockOffset.dx, blockOffset.dy, render.size.width, render.size.height);
+    final totalSize = CallbackRegistry.getEditStateSize();
+    MyLogger.info('efantest: currentSize=$currentSize, totalSize=$totalSize');
+    if(totalSize != null && totalSize.bottom - currentSize.bottom <= 5 + Controller.instance.setting.blockNormalLineHeight + 5 + 10) {
+      MyLogger.info('efantest: need scroll');
+      CallbackRegistry.scrollDown(5 + Controller.instance.setting.blockNormalLineHeight + 5 + 10);
+    }
   }
 
   String _getCurrentListing() {

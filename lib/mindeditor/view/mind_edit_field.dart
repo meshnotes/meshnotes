@@ -32,6 +32,8 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   FocusAttachment? _focusAttachment;
   TextInputConnection? _textInputConnection;
   TextEditingValue? _lastEditingValue;
+  Rect? _currentSize;
+  ScrollController controller = ScrollController();
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -48,6 +50,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   @override
   Widget build(BuildContext context) {
     MyLogger.debug('efantest: build block list');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final render = context.findRenderObject()! as RenderBox;
+      _currentSize = render.localToGlobal(Offset.zero) & render.size;
+    });
     _focusAttachment!.reparent();
     Widget listView = _buildBlockList();
     if(Controller.instance.isDebugMode) {
@@ -90,6 +96,12 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     widget.focusNode.removeListener(_handleFocusChanged);
     _focusAttachment!.detach();
     super.dispose();
+  }
+
+  Rect getCurrentSize() => _currentSize!;
+
+  void scrollDown(double delta) {
+    controller.jumpTo(controller.offset + delta);
   }
 
   void _attachFocus() {
@@ -200,6 +212,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   Widget _buildBlockList() {
     var builder = ListView.builder(
+      controller: controller,
       itemCount: widget.document.paragraphs.length,
       itemBuilder: (context, index) {
         return _constructBlock(widget.document.paragraphs[index]);
