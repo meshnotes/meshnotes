@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:libp2p/network/incomplete_pool.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
-import 'package:libp2p/network/packet/packet.dart';
+import 'package:libp2p/network/protocol/packet.dart';
 import 'package:libp2p/utils.dart';
 import 'peer.dart';
 
@@ -14,6 +14,7 @@ enum NetworkStatus {
 
 // Stateless Object Transfer Protocol
 class SOTPNetworkLayer {
+  static const multicastGroup = '224.0.179.74';
   static const logPrefix = '[Network]';
   final connectionPool = ConnectionPool();
   final incompletePool = IncompletePool();
@@ -27,12 +28,17 @@ class SOTPNetworkLayer {
   NetworkStatus getStatus() => _status;
   int maxTimeout = 3000;
   NetworkEnvSimulator? _networkCondition;
+  bool useMulticast;
+  String _deviceId;
+  int _lastSentMulticast = 0;
+  static const _maxMulticastInterval = 60 * 1000; // 1 minute in milliseconds
 
   // Callback functions
-  Function()? startedCallback;
-  Function(Peer)? connectOkCallback; // For client after outgoing connect is success
-  Function(Peer)? newConnectCallback; // For server if a new incoming connect is success
-  Function(Packet)? onReceivePacket;
+  Function()? startedCallback; // Trigger after network layer started
+  Function(Peer)? connectOkCallback; // Trigger after an outgoing connect is success, for client mode
+  Function(Peer)? newConnectCallback; // Trigger after a new incoming connect is success, for server mode
+  Function(Packet)? onReceivePacket; // Trigger after a packet is received
+  Function(String, InternetAddress, int)? onDetected; // Trigger after a multicast hello message is received
 
   bool _debugIgnoreConnect = false;
   void setDebugIgnoreConnect(bool _b) => _debugIgnoreConnect = _b;
@@ -49,12 +55,18 @@ class SOTPNetworkLayer {
     this.connectOkCallback,
     this.newConnectCallback,
     this.onReceivePacket,
+    this.onDetected,
     NetworkEnvSimulator? networkCondition,
-  }) : _networkCondition = networkCondition;
+    this.useMulticast = false,
+    required String deviceId,
+  }) : _networkCondition = networkCondition, _deviceId = deviceId;
 
   start() async {
     _udp = await RawDatagramSocket.bind(localIp, localPort);
     realPort = udp.port;
+    if(useMulticast) {
+      udp.joinMulticast(InternetAddress(multicastGroup));
+    }
     _status = NetworkStatus.running;
     udp.listen((event) {
       if(event == RawSocketEvent.read) {
@@ -73,7 +85,7 @@ class SOTPNetworkLayer {
         var packet = packetFactory.getAbstractPacket()!;
         MyLogger.debug('${logPrefix} Receive packet with type(${packet.getType().name})');
         onReceivePacket?.call(packet);
-        switch(type) { // ignore: missing_enum_constant_in_switch
+        switch(type) {
           case PacketType.connect:
             if(_debugIgnoreConnect) break;
             _onConnect(peerIp, port, packet as PacketConnect);
@@ -90,6 +102,11 @@ class SOTPNetworkLayer {
             if(_debugIgnoreData) break;
             _onData(packet as PacketData);
             break;
+          case PacketType.hello:
+            if(!useMulticast) break;
+            if(peerIp == localIp && port == localPort) break; // Ignore packet from myself
+            _onHello(packet as PacketHello, peerIp, port);
+            break;
           case PacketType.invalid: // Not possible
             break;
         }
@@ -102,6 +119,9 @@ class SOTPNetworkLayer {
     int now = DateTime.now().millisecondsSinceEpoch;
     _traverseAndResend(connectionPool.getAllConnections(), now);
     _traverseAndResend(incompletePool.getAllConnections(), now);
+    if(useMulticast) {
+      _tryMulticast(now);
+    }
   }
   void _traverseAndResend(Iterable<Peer> connections, int now) {
     var timestamp = now - maxTimeout;
@@ -113,6 +133,13 @@ class SOTPNetworkLayer {
   void _traverseAndClose(List<Peer> connections) {
     for(var conn in connections) {
       conn.close();
+    }
+  }
+  void _tryMulticast(int now) {
+    if(now - _lastSentMulticast > _maxMulticastInterval) {
+      MyLogger.info('${logPrefix} send multicast message to $multicastGroup');
+      _sendHello(InternetAddress(multicastGroup), localPort);
+      _lastSentMulticast = now;
     }
   }
 
@@ -205,6 +232,22 @@ class SOTPNetworkLayer {
     if(peer == null) return;
 
     peer.onData(packet);
+  }
+
+  _onHello(PacketHello packet, InternetAddress ip, int port) {
+    String peerDeviceId = packet.deviceId;
+    MyLogger.info('${logPrefix} receive hello message from ${ip.address}:$port, with deviceId($peerDeviceId)');
+    // MyLogger.info('receive hello');
+    // _sendHello(ip, port);
+    onDetected?.call(peerDeviceId, ip, port);
+  }
+
+  void _sendHello(InternetAddress ip, int port) {
+    PacketHello reply = PacketHello(
+      deviceId: _deviceId,
+      header: PacketHeader(type: PacketType.hello, destConnectionId: 0, packetNumber: 0),
+    );
+    _sendDelegate(reply.toBytes(), ip, port);
   }
 
   Peer? _getConnectionFromHeader(PacketHeader header) {

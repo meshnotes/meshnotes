@@ -64,6 +64,9 @@ class VillageOverlay implements ApplicationController {
       localPort: _localPort,
       connectOkCallback: _onConnected,
       newConnectCallback: _onNewConnect,
+      onDetected: _onDetected,
+      deviceId: _deviceId,
+      useMulticast: true,
     );
     await _network.start();
     _addConnectTasks(_villagers);
@@ -163,6 +166,20 @@ class VillageOverlay implements ApplicationController {
     });
     _villagers.add(node);
     _onConnect(node);
+  }
+  void _onDetected(String peerDeviceId, InternetAddress peerIp, int peerPort) {
+    // Let the peer with smaller device id to connect
+    if(_deviceId.compareTo(peerDeviceId) < 0) {
+      for(var node in _villagers) {
+        if(node.ip == peerIp && node.port == peerPort) { // Already in the _villagers list
+          return;
+        }
+      }
+      var node = VillagerNode(host: peerIp.address, port: peerPort)
+        ..ip = peerIp;
+      _villagers.add(node);
+      _tryToConnect(node);
+    }
   }
   void _onConnect(VillagerNode _node) {
     MyLogger.info('${logPrefix} New connection to address(${_node.ip}:${_node.port}), id=${_node.id}, say Hello');

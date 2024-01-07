@@ -1,8 +1,8 @@
 import 'dart:math';
 
 import 'package:my_log/my_log.dart';
-import 'package:libp2p/network/packet/frame.dart';
-import 'package:libp2p/network/packet/packet.dart';
+import 'protocol/frame.dart';
+import 'protocol/packet.dart';
 import 'network_util.dart';
 
 

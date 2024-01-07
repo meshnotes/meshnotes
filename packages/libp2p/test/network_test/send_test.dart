@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:libp2p/network/peer.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
-import 'package:libp2p/network/packet/frame.dart';
-import 'package:libp2p/network/packet/packet.dart';
+import 'package:libp2p/network/protocol/frame.dart';
+import 'package:libp2p/network/protocol/packet.dart';
 import 'package:test/test.dart';
 import 'package:libp2p/network/network_layer.dart';
 
@@ -21,6 +21,7 @@ void main() {
     var server = SOTPNetworkLayer(
       localIp: serverIp,
       localPort: serverPort,
+      deviceId: 'x',
       newConnectCallback: (c) {
         serverEstablished.complete(true);
         serverConnection = c;
@@ -32,6 +33,7 @@ void main() {
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
       localPort: 0,
+      deviceId: 'x',
       connectOkCallback: (c) {
         clientEstablished.complete(true);
       },
@@ -69,6 +71,7 @@ void main() {
     var server = SOTPNetworkLayer(
       localIp: serverIp,
       localPort: serverPort,
+      deviceId: 'x',
       newConnectCallback: (c) {
         serverEstablished.complete(true);
         serverConnection = c;
@@ -81,6 +84,7 @@ void main() {
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
       localPort: 0,
+      deviceId: 'x',
       connectOkCallback: (c) {
         clientEstablished.complete(true);
       },
@@ -145,6 +149,7 @@ void main() {
     var server = SOTPNetworkLayer(
       localIp: serverIp,
       localPort: serverPort,
+      deviceId: 'x',
       newConnectCallback: (c) {
         serverEstablished.complete(true);
         serverConnection = c;
@@ -156,6 +161,7 @@ void main() {
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
       localPort: 0,
+      deviceId: 'x',
       connectOkCallback: (c) {
         clientEstablished.complete(true);
       },
@@ -238,6 +244,7 @@ Future<void> testSendObject(String localIp, int serverPort, int dataSize, {bool 
   var server = SOTPNetworkLayer(
     localIp: serverIp,
     localPort: serverPort,
+    deviceId: 'x',
     newConnectCallback: (c) {
       serverEstablished.complete(true);
       serverConnection = c;
@@ -249,6 +256,7 @@ Future<void> testSendObject(String localIp, int serverPort, int dataSize, {bool 
   var client = SOTPNetworkLayer(
     localIp: InternetAddress(localIp),
     localPort: 0,
+    deviceId: 'x',
     connectOkCallback: (c) {
       clientEstablished.complete(true);
     },

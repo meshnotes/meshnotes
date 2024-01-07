@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:libp2p/network/peer.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
-import 'package:libp2p/network/packet/packet.dart';
+import 'package:libp2p/network/protocol/packet.dart';
 import 'package:test/test.dart';
 import 'package:libp2p/network/network_layer.dart';
 
@@ -28,6 +28,7 @@ void main() {
       newConnectCallback: (c) {
         serverEstablished.complete(true);
       },
+      deviceId: 'x',
       onReceivePacket: (p) {
         final packetNumber = p.getPacketNumber();
         if(lastClientPacketNumber != 0) {
@@ -51,6 +52,7 @@ void main() {
         destId = c.getDestinationId();
         clientEstablished.complete(true);
       },
+      deviceId: 'x',
       onReceivePacket: (p) {
         final packetNumber = p.getPacketNumber();
         if(lastServerPacketNumber != 0) {
@@ -116,6 +118,7 @@ void main() {
       localPort: serverPort, newConnectCallback: (c) {
         serverEstablished.complete(true);
       },
+      deviceId: 'x',
     );
     await server.start();
 
@@ -130,6 +133,7 @@ void main() {
         destId = c.getDestinationId();
         clientEstablished.complete(true);
       },
+      deviceId: 'x',
     );
     await client.start();
     client.setNetworkEnv(NetworkEnvSimulator.dropAll);
@@ -234,6 +238,7 @@ void main() {
     var server = SOTPNetworkLayer(
       localIp: serverIp,
       localPort: serverPort,
+      deviceId: 'x',
       newConnectCallback: (c) {
         serverEstablished.complete(true);
       },
@@ -266,6 +271,7 @@ void main() {
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
       localPort: 0,
+      deviceId: 'x',
       connectOkCallback: (c) {
         sourceId = c.getSourceId();
         destId = c.getDestinationId();
@@ -388,6 +394,7 @@ void main() {
     var server = SOTPNetworkLayer(
       localIp: serverIp,
       localPort: serverPort,
+      deviceId: 'x',
       newConnectCallback: (c) {
         serverEstablished.complete(true);
       },
@@ -410,6 +417,7 @@ void main() {
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
       localPort: 0,
+      deviceId: 'x',
       connectOkCallback: (c) {
         sourceId = c.getSourceId();
         destId = c.getDestinationId();

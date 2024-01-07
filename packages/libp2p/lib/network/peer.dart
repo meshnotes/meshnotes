@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:libp2p/network/packet/packet.dart';
+import 'protocol/packet.dart';
 import 'package:libp2p/network/buffer_and_queue.dart';
 import 'package:libp2p/utils.dart';
 import 'network_util.dart';
-import 'packet/frame.dart';
+import 'protocol/frame.dart';
 import '../constants.dart';
 import 'package:my_log/my_log.dart';
 

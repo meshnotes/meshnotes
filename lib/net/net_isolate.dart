@@ -7,7 +7,7 @@ import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/villager_node.dart';
 import 'package:my_log/my_log.dart';
 import 'p2p_net.dart';
-import 'package:libp2p/application/application.dart';
+import 'package:libp2p/application/application_layer.dart';
 import 'command.dart';
 import 'status.dart';
 
