@@ -221,9 +221,11 @@ class Document {
     // if(!_hasModified) return hash;
     // Store ContentBlock objects and DocContent object
     for(var p in paragraphs) {
-      if(p.getLastUpdated() > _lastUpdate) {
-        p.storeObject();
-      }
+      // if(p.getLastUpdated() > _lastUpdate) {
+      //   p.storeObject();
+      // }
+      //TODO should optimize here, only store objects that is modified
+      p.storeObject();
     }
     var docContent = _generateDocContent();
     String docHash = docContent.getHash();
