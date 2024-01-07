@@ -110,6 +110,7 @@ void _nodeChanged(VillagerNode node) {
   final info = node.id;
   final nodeInfo = NodeInfo(id: id, name: info, status: _status);
   _nodes[id] = nodeInfo;
+  _reportNodes();
 }
 void _handleNewVersionTree(List<VersionNode> dag) {
   _sendPort?.send(Message(
@@ -133,10 +134,14 @@ void _handleSendVersions(List<SendVersionsNode> versions) {
 void _timerHandler(Timer _t) {
   if(_nodes.isEmpty) return;
 
+  _reportNodes();
+  _nodes.clear();
+}
+
+void _reportNodes() {
   final nodeList = _nodes.values.toList();
   _sendPort?.send(Message(
     cmd: Command.nodeStatus,
     parameter: nodeList,
   ));
-  _nodes.clear();
 }
