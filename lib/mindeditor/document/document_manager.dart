@@ -306,7 +306,7 @@ class DocumentManager {
       // Not support .children
       // String blockStr = objects[blockHash]!;
       String blockStr = _db.getObject(blockHash);
-      MyLogger.info('efantest: blockId=$blockId, blockHash=$blockHash, blockStr=$blockStr');
+      MyLogger.info('efantest: docId=$docId, blockId=$blockId, blockHash=$blockHash, blockStr=$blockStr');
       _db.storeObject(blockHash, blockStr);
       _db.storeDocBlock(docId, blockId, blockStr, found.timestamp);
     }

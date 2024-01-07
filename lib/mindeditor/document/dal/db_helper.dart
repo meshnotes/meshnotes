@@ -324,7 +324,7 @@ class RealDbHelper implements DbHelper {
 
   @override
   void insertOrUpdateDoc(String docId, String docHash, int timestamp) {
-    const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?, ?)  '
+    const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?) '
         'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at';
     _database.execute(sql, [docId, docHash, timestamp]);
   }
