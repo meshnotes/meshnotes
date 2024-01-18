@@ -525,4 +525,48 @@ void main() {
     expect(server.getStatus(), NetworkStatus.invalid);
     expect(client.getStatus(), NetworkStatus.invalid);
   });
+
+  test('Network connect timeout and fail', timeout: Timeout(Duration(seconds: 30)), () async {
+    MyLogger.initForTest(name: 'libp2p_test');
+    // 1. Start network services: server and client
+    // 2. Set server network environment as: drop all packets
+    // 3. Start a connection from client to server
+    // 4. Set connection's fail handler
+    // 5. Wait for timeout
+    // 6. Check connection status
+    // 7. Shutdown network services
+    var serverIp = InternetAddress.anyIPv4;
+    var loopbackIp = "127.0.0.1";
+    var server = SOTPNetworkLayer(
+      localIp: serverIp,
+      localPort: serverPort,
+      deviceId: 'x',
+    );
+    await server.start();
+    server.setNetworkEnv(NetworkEnvSimulator.dropAll);
+
+    var timeBeforeSend = DateTime.now().millisecondsSinceEpoch;
+    int? sourceId, destId;
+    var clientFailed = Completer<bool>();
+    var client = SOTPNetworkLayer(
+      localIp: InternetAddress(loopbackIp),
+      localPort: 0,
+      deviceId: 'x',
+    );
+    await client.start();
+    var connection = client.connect(loopbackIp, serverPort);
+    connection.onConnectionFail = (peer) {
+      clientFailed.complete(true);
+    };
+
+    // Wait for complete
+    await clientFailed.future;
+    expect(connection.getStatus(), ConnectionStatus.invalid);
+
+    // 7. Shutdown network services
+    server.stop();
+    client.stop();
+    expect(server.getStatus(), NetworkStatus.invalid);
+    expect(client.getStatus(), NetworkStatus.invalid);
+  });
 }

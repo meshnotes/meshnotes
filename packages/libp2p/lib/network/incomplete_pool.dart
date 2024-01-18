@@ -42,4 +42,22 @@ class IncompletePool {
   List<Peer> getAllConnections() {
     return _map.values.toList();
   }
+
+  List<Peer> removeInvalidAndClosedConnections() {
+    var result = <Peer>[];
+    var toBeRemove = <IncompleteTriple>{};
+    for(var entry in _map.entries) {
+      var k = entry.key;
+      var v = entry.value;
+      var status = v.getStatus();
+      if(status == ConnectionStatus.invalid || status == ConnectionStatus.shutdown) {
+        result.add(v);
+        toBeRemove.add(k);
+      }
+    }
+    for(var item in toBeRemove) {
+      _map.remove(item);
+    }
+    return result;
+  }
 }

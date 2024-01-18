@@ -115,37 +115,14 @@ class SOTPNetworkLayer {
     timer = Timer.periodic(Duration(milliseconds: 1000), _networkTimerHandler);
     startedCallback?.call();
   }
-  void _networkTimerHandler(Timer _t) {
-    int now = DateTime.now().millisecondsSinceEpoch;
-    _traverseAndResend(connectionPool.getAllConnections(), now);
-    _traverseAndResend(incompletePool.getAllConnections(), now);
-    if(useMulticast) {
-      _tryMulticast(now);
-    }
-  }
-  void _traverseAndResend(Iterable<Peer> connections, int now) {
-    var timestamp = now - maxTimeout;
-    for(var conn in connections) {
-      conn.updateResendQueue(timestamp);
-      conn.updateControlQueue(timestamp);
-    }
-  }
-  void _traverseAndClose(List<Peer> connections) {
-    for(var conn in connections) {
-      conn.close();
-    }
-  }
-  void _tryMulticast(int now) {
-    if(now - _lastSentMulticast > _maxMulticastInterval) {
-      MyLogger.info('${logPrefix} send multicast message to $multicastGroup');
-      _sendHello(InternetAddress(multicastGroup), localPort);
-      _lastSentMulticast = now;
-    }
+
+  void setNetworkEnv(NetworkEnvSimulator? _env) {
+    _networkCondition = _env;
   }
 
   stop() {
     if(_status == NetworkStatus.invalid) return;
-    //TODO 要发送断开连接消息
+    //TODO Should send shutdown message
     timer.cancel();
     _traverseAndClose(connectionPool.getAllConnections());
     _traverseAndClose(incompletePool.getAllConnections());
@@ -153,16 +130,15 @@ class SOTPNetworkLayer {
     _status = NetworkStatus.invalid;
   }
 
-  Peer connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null}) {
+  Peer connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null, OnDisconnectCallback? onDisconnect, }) {
     // 1. 生成source connection Id
     // 2. 将connection置为initializing状态
     // 3. 发送connect消息
     var id = _generateId();
     var ip = InternetAddress(peerIp);
-    var peer = Peer(ip: ip, port: peerPort, transport: _sendDelegate)
+    var peer = Peer(ip: ip, port: peerPort, transport: _sendDelegate, onReceiveData: onReceive, onDisconnect: onDisconnect)
       ..setInitializing()
-      ..setSourceId(id)
-      ..setOnReceive(onReceive);
+      ..setSourceId(id);
     MyLogger.info('${logPrefix} Connecting ip=$peerIp, port=$peerPort, id=$id');
     incompletePool.addConnection(ip, peerPort, id, peer);
     peer.connect();
@@ -252,6 +228,9 @@ class SOTPNetworkLayer {
 
   Peer? _getConnectionFromHeader(PacketHeader header) {
     var peer = connectionPool.getConnectionById(header.destConnectionId);
+    if(peer?.getStatus() != ConnectionStatus.established) {
+      return null;
+    }
     return peer;
   }
 
@@ -274,7 +253,53 @@ class SOTPNetworkLayer {
     }
   }
 
-  void setNetworkEnv(NetworkEnvSimulator? _env) {
-    _networkCondition = _env;
+  void _networkTimerHandler(Timer _t) {
+    _clearInvalidConnections();
+    int now = DateTime.now().millisecondsSinceEpoch;
+    _traverseAndResend(connectionPool.getAllConnections(), now);
+    _traverseAndResend(incompletePool.getAllConnections(), now);
+    if(useMulticast) {
+      _tryMulticast(now);
+    }
+  }
+  void _traverseAndResend(Iterable<Peer> connections, int now) {
+    var timestamp = now - maxTimeout;
+    for(var conn in connections) {
+      conn.updateResendQueue(timestamp);
+      conn.updateControlQueue(timestamp);
+    }
+  }
+  void _clearInvalidConnections() {
+    var invalidConnections = connectionPool.removeInvalidAndClosedConnections();
+    _triggerConnectionCallbacks(invalidConnections);
+    invalidConnections = incompletePool.removeInvalidAndClosedConnections();
+    _triggerConnectionCallbacks(invalidConnections);
+  }
+  void _traverseAndClose(List<Peer> connections) {
+    for(var conn in connections) {
+      conn.close();
+    }
+  }
+  void _tryMulticast(int now) {
+    if(now - _lastSentMulticast > _maxMulticastInterval) {
+      MyLogger.info('${logPrefix} send multicast message to $multicastGroup');
+      _sendHello(InternetAddress(multicastGroup), localPort);
+      _lastSentMulticast = now;
+    }
+  }
+
+  void _triggerConnectionCallbacks(List<Peer> connections) {
+    for(var peer in connections) {
+      switch(peer.getStatus()) {
+        case ConnectionStatus.invalid:
+          peer.onConnectionFail?.call(peer);
+          break;
+        case ConnectionStatus.shutdown:
+          break;
+        default:
+          // Do nothing
+          break;
+      }
+    }
   }
 }

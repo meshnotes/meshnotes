@@ -69,6 +69,7 @@ class VillageOverlay implements ApplicationController {
       useMulticast: true,
     );
     await _network.start();
+    // Connect to upper nodes immediately
     _addConnectTasks(_villagers);
     Timer.periodic(Duration(milliseconds: __villageTimerInterval), _villageTimerHandler);
   }
@@ -164,6 +165,9 @@ class VillageOverlay implements ApplicationController {
     _c.setOnReceive((data) {
       _onRawData(node, data);
     });
+    _c.setOnDisconnect((peer) {
+      _onDisconnect(peer);
+    });
     _villagers.add(node);
     _onConnect(node);
   }
@@ -186,6 +190,21 @@ class VillageOverlay implements ApplicationController {
     _node.setConnected();
     _addHelloTask(_node);
     onNodeChanged(_node);
+  }
+  void _onDisconnect(Peer peer) {
+    var _toBeDelete = <VillagerNode>[];
+    for(var node in _villagers) {
+      if(node.getPeer() != peer) continue;
+
+      if(node.isUpper) {
+        node.setUnknown();
+      } else {
+        _toBeDelete.add(node);
+      }
+    }
+    for(var d in _toBeDelete) {
+      _villagers.remove(d);
+    }
   }
 
   void _onRawData(VillagerNode node, List<int> rawData) {
@@ -234,6 +253,9 @@ class VillageOverlay implements ApplicationController {
     var peer = _network.connect(peerIp.address, peerPort,
       onReceive: (data) {
         _onRawData(node, data);
+      },
+      onDisconnect: (peer) {
+        _onDisconnect(peer);
       },
     );
     node.setPeer(peer);

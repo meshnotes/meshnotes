@@ -86,9 +86,7 @@ class ControlQueue {
     _connectRetryCount = 0;
   }
   void clearConnect() {
-    _packetConnect = null;
-    _connectTime = 0;
-    _connectRetryCount = 0;
+    clearAll();
   }
   void setConnectAck(PacketConnect _connectAck) {
     _packetConnect = _connectAck;
@@ -96,6 +94,9 @@ class ControlQueue {
     _connectRetryCount = 0;
   }
   void clearConnectAck() {
+    clearAll();
+  }
+  void clearAll() {
     _packetConnect = null;
     _connectTime = 0;
     _connectRetryCount = 0;

@@ -59,6 +59,9 @@ class VillagerNode {
   void setConnected() {
     _status = VillagerStatus.keepInTouch;
   }
+  void setUnknown() {
+    _status = VillagerStatus.unknown;
+  }
 
   void setPeer(Peer _p) {
     _peer = _p;
