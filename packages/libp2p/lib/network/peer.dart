@@ -2,7 +2,6 @@ import 'dart:io';
 import 'protocol/packet.dart';
 import 'package:libp2p/network/buffer_and_queue.dart';
 import 'package:libp2p/utils.dart';
-import 'network_util.dart';
 import 'protocol/frame.dart';
 import '../constants.dart';
 import 'package:my_log/my_log.dart';
@@ -24,7 +23,7 @@ enum ConnectionStatus {
 
 typedef OnReceiveDataCallback = void Function(List<int> data);
 typedef OnDisconnectCallback = void Function(Peer);
-typedef OnConnectFail = void Function(Peer);
+typedef OnConnectionFail = void Function(Peer);
 
 class Peer {
   static const logPrefix = '[Peer]';
@@ -50,7 +49,7 @@ class Peer {
   int _lastHeartbeat = 0;
   OnReceiveDataCallback? onReceiveData;
   OnDisconnectCallback? onDisconnect;
-  OnConnectFail? onConnectionFail;
+  OnConnectionFail? onConnectionFail;
   int Function(List<int>, InternetAddress, int) _transport;
   bool alreadyScheduledNotifier = false;
 
@@ -339,8 +338,8 @@ class Peer {
       final now = networkNow();
       final lastContactInterval = now - _lastContact;
       if(lastContactInterval >= 5 * maxHeartbeat) {
-        MyLogger.debug('${logPrefix} Ready to disconnect, now=$now, _lastContact=$_lastContact, maxHeartbeat=$maxHeartbeat');
-        _disconnect();
+        MyLogger.info('${logPrefix} Connection failed due to heartbeat lost, now=$now, _lastContact=$_lastContact, maxHeartbeat=$maxHeartbeat');
+        _connectFailed();
         return;
       }
       final lastHeartbeatInterval = now - _lastHeartbeat;
@@ -351,10 +350,14 @@ class Peer {
     } else if(_status != ConnectionStatus.invalid) {
       int retryCount = controlQueue.getConnectRetryCount();
       if(retryCount >= maxRetryCount) {
+        MyLogger.info('${logPrefix} Connection failed due to exceed max retry count');
         controlQueue.clearAll();
-        setInvalid();
+        _connectFailed();
       } else {
         var retryPackets = controlQueue.getRetryPacketIfTimeout(timeoutThreshold);
+        if(retryPackets.isNotEmpty) {
+          MyLogger.debug('${logPrefix} Resend packets, retry for ${retryCount + 1} time');
+        }
         for (var packet in retryPackets) {
           _sendPacket(packet);
         }
@@ -373,9 +376,13 @@ class Peer {
   }
 
   void _disconnect() {
-    if(_status == ConnectionStatus.invalid) return;
-    // TODO send shutdown packet
+    if(_status == ConnectionStatus.shutdown) return;
     onDisconnect?.call(this);
+    setShutdown();
+  }
+  void _connectFailed() {
+    if(_status == ConnectionStatus.invalid) return;
+    onConnectionFail?.call(this);
     setInvalid();
   }
 
@@ -406,9 +413,11 @@ class Peer {
   void setOnReceive(OnReceiveDataCallback? _func) {
     onReceiveData = _func;
   }
-
   void setOnDisconnect(OnDisconnectCallback? _func) {
     onDisconnect = _func;
+  }
+  void setOnConnectFail(OnConnectionFail? _func) {
+    onConnectionFail = _func;
   }
 }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:libp2p/overlay/overlay_msg.dart';
+import 'package:libp2p/utils.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_layer.dart';
 import 'package:libp2p/overlay/villager_node.dart';
@@ -72,6 +73,9 @@ class VillageOverlay implements ApplicationController {
     // Connect to upper nodes immediately
     _addConnectTasks(_villagers);
     Timer.periodic(Duration(milliseconds: __villageTimerInterval), _villageTimerHandler);
+  }
+  void stop() {
+    _network.stop();
   }
 
   /// @return true - success, false - failed
@@ -168,6 +172,9 @@ class VillageOverlay implements ApplicationController {
     _c.setOnDisconnect((peer) {
       _onDisconnect(peer);
     });
+    _c.setOnConnectFail((peer) {
+      _onConnectionFail(peer);
+    });
     _villagers.add(node);
     _onConnect(node);
   }
@@ -191,19 +198,34 @@ class VillageOverlay implements ApplicationController {
     _addHelloTask(_node);
     onNodeChanged(_node);
   }
-  void _onDisconnect(Peer peer) {
-    var _toBeDelete = <VillagerNode>[];
+  void _onConnectionFail(Peer peer) {
+    MyLogger.info('${logPrefix} connection failed');
     for(var node in _villagers) {
       if(node.getPeer() != peer) continue;
 
       if(node.isUpper) {
         node.setUnknown();
       } else {
-        _toBeDelete.add(node);
+        node.setUnknown();
+        _villagers.remove(node);
       }
+      onNodeChanged(node);
+      break;
     }
-    for(var d in _toBeDelete) {
-      _villagers.remove(d);
+  }
+  void _onDisconnect(Peer peer) {
+    MyLogger.info('${logPrefix} disconnected');
+    for(var node in _villagers) {
+      if(node.getPeer() != peer) continue;
+
+      if(node.isUpper) {
+        node.setLost();
+      } else {
+        node.setLost();
+        _villagers.remove(node);
+      }
+      onNodeChanged(node);
+      break;
     }
   }
 
@@ -257,13 +279,24 @@ class VillageOverlay implements ApplicationController {
       onDisconnect: (peer) {
         _onDisconnect(peer);
       },
+      onConnectionFail: (peer) {
+        _onConnectionFail(peer);
+      }
     );
     node.setPeer(peer);
   }
   void _tryToReconnect() {
-    // TODO
-    // Traverse all villagers who are lost contact, try to reconnect if timeout
-    // If failed, double the timeout interval
+    int now = networkNow();
+    var reconnectVillages = <VillagerNode>[];
+    for(var node in _villagers) {
+      final status = node.getStatus();
+      if(status == VillagerStatus.unknown || status == VillagerStatus.lostContact) {
+        if(now - node.failedTimestamp >= node.currentReconnectIntervalInSeconds * 1000) {
+          reconnectVillages.add(node);
+        }
+      }
+    }
+    _addConnectTasks(reconnectVillages);
   }
 
   String _introduceMyselfMessage() {

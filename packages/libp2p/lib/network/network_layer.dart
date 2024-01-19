@@ -130,13 +130,13 @@ class SOTPNetworkLayer {
     _status = NetworkStatus.invalid;
   }
 
-  Peer connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null, OnDisconnectCallback? onDisconnect, }) {
+  Peer connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null, OnDisconnectCallback? onDisconnect, OnConnectionFail? onConnectionFail, }) {
     // 1. 生成source connection Id
     // 2. 将connection置为initializing状态
     // 3. 发送connect消息
     var id = _generateId();
     var ip = InternetAddress(peerIp);
-    var peer = Peer(ip: ip, port: peerPort, transport: _sendDelegate, onReceiveData: onReceive, onDisconnect: onDisconnect)
+    var peer = Peer(ip: ip, port: peerPort, transport: _sendDelegate, onReceiveData: onReceive, onDisconnect: onDisconnect, onConnectionFail: onConnectionFail)
       ..setInitializing()
       ..setSourceId(id);
     MyLogger.info('${logPrefix} Connecting ip=$peerIp, port=$peerPort, id=$id');
@@ -254,10 +254,13 @@ class SOTPNetworkLayer {
   }
 
   void _networkTimerHandler(Timer _t) {
-    _clearInvalidConnections();
+    /// 1. Resend connections and incomplete connections
+    /// 2. Clear invalid or disconnected connections
+    /// 3. Broadcast announce
     int now = DateTime.now().millisecondsSinceEpoch;
     _traverseAndResend(connectionPool.getAllConnections(), now);
     _traverseAndResend(incompletePool.getAllConnections(), now);
+    _clearInvalidConnections();
     if(useMulticast) {
       _tryMulticast(now);
     }
@@ -270,10 +273,8 @@ class SOTPNetworkLayer {
     }
   }
   void _clearInvalidConnections() {
-    var invalidConnections = connectionPool.removeInvalidAndClosedConnections();
-    _triggerConnectionCallbacks(invalidConnections);
-    invalidConnections = incompletePool.removeInvalidAndClosedConnections();
-    _triggerConnectionCallbacks(invalidConnections);
+    var _ = connectionPool.removeInvalidAndClosedConnections();
+    _ = incompletePool.removeInvalidAndClosedConnections();
   }
   void _traverseAndClose(List<Peer> connections) {
     for(var conn in connections) {
@@ -285,21 +286,6 @@ class SOTPNetworkLayer {
       MyLogger.info('${logPrefix} send multicast message to $multicastGroup');
       _sendHello(InternetAddress(multicastGroup), localPort);
       _lastSentMulticast = now;
-    }
-  }
-
-  void _triggerConnectionCallbacks(List<Peer> connections) {
-    for(var peer in connections) {
-      switch(peer.getStatus()) {
-        case ConnectionStatus.invalid:
-          peer.onConnectionFail?.call(peer);
-          break;
-        case ConnectionStatus.shutdown:
-          break;
-        default:
-          // Do nothing
-          break;
-      }
     }
   }
 }

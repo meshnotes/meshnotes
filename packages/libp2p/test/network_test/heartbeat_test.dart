@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-
 import 'package:libp2p/network/peer.dart';
+import 'package:libp2p/utils.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
-import 'package:libp2p/network/network_util.dart';
 import 'package:test/test.dart';
 import 'package:libp2p/network/network_layer.dart';
 

@@ -11,3 +11,7 @@ int randomId() {
 int randomInitialPacketNumber() {
   return _random.nextInt(maximumInitialPacketNumber - minimalInitialPacketNumber) + minimalInitialPacketNumber;
 }
+
+int networkNow() {
+  return DateTime.now().millisecondsSinceEpoch;
+}

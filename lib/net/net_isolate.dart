@@ -110,6 +110,7 @@ void _nodeChanged(VillagerNode node) {
   final info = node.id;
   final nodeInfo = NodeInfo(id: id, name: info, status: _status);
   _nodes[id] = nodeInfo;
+  MyLogger.info('Node changed: $id: $nodeInfo');
 }
 void _handleNewVersionTree(List<VersionNode> dag) {
   _sendPort?.send(Message(

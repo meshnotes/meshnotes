@@ -1,9 +1,8 @@
 import 'dart:math';
-
 import 'package:my_log/my_log.dart';
+import '../utils.dart';
 import 'protocol/frame.dart';
 import 'protocol/packet.dart';
-import 'network_util.dart';
 
 
 class RetryFrame {
