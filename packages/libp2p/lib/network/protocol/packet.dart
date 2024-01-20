@@ -4,11 +4,11 @@ import 'frame.dart';
 import 'util.dart';
 
 enum PacketType {
-  connect,
-  connectAck,
-  connected,
-  data,
-  hello,
+  connect,    // initialize connect from client
+  connectAck, // response connect_ack from server
+  connected,  // response connected from client, connection established
+  data,       // send data frames
+  announce,   // broadcast
   invalid,
 }
 
@@ -145,15 +145,15 @@ class PacketData extends Packet {
 /// +---------------+
 /// | deviceId(len) |
 /// +---------------+
-class PacketHello extends Packet {
+class PacketAnnounce extends Packet {
   String deviceId;
 
-  PacketHello({
+  PacketAnnounce({
     required this.deviceId,
     required super.header,
   });
 
-  factory PacketHello.fromBytes(List<int> bytes) {
+  factory PacketAnnounce.fromBytes(List<int> bytes) {
     var header = PacketHeader.fromBytes(bytes);
     int len = buildBytes16(bytes, PacketHeader.getLength());
     final data = bytes.sublist(PacketHeader.getLength() + 2);
@@ -161,7 +161,7 @@ class PacketHello extends Packet {
       //TODO invalid frame
     }
     String deviceId = utf8.decode(data);
-    return PacketHello(header: header, deviceId: deviceId);
+    return PacketAnnounce(header: header, deviceId: deviceId);
   }
 
   @override
@@ -210,8 +210,8 @@ class PacketFactory {
         return length == PacketConnect.getLength();
       case PacketType.data:
         return true;
-      case PacketType.hello:
-        return PacketHello.isValid(data);
+      case PacketType.announce:
+        return PacketAnnounce.isValid(data);
       case PacketType.invalid:
         return false;
     }
@@ -232,8 +232,8 @@ class PacketFactory {
     return PacketData.fromBytes(data);
   }
 
-  PacketHello getPacketHello() {
-    return PacketHello.fromBytes(data);
+  PacketAnnounce getPacketHello() {
+    return PacketAnnounce.fromBytes(data);
   }
 
   Packet? getAbstractPacket() {
@@ -245,7 +245,7 @@ class PacketFactory {
         return getPacketConnect();
       case PacketType.data:
         return getPacketData();
-      case PacketType.hello:
+      case PacketType.announce:
         return getPacketHello();
       case PacketType.invalid:
         return null;

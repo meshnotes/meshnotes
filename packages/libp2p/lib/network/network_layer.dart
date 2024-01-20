@@ -38,7 +38,7 @@ class SOTPNetworkLayer {
   Function(Peer)? connectOkCallback; // Trigger after an outgoing connect is success, for client mode
   Function(Peer)? newConnectCallback; // Trigger after a new incoming connect is success, for server mode
   Function(Packet)? onReceivePacket; // Trigger after a packet is received
-  Function(String, InternetAddress, int)? onDetected; // Trigger after a multicast hello message is received
+  Function(String, InternetAddress, int)? onDetected; // Trigger after a multicast announce message is received
 
   bool _debugIgnoreConnect = false;
   void setDebugIgnoreConnect(bool _b) => _debugIgnoreConnect = _b;
@@ -102,10 +102,10 @@ class SOTPNetworkLayer {
             if(_debugIgnoreData) break;
             _onData(packet as PacketData);
             break;
-          case PacketType.hello:
+          case PacketType.announce:
             if(!useMulticast) break;
             if(peerIp == localIp && port == localPort) break; // Ignore packet from myself
-            _onHello(packet as PacketHello, peerIp, port);
+            _onAnnounce(packet as PacketAnnounce, peerIp, port);
             break;
           case PacketType.invalid: // Not possible
             break;
@@ -210,18 +210,16 @@ class SOTPNetworkLayer {
     peer.onData(packet);
   }
 
-  _onHello(PacketHello packet, InternetAddress ip, int port) {
+  _onAnnounce(PacketAnnounce packet, InternetAddress ip, int port) {
     String peerDeviceId = packet.deviceId;
-    MyLogger.info('${logPrefix} receive hello message from ${ip.address}:$port, with deviceId($peerDeviceId)');
-    // MyLogger.info('receive hello');
-    // _sendHello(ip, port);
+    MyLogger.info('${logPrefix} receive announce message from ${ip.address}:$port, with deviceId($peerDeviceId)');
     onDetected?.call(peerDeviceId, ip, port);
   }
 
-  void _sendHello(InternetAddress ip, int port) {
-    PacketHello reply = PacketHello(
+  void _sendAnnounce(InternetAddress ip, int port) {
+    PacketAnnounce reply = PacketAnnounce(
       deviceId: _deviceId,
-      header: PacketHeader(type: PacketType.hello, destConnectionId: 0, packetNumber: 0),
+      header: PacketHeader(type: PacketType.announce, destConnectionId: 0, packetNumber: 0),
     );
     _sendDelegate(reply.toBytes(), ip, port);
   }
@@ -284,7 +282,7 @@ class SOTPNetworkLayer {
   void _tryMulticast(int now) {
     if(now - _lastSentMulticast > _maxMulticastInterval) {
       MyLogger.info('${logPrefix} send multicast message to $multicastGroup');
-      _sendHello(InternetAddress(multicastGroup), localPort);
+      _sendAnnounce(InternetAddress(multicastGroup), localPort);
       _lastSentMulticast = now;
     }
   }
