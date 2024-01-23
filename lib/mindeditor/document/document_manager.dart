@@ -282,11 +282,10 @@ class DocumentManager {
     if(found != null && found.hash == node.docHash && found.timestamp == node.updatedAt) return;
 
     if(found == null) {
-      found = DocData(docId: docId, title: node.title, hash: node.docHash, timestamp: node.updatedAt);
+      found = DocData(docId: docId, title: '', hash: node.docHash, timestamp: node.updatedAt);
       _docTitles.add(found);
     } else {
-      found..title = node.title
-        ..hash = node.docHash
+      found..hash = node.docHash
         ..timestamp = node.updatedAt;
     }
     // Restore doc list
@@ -307,7 +306,15 @@ class DocumentManager {
       // String blockStr = objects[blockHash]!;
       String blockStr = _db.getObject(blockHash);
       MyLogger.info('efantest: docId=$docId, blockId=$blockId, blockHash=$blockHash, blockStr=$blockStr');
-      _db.storeObject(blockHash, blockStr);
+      if(blockId == Constants.keyTitleId) {
+        BlockContent blockContent = BlockContent.fromJson(jsonDecode(blockStr));
+        var title = '';
+        for(var t in blockContent.text) {
+          title += t.text;
+        }
+        found.title = title;
+      }
+      // _db.storeObject(blockHash, blockStr);
       _db.storeDocBlock(docId, blockId, blockStr, found.timestamp);
     }
     // Update doc content
@@ -449,7 +456,7 @@ class DocumentManager {
   static List<VersionContentItem> _genDocTreeNodeList(List<DocData> list) {
     List<VersionContentItem> result = [];
     for(var item in list) {
-      var node = VersionContentItem(docId: item.docId, docHash: item.hash, title: item.title, updatedAt: item.timestamp);
+      var node = VersionContentItem(docId: item.docId, docHash: item.hash, updatedAt: item.timestamp);
       result.add(node);
     }
     return result;

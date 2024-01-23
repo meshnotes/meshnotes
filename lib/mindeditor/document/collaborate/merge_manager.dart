@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:mesh_note/mindeditor/document/collaborate/diff_manager.dart';
-import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
@@ -20,33 +17,26 @@ class MergeManager {
   ///   2.2 Add operation
   ///     2.2.1 conflicts to another add operation, unless it has the same title, and hash, and parent, and previous node
   ///       2.2.1.1 use the latest one
-  ///     2.2.2 del/move/rename/modify are not possible
+  ///     2.2.2 del/move/modify are not possible
   ///   2.3 Move operation
   ///     2.3.1 conflicts to another move operation, unless it has the same parent and previous node
   ///       2.3.1.1 use the latest one
   ///     2.3.2 conflicts to del operation
   ///       2.3.2.1 use the latest one
-  ///     2.3.3 compatible to rename or modify operation
+  ///     2.3.3 compatible to modify operation
   ///     2.3.4 add is not possible
   ///   2.4 Del operation
-  ///     2.4.1 conflicts to move/rename/modify operations
+  ///     2.4.1 conflicts to move/modify operations
   ///       2.4.1.1 use the latest one
   ///     2.4.2 compatible to del operation
   ///     2.4.3 add is not possible
-  ///   2.5 Rename operation
-  ///     2.5.1 conflicts to another rename operation, unless it has the same title
-  ///       2.5.1.1 use the latest one
+  ///   2.5 Modify operation
+  ///     2.5.1 conflicts to another modify operation, unless it has the same hash
+  ///       2.5.1.1 use the merge content algorithm
   ///     2.5.2 conflicts to del operation
   ///       2.5.2.1 use the latest one
-  ///     2.5.3 compatible to move or modify operation
+  ///     2.5.3 compatible to move operations
   ///     2.5.4 add is not possible
-  ///   2.6 Modify operation
-  ///     2.6.1 conflicts to another modify operation, unless it has the same hash
-  ///       2.6.1.1 use the merge content algorithm
-  ///     2.6.2 conflicts to del operation
-  ///       2.6.2.1 use the latest one
-  ///     2.6.3 compatible to move/rename operations
-  ///     2.6.4 add is not possible
   /// 3. Return all operations and conflicts
   (List<ContentOperation>, List<ContentConflict>) mergeOperations(DiffOperations op1, DiffOperations op2) {
     var totalOperations = <ContentOperation>[...op1.operations, ...op2.operations];
@@ -73,14 +63,13 @@ class MergeManager {
           case ContentOperationType.add:
             switch(thatOp.operation) {
               case ContentOperationType.add:
-                if(thisOp.title != thatOp.title || thisOp.data != thatOp.data || thisOp.parentId != thatOp.parentId || thisOp.previousId != thatOp.previousId) {
+                if(thisOp.data != thatOp.data || thisOp.parentId != thatOp.parentId || thisOp.previousId != thatOp.previousId) {
                   MyLogger.warn('Conflict operations! Add($thisOp) <==> Add($thatOp)');
                 }
                 _leaveLatestOperation(thisOp, thatOp); // Leave only the latest add, even if title/data/parentId/previousId are all identity
                 break;
               case ContentOperationType.del:
               case ContentOperationType.move:
-              case ContentOperationType.rename:
               case ContentOperationType.modify:
                 MyLogger.warn('Impossible operations! Add($thisOp) <==> $thatOp');
                 thatOp.setInvalid();
@@ -101,7 +90,6 @@ class MergeManager {
                 MyLogger.warn('Impossible operations! Move($thisOp) <==> Add($thatOp)');
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
-              case ContentOperationType.rename:
               case ContentOperationType.modify:
                 // Compatible, do nothing
                 break;
@@ -110,7 +98,6 @@ class MergeManager {
           case ContentOperationType.del:
             switch(thatOp.operation) {
               case ContentOperationType.move:
-              case ContentOperationType.rename:
               case ContentOperationType.modify:
                 MyLogger.warn('Conflict operations! Del($thisOp) <==> $thatOp');
                 _leaveLatestOperation(thisOp, thatOp);
@@ -120,28 +107,6 @@ class MergeManager {
                 break;
               case ContentOperationType.add:
                 MyLogger.warn('Impossible operations! Del($thisOp) <==> Add($thatOp)');
-                _leaveLatestOperation(thisOp, thatOp);
-                break;
-            }
-            break;
-          case ContentOperationType.rename:
-            switch(thatOp.operation) {
-              case ContentOperationType.rename:
-                if(thisOp.title != thatOp.title) {
-                  MyLogger.warn('Conflict operations! Rename($thisOp) <==> Rename($thatOp)');
-                }
-                _leaveLatestOperation(thisOp, thatOp);
-                break;
-              case ContentOperationType.del:
-                MyLogger.warn('Conflict operations! Rename($thisOp) <==> Del($thatOp)');
-                _leaveLatestOperation(thisOp, thatOp);
-                break;
-              case ContentOperationType.move:
-              case ContentOperationType.modify:
-                // Compatible, do nothing
-                break;
-              case ContentOperationType.add:
-                MyLogger.warn('Impossible operations! Rename($thisOp) <==> Add($thatOp)');
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
             }
@@ -184,7 +149,6 @@ class MergeManager {
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
               case ContentOperationType.move:
-              case ContentOperationType.rename:
                 // Compatible, do nothing
                 break;
               case ContentOperationType.add:
@@ -229,7 +193,7 @@ class MergeManager {
       switch(op.operation) {
         case ContentOperationType.add:
           int idx = _findIndexOf(table, op.previousId);
-          var newNode = VersionContentItem(docId: op.targetId, docHash: op.data!, title: op.title!, updatedAt: now);
+          var newNode = VersionContentItem(docId: op.targetId, docHash: op.data!, updatedAt: now);
           table.insert(idx + 1, newNode);
           break;
         case ContentOperationType.del:
@@ -242,12 +206,6 @@ class MergeManager {
           int newIdx = _findIndexOf(table, op.previousId);
           node.updatedAt = now;
           table.insert(newIdx + 1, node);
-          break;
-        case ContentOperationType.rename:
-          int idx = _findIndexOf(table, op.targetId);
-          var node = table[idx];
-          node.title = op.title!;
-          node.updatedAt = now;
           break;
         case ContentOperationType.modify:
           int idx = _findIndexOf(table, op.targetId);

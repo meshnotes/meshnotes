@@ -45,7 +45,7 @@ DiffOperations _genSimpleDiffOperations(String version, List<String> names, int 
   List<ContentOperation> operations = [];
   String? lastId;
   for(var item in names) {
-    var op = ContentOperation(operation: ContentOperationType.add, targetId: item, title: 'title_$item', data: 'hash_$item', previousId: lastId, timestamp: timestamp);
+    var op = ContentOperation(operation: ContentOperationType.add, targetId: item, data: 'hash_$item', previousId: lastId, timestamp: timestamp);
     operations.add(op);
     lastId = item;
   }

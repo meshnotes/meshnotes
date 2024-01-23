@@ -4,7 +4,6 @@ enum ContentOperationType {
   add,
   del,
   move,
-  rename,
   modify,
 }
 
@@ -13,7 +12,6 @@ class ContentOperation {
   String targetId;
   String? parentId;
   String? previousId;
-  String? title;
   String? data;
   bool _valid = true;
   int timestamp;
@@ -23,7 +21,6 @@ class ContentOperation {
     required this.targetId,
     this.parentId,
     this.previousId,
-    this.title,
     this.data,
     required this.timestamp,
   });
@@ -87,7 +84,6 @@ class DiffOperations {
         targetId: item.docId,
         parentId: null,
         previousId: lastNodeId,
-        title: item.title,
         data: item.docHash,
         timestamp: timestamp,
       );
@@ -101,7 +97,6 @@ class DiffOperations {
 
 class ContentNode {
   String contentId;
-  String contentName;
   String contentHash;
   String? parentId;
   String? previousId;
@@ -109,7 +104,6 @@ class ContentNode {
 
   ContentNode({
     required this.contentId,
-    required this.contentName,
     required this.contentHash,
     this.parentId,
     this.previousId,
@@ -125,7 +119,6 @@ class DiffManager {
   ///   2.2 If any item appears in version2 but not in version1, that's deleted
   ///   2.3 If any item appears both in version1 and version2
   ///     2.3.1 but with different parent or previous node, that's moved
-  ///     2.3.2 but with different name, that's renamed
   ///     2.3.3 but with different hash, that's modified
   ///     2.3.4 the operations above may occur at the same time
   ///   2.4 Otherwise, the content does not change
@@ -147,11 +140,7 @@ class DiffManager {
       var baseItem = baseList[baseIdx];
       final targetId = targetItem.contentId;
       final baseId = baseItem.contentId;
-      if(targetId == baseId) { // With same ID, maybe rename or modify
-        if(targetItem.contentName != baseItem.contentName) {
-          var op = ContentOperation(operation: ContentOperationType.rename, targetId: targetId, title: targetItem.contentName, timestamp: timestamp);
-          operations.add(op);
-        }
+      if(targetId == baseId) { // With same ID, maybe modify
         if(targetItem.contentHash != baseItem.contentHash) {
           var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: targetItem.contentHash, timestamp: timestamp);
           operations.add(op);
@@ -169,11 +158,7 @@ class DiffManager {
             baseList.remove(baseItem);
             var op = ContentOperation(operation: ContentOperationType.move, targetId: targetId, parentId: null, previousId: lastNodeId, timestamp: timestamp);
             operations.add(op);
-            if (targetItem.contentName != baseItem.contentName) {
-              var op = ContentOperation(operation: ContentOperationType.rename, targetId: targetId, title: targetItem.contentName, timestamp: timestamp);
-              operations.add(op);
-            }
-            if (targetItem.contentHash != baseItem.contentHash) {
+            if (targetItem.contentHash != baseItem.contentHash) { // Should be moved and modified
               var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: targetItem.contentHash, timestamp: timestamp);
               operations.add(op);
             }
@@ -183,7 +168,6 @@ class DiffManager {
                 targetId: targetId,
                 parentId: null,
                 previousId: lastNodeId,
-                title: targetItem.contentName,
                 data: targetItem.contentHash,
                 timestamp: timestamp,
             );
@@ -201,7 +185,6 @@ class DiffManager {
           targetId: targetItem.contentId,
           parentId: null,
           previousId: lastNodeId,
-          title: targetItem.contentName,
           data: targetItem.contentHash,
           timestamp: timestamp,
       );
@@ -251,9 +234,8 @@ class DiffManager {
     for(var item in contentVersion.table) {
       var docId = item.docId;
       var docHash = item.docHash;
-      var docTitle = item.title;
       var timestamp = item.updatedAt;
-      var node = ContentNode(contentId: docId, contentName: docTitle, contentHash: docHash, previousId: lastNode?.contentId, updatedAt: timestamp);
+      var node = ContentNode(contentId: docId, contentHash: docHash, previousId: lastNode?.contentId, updatedAt: timestamp);
       list.add(node);
       map[docId] = node;
       lastNode = node;

@@ -1,4 +1,3 @@
-import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:my_log/my_log.dart';
 
 class VersionManager {
