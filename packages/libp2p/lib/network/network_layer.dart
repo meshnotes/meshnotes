@@ -124,8 +124,8 @@ class SOTPNetworkLayer {
   }
 
   stop() {
+    MyLogger.info('${logPrefix} Shutdown network_layer');
     if(_status == NetworkStatus.invalid) return;
-    //TODO Should send shutdown message
     timer.cancel();
     _traverseAndClose(connectionPool.getAllConnections());
     _traverseAndClose(incompletePool.getAllConnections());

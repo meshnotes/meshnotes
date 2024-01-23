@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:libp2p/overlay/villager_node.dart';
 import 'package:my_log/my_log.dart';
