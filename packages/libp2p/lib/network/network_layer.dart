@@ -107,6 +107,9 @@ class SOTPNetworkLayer {
             if(peerIp == localIp && port == localPort) break; // Ignore packet from myself
             _onAnnounce(packet as PacketAnnounce, peerIp, port);
             break;
+          case PacketType.bye:
+            _onBye(packet as PacketBye);
+            break;
           case PacketType.invalid: // Not possible
             break;
         }
@@ -222,6 +225,17 @@ class SOTPNetworkLayer {
       header: PacketHeader(type: PacketType.announce, destConnectionId: 0, packetNumber: 0),
     );
     _sendDelegate(reply.toBytes(), ip, port);
+  }
+
+  void _onBye(PacketBye packet) {
+    final header = packet.header;
+    if(packet.tag == PacketBye.tagByeAck) { // Receive bye_ack, ignore it
+      return;
+    }
+    var peer = _getConnectionFromHeader(header);
+    if(peer == null) return;
+
+    peer.onClose();
   }
 
   Peer? _getConnectionFromHeader(PacketHeader header) {

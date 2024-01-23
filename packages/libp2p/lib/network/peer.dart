@@ -135,6 +135,13 @@ class Peer {
     );
     _sendPacket(packet);
   }
+  void _sendBye() {
+    var packet = PacketBye(
+      tag: PacketBye.tagBye,
+      header: _buildPacketHeader(PacketType.bye),
+    );
+    _sendPacket(packet);
+  }
 
   bool onConnected(PacketConnect packet) {
     // 1. 确认connection状态为establishing
@@ -218,6 +225,10 @@ class Peer {
       }
     }
     return true;
+  }
+
+  void onClose() {
+    _disconnect();
   }
 
   Future<void> _notifyUpperLayerOnReceivedData() async {
@@ -407,6 +418,7 @@ class Peer {
     _destinationId = destId;
   }
   void close() {
+    _sendBye();
     _disconnect();
   }
 

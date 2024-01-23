@@ -9,6 +9,7 @@ enum PacketType {
   connected,  // response connected from client, connection established
   data,       // send data frames
   announce,   // broadcast
+  bye,        // close a connection
   invalid,
 }
 
@@ -190,6 +191,48 @@ class PacketAnnounce extends Packet {
   }
 }
 
+/// Packet implementation for bye message
+/// +---------------+
+/// | header        |
+/// +---------------+
+/// | tag           |
+/// +---------------+
+class PacketBye extends Packet {
+  int tag;
+  static const tagBye = 0;
+  static const tagByeAck = 1;
+  PacketBye({
+    required this.tag,
+    required super.header,
+  });
+
+  factory PacketBye.fromBytes(List<int> bytes) {
+    var header = PacketHeader.fromBytes(bytes);
+    int start = PacketHeader.getLength();
+    int tag = buildBytes32(bytes, start);
+    return PacketBye(tag: tag, header: header);
+  }
+
+  @override
+  List<int> toBytes() {
+    var result = List.filled(getLength(), 0);
+    header.fillBytes(result);
+    int start = PacketHeader.getLength();
+    fillBytes32(result, start, tag);
+    return result;
+  }
+
+  int getLength() {
+    int headerLength = PacketHeader.getLength();
+    return headerLength + 4;
+  }
+
+  static bool isValid(List<int> data) {
+    int headerLength = PacketHeader.getLength();
+    return data.length == headerLength + 4;
+  }
+}
+
 class PacketFactory {
   List<int> data;
   int _type;
@@ -212,6 +255,8 @@ class PacketFactory {
         return true;
       case PacketType.announce:
         return PacketAnnounce.isValid(data);
+      case PacketType.bye:
+        return PacketBye.isValid(data);
       case PacketType.invalid:
         return false;
     }
@@ -236,6 +281,10 @@ class PacketFactory {
     return PacketAnnounce.fromBytes(data);
   }
 
+  PacketBye getPacketBye() {
+    return PacketBye.fromBytes(data);
+  }
+
   Packet? getAbstractPacket() {
     final type = getType();
     switch(type) {
@@ -247,6 +296,8 @@ class PacketFactory {
         return getPacketData();
       case PacketType.announce:
         return getPacketHello();
+      case PacketType.bye:
+        return getPacketBye();
       case PacketType.invalid:
         return null;
     }
