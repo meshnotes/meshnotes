@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import '../setting/constants.dart';
 import '../setting/setting.dart';
@@ -41,6 +42,7 @@ class _SettingViewState extends State<SettingView> {
       _controllers.add(TextEditingController(text: item.value));
     }
     everChanged = false;
+    CallbackRegistry.hideKeyboard();
   }
 
   @override

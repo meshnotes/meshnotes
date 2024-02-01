@@ -1,6 +1,6 @@
 import 'package:my_log/my_log.dart';
 import 'package:test/test.dart';
-import 'package:libp2p/network/packet/packet.dart';
+import 'package:libp2p/network/protocol/packet.dart';
 
 void main() {
   test('Packet from bytes', () {

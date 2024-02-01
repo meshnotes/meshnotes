@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'frame.dart';
 import 'util.dart';
 
 enum PacketType {
-  connect,
-  connectAck,
-  connected,
-  data,
+  connect,    // initialize connect from client
+  connectAck, // response connect_ack from server
+  connected,  // response connected from client, connection established
+  data,       // send data frames
+  announce,   // broadcast
+  bye,        // close a connection
   invalid,
 }
 
@@ -45,7 +49,7 @@ class PacketHeader {
   }
 }
 
-// Abstract class for sending and resending packets
+/// Abstract class for sending and resending packets
 abstract class Packet {
   PacketHeader header;
 
@@ -66,7 +70,7 @@ abstract class Packet {
   List<int> toBytes();
 }
 
-// Packet implementation for connect/connect_ack/connected message
+/// Packet implementation for connect/connect_ack/connected message
 class PacketConnect extends Packet {
   int sourceConnectionId;
 
@@ -94,7 +98,7 @@ class PacketConnect extends Packet {
   }
 }
 
-// Packet implementation for data message
+/// Packet implementation for data message
 class PacketData extends Packet {
   List<Frame> frames;
 
@@ -134,12 +138,108 @@ class PacketData extends Packet {
   }
 }
 
+/// Packet implementation for hello message
+/// +---------------+
+/// | header        |
+/// +---------------+
+/// | len(2)        |
+/// +---------------+
+/// | deviceId(len) |
+/// +---------------+
+class PacketAnnounce extends Packet {
+  String deviceId;
+
+  PacketAnnounce({
+    required this.deviceId,
+    required super.header,
+  });
+
+  factory PacketAnnounce.fromBytes(List<int> bytes) {
+    var header = PacketHeader.fromBytes(bytes);
+    int len = buildBytes16(bytes, PacketHeader.getLength());
+    final data = bytes.sublist(PacketHeader.getLength() + 2);
+    if(data.length != len) {
+      //TODO invalid frame
+    }
+    String deviceId = utf8.decode(data);
+    return PacketAnnounce(header: header, deviceId: deviceId);
+  }
+
+  @override
+  List<int> toBytes() {
+    var result = List.filled(getLength(), 0);
+    header.fillBytes(result);
+    int len = deviceId.length;
+    int start = PacketHeader.getLength();
+    fillBytes16(result, start, len);
+    start += 2;
+    var bytes = utf8.encode(deviceId);
+    result.setRange(start, start + len, bytes);
+    return result;
+  }
+
+  int getLength() {
+    int headerLength = PacketHeader.getLength();
+    int len = deviceId.length;
+    return headerLength + len + 2;
+  }
+
+  static bool isValid(List<int> data) {
+    int headerLength = PacketHeader.getLength();
+    int len = buildBytes16(data, headerLength);
+    return data.length == headerLength + 2 + len;
+  }
+}
+
+/// Packet implementation for bye message
+/// +---------------+
+/// | header        |
+/// +---------------+
+/// | tag           |
+/// +---------------+
+class PacketBye extends Packet {
+  int tag;
+  static const tagBye = 0;
+  static const tagByeAck = 1;
+  PacketBye({
+    required this.tag,
+    required super.header,
+  });
+
+  factory PacketBye.fromBytes(List<int> bytes) {
+    var header = PacketHeader.fromBytes(bytes);
+    int start = PacketHeader.getLength();
+    int tag = buildBytes32(bytes, start);
+    return PacketBye(tag: tag, header: header);
+  }
+
+  @override
+  List<int> toBytes() {
+    var result = List.filled(getLength(), 0);
+    header.fillBytes(result);
+    int start = PacketHeader.getLength();
+    fillBytes32(result, start, tag);
+    return result;
+  }
+
+  int getLength() {
+    int headerLength = PacketHeader.getLength();
+    return headerLength + 4;
+  }
+
+  static bool isValid(List<int> data) {
+    int headerLength = PacketHeader.getLength();
+    return data.length == headerLength + 4;
+  }
+}
+
 class PacketFactory {
   List<int> data;
   int _type;
 
   PacketFactory({required this.data}): _type = buildBytes32(data, 0);
 
+  /// Check whether packet data is valid, based on the packet type and data length
   bool isValid() {
     if(_type < 0 || _type >= PacketType.values.length) {
       return false;
@@ -153,6 +253,10 @@ class PacketFactory {
         return length == PacketConnect.getLength();
       case PacketType.data:
         return true;
+      case PacketType.announce:
+        return PacketAnnounce.isValid(data);
+      case PacketType.bye:
+        return PacketBye.isValid(data);
       case PacketType.invalid:
         return false;
     }
@@ -173,6 +277,14 @@ class PacketFactory {
     return PacketData.fromBytes(data);
   }
 
+  PacketAnnounce getPacketHello() {
+    return PacketAnnounce.fromBytes(data);
+  }
+
+  PacketBye getPacketBye() {
+    return PacketBye.fromBytes(data);
+  }
+
   Packet? getAbstractPacket() {
     final type = getType();
     switch(type) {
@@ -182,6 +294,10 @@ class PacketFactory {
         return getPacketConnect();
       case PacketType.data:
         return getPacketData();
+      case PacketType.announce:
+        return getPacketHello();
+      case PacketType.bye:
+        return getPacketBye();
       case PacketType.invalid:
         return null;
     }

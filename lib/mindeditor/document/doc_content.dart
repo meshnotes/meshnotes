@@ -63,20 +63,17 @@ class VersionContent {
 class VersionContentItem {
   String docId;
   String docHash;
-  String title;
   int updatedAt;
 
   VersionContentItem({
     required this.docId,
     required this.docHash,
-    required this.title,
     required this.updatedAt,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'doc_id': docId,
-      'title': title,
       'doc_hash': docHash,
       'updated_at': updatedAt,
     };
@@ -84,7 +81,6 @@ class VersionContentItem {
   VersionContentItem.fromJson(Map<String, dynamic> map):
         docId = map['doc_id'],
         docHash = map['doc_hash'],
-        title = map['title'],
         updatedAt = map['updated_at'];
 }
 

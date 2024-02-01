@@ -62,6 +62,12 @@ class CallbackRegistry {
   static List<Widget> getReadOnlyBlocks() {
     return _editFieldState?.getReadOnlyBlocks()?? [];
   }
+  static Rect? getEditStateSize() {
+    return _editFieldState?.getCurrentSize();
+  }
+  static scrollDown(double delta) {
+    _editFieldState?.scrollDown(delta);
+  }
 
   static registerMessengerKey(GlobalKey<State<ScaffoldMessenger>> _k) {
     _messengerKey = _k;

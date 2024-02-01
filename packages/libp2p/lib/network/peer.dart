@@ -1,9 +1,8 @@
 import 'dart:io';
-import 'package:libp2p/network/packet/packet.dart';
+import 'protocol/packet.dart';
 import 'package:libp2p/network/buffer_and_queue.dart';
 import 'package:libp2p/utils.dart';
-import 'network_util.dart';
-import 'packet/frame.dart';
+import 'protocol/frame.dart';
 import '../constants.dart';
 import 'package:my_log/my_log.dart';
 
@@ -15,14 +14,16 @@ class ConnectionController {
 }
 
 enum ConnectionStatus {
-  invalid,
-  initializing,
-  establishing,
-  established,
+  invalid, // connect fail or heartbeat timeout
+  initializing, // after connect package was sent
+  establishing, // after connect_ack package was sent
+  established, // after connected package was sent or received
+  shutdown, // closed by one peer
 }
 
 typedef OnReceiveDataCallback = void Function(List<int> data);
 typedef OnDisconnectCallback = void Function(Peer);
+typedef OnConnectionFail = void Function(Peer);
 
 class Peer {
   static const logPrefix = '[Peer]';
@@ -36,6 +37,7 @@ class Peer {
   InternetAddress ip;
   int port;
   int maxHeartbeat = 30000;
+  int maxRetryCount = 5;
   ConnectionStatus _status = ConnectionStatus.invalid;
   ConnectionStatus getStatus() => _status;
   int _sourceId = 0;
@@ -45,8 +47,9 @@ class Peer {
   int receivePacketNumber = 0;
   int _lastContact = 0;
   int _lastHeartbeat = 0;
-  OnReceiveDataCallback? _onReceiveData;
+  OnReceiveDataCallback? onReceiveData;
   OnDisconnectCallback? onDisconnect;
+  OnConnectionFail? onConnectionFail;
   int Function(List<int>, InternetAddress, int) _transport;
   bool alreadyScheduledNotifier = false;
 
@@ -54,12 +57,16 @@ class Peer {
     required this.ip,
     required this.port,
     required int Function(List<int>, InternetAddress, int) transport,
+    this.onReceiveData,
+    this.onDisconnect,
+    this.onConnectionFail,
   }): _transport = transport;
 
   void setInitializing() => _status = ConnectionStatus.initializing;
   void setEstablishing() => _status = ConnectionStatus.establishing;
   void setEstablished() => _status = ConnectionStatus.established;
-  void setShutdown() => _status = ConnectionStatus.invalid;
+  void setInvalid() => _status = ConnectionStatus.invalid;
+  void setShutdown() => _status = ConnectionStatus.shutdown;
 
   PacketHeader _buildPacketHeader(PacketType type) {
     return PacketHeader(type: type, destConnectionId: _destinationId, packetNumber: 0);
@@ -125,6 +132,13 @@ class Peer {
     var packet = PacketConnect(
       header: _buildPacketHeader(PacketType.connected),
       sourceConnectionId: _sourceId,
+    );
+    _sendPacket(packet);
+  }
+  void _sendBye() {
+    var packet = PacketBye(
+      tag: PacketBye.tagBye,
+      header: _buildPacketHeader(PacketType.bye),
     );
     _sendPacket(packet);
   }
@@ -213,16 +227,20 @@ class Peer {
     return true;
   }
 
+  void onClose() {
+    _disconnect();
+  }
+
   Future<void> _notifyUpperLayerOnReceivedData() async {
     alreadyScheduledNotifier = false;
     var availableData = receiveQueue.popAvailableData();
-    if(_onReceiveData == null) {
+    if(onReceiveData == null) {
       // TODO May be should not drop data here
       MyLogger.verbose('${logPrefix} Drop data since _onReceiveData is null');
       return;
     }
     for(var data in availableData) {
-      _onReceiveData!(data);
+      onReceiveData!(data);
     }
   }
 
@@ -325,13 +343,14 @@ class Peer {
   void updateControlQueue(int timeoutThreshold) {
     // 1. If status is established and exceeds 5 heartbeat timer, end the connection
     // 2. If status is established and heartbeat timer expired, send heartbeat
-    // 3. If control queue is not empty, resend all timeout packages
+    // 3. If status is not established, and retry count exceeds maxRetryCount, shut it down
+    // 4. If status is not established, and control queue is not empty, resend all timeout connect packages
     if(_status == ConnectionStatus.established) {
       final now = networkNow();
       final lastContactInterval = now - _lastContact;
       if(lastContactInterval >= 5 * maxHeartbeat) {
-        MyLogger.debug('${logPrefix} Ready to disconnect, now=$now, _lastContact=$_lastContact, maxHeartbeat=$maxHeartbeat');
-        _disconnect();
+        MyLogger.info('${logPrefix} Connection failed due to heartbeat lost, now=$now, _lastContact=$_lastContact, maxHeartbeat=$maxHeartbeat');
+        _connectFailed();
         return;
       }
       final lastHeartbeatInterval = now - _lastHeartbeat;
@@ -339,10 +358,21 @@ class Peer {
         MyLogger.debug('${logPrefix} Send heartbeat, now=$now, _lastHeartbeat=$_lastHeartbeat, maxHeartbeat=$maxHeartbeat');
         _sendHeartbeat();
       }
-    }
-    var retryPackets = controlQueue.getRetryPacketIfTimeout(timeoutThreshold);
-    for(var packet in retryPackets) {
-      _sendPacket(packet);
+    } else if(_status != ConnectionStatus.invalid) {
+      int retryCount = controlQueue.getConnectRetryCount();
+      if(retryCount >= maxRetryCount) {
+        MyLogger.info('${logPrefix} Connection failed due to exceed max retry count');
+        controlQueue.clearAll();
+        _connectFailed();
+      } else {
+        var retryPackets = controlQueue.getRetryPacketIfTimeout(timeoutThreshold);
+        if(retryPackets.isNotEmpty) {
+          MyLogger.debug('${logPrefix} Resend packets, retry for ${retryCount + 1} time');
+        }
+        for (var packet in retryPackets) {
+          _sendPacket(packet);
+        }
+      }
     }
   }
 
@@ -357,10 +387,14 @@ class Peer {
   }
 
   void _disconnect() {
-    if(_status == ConnectionStatus.invalid) return;
-    // TODO send shutdown packet
+    if(_status == ConnectionStatus.shutdown) return;
     onDisconnect?.call(this);
     setShutdown();
+  }
+  void _connectFailed() {
+    if(_status == ConnectionStatus.invalid) return;
+    onConnectionFail?.call(this);
+    setInvalid();
   }
 
   void _updateContact() {
@@ -384,11 +418,18 @@ class Peer {
     _destinationId = destId;
   }
   void close() {
+    _sendBye();
     _disconnect();
   }
 
   void setOnReceive(OnReceiveDataCallback? _func) {
-    _onReceiveData = _func;
+    onReceiveData = _func;
+  }
+  void setOnDisconnect(OnDisconnectCallback? _func) {
+    onDisconnect = _func;
+  }
+  void setOnConnectFail(OnConnectionFail? _func) {
+    onConnectionFail = _func;
   }
 }
 
@@ -411,5 +452,23 @@ class ConnectionPool {
 
   List<Peer> getAllConnections() {
     return _connectionIdMap.values.toList();
+  }
+
+  List<Peer> removeInvalidAndClosedConnections() {
+    var result = <Peer>[];
+    var toBeRemove = <int>{};
+    for(var entry in _connectionIdMap.entries) {
+      var k = entry.key;
+      var v = entry.value;
+      var status = v.getStatus();
+      if(status == ConnectionStatus.invalid || status == ConnectionStatus.shutdown) {
+        result.add(v);
+        toBeRemove.add(k);
+      }
+    }
+    for(var item in toBeRemove) {
+      _connectionIdMap.remove(item);
+    }
+    return result;
   }
 }

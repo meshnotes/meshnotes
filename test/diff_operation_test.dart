@@ -19,7 +19,6 @@ void main() {
     expect(operations[0].targetId, 'c');
     expect(operations[0].parentId, null);
     expect(operations[0].previousId, 'b');
-    expect(operations[0].title, 'title_c');
     expect(operations[0].data, 'hash_c');
   });
 
@@ -39,24 +38,6 @@ void main() {
     expect(operations[1].targetId, 'b');
     expect(operations[1].parentId, null);
     expect(operations[1].previousId, 'a');
-  });
-
-  test('Generate rename operations only', () {
-    var baseVersion = _genSimpleVersionContent(['a', 'b', 'c']);
-    var targetVersion = _genSimpleVersionContent(['a', 'b', 'c']);
-    targetVersion.table[0].title = 'renamed';
-    targetVersion.table[2].title = 'renamed2';
-    DiffManager dm = DiffManager();
-    var result = dm.findDifferentOperation(targetVersion, baseVersion);
-    var operations = result.operations;
-    expect(operations.length, 2);
-    expect(operations[0].operation, ContentOperationType.rename);
-    expect(operations[0].targetId, 'a');
-    expect(operations[0].title, 'renamed');
-
-    expect(operations[1].operation, ContentOperationType.rename);
-    expect(operations[1].targetId, 'c');
-    expect(operations[1].title, 'renamed2');
   });
 
   test('Generate modify operations only', () {
@@ -99,29 +80,25 @@ void main() {
   test('Generate mix operations', () {
     var baseVersion = _genSimpleVersionContent(['a', 'b', 'c', 'd', 'e']);
     var targetVersion = _genSimpleVersionContent(['0', 'a', 'd', 'f', 'c', 'e', 'g']);
-    targetVersion.table[2].title = 'renamed';
     targetVersion.table[5].docHash = 'new_hash';
     DiffManager dm = DiffManager();
     var result = dm.findDifferentOperation(targetVersion, baseVersion);
     var operations = result.operations;
-    expect(operations.length, 7);
+    expect(operations.length, 6);
 
     expect(_hasAnOperation(operations, ContentOperation(operation: ContentOperationType.add, targetId: '0', timestamp: 0)), true);
     expect(_hasAnOperation(operations, ContentOperation(operation: ContentOperationType.del, targetId: 'b', timestamp: 0)), true);
     expect(_hasAnOperation(operations, ContentOperation(operation: ContentOperationType.move, targetId: 'd', timestamp: 0)), true);
-    expect(_hasAnOperation(operations, ContentOperation(operation: ContentOperationType.rename, targetId: 'd', title: 'renamed', timestamp: 0)), true);
     expect(_hasAnOperation(operations, ContentOperation(operation: ContentOperationType.add, targetId: 'f', timestamp: 0)), true);
     expect(_hasAnOperation(operations, ContentOperation(operation: ContentOperationType.modify, targetId: 'e', data: 'new_hash', timestamp: 0)), true);
     expect(_hasAnOperation(operations, ContentOperation(operation: ContentOperationType.add, targetId: 'g', timestamp: 0)), true);
-
-    expect(_hasAnOperation(operations, ContentOperation(operation: ContentOperationType.rename, targetId: 'd', title: 'renamed2', timestamp: 0)), false);
   });
 }
 
 VersionContent _genSimpleVersionContent(List<String> tags) {
   List<VersionContentItem> table = [];
   for(var tag in tags) {
-    var item = VersionContentItem(docId: tag, docHash: 'hash_$tag', title: 'title_$tag', updatedAt: 0);
+    var item = VersionContentItem(docId: tag, docHash: 'hash_$tag', updatedAt: 0);
     table.add(item);
   }
   return VersionContent(table: table, timestamp: 0, parentsHash: []);
@@ -131,9 +108,6 @@ bool _hasAnOperation(List<ContentOperation> operations, ContentOperation targetO
   for(var op in operations) {
     if(op.targetId == targetOp.targetId) {
       if(op.operation == targetOp.operation) {
-        if(targetOp.title != null && targetOp.title != op.title) {
-          return false;
-        }
         if(targetOp.data != null && targetOp.data != op.data) {
           return false;
         }

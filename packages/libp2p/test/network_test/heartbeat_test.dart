@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-
 import 'package:libp2p/network/peer.dart';
+import 'package:libp2p/utils.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
-import 'package:libp2p/network/network_util.dart';
 import 'package:test/test.dart';
 import 'package:libp2p/network/network_layer.dart';
 
@@ -22,6 +21,7 @@ void main() {
       newConnectCallback: (c) {
         serverEstablished.complete(true);
       },
+      deviceId: 'x',
     );
     await server.start();
 
@@ -32,6 +32,7 @@ void main() {
       connectOkCallback: (c) {
         clientEstablished.complete(true);
       },
+      deviceId: 'x',
     );
     await client.start();
 
@@ -74,6 +75,7 @@ void main() {
         serverEstablished.complete(true);
         serverConnection = c;
       },
+      deviceId: 'x',
     );
     await server.start();
 
@@ -84,6 +86,7 @@ void main() {
       connectOkCallback: (c) {
         clientEstablished.complete(true);
       },
+      deviceId: 'x',
     );
     await client.start();
 

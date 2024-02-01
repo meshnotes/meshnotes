@@ -39,11 +39,7 @@ class Document {
   }
 
   factory Document.loadByNode(DocData docNode, DocumentManager parent) {
-    // Load title
-    ParagraphDesc title = ParagraphDesc.fromTitle(docNode.title);
     List<ParagraphDesc> paragraphs = [];
-    paragraphs.add(title);
-
     // Load content
     var blocks = _loadBlocks(docNode.docId);
     paragraphs.addAll(blocks);
@@ -54,8 +50,13 @@ class Document {
       parent: parent,
       time: docNode.timestamp,
     );
-    // If the document has no content, add an empty line
+    // If the document has no content(or only has a title), add an title line
     if(blocks.isEmpty) {
+      ParagraphDesc title = ParagraphDesc.fromTitle(docNode.title);
+      paragraphs.add(title);
+      doc.insertEmptyLineAfterTitle();
+      doc.setModified();
+    } else if(blocks.length == 1 && blocks[0].isTitle()) {
       doc.insertEmptyLineAfterTitle();
     }
     return doc;
@@ -145,7 +146,7 @@ class Document {
 
   void updateTitle(String title) {
     var now = Util.getTimeStamp();
-    _db.storeDocTitle(id, title, now);
+    // _db.storeDocTitle(id, title, now);
     parent.updateDocTitle(id, title, now);
 
     _lastUpdate = now;
@@ -220,9 +221,11 @@ class Document {
     // if(!_hasModified) return hash;
     // Store ContentBlock objects and DocContent object
     for(var p in paragraphs) {
-      if(p.getLastUpdated() > _lastUpdate) {
-        p.storeObject();
-      }
+      // if(p.getLastUpdated() > _lastUpdate) {
+      //   p.storeObject();
+      // }
+      //TODO should optimize here, only store objects that is modified
+      p.storeObject();
     }
     var docContent = _generateDocContent();
     String docHash = docContent.getHash();
@@ -298,13 +301,12 @@ class Document {
     final now = Util.getTimeStamp();
     var docContent = _generateDocContent();
     final jsonStr = jsonEncode(docContent);
-    Controller.instance.dbHelper.storeDocContent(id, jsonStr, now);
+    _db.storeDocContent(id, jsonStr, now);
   }
 
   DocContent _generateDocContent() {
     List<DocContentItem> list = [];
     for(var p in paragraphs) {
-      if(p.isTitle()) continue;
       final block = p.getBlockContent();
       var hash = block.getHash();
       var item = DocContentItem(

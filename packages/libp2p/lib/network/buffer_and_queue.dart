@@ -1,9 +1,8 @@
 import 'dart:math';
-
 import 'package:my_log/my_log.dart';
-import 'package:libp2p/network/packet/frame.dart';
-import 'package:libp2p/network/packet/packet.dart';
-import 'network_util.dart';
+import '../utils.dart';
+import 'protocol/frame.dart';
+import 'protocol/packet.dart';
 
 
 class RetryFrame {
@@ -86,9 +85,7 @@ class ControlQueue {
     _connectRetryCount = 0;
   }
   void clearConnect() {
-    _packetConnect = null;
-    _connectTime = 0;
-    _connectRetryCount = 0;
+    clearAll();
   }
   void setConnectAck(PacketConnect _connectAck) {
     _packetConnect = _connectAck;
@@ -96,6 +93,9 @@ class ControlQueue {
     _connectRetryCount = 0;
   }
   void clearConnectAck() {
+    clearAll();
+  }
+  void clearAll() {
     _packetConnect = null;
     _connectTime = 0;
     _connectRetryCount = 0;

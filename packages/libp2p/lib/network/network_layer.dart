@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:libp2p/network/incomplete_pool.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
-import 'package:libp2p/network/packet/packet.dart';
+import 'package:libp2p/network/protocol/packet.dart';
 import 'package:libp2p/utils.dart';
 import 'peer.dart';
 
@@ -14,6 +14,7 @@ enum NetworkStatus {
 
 // Stateless Object Transfer Protocol
 class SOTPNetworkLayer {
+  static const multicastGroup = '224.0.179.74';
   static const logPrefix = '[Network]';
   final connectionPool = ConnectionPool();
   final incompletePool = IncompletePool();
@@ -27,12 +28,17 @@ class SOTPNetworkLayer {
   NetworkStatus getStatus() => _status;
   int maxTimeout = 3000;
   NetworkEnvSimulator? _networkCondition;
+  bool useMulticast;
+  String _deviceId;
+  int _lastSentMulticast = 0;
+  static const _maxMulticastInterval = 60 * 1000; // 1 minute in milliseconds
 
   // Callback functions
-  Function()? startedCallback;
-  Function(Peer)? connectOkCallback; // For client after outgoing connect is success
-  Function(Peer)? newConnectCallback; // For server if a new incoming connect is success
-  Function(Packet)? onReceivePacket;
+  Function()? startedCallback; // Trigger after network layer started
+  Function(Peer)? connectOkCallback; // Trigger after an outgoing connect is success, for client mode
+  Function(Peer)? newConnectCallback; // Trigger after a new incoming connect is success, for server mode
+  Function(Packet)? onReceivePacket; // Trigger after a packet is received
+  Function(String, InternetAddress, int)? onDetected; // Trigger after a multicast announce message is received
 
   bool _debugIgnoreConnect = false;
   void setDebugIgnoreConnect(bool _b) => _debugIgnoreConnect = _b;
@@ -49,12 +55,18 @@ class SOTPNetworkLayer {
     this.connectOkCallback,
     this.newConnectCallback,
     this.onReceivePacket,
+    this.onDetected,
     NetworkEnvSimulator? networkCondition,
-  }) : _networkCondition = networkCondition;
+    this.useMulticast = false,
+    required String deviceId,
+  }) : _networkCondition = networkCondition, _deviceId = deviceId;
 
   start() async {
     _udp = await RawDatagramSocket.bind(localIp, localPort);
     realPort = udp.port;
+    if(useMulticast) {
+      udp.joinMulticast(InternetAddress(multicastGroup));
+    }
     _status = NetworkStatus.running;
     udp.listen((event) {
       if(event == RawSocketEvent.read) {
@@ -73,7 +85,7 @@ class SOTPNetworkLayer {
         var packet = packetFactory.getAbstractPacket()!;
         MyLogger.debug('${logPrefix} Receive packet with type(${packet.getType().name})');
         onReceivePacket?.call(packet);
-        switch(type) { // ignore: missing_enum_constant_in_switch
+        switch(type) {
           case PacketType.connect:
             if(_debugIgnoreConnect) break;
             _onConnect(peerIp, port, packet as PacketConnect);
@@ -90,6 +102,14 @@ class SOTPNetworkLayer {
             if(_debugIgnoreData) break;
             _onData(packet as PacketData);
             break;
+          case PacketType.announce:
+            if(!useMulticast) break;
+            if(peerIp == localIp && port == localPort) break; // Ignore packet from myself
+            _onAnnounce(packet as PacketAnnounce, peerIp, port);
+            break;
+          case PacketType.bye:
+            _onBye(packet as PacketBye);
+            break;
           case PacketType.invalid: // Not possible
             break;
         }
@@ -98,27 +118,14 @@ class SOTPNetworkLayer {
     timer = Timer.periodic(Duration(milliseconds: 1000), _networkTimerHandler);
     startedCallback?.call();
   }
-  void _networkTimerHandler(Timer _t) {
-    int now = DateTime.now().millisecondsSinceEpoch;
-    _traverseAndResend(connectionPool.getAllConnections(), now);
-    _traverseAndResend(incompletePool.getAllConnections(), now);
-  }
-  void _traverseAndResend(Iterable<Peer> connections, int now) {
-    var timestamp = now - maxTimeout;
-    for(var conn in connections) {
-      conn.updateResendQueue(timestamp);
-      conn.updateControlQueue(timestamp);
-    }
-  }
-  void _traverseAndClose(List<Peer> connections) {
-    for(var conn in connections) {
-      conn.close();
-    }
+
+  void setNetworkEnv(NetworkEnvSimulator? _env) {
+    _networkCondition = _env;
   }
 
   stop() {
+    MyLogger.info('${logPrefix} Shutdown network_layer');
     if(_status == NetworkStatus.invalid) return;
-    //TODO 要发送断开连接消息
     timer.cancel();
     _traverseAndClose(connectionPool.getAllConnections());
     _traverseAndClose(incompletePool.getAllConnections());
@@ -126,16 +133,15 @@ class SOTPNetworkLayer {
     _status = NetworkStatus.invalid;
   }
 
-  Peer connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null}) {
+  Peer connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null, OnDisconnectCallback? onDisconnect, OnConnectionFail? onConnectionFail, }) {
     // 1. 生成source connection Id
     // 2. 将connection置为initializing状态
     // 3. 发送connect消息
     var id = _generateId();
     var ip = InternetAddress(peerIp);
-    var peer = Peer(ip: ip, port: peerPort, transport: _sendDelegate)
+    var peer = Peer(ip: ip, port: peerPort, transport: _sendDelegate, onReceiveData: onReceive, onDisconnect: onDisconnect, onConnectionFail: onConnectionFail)
       ..setInitializing()
-      ..setSourceId(id)
-      ..setOnReceive(onReceive);
+      ..setSourceId(id);
     MyLogger.info('${logPrefix} Connecting ip=$peerIp, port=$peerPort, id=$id');
     incompletePool.addConnection(ip, peerPort, id, peer);
     peer.connect();
@@ -207,8 +213,36 @@ class SOTPNetworkLayer {
     peer.onData(packet);
   }
 
+  _onAnnounce(PacketAnnounce packet, InternetAddress ip, int port) {
+    String peerDeviceId = packet.deviceId;
+    MyLogger.info('${logPrefix} receive announce message from ${ip.address}:$port, with deviceId($peerDeviceId)');
+    onDetected?.call(peerDeviceId, ip, port);
+  }
+
+  void _sendAnnounce(InternetAddress ip, int port) {
+    PacketAnnounce reply = PacketAnnounce(
+      deviceId: _deviceId,
+      header: PacketHeader(type: PacketType.announce, destConnectionId: 0, packetNumber: 0),
+    );
+    _sendDelegate(reply.toBytes(), ip, port);
+  }
+
+  void _onBye(PacketBye packet) {
+    final header = packet.header;
+    if(packet.tag == PacketBye.tagByeAck) { // Receive bye_ack, ignore it
+      return;
+    }
+    var peer = _getConnectionFromHeader(header);
+    if(peer == null) return;
+
+    peer.onClose();
+  }
+
   Peer? _getConnectionFromHeader(PacketHeader header) {
     var peer = connectionPool.getConnectionById(header.destConnectionId);
+    if(peer?.getStatus() != ConnectionStatus.established) {
+      return null;
+    }
     return peer;
   }
 
@@ -231,7 +265,39 @@ class SOTPNetworkLayer {
     }
   }
 
-  void setNetworkEnv(NetworkEnvSimulator? _env) {
-    _networkCondition = _env;
+  void _networkTimerHandler(Timer _t) {
+    /// 1. Resend connections and incomplete connections
+    /// 2. Clear invalid or disconnected connections
+    /// 3. Broadcast announce
+    int now = DateTime.now().millisecondsSinceEpoch;
+    _traverseAndResend(connectionPool.getAllConnections(), now);
+    _traverseAndResend(incompletePool.getAllConnections(), now);
+    _clearInvalidConnections();
+    if(useMulticast) {
+      _tryMulticast(now);
+    }
+  }
+  void _traverseAndResend(Iterable<Peer> connections, int now) {
+    var timestamp = now - maxTimeout;
+    for(var conn in connections) {
+      conn.updateResendQueue(timestamp);
+      conn.updateControlQueue(timestamp);
+    }
+  }
+  void _clearInvalidConnections() {
+    var _ = connectionPool.removeInvalidAndClosedConnections();
+    _ = incompletePool.removeInvalidAndClosedConnections();
+  }
+  void _traverseAndClose(List<Peer> connections) {
+    for(var conn in connections) {
+      conn.close();
+    }
+  }
+  void _tryMulticast(int now) {
+    if(now - _lastSentMulticast > _maxMulticastInterval) {
+      MyLogger.info('${logPrefix} send multicast message to $multicastGroup');
+      _sendAnnounce(InternetAddress(multicastGroup), localPort);
+      _lastSentMulticast = now;
+    }
   }
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:libp2p/overlay/overlay_msg.dart';
+import 'package:libp2p/utils.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_layer.dart';
 import 'package:libp2p/overlay/villager_node.dart';
@@ -64,10 +65,17 @@ class VillageOverlay implements ApplicationController {
       localPort: _localPort,
       connectOkCallback: _onConnected,
       newConnectCallback: _onNewConnect,
+      onDetected: _onDetected,
+      deviceId: _deviceId,
+      useMulticast: true,
     );
     await _network.start();
+    // Connect to upper nodes immediately
     _addConnectTasks(_villagers);
     Timer.periodic(Duration(milliseconds: __villageTimerInterval), _villageTimerHandler);
+  }
+  void stop() {
+    _network.stop();
   }
 
   /// @return true - success, false - failed
@@ -161,14 +169,64 @@ class VillageOverlay implements ApplicationController {
     _c.setOnReceive((data) {
       _onRawData(node, data);
     });
+    _c.setOnDisconnect((peer) {
+      _onDisconnect(peer);
+    });
+    _c.setOnConnectFail((peer) {
+      _onConnectionFail(peer);
+    });
     _villagers.add(node);
     _onConnect(node);
+  }
+  void _onDetected(String peerDeviceId, InternetAddress peerIp, int peerPort) {
+    // Let the peer with smaller device id to connect
+    if(_deviceId.compareTo(peerDeviceId) < 0) {
+      for(var node in _villagers) {
+        if(node.ip == peerIp && node.port == peerPort) { // Already in the _villagers list
+          return;
+        }
+      }
+      var node = VillagerNode(host: peerIp.address, port: peerPort)
+        ..ip = peerIp;
+      _villagers.add(node);
+      _tryToConnect(node);
+    }
   }
   void _onConnect(VillagerNode _node) {
     MyLogger.info('${logPrefix} New connection to address(${_node.ip}:${_node.port}), id=${_node.id}, say Hello');
     _node.setConnected();
     _addHelloTask(_node);
     onNodeChanged(_node);
+  }
+  void _onConnectionFail(Peer peer) {
+    MyLogger.info('${logPrefix} connection failed');
+    for(var node in _villagers) {
+      if(node.getPeer() != peer) continue;
+
+      if(node.isUpper) {
+        node.setUnknown();
+      } else {
+        node.setUnknown();
+        _villagers.remove(node);
+      }
+      onNodeChanged(node);
+      break;
+    }
+  }
+  void _onDisconnect(Peer peer) {
+    MyLogger.info('${logPrefix} disconnected');
+    for(var node in _villagers) {
+      if(node.getPeer() != peer) continue;
+
+      if(node.isUpper) {
+        node.setLost();
+      } else {
+        node.setLost();
+        _villagers.remove(node);
+      }
+      onNodeChanged(node);
+      break;
+    }
   }
 
   void _onRawData(VillagerNode node, List<int> rawData) {
@@ -218,13 +276,27 @@ class VillageOverlay implements ApplicationController {
       onReceive: (data) {
         _onRawData(node, data);
       },
+      onDisconnect: (peer) {
+        _onDisconnect(peer);
+      },
+      onConnectionFail: (peer) {
+        _onConnectionFail(peer);
+      }
     );
     node.setPeer(peer);
   }
   void _tryToReconnect() {
-    // TODO
-    // Traverse all villagers who are lost contact, try to reconnect if timeout
-    // If failed, double the timeout interval
+    int now = networkNow();
+    var reconnectVillages = <VillagerNode>[];
+    for(var node in _villagers) {
+      final status = node.getStatus();
+      if(status == VillagerStatus.unknown || status == VillagerStatus.lostContact) {
+        if(now - node.failedTimestamp >= node.currentReconnectIntervalInSeconds * 1000) {
+          reconnectVillages.add(node);
+        }
+      }
+    }
+    _addConnectTasks(reconnectVillages);
   }
 
   String _introduceMyselfMessage() {

@@ -199,7 +199,7 @@ class Controller {
 
   bool sendVersionTree() {
     // If there is any modification, generate a new version tree, and try to sync this version
-    if(!docManager.hasModified()) return false;
+    if(!docManager.hasModified() || docManager.isSyncing()) return false;
     var versionData = docManager.genAndSaveNewVersionTree();
     if(versionData.isEmpty) {
       return false;
@@ -214,6 +214,11 @@ class Controller {
   }
 
   void receiveVersionTree(List<VersionNode> dag) {
+    if(docManager.isSyncing()) {
+      MyLogger.info('receiveVersionTree: too busy to handle version tree: $dag');
+      //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
+      return;
+    }
     MyLogger.info('efantest: receive version tree: $dag');
     docManager.assembleVersionTree(dag);
   }
@@ -226,10 +231,5 @@ class Controller {
   void receiveVersions(List<SendVersionsNode> versions) {
     MyLogger.info('efantest: receive versions message: $versions');
     docManager.assembleVersions(versions);
-  }
-  void receiveVersion(String hash, String versionStr, Map<String, String> requiredObjects) {
-    MyLogger.info('efantest: receive version: $versionStr');
-
-    // docManager.assembleVersion(hash, versionStr, requiredObjects);
   }
 }

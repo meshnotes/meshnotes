@@ -30,6 +30,10 @@ class VillagerNode {
   VillagerStatus _status = VillagerStatus.unknown;
   VillagerRole _role;
   Peer? _peer;
+  int failedTimestamp = 0;
+  int currentReconnectIntervalInSeconds = defaultReconnectInterval;
+  static int maxReconnectInterval = 60 * 5;
+  static int defaultReconnectInterval = 5;
 
   VillagerNode({
     required this.host,
@@ -58,6 +62,15 @@ class VillagerNode {
   }
   void setConnected() {
     _status = VillagerStatus.keepInTouch;
+    _resetReconnectInterval();
+  }
+  void setUnknown() {
+    _status = VillagerStatus.unknown;
+    _exponentialBackoff();
+  }
+  void setLost() {
+    _status = VillagerStatus.lostContact;
+    _exponentialBackoff();
   }
 
   void setPeer(Peer _p) {
@@ -70,5 +83,15 @@ class VillagerNode {
   @override
   String toString() {
     return 'VillagerNode($host:$port)';
+  }
+
+  void _exponentialBackoff() {
+    currentReconnectIntervalInSeconds *= 2;
+    if(currentReconnectIntervalInSeconds > maxReconnectInterval) {
+      currentReconnectIntervalInSeconds = maxReconnectInterval;
+    }
+  }
+  void _resetReconnectInterval() {
+    currentReconnectIntervalInSeconds = defaultReconnectInterval;
   }
 }

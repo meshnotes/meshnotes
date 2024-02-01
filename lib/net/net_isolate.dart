@@ -7,7 +7,7 @@ import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/villager_node.dart';
 import 'package:my_log/my_log.dart';
 import 'p2p_net.dart';
-import 'package:libp2p/application/application.dart';
+import 'package:libp2p/application/application_layer.dart';
 import 'command.dart';
 import 'status.dart';
 
@@ -110,6 +110,8 @@ void _nodeChanged(VillagerNode node) {
   final info = node.id;
   final nodeInfo = NodeInfo(id: id, name: info, status: _status);
   _nodes[id] = nodeInfo;
+  MyLogger.info('Node changed: $id: $nodeInfo');
+  _reportNodes();
 }
 void _handleNewVersionTree(List<VersionNode> dag) {
   _sendPort?.send(Message(
@@ -133,6 +135,11 @@ void _handleSendVersions(List<SendVersionsNode> versions) {
 void _timerHandler(Timer _t) {
   if(_nodes.isEmpty) return;
 
+  _reportNodes();
+  _nodes.clear();
+}
+
+void _reportNodes() {
   final nodeList = _nodes.values.toList();
   _sendPort?.send(Message(
     cmd: Command.nodeStatus,
