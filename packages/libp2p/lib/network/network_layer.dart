@@ -103,9 +103,13 @@ class SOTPNetworkLayer {
             _onData(packet as PacketData);
             break;
           case PacketType.announce:
-            if(!useMulticast) break;
-            if(peerIp == localIp && port == localPort) break; // Ignore packet from myself
+            if(peerIp == localIp && port == localPort) break; // Ignore packet from itself
             _onAnnounce(packet as PacketAnnounce, peerIp, port);
+            break;
+          case PacketType.announceAck:
+            if(!useMulticast) break; // Ignore announce_ack if not supporting multicast
+            if(peerIp == localIp && port == localPort) break; // Ignore packet from itself
+            _onAnnounceAck(packet as PacketAnnounce, peerIp, port);
             break;
           case PacketType.bye:
             _onBye(packet as PacketBye);
@@ -147,7 +151,7 @@ class SOTPNetworkLayer {
     peer.connect();
     return peer;
   }
-  _onConnect(InternetAddress peerIp, int peerPort, PacketConnect packet) {
+  void _onConnect(InternetAddress peerIp, int peerPort, PacketConnect packet) {
     // 1. 收到connect消息后，先判断是否已有Peer（有可能是重发的connect消息）。如果没有，则生成新的Peer，生成source connection Id
     // 2. 因为方向是相反的，将报文的source connection Id设置为dest connection Id
     // 3. 将peer状态置为establishing
@@ -165,7 +169,7 @@ class SOTPNetworkLayer {
     }
     peer.onConnect(packet);
   }
-  _onConnectAck(InternetAddress ip, int port, PacketConnect packet) {
+  void _onConnectAck(InternetAddress ip, int port, PacketConnect packet) {
     // 1. 只有客户端才会收到connect_ack，因此根据消息包的ip、端口、source connection Id查找connection
     // 2. 如果在incompletePool查不到connection，有可能是connected消息丢失，从connectionPool查找
     // 3. 发送connected消息
@@ -186,7 +190,7 @@ class SOTPNetworkLayer {
       connectOkCallback?.call(peer);
     }
   }
-  _onConnected(InternetAddress ip, int port, PacketConnect packet) {
+  void _onConnected(InternetAddress ip, int port, PacketConnect packet) {
     // 1. 如果是首次收到connected消息，要从incompletePool取得connection。如果是重发的connected消息，要从connectionPool取得connection
     // 2. 交给connection处理
     var originalId = packet.sourceConnectionId;
@@ -204,18 +208,24 @@ class SOTPNetworkLayer {
       newConnectCallback?.call(peer);
     }
   }
-
-  _onData(PacketData packet) {
+  void _onData(PacketData packet) {
     final header = packet.header;
     var peer = _getConnectionFromHeader(header);
     if(peer == null) return;
 
     peer.onData(packet);
   }
-
-  _onAnnounce(PacketAnnounce packet, InternetAddress ip, int port) {
+  void _onAnnounce(PacketAnnounce packet, InternetAddress ip, int port) {
     String peerDeviceId = packet.deviceId;
+    if(peerDeviceId == _deviceId) return;
     MyLogger.info('${logPrefix} receive announce message from ${ip.address}:$port, with deviceId($peerDeviceId)');
+    _sendAnnounceAck(ip, port);
+    onDetected?.call(peerDeviceId, ip, port);
+  }
+  void _onAnnounceAck(PacketAnnounce packet, InternetAddress ip, int port) {
+    String peerDeviceId = packet.deviceId;
+    if(peerDeviceId == _deviceId) return; // Impossible
+    MyLogger.info('${logPrefix} receive announce_ack message from ${ip.address}:$port, with deviceId($peerDeviceId)');
     onDetected?.call(peerDeviceId, ip, port);
   }
 
@@ -223,6 +233,13 @@ class SOTPNetworkLayer {
     PacketAnnounce reply = PacketAnnounce(
       deviceId: _deviceId,
       header: PacketHeader(type: PacketType.announce, destConnectionId: 0, packetNumber: 0),
+    );
+    _sendDelegate(reply.toBytes(), ip, port);
+  }
+  void _sendAnnounceAck(InternetAddress ip, int port) {
+    PacketAnnounce reply = PacketAnnounce(
+      deviceId: _deviceId,
+      header: PacketHeader(type: PacketType.announceAck, destConnectionId: 0, packetNumber: 0),
     );
     _sendDelegate(reply.toBytes(), ip, port);
   }
