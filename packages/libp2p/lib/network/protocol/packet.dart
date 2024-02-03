@@ -9,6 +9,7 @@ enum PacketType {
   connected,  // response connected from client, connection established
   data,       // send data frames
   announce,   // broadcast
+  announceAck,  // broadcast ack
   bye,        // close a connection
   invalid,
 }
@@ -254,6 +255,7 @@ class PacketFactory {
       case PacketType.data:
         return true;
       case PacketType.announce:
+      case PacketType.announceAck:
         return PacketAnnounce.isValid(data);
       case PacketType.bye:
         return PacketBye.isValid(data);
@@ -277,7 +279,7 @@ class PacketFactory {
     return PacketData.fromBytes(data);
   }
 
-  PacketAnnounce getPacketHello() {
+  PacketAnnounce getPacketAnnounce() {
     return PacketAnnounce.fromBytes(data);
   }
 
@@ -295,7 +297,9 @@ class PacketFactory {
       case PacketType.data:
         return getPacketData();
       case PacketType.announce:
-        return getPacketHello();
+        return getPacketAnnounce();
+      case PacketType.announceAck:
+        return getPacketAnnounce();
       case PacketType.bye:
         return getPacketBye();
       case PacketType.invalid:
