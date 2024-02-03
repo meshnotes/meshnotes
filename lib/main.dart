@@ -123,7 +123,6 @@ class _AppLifecyclePageState extends State<MeshApp> {
         break;
       case AppLifecycleState.inactive:
         MyLogger.info('inactive');
-        await _beforeClose();
         break;
       case AppLifecycleState.hidden:
         MyLogger.info('hidden');
