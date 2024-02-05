@@ -236,42 +236,10 @@ class MindBlockImplRenderObject extends RenderBox {
     if(boxes.isEmpty) {
       return;
     }
-    // 规整每个box，输出至adjustedBoxes
-    var adjustedBoxes = <Rect>[];
-
-    for (final box in boxes) {
-      if(controller.environment.isLinux()) {
-        adjustedBoxes.add(Rect.fromLTRB(box.left, box.top, box.right, box.bottom));
-      } else {
-        double midLine = box.top / 2 + box.bottom / 2;
-        double newTop = (midLine ~/ height) * height;
-        double newBottom = newTop + height;
-        Rect rect = Rect.fromLTRB(box.left, newTop, box.right, newBottom);
-        MyLogger.verbose('efantest: box=$box, rect=$rect, height=$height');
-        adjustedBoxes.add(rect);
-      }
-    }
-    // 合并rect
-    var realSelectionRectangles = <Rect>[adjustedBoxes[0]];
-    int newIdx = 0;
-    for(int i = 1; i < adjustedBoxes.length; i++) {
-      Rect lastRect = realSelectionRectangles[newIdx];
-      Rect nextRect = adjustedBoxes[i];
-      if(lastRect.top == nextRect.top && lastRect.bottom == nextRect.bottom
-          && lastRect.right - nextRect.left < 0.01) {
-        realSelectionRectangles[newIdx] = Rect.fromLTRB(lastRect.left, lastRect.top, nextRect.right, nextRect.bottom);
-        MyLogger.verbose('efantest: Merge rect($lastRect) and rect($nextRect)');
-      } else {
-        realSelectionRectangles.add(nextRect);
-        newIdx++;
-      }
-    }
-    MyLogger.verbose('efantest: Merge rectangles from ${adjustedBoxes.length} items to ${realSelectionRectangles.length} items');
-
-    // 绘制
     final paint = Paint()
-      ..color = Colors.blue[100]!;//.withOpacity(0.5);
-    for(final rect in realSelectionRectangles) {
+      ..color = Colors.blue[100]!; //.withOpacity(0.5);
+    for(final box in boxes) {
+      Rect rect = Rect.fromLTRB(box.left, box.top, box.right, box.bottom);
       canvas.drawRect(rect.shift(offset), paint);
     }
   }
