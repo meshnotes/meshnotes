@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
@@ -97,7 +98,10 @@ class MindBlockImplRenderObject extends RenderBox {
   }
 
   updateParagraph() {
-    paragraph = _buildParagraph(texts, fontSize);
+    paragraph.text = _buildTextSpanAndCalcTotalLength(texts, fontSize);
+    paragraph.strutStyle = StrutStyle(
+      fontSize: fontSize,
+    );
   }
 
   void setTexts(ParagraphDesc _texts) {
@@ -202,6 +206,7 @@ class MindBlockImplRenderObject extends RenderBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     bool hasCursor = false;
+    List<Rect>? boxes;
     if(!readOnly) {
       final canvas = context.canvas;
       var textSelection = texts.getTextSelection();
@@ -212,7 +217,7 @@ class MindBlockImplRenderObject extends RenderBox {
         // currentCursorRect用于计算上一行、下一行的位置，所以必须更新
         currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
         if(!textSelection.isCollapsed) {
-          _drawSelectionBoxes(canvas, offset, textSelection, _lineHeight);
+          boxes = _drawSelectionBoxes(canvas, offset, textSelection, _lineHeight);
         }
         _drawCursor(canvas, offset, _lineHeight);
         _drawComposing(canvas, offset, _lineHeight); // 如果处于输入法状态中，在输入中的文字下方画线
@@ -225,55 +230,28 @@ class MindBlockImplRenderObject extends RenderBox {
     } else {
       paragraph.paint(context, offset);
     }
+    if(boxes != null && boxes.isNotEmpty) {
+      _drawLeaderLayer(context, boxes, offset);
+    }
   }
   void _drawCursor(Canvas canvas, Offset offset, double height) {
     // 如果editCursor不存在，新建之
     editCursor ??= EditCursor(timeoutFunc: markNeedsPaint);
     editCursor!.paint(canvas, currentCursorRect!, offset);
   }
-  void _drawSelectionBoxes(Canvas canvas, Offset offset, TextSelection textSelection, double height) {
+  List<Rect> _drawSelectionBoxes(Canvas canvas, Offset offset, TextSelection textSelection, double height) {
     var boxes = paragraph.getBoxesForSelection(textSelection);
-    if(boxes.isEmpty) {
-      return;
-    }
-    // 规整每个box，输出至adjustedBoxes
-    var adjustedBoxes = <Rect>[];
-
-    for (final box in boxes) {
-      if(controller.environment.isLinux()) {
-        adjustedBoxes.add(Rect.fromLTRB(box.left, box.top, box.right, box.bottom));
-      } else {
-        double midLine = box.top / 2 + box.bottom / 2;
-        double newTop = (midLine ~/ height) * height;
-        double newBottom = newTop + height;
-        Rect rect = Rect.fromLTRB(box.left, newTop, box.right, newBottom);
-        MyLogger.verbose('efantest: box=$box, rect=$rect, height=$height');
-        adjustedBoxes.add(rect);
+    List<Rect> result = [];
+    if(boxes.isNotEmpty) {
+      final paint = Paint()
+        ..color = Colors.blue[100]!; //.withOpacity(0.5);
+      for (final box in boxes) {
+        Rect rect = Rect.fromLTRB(box.left, box.top, box.right, box.bottom);
+        canvas.drawRect(rect.shift(offset), paint);
+        result.add(rect);
       }
     }
-    // 合并rect
-    var realSelectionRectangles = <Rect>[adjustedBoxes[0]];
-    int newIdx = 0;
-    for(int i = 1; i < adjustedBoxes.length; i++) {
-      Rect lastRect = realSelectionRectangles[newIdx];
-      Rect nextRect = adjustedBoxes[i];
-      if(lastRect.top == nextRect.top && lastRect.bottom == nextRect.bottom
-          && lastRect.right - nextRect.left < 0.01) {
-        realSelectionRectangles[newIdx] = Rect.fromLTRB(lastRect.left, lastRect.top, nextRect.right, nextRect.bottom);
-        MyLogger.verbose('efantest: Merge rect($lastRect) and rect($nextRect)');
-      } else {
-        realSelectionRectangles.add(nextRect);
-        newIdx++;
-      }
-    }
-    MyLogger.verbose('efantest: Merge rectangles from ${adjustedBoxes.length} items to ${realSelectionRectangles.length} items');
-
-    // 绘制
-    final paint = Paint()
-      ..color = Colors.blue[100]!;//.withOpacity(0.5);
-    for(final rect in realSelectionRectangles) {
-      canvas.drawRect(rect.shift(offset), paint);
-    }
+    return result;
   }
   void _drawComposing(Canvas canvas, Offset offset, double height) {
     final editingValue = CallbackRegistry.getLastEditingValue();
@@ -287,6 +265,30 @@ class MindBlockImplRenderObject extends RenderBox {
     Offset from = startPos.translate(0, height) + offset;
     Offset to = endPos.translate(0, height) + offset;
     canvas.drawLine(from, to, paint);
+  }
+  void _drawLeaderLayer(PaintingContext context, List<Rect> boxes, Offset offset) {
+    // Add start handle layer, which is linked with CompositedTransformFollower by linkOfStartHandle
+    var linkOfStartHandle = controller.selectionController.getLayerLinkOfStartHandle();
+    if(linkOfStartHandle == null) {
+      return;
+    }
+    var startPoint = Offset(boxes.first.left, boxes.first.top);
+    context.pushLayer(
+      LeaderLayer(link: linkOfStartHandle, offset: startPoint + offset),
+      super.paint,
+      Offset.zero,
+    );
+    // Add end handle layer, which is linked with CompositedTransformFollower by linkOfEndHandle
+    var linkOfEndHandle = controller.selectionController.getLayerLinkOfEndHandle();
+    if(linkOfEndHandle == null) {
+      return;
+    }
+    var endPoint = Offset(boxes.last.right, boxes.last.bottom);
+    context.pushLayer(
+      LeaderLayer(link: linkOfEndHandle, offset: endPoint + offset),
+      super.paint,
+      Offset.zero,
+    );
   }
 
   @override

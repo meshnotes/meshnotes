@@ -6,6 +6,7 @@ import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mesh_note/mindeditor/view/selection_controller.dart';
 import 'package:my_log/my_log.dart';
 import '../document/paragraph_desc.dart';
 
@@ -34,6 +35,8 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   TextEditingValue? _lastEditingValue;
   Rect? _currentSize;
   ScrollController controller = ScrollController();
+  final LayerLink _startHandle = LayerLink();
+  final LayerLink _endHandle = LayerLink();
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -44,12 +47,14 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     super.initState();
     initDocAndControlBlock();
     CallbackRegistry.registerEditFieldState(this);
+    widget.controller.selectionController.updateLayerLink(_startHandle, _endHandle);
     _attachFocus();
   }
 
   @override
   Widget build(BuildContext context) {
     MyLogger.debug('efantest: build block list');
+    widget.controller.selectionController.updateContext(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final render = context.findRenderObject()! as RenderBox;
       _currentSize = render.localToGlobal(Offset.zero) & render.size;
@@ -95,6 +100,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     _closeConnectionIfNeeded();
     widget.focusNode.removeListener(_handleFocusChanged);
     _focusAttachment!.detach();
+    widget.controller.selectionController.dispose();
     super.dispose();
   }
 
