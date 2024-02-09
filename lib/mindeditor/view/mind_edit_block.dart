@@ -160,15 +160,20 @@ class MindEditBlockState extends State<MindEditBlock> {
         widget.controller.gestureHandler.onPanUpdate(details, widget.texts.getBlockId());
       },
       onPanDown: (DragDownDetails details) {
-        // MyLogger.debug('efantest: on pan down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
-        // widget.controller.gestureHandler.onPanDown(details, widget.texts.id);
+        MyLogger.debug('efantest: on pan down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onPanDown(details, widget.texts.getBlockId());
       },
       onPanCancel: () {
-        // MyLogger.debug('efantest: on pan cancel, id=${widget.key}');
-        // widget.controller.gestureHandler.onPanCancel(widget.texts.id);
+        MyLogger.debug('efantest: on pan cancel, id=${widget.key}');
+        widget.controller.gestureHandler.onPanCancel(widget.texts.getBlockId());
       },
       onPanEnd: (DragEndDetails details) {
         MyLogger.debug('efantest: on pan end');
+      },
+      onLongPressStart: (LongPressStartDetails details) {
+        var blockId = widget.texts.getBlockId();
+        MyLogger.info('Long press start on block($blockId)');
+        widget.controller.gestureHandler.onLongPressStart(details, blockId);
       },
     );
     Widget container = gesture;

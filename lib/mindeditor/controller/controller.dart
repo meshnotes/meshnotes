@@ -6,6 +6,7 @@ import 'package:mesh_note/mindeditor/controller/environment.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/document_manager.dart';
+import 'package:mesh_note/mindeditor/view/selection_controller.dart';
 import 'package:mesh_note/net/net_controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +31,7 @@ class Controller {
   // Mouse and gesture handler
   late final GestureHandler gestureHandler;
   late final NetworkController network;
+  late final SelectionController selectionController;
   String deviceId = '';
   String simpleDeviceId = '';
   String userKey = '166f826179b0b077c90efe9bda61506844e658bba43f7edc67f741c1ccfccdfe';
@@ -72,6 +74,7 @@ class Controller {
     MyLogger.debug('initAll: start network');
     network = _net;
     network.start(setting, deviceId, userKey);
+    selectionController = SelectionController();
 
     MyLogger.debug('initAll: finish initialization');
     return true;

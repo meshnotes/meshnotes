@@ -65,7 +65,7 @@ class CallbackRegistry {
   static Rect? getEditStateSize() {
     return _editFieldState?.getCurrentSize();
   }
-  static scrollDown(double delta) {
+  static void scrollDown(double delta) {
     _editFieldState?.scrollDown(delta);
   }
 
