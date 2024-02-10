@@ -52,12 +52,12 @@ class SelectionController {
   }
 
   OverlayEntry _buildStartHandle(double _handleSize) {
-    return _buildHandle(_handleSize, _layerLinkOfStartHandle!, Offset(-_handleSize / 2, -_handleSize));
+    return _buildHandle(_handleSize, _layerLinkOfStartHandle!, _HandleType.start);
   }
   OverlayEntry _buildEndHandle(double _handleSize) {
-    return _buildHandle(_handleSize, _layerLinkOfEndHandle!, Offset(-_handleSize / 2, 0));
+    return _buildHandle(_handleSize, _layerLinkOfEndHandle!, _HandleType.end);
   }
-  OverlayEntry _buildHandle(double _handleSize, LayerLink _link, Offset offset) {
+  OverlayEntry _buildHandle(double _handleSize, LayerLink _link, _HandleType type) {
     var container = Container(
       alignment: Alignment.topLeft,
       child: SizedBox(
@@ -73,7 +73,7 @@ class SelectionController {
         MyLogger.info('selection handle: drag start');
       },
       onPanUpdate: (DragUpdateDetails details) {
-        MyLogger.info('selection handle: drag update');
+        MyLogger.debug('selection handle: drag update');
         var _controller = Controller.instance;
         var blockId = _controller.getEditingBlockId();
         if(blockId == null) {
@@ -84,10 +84,11 @@ class SelectionController {
           return;
         }
         var render = blockState.getRender();
-        var globalOffset = details.globalPosition;
+        // handle circle has an offset from actual point of text line, depending on start handle or end handle.
+        var globalOffset = details.globalPosition + (type == _HandleType.start? Offset(0, _handleSize): Offset(0, -_handleSize));
+        var modifyType = type == _HandleType.start? _ModifyType.base: _ModifyType.extend;
         var localOffset = render!.globalToLocal(globalOffset);
-        updateSelectionByOffset(blockId, localOffset);
-
+        updateSelectionByOffset(blockId, localOffset, type: modifyType);
       },
       onPanEnd: (DragEndDetails details) {
         MyLogger.info('selection handle: drag end');
@@ -97,6 +98,12 @@ class SelectionController {
       },
       child: container,
     );
+    Offset offset;
+    if(type == _HandleType.start) {
+      offset = Offset(-_handleSize / 2, -_handleSize);
+    } else {
+      offset = Offset(-_handleSize / 2, 0);
+    }
     return OverlayEntry(
       builder: (BuildContext context) {
         var result = CompositedTransformFollower(
@@ -110,12 +117,19 @@ class SelectionController {
     );
   }
 
-  void updateSelectionByOffset(String blockId, Offset offset) {
+  void updateSelectionByOffset(String blockId, Offset offset, {
+    _ModifyType type = _ModifyType.extend,
+  }) {
     final block = Controller.instance.getBlockState(blockId)!;
     final render = block.getRender()!;
     int pos = render.getPositionByOffset(offset);
     final node = Controller.instance.getBlockDesc(blockId)!;
-    var newTextSelection = node.getTextSelection(extentOffset: pos);
+    TextSelection? newTextSelection;
+    if(type == _ModifyType.extend) {
+      newTextSelection = node.getTextSelection(extentOffset: pos);
+    } else {
+      newTextSelection = node.getTextSelection(baseOffset: pos);
+    }
     if(newTextSelection == null) {
       MyLogger.warn('Unbelievable!!! onPanUpdate: node.getTextSelection returns null!');
     } else {
@@ -137,6 +151,16 @@ class SelectionController {
   void setShouldShowSelectionHandle(bool _b) {
     _shouldShowSelectionHandle = _b;
   }
+}
+
+enum _ModifyType {
+  base,
+  extend,
+}
+
+enum _HandleType {
+  start,
+  end,
 }
 
 class _HandlePainter extends CustomPainter {
