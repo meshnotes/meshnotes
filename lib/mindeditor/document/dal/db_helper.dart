@@ -74,7 +74,7 @@ class RealDbHelper implements DbHelper {
     open.overrideFor(OperatingSystem.windows, _openOnWindows);
     final directory = await getApplicationDocumentsDirectory();
     final dbFile = join(directory.path, dbFileName);
-    MyLogger.debug('MeshNotesDB: start opening mesh_notes db: $dbFile');
+    MyLogger.info('MeshNotesDB: start opening mesh_notes db: $dbFile');
     final db = sqlite3.open(dbFile);
     MyLogger.debug('MeshNotesDB: finish loading sqlite3');
     _database = db;

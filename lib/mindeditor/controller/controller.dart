@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:android_id/android_id.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
@@ -16,8 +18,6 @@ import '../document/paragraph_desc.dart';
 import '../setting/setting.dart';
 import 'device.dart';
 import 'gesture_handler.dart';
-import 'package:platform_device_id_v3/platform_device_id.dart';
-
 
 class Controller {
   bool isUnitTest = false;
@@ -31,8 +31,8 @@ class Controller {
   // Mouse and gesture handler
   late final GestureHandler gestureHandler;
   late final NetworkController network;
+  String deviceId = 'Unknown';
   late final SelectionController selectionController;
-  String deviceId = '';
   String simpleDeviceId = '';
   String userKey = '166f826179b0b077c90efe9bda61506844e658bba43f7edc67f741c1ccfccdfe';
 
@@ -81,7 +81,13 @@ class Controller {
   }
 
   Future<void> _genDeviceId() async {
-    deviceId = (await PlatformDeviceId.getDeviceId??'').trim();
+    // deviceId = (await PlatformDeviceId.getDeviceId??'').trim();
+    var platformDeviceId = await _getDeviceIdByPlatform();
+    if(platformDeviceId != null) {
+      deviceId = platformDeviceId;
+    } else {
+      deviceId = HashUtil.hashText(userKey) + ':Unknown';
+    }
 
     // simpleDeviceId is composed of first 8 character of deviceId and first 8 character of SHA256 of deviceId
     var len = deviceId.length > 8? 8: deviceId.length;
@@ -89,6 +95,31 @@ class Controller {
     final shaOfId = HashUtil.hashText(deviceId);
     len = shaOfId.length > 8? 8: shaOfId.length;
     simpleDeviceId += shaOfId.substring(0, len);
+  }
+  Future<String?> _getDeviceIdByPlatform() async {
+    final deviceInfoPlugin = DeviceInfoPlugin();
+    if(environment.isAndroid()) {
+      var plugin = const AndroidId();
+      var id = await plugin.getId();
+      return id;
+    }
+    if(environment.isIos()) {
+      var data = await deviceInfoPlugin.iosInfo;
+      return data.identifierForVendor;
+    }
+    if(environment.isMac()) {
+      var macInfo = await deviceInfoPlugin.macOsInfo;
+      return macInfo.systemGUID;
+    }
+    if(environment.isLinux()) {
+      var linuxInfo = await deviceInfoPlugin.linuxInfo;
+      return linuxInfo.machineId;
+    }
+    if(environment.isWindows()) {
+      var winInfo = await deviceInfoPlugin.windowsInfo;
+      return winInfo.deviceId;
+    }
+    return null;
   }
 
   MouseCursor getHandCursor() {
