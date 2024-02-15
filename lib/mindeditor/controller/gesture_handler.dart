@@ -1,6 +1,5 @@
 import 'package:flutter/gestures.dart';
 import 'package:my_log/my_log.dart';
-import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'controller.dart';
 
 class GestureHandler {
@@ -19,8 +18,8 @@ class GestureHandler {
   }
 
   void onPanStart(DragStartDetails details, String blockId) {
-    bool _shouldShowSelectionHandle = details.kind == PointerDeviceKind.touch || details.kind == PointerDeviceKind.stylus;
-    controller.selectionController.setShouldShowSelectionHandle(_shouldShowSelectionHandle);
+    _setShouldShowHandles(details.kind);
+
     MyLogger.debug('efantest: onPanStart');
     var offset = details.localPosition;
     final block = controller.getBlockState(blockId)!;
@@ -50,11 +49,26 @@ class GestureHandler {
     // }
   }
 
+  void onLongPressDown(LongPressDownDetails details, String blockId) {
+    _setShouldShowHandles(details.kind);
+  }
+
   void onLongPressStart(LongPressStartDetails details, String blockId) {
-    final offset = details.globalPosition;
-    final block = controller.getBlockState(blockId)!;
-    // final render = block.getRender()!;
-    // int pos = render.getPositionByOffset(offset);
-    controller.selectionController.showTextSelectionHandles(offset);
+    _onSelectWord(details.localPosition, blockId);
+  }
+
+  void onDoubleTapDown(TapDownDetails details, String blockId) {
+    _setShouldShowHandles(details.kind);
+
+    _onSelectWord(details.localPosition, blockId);
+  }
+
+  void _setShouldShowHandles(PointerDeviceKind? kind) {
+    bool _shouldShowSelectionHandle = kind == PointerDeviceKind.touch || kind == PointerDeviceKind.stylus;
+    controller.selectionController.setShouldShowSelectionHandle(_shouldShowSelectionHandle);
+  }
+
+  void _onSelectWord(Offset offset, String blockId) {
+    controller.selectionController.updateSelectionByPosRange(offset, blockId);
   }
 }

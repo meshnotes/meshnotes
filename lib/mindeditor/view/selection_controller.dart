@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:my_log/my_log.dart';
-
 import '../controller/callback_registry.dart';
 import '../controller/controller.dart';
 
@@ -24,15 +23,18 @@ class SelectionController {
   LayerLink? getLayerLinkOfStartHandle() => _layerLinkOfStartHandle;
   LayerLink? getLayerLinkOfEndHandle() => _layerLinkOfEndHandle;
 
-  void showTextSelectionHandles(Offset position) {
+  void showTextSelectionHandles() {
     if(!_shouldShowSelectionHandle) {
       return;
     }
     if(_context == null || _handleOfStart != null || _handleOfEnd != null) { // No context or already displayed handles
       return;
     }
+    if(_layerLinkOfStartHandle == null || _layerLinkOfEndHandle == null) {
+      return;
+    }
     MyLogger.info('SelectionController: add selection overlay handle');
-    double _handleSize = 10;
+    double _handleSize = 22;
     _handleOfStart = _buildStartHandle(_handleSize);
     _handleOfEnd = _buildEndHandle(_handleSize);
     Overlay.of(_context!).insert(_handleOfStart!);
@@ -86,7 +88,7 @@ class SelectionController {
         var render = blockState.getRender();
         // handle circle has an offset from actual point of text line, depending on start handle or end handle.
         var globalOffset = details.globalPosition + (type == _HandleType.start? Offset(0, _handleSize): Offset(0, -_handleSize));
-        var modifyType = type == _HandleType.start? _ModifyType.base: _ModifyType.extend;
+        var modifyType = type == _HandleType.start? _ExtendType.base: _ExtendType.extend;
         var localOffset = render!.globalToLocal(globalOffset);
         updateSelectionByOffset(blockId, localOffset, type: modifyType);
       },
@@ -118,14 +120,14 @@ class SelectionController {
   }
 
   void updateSelectionByOffset(String blockId, Offset offset, {
-    _ModifyType type = _ModifyType.extend,
+    _ExtendType type = _ExtendType.extend,
   }) {
     final block = Controller.instance.getBlockState(blockId)!;
     final render = block.getRender()!;
     int pos = render.getPositionByOffset(offset);
     final node = Controller.instance.getBlockDesc(blockId)!;
     TextSelection? newTextSelection;
-    if(type == _ModifyType.extend) {
+    if(type == _ExtendType.extend) {
       newTextSelection = node.getTextSelection(extentOffset: pos);
     } else {
       newTextSelection = node.getTextSelection(baseOffset: pos);
@@ -136,7 +138,23 @@ class SelectionController {
       node.setTextSelection(newTextSelection);
       CallbackRegistry.refreshTextEditingValue();
       render.markNeedsPaint();
-      Controller.instance.selectionController.showTextSelectionHandles(offset);
+      Controller.instance.selectionController.showTextSelectionHandles();
+    }
+  }
+  void updateSelectionByPosRange(Offset offset, String blockId) {
+    final controller = Controller.instance;
+    final blockState = controller.getBlockState(blockId)!;
+    var (startPos, endPos) = blockState.selectWord(offset);
+
+    blockState.requestCursorAtPosition(startPos);
+    if(startPos != endPos) {
+      final node = controller.getBlockDesc(blockId)!;
+      var newTextSelection = node.getTextSelection(extentOffset: endPos)!;
+      node.setTextSelection(newTextSelection);
+      CallbackRegistry.refreshTextEditingValue();
+      var render = blockState.getRender()!;
+      render.markNeedsPaint();
+      Controller.instance.selectionController.showTextSelectionHandles();
     }
   }
 
@@ -153,7 +171,7 @@ class SelectionController {
   }
 }
 
-enum _ModifyType {
+enum _ExtendType {
   base,
   extend,
 }

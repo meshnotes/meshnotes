@@ -148,7 +148,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     var gesture = GestureDetector(
       child: block,
       onTapDown: (TapDownDetails details) {
-        MyLogger.debug('efantest: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        MyLogger.info('efantest: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onTapDown(details, widget.texts.getBlockId());
       },
       onPanStart: (DragStartDetails details) {
@@ -170,10 +170,22 @@ class MindEditBlockState extends State<MindEditBlock> {
       onPanEnd: (DragEndDetails details) {
         MyLogger.debug('efantest: on pan end');
       },
+      onLongPressDown: (LongPressDownDetails details) {
+        var blockId = widget.texts.getBlockId();
+        // MyLogger.info('Long press down on block($blockId)');
+        widget.controller.gestureHandler.onLongPressDown(details, blockId);
+      },
       onLongPressStart: (LongPressStartDetails details) {
         var blockId = widget.texts.getBlockId();
-        MyLogger.info('Long press start on block($blockId)');
         widget.controller.gestureHandler.onLongPressStart(details, blockId);
+      },
+      onLongPressCancel: () {
+        MyLogger.info('long press cancel');
+      },
+      onDoubleTapDown: (TapDownDetails details) {
+        var blockId = widget.texts.getBlockId();
+        MyLogger.info('Double tap down on block($blockId)');
+        widget.controller.gestureHandler.onDoubleTapDown(details, blockId);
       },
     );
     Widget container = gesture;
@@ -698,6 +710,45 @@ class MindEditBlockState extends State<MindEditBlock> {
 
     _updateNavigatorViewIfNeeded();
     _triggerBlockModified();
+  }
+
+  (int, int) selectWord(Offset offset) {
+    int pos = _render!.getPositionByOffset(offset);
+    MyLogger.info('efantest: pos=$pos');
+    var plainText = widget.texts.getPlainText();
+    var currentChar = plainText.codeUnitAt(pos);
+    if(_isAlphabet(currentChar)) { // Find English word
+      return _findWord(plainText, pos);
+    } else { // Return current position
+      if(pos == 0) {
+        return (0, 1);
+      }
+      return (pos - 1, pos);
+    }
+  }
+  bool _isAlphabet(int c) {
+    return (c >= 'a'.codeUnitAt(0) && c <= 'z'.codeUnitAt(0)) || (c >= 'A'.codeUnitAt(0) && c <= 'Z'.codeUnitAt(0) || c == '_'.codeUnitAt(0));
+  }
+  (int, int) _findWord(String plainText, int pos) {
+    int t = pos;
+    while(t >= 0) {
+      var c = plainText.codeUnitAt(t);
+      if(!_isAlphabet(c)) {
+        break;
+      }
+      t--;
+    }
+    int start = t + 1;
+    t = pos;
+    while(t < plainText.length) {
+      var c = plainText.codeUnitAt(t);
+      if(!_isAlphabet(c)) {
+        break;
+      }
+      t++;
+    }
+    int end = t;
+    return (start, end);
   }
 
   void mergeParagraph(String nextBlockId) {
