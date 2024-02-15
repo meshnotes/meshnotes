@@ -145,8 +145,8 @@ class ParagraphDesc {
   void newTextSelection(int pos) {
     setTextSelection(TextSelection.collapsed(offset: pos));
   }
-  TextSelection? getTextSelection({int? extentOffset}) {
-    return _editingPosition?.copyWith(extentOffset: extentOffset);
+  TextSelection? getTextSelection({int? extentOffset, int? baseOffset}) {
+    return _editingPosition?.copyWith(baseOffset: baseOffset, extentOffset: extentOffset);
   }
   void clearTextSelection() {
     _setTextSelection(null);
