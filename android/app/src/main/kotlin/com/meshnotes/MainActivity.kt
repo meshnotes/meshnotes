@@ -1,4 +1,4 @@
-package com.example.meshnotes
+package com.meshnotes
 
 import io.flutter.embedding.android.FlutterActivity
 

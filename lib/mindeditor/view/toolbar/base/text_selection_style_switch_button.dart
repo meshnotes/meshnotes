@@ -1,50 +1,50 @@
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/appearance_setting.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/toolbar_button.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
-import '../../controller/callback_registry.dart';
+import '../../../controller/callback_registry.dart';
+import '../../../document/paragraph_desc.dart';
 
-class BlockFormatButton extends StatefulWidget {
+class TextSelectionStyleSwitchButton extends StatefulWidget {
   final AppearanceSetting appearance;
   final Controller controller;
   final Widget icon;
   final String tip;
   final String buttonKey;
-  final bool Function(String? type, String? listing, int? level) showOrNot;
-  final void Function() onPressed;
+  final bool Function(TextSpansStyle?) showOrNot;
+  final bool Function() onPressed; // return value: - true: show button; - false: hide button
 
-  const BlockFormatButton({
+  const TextSelectionStyleSwitchButton({
     Key? key,
     required this.controller,
     required this.appearance,
     required this.icon,
     required this.tip,
+    required this.buttonKey,
     required this.showOrNot,
     required this.onPressed,
-    required this.buttonKey,
   }) : super(key: key);
 
   @override
-  State<StatefulWidget> createState() => _BlockFormatButtonState();
+  State<StatefulWidget> createState() => _TextSelectionStyleSwitchButtonState();
 }
 
-class _BlockFormatButtonState extends State<BlockFormatButton> {
+class _TextSelectionStyleSwitchButtonState extends State<TextSelectionStyleSwitchButton> {
   bool isOn = false;
 
   @override
   void initState() {
     super.initState();
-    MyLogger.debug('efantest: building block format button: ${widget.buttonKey}');
-    CallbackRegistry.registerEditingBlockFormatWatcher(widget.buttonKey, (String? type, String? listing, int? level) {
-      _setOn(widget.showOrNot(type, listing, level));
+    MyLogger.debug('efantest: building toolbar switch button key=${widget.buttonKey}');
+    CallbackRegistry.registerSelectionStyleWatcher(widget.buttonKey, (TextSpansStyle? style) {
+      _setOn(widget.showOrNot(style));
     });
   }
   @override
   void dispose() {
     super.dispose();
-    MyLogger.debug('efantest: destroying block format button: ${widget.buttonKey}');
-    CallbackRegistry.unregisterEditingBlockFormatWatcher(widget.buttonKey);
+    CallbackRegistry.unregisterSelectionStyleWatcher(widget.buttonKey);
   }
 
   @override
@@ -56,7 +56,7 @@ class _BlockFormatButtonState extends State<BlockFormatButton> {
       tip: widget.tip,
       isOn: isOn,
       onPressed: () {
-        widget.onPressed();
+        _setOn(widget.onPressed());
       },
     );
   }

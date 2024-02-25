@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.1.0 <3.3.0"
+  sdk: ">=3.1.0 <=3.3.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -60,6 +60,7 @@ dependencies:
 #  image_gallery_saver: ^1.7.1
   device_info_plus: ^9.1.1
   android_id: ^0.3.6
+  super_clipboard: ^0.8.5
   libp2p:
     path: packages/libp2p
   my_log:

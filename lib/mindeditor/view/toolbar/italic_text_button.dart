@@ -1,8 +1,7 @@
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/switch_button_state.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/base/text_selection_style_switch_button.dart';
 import 'package:flutter/material.dart';
-import 'package:my_log/my_log.dart';
 import '../../document/paragraph_desc.dart';
 import 'appearance_setting.dart';
 
@@ -18,29 +17,14 @@ class ItalicTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ToolbarSwitchButton(
+    return TextSelectionStyleSwitchButton(
       icon: Icon(Icons.format_italic, size: appearance.iconSize),
       appearance: appearance,
       controller: controller,
       tip: 'Italicize',
-      initCallback: (Function(bool) _setOn) {
-        CallbackRegistry.registerSelectionChangedWatcher('italic', (TextSpansStyle? style) {
-          if(style == null) {
-            MyLogger.debug('efantest: style is null');
-            _setOn(false);
-            return;
-          }
-          if(style.isAllItalic) {
-            MyLogger.debug('efantest: italic is on');
-            _setOn(true);
-          } else {
-            MyLogger.debug('efantest: italic is off');
-            _setOn(false);
-          }
-        });
-      },
-      destroyCallback: () {
-        CallbackRegistry.unregisterDocumentChangedWatcher('italic');
+      buttonKey: 'italic',
+      showOrNot: (TextSpansStyle? style) {
+        return (style != null && style.isAllItalic);
       },
       onPressed: () {
         var blockState = controller.getEditingBlockState();

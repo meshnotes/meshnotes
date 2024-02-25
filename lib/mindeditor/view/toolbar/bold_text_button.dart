@@ -1,7 +1,6 @@
-import 'package:my_log/my_log.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/switch_button_state.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/base/text_selection_style_switch_button.dart';
 import 'package:flutter/material.dart';
 import '../../document/paragraph_desc.dart';
 import 'appearance_setting.dart';
@@ -18,29 +17,14 @@ class BoldTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ToolbarSwitchButton(
+    return TextSelectionStyleSwitchButton(
       icon: Icon(Icons.format_bold, size: appearance.iconSize),
       appearance: appearance,
       controller: controller,
       tip: 'Bold',
-      initCallback: (Function(bool) _setOn) {
-        CallbackRegistry.registerSelectionChangedWatcher('bold', (TextSpansStyle? style) {
-          if(style == null) {
-            MyLogger.debug('efantest: style is null');
-            _setOn(false);
-            return;
-          }
-          if(style.isAllBold) {
-            MyLogger.debug('efantest: bold is on');
-            _setOn(true);
-          } else {
-            MyLogger.debug('efantest: bold is off');
-            _setOn(false);
-          }
-        });
-      },
-      destroyCallback: () {
-        CallbackRegistry.unregisterDocumentChangedWatcher('bold');
+      buttonKey: 'bold',
+      showOrNot: (TextSpansStyle? style) {
+        return (style != null && style.isAllBold);
       },
       onPressed: () {
         var blockState = controller.getEditingBlockState();

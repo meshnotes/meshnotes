@@ -263,6 +263,31 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     return result;
   }
 
+  /// Compose a new TextEditingValue from old TextEditingValue, and re-use updateEditingValue() method
+  void pasteText(String text) {
+    // 1. Get old editing value
+    TextEditingValue oldEditingValue = getLastEditingValue()?? const TextEditingValue(text: '');
+    String oldText = oldEditingValue.text;
+    int oldTextLength = oldText.length;
+
+    // 2. Compose new editing value from oldEditingValue and pasted text
+    var selection = oldEditingValue.selection;
+    String prefixText = '', suffixText = '';
+    if(selection.start > 0) {
+      prefixText = oldText.substring(0, selection.start);
+    }
+    if(selection.end >= 0 && selection.end < oldTextLength) {
+      suffixText = oldText.substring(selection.end);
+    }
+    TextEditingValue newEditingValue = TextEditingValue(
+      text: prefixText + text + suffixText,
+      selection: TextSelection.collapsed(offset: prefixText.length + text.length),
+    );
+
+    _textInputConnection?.setEditingState(newEditingValue);
+    updateEditingValue(newEditingValue);
+  }
+
   @override
   void connectionClosed() {
     if(!_hasConnection) {
@@ -304,7 +329,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   @override
   void updateEditingValue(TextEditingValue value) {
-    MyLogger.debug('efantest: updating editing value: $value, $_lastEditingValue');
+    MyLogger.debug('updateEditingValue: updating editing value: $value, $_lastEditingValue');
     // 跟上一次没有区别，什么也不做
     if(_lastEditingValue == value) {
       return;

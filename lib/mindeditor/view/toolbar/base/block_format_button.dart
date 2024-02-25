@@ -1,46 +1,50 @@
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/appearance_setting.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/toolbar_button.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
+import '../../../controller/callback_registry.dart';
 
-class ToolbarSwitchButton extends StatefulWidget {
+class BlockFormatButton extends StatefulWidget {
   final AppearanceSetting appearance;
   final Controller controller;
   final Widget icon;
   final String tip;
-  final Function(Function(bool) _setOn) initCallback; // _setOn是给callback函数设置按钮按下状态的
-  final Function() destroyCallback;
-  final bool Function() onPressed; // 返回的bool是给_setOn用来设置按钮按下状态的
+  final String buttonKey;
+  final bool Function(String? type, String? listing, int? level) showOrNot;
+  final void Function() onPressed;
 
-  const ToolbarSwitchButton({
+  const BlockFormatButton({
     Key? key,
     required this.controller,
     required this.appearance,
     required this.icon,
     required this.tip,
-    required this.initCallback,
-    required this.destroyCallback,
+    required this.showOrNot,
     required this.onPressed,
+    required this.buttonKey,
   }) : super(key: key);
 
   @override
-  State<StatefulWidget> createState() => _ToolbarSwitchButtonState();
+  State<StatefulWidget> createState() => _BlockFormatButtonState();
 }
 
-class _ToolbarSwitchButtonState extends State<ToolbarSwitchButton> {
+class _BlockFormatButtonState extends State<BlockFormatButton> {
   bool isOn = false;
 
   @override
   void initState() {
     super.initState();
-    MyLogger.debug('efantest: building toolbar switch button');
-    widget.initCallback(_setOn);
+    MyLogger.debug('efantest: building block format button: ${widget.buttonKey}');
+    CallbackRegistry.registerEditingBlockFormatWatcher(widget.buttonKey, (String? type, String? listing, int? level) {
+      _setOn(widget.showOrNot(type, listing, level));
+    });
   }
   @override
   void dispose() {
     super.dispose();
-    widget.destroyCallback();
+    MyLogger.debug('efantest: destroying block format button: ${widget.buttonKey}');
+    CallbackRegistry.unregisterEditingBlockFormatWatcher(widget.buttonKey);
   }
 
   @override
@@ -52,7 +56,7 @@ class _ToolbarSwitchButtonState extends State<ToolbarSwitchButton> {
       tip: widget.tip,
       isOn: isOn,
       onPressed: () {
-        _setOn(widget.onPressed());
+        widget.onPressed();
       },
     );
   }

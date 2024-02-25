@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 typedef OnHandleNewVersion = Function(String versionHash, String versionStr, Map<String, String> objects);
 typedef OnHandleNewVersionTree = Function(List<VersionNode> dag);
 typedef OnHandleRequireVersions = Function(List<String> requiredVersions);

@@ -190,7 +190,7 @@ class Controller {
   }
 
   void triggerSelectionChanged(TextSpansStyle? selection) {
-    CallbackRegistry.triggerSelectionChangedEvent(selection);
+    CallbackRegistry.triggerSelectionStyleEvent(selection);
   }
   void triggerBlockFormatChanged(ParagraphDesc? para) {
     var type = para?.getType();

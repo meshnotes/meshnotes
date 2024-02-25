@@ -148,7 +148,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     var gesture = GestureDetector(
       child: block,
       onTapDown: (TapDownDetails details) {
-        MyLogger.info('efantest: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        MyLogger.debug('efantest: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onTapDown(details, widget.texts.getBlockId());
       },
       onPanStart: (DragStartDetails details) {
@@ -172,7 +172,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       },
       onLongPressDown: (LongPressDownDetails details) {
         var blockId = widget.texts.getBlockId();
-        // MyLogger.info('Long press down on block($blockId)');
+        MyLogger.info('Long press down on block($blockId)');
         widget.controller.gestureHandler.onLongPressDown(details, blockId);
       },
       onLongPressStart: (LongPressStartDetails details) {
@@ -182,11 +182,11 @@ class MindEditBlockState extends State<MindEditBlock> {
       onLongPressCancel: () {
         MyLogger.info('long press cancel');
       },
-      onDoubleTapDown: (TapDownDetails details) {
-        var blockId = widget.texts.getBlockId();
-        MyLogger.info('Double tap down on block($blockId)');
-        widget.controller.gestureHandler.onDoubleTapDown(details, blockId);
-      },
+      // onDoubleTapDown: (TapDownDetails details) {
+      //   var blockId = widget.texts.getBlockId();
+      //   MyLogger.info('Double tap down on block($blockId)');
+      //   widget.controller.gestureHandler.onDoubleTapDown(details, blockId);
+      // },
     );
     Widget container = gesture;
     if(Controller.instance.isDebugMode) {
@@ -683,6 +683,31 @@ class MindEditBlockState extends State<MindEditBlock> {
     _updateNavigatorViewIfNeeded();
     _triggerBlockModified();
   }
+
+  /// Return plain text of selected range
+  String getSelectedContent() {
+    const invalidResult = '';
+    var block = widget.texts;
+    var selection = block.getTextSelection();
+    if(selection == null) {
+      MyLogger.warn('Unbelievable!!! getSelectedContent(): getTextSelection returns null!');
+      return invalidResult;
+    }
+    int selectionStart = selection.start;
+    int selectionEnd = selection.end;
+    if(selectionStart >= selectionEnd) {
+      return invalidResult;
+    }
+    if(selectionStart < 0) {
+      selectionStart = 0;
+    }
+    if(selectionEnd > widget.texts.getTotalLength()) {
+      selectionEnd = widget.texts.getTotalLength();
+    }
+    return widget.texts.getPlainText().substring(selectionStart, selectionEnd);
+  }
+
+  /// Delete selected content, and update view
   void deleteSelection() {
     var block = widget.texts;
     var selection = block.getTextSelection();
