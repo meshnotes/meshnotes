@@ -1,15 +1,32 @@
 import 'package:flutter/gestures.dart';
+import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import 'controller.dart';
 
 class GestureHandler {
+  int _lastTapDownTime = 0;
+  String _lastBlockId = '';
+  static const int _doubleTapInterval = 300;
   Controller controller;
 
   GestureHandler({
     required this.controller,
   });
 
-  void onTapDown(TapDownDetails details, String blockId) {
+  void onTapOrDoubleTap(TapDownDetails details, String blockId) {
+    int now = Util.getTimeStamp();
+    if(_lastBlockId == blockId && now - _lastTapDownTime < _doubleTapInterval) {
+      _onDoubleTapDown(details, blockId);
+      _lastTapDownTime = 0;
+      _lastBlockId = '';
+    } else {
+      _onTapDown(details, blockId);
+      _lastBlockId = blockId;
+      _lastTapDownTime = now;
+    }
+  }
+
+  void _onTapDown(TapDownDetails details, String blockId) {
     MyLogger.debug('efantest: onTapDown, blockId=$blockId');
     var offset = details.localPosition;
     final block = controller.getBlockState(blockId)!;
@@ -57,7 +74,7 @@ class GestureHandler {
     _onSelectWord(details.localPosition, blockId);
   }
 
-  void onDoubleTapDown(TapDownDetails details, String blockId) {
+  void _onDoubleTapDown(TapDownDetails details, String blockId) {
     _setShouldShowHandles(details.kind);
 
     _onSelectWord(details.localPosition, blockId);

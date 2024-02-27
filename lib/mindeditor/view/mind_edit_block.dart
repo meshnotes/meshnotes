@@ -149,7 +149,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       child: block,
       onTapDown: (TapDownDetails details) {
         MyLogger.debug('efantest: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
-        widget.controller.gestureHandler.onTapDown(details, widget.texts.getBlockId());
+        widget.controller.gestureHandler.onTapOrDoubleTap(details, widget.texts.getBlockId());
       },
       onPanStart: (DragStartDetails details) {
         MyLogger.debug('efantest: on pan start, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
@@ -182,6 +182,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       onLongPressCancel: () {
         MyLogger.info('long press cancel');
       },
+      // This will cause 300ms delay of onTapDown event
       // onDoubleTapDown: (TapDownDetails details) {
       //   var blockId = widget.texts.getBlockId();
       //   MyLogger.info('Double tap down on block($blockId)');
