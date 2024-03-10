@@ -220,16 +220,17 @@ class Document {
   String genAndSaveObject() {
     // if(!_hasModified) return hash;
     // Store ContentBlock objects and DocContent object
+    int now = Util.getTimeStamp();
     for(var p in paragraphs) {
       // if(p.getLastUpdated() > _lastUpdate) {
       //   p.storeObject();
       // }
       //TODO should optimize here, only store objects that is modified
-      p.storeObject();
+      p.storeObject(now);
     }
     var docContent = _generateDocContent();
     String docHash = docContent.getHash();
-    _db.storeObject(docHash, jsonEncode(docContent));
+    _db.storeObject(docHash, jsonEncode(docContent), now);
     return docHash;
   }
 
@@ -239,8 +240,9 @@ class Document {
     var docContent = _generateDocContent();
     for(var b in docContent.contents) {
       var blockHash = b.blockHash;
-      var blockStr = _db.getObject(blockHash);
-      result[blockHash] = blockStr;
+      var object = _db.getObject(blockHash);
+      if(object == null) continue;
+      result[blockHash] = object.data;
     }
     return result;
   }

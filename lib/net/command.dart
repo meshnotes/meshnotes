@@ -5,11 +5,13 @@ enum Command {
   networkStatus,
   nodeStatus,
   sendVersionTree, // Send version tree
-  receiveVersionTree, // Receive version tree
+  // receiveVersionTree, // Receive version tree
   sendRequireVersions,
-  receiveRequiredVersions,
+  // receiveRequiredVersions,
   sendVersions,
-  receiveVersions,
+  // receiveVersions,
+  receiveProvide,
+  receiveQuery,
 }
 
 class Message {

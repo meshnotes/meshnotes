@@ -35,9 +35,9 @@ class FakeDbHelper implements DbHelper {
   @override
   List<DocData> getAllDocuments() { return <DocData>[]; }
   @override
-  String getObject(String hash) { return ''; }
+  ObjectData? getObject(String hash) { return null; }
   @override
-  void storeObject(String hash, String data) {}
+  void storeObject(String hash, String data, int updatedAt) {}
   @override
   void storeVersion(String hash, String parents, int timestamp) {}
   @override

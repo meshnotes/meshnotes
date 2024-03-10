@@ -172,10 +172,13 @@ class ParagraphDesc {
     _storeBlock(); // Save immediately
   }
 
-  void storeObject() {
+  void storeObject(int timestamp) {
     var block = getBlockContent();
     var hash = block.getHash();
-    Controller.instance.dbHelper.storeObject(hash, jsonEncode(block));
+    var oldObject = Controller.instance.dbHelper.getObject(hash);
+    if(oldObject == null) {
+      Controller.instance.dbHelper.storeObject(hash, jsonEncode(block), timestamp);
+    }
   }
 
   void drop() {

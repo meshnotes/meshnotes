@@ -41,8 +41,8 @@ class Constants {
   // InspiredCard related
   static const int cardMaximumWidth = 800;
   static const int cardMaximumHeight = 600;
-  static const cardMinimalPaddingHorizontal = 20.0;
-  static const cardMinimalPaddingVertical = 10.0;
+  static const double cardMinimalPaddingHorizontal = 20.0;
+  static const double cardMinimalPaddingVertical = 10.0;
   static const double cardViewDragThreshold = 150;
   static const int cardViewScrollAnimationDuration = 300;
   static const int cardViewDesktopInnerPadding = 64;
@@ -66,4 +66,6 @@ class Constants {
   static const String settingDefaultLocalPort = '17974';
   static const String settingKeyTest = 'just_for_test';
   static const String settingCommentTest = 'Just for test';
+
+  static const String resourceKeyVersionTree = 'version_tree';
 }

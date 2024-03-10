@@ -1,17 +1,6 @@
 import 'dart:convert';
 import 'package:keygen/keygen.dart';
-
 import 'text_desc.dart';
-
-class VersionTreeItem {
-  String versionHash;
-  List<VersionTreeItem> parents;
-
-  VersionTreeItem({
-    required this.versionHash,
-    required this.parents,
-  });
-}
 
 class VersionContent {
   List<VersionContentItem> table;

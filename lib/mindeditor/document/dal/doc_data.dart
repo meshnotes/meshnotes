@@ -47,3 +47,15 @@ class VersionData {
     required this.createdAt,
   });
 }
+
+class ObjectData {
+  String key;
+  String data;
+  int timestamp;
+
+  ObjectData({
+    required this.key,
+    required this.data,
+    required this.timestamp,
+  });
+}

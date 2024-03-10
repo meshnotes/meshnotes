@@ -5,7 +5,7 @@ publish_to: none
 # repository: https://github.com/my_org/my_repo
 
 environment:
-  sdk: ^3.0.6
+  sdk: ">=3.1.0 <=3.3.0"
 
 # Add regular dependencies here.
 dependencies:
@@ -13,6 +13,7 @@ dependencies:
   elliptic: ^0.3.10
   ecdsa: ^0.1.0
   crypto: ^3.0.3
+  encrypt: ^5.0.3
 
 dev_dependencies:
   lints: ^2.0.0

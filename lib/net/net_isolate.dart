@@ -65,23 +65,25 @@ void _handleMessage(Message msg) async {
       }
       final parameter = msg.parameter as StartVillageParameter;
       VillageMessageHandler handler = VillageMessageHandler()
-        ..handleNewVersionTree = _handleNewVersionTree
-        ..handleRequireVersions = _handleRequireVersions
-        ..handleSendVersions = _handleSendVersions;
+        // ..handleNewVersionTree = _handleNewVersionTree
+        // ..handleRequireVersions = _handleRequireVersions
+        // ..handleSendVersions = _handleSendVersions
+        ..handleProvide = _handleProvide
+        ..handleQuery = _handleQuery
+      ;
       _village = await startVillage(parameter.localPort, parameter.serverList, parameter.deviceId, _nodeChanged, handler);
       _sendPort?.send(Message(cmd: Command.networkStatus, parameter: NetworkStatus.running,));
       break;
     case Command.terminateOk:
     case Command.networkStatus:
     case Command.nodeStatus:
-    case Command.receiveVersionTree:
-    case Command.receiveRequiredVersions:
-    case Command.receiveVersions:
-      // Do nothing, these part is in net_controller
+    case Command.receiveProvide:
+    case Command.receiveQuery:
+      // Do nothing, these commands are handled in net_controller
       break;
     case Command.sendVersionTree:
-      final versionTreeJson = msg.parameter as String;
-      _village?.sendVersionTree(versionTreeJson);
+      final resourceJson = msg.parameter as String;
+      _village?.sendVersionTree(resourceJson);
       break;
     case Command.sendRequireVersions:
       final requiredVersions = msg.parameter as String;
@@ -113,24 +115,6 @@ void _nodeChanged(VillagerNode node) {
   MyLogger.info('Node changed: $id: $nodeInfo');
   _reportNodes();
 }
-void _handleNewVersionTree(List<VersionNode> dag) {
-  _sendPort?.send(Message(
-    cmd: Command.receiveVersionTree,
-    parameter: dag,
-  ));
-}
-void _handleRequireVersions(List<String> requiredVersions) {
-  _sendPort?.send(Message(
-    cmd: Command.receiveRequiredVersions,
-    parameter: requiredVersions,
-  ));
-}
-void _handleSendVersions(List<SendVersionsNode> versions) {
-  _sendPort?.send(Message(
-    cmd: Command.receiveVersions,
-    parameter: versions,
-  ));
-}
 
 void _timerHandler(Timer _t) {
   if(_nodes.isEmpty) return;
@@ -146,4 +130,18 @@ void _reportNodes() {
     parameter: nodeList,
   ));
   _nodes.clear();
+}
+
+void _handleProvide(String data) {
+  _sendPort?.send(Message(
+    cmd: Command.receiveProvide,
+    parameter: data,
+  ));
+}
+
+void _handleQuery(String data) {
+  _sendPort?.send(Message(
+    cmd: Command.receiveQuery,
+    parameter: data,
+  ));
 }

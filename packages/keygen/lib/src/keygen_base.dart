@@ -1,11 +1,17 @@
 import 'dart:convert';
-
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'package:encrypt/encrypt.dart';
 import 'package:elliptic/elliptic.dart';
 import 'package:ecdsa/ecdsa.dart';
 
 final EllipticCurve _ec = getP256();
 
-/// Checks if you are awesome. Spoiler: you are.
+PrivateKey genRandomKey() {
+  var privateKey = _ec.generatePrivateKey();
+  return privateKey;
+}
+
 class SigningWrapper {
 
   PrivateKey key;
@@ -13,16 +19,13 @@ class SigningWrapper {
   SigningWrapper({
     required this.key,
   });
-  SigningWrapper.random(): key = _genRandomKey();
+  SigningWrapper.random(): key = genRandomKey();
+
   factory SigningWrapper.loadKey(String hex) {
     final key = PrivateKey.fromHex(_ec, hex);
     return SigningWrapper(key: key);
   }
 
-  static PrivateKey _genRandomKey() {
-    var privateKey = _ec.generatePrivateKey();
-    return privateKey;
-  }
 
   String sign(String text) {
     // var hash = List<int>.generate(text.length ~/ 2,
@@ -69,5 +72,47 @@ class VerifyingWrapper {
   }
   String getCompressedPublicKey() {
     return key.toCompressedHex();
+  }
+}
+
+class EncryptWrapper {
+  PrivateKey key;
+  EncryptWrapper({
+    required this.key,
+  });
+
+  Uint8List _genUint8List(int value) {
+    List<int> list = List.filled(8, 0);
+    for(int i = 0; i < 8; i++) {
+      list[i] = value & 0xFF;
+      value >>= 8;
+    }
+    return Uint8List.fromList(list);
+  }
+  (Encrypter, IV) _genEncrypter(int timestamp) {
+    final keyText = key.toString() + timestamp.toString();
+    final keyInt = keyText.codeUnits;
+    final digest = sha256.convert(keyInt);
+    final digestBase64 = base64Encode(digest.bytes);
+    final aesKey = Key.fromBase64(digestBase64);
+
+    final en = Encrypter(AES(aesKey));
+    final iv = IV(_genUint8List(timestamp));
+    return (en, iv);
+  }
+
+  String encrypt(int timestamp, String text) {
+    var (en, iv) = _genEncrypter(timestamp);
+
+    final encrypted = en.encrypt(text, iv: iv);
+    return encrypted.base64;
+  }
+
+  String decrypt(int timestamp, String text) {
+    var (en, iv) = _genEncrypter(timestamp);
+
+    final encrypted = Encrypted.fromBase64(text);
+    final decrypted = en.decrypt(encrypted, iv: iv);
+    return decrypted;
   }
 }

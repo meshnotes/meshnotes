@@ -22,6 +22,8 @@ class NetworkController {
   NetworkStatus _networkStatus = NetworkStatus.unknown;
   final Map<String, NodeInfo> _nodes = {};
   late SigningWrapper _signing;
+  late VerifyingWrapper _verify;
+  late EncryptWrapper _encrypt;
   Completer<bool>? finished;
 
   NetworkController(Isolate isolate, ReceivePort port): _isolate = isolate, _receivePort = port;
@@ -29,6 +31,8 @@ class NetworkController {
   void start(Setting settings, String deviceId, String privateKey) {
     MyLogger.info('Spawning isolate and start listening');
     _signing = SigningWrapper.loadKey(privateKey);
+    _verify = VerifyingWrapper.loadKey(_signing.getCompressedPublicKey());
+    _encrypt = EncryptWrapper(key: _signing.key);
     final serverList = settings.getSetting(Constants.settingKeyServerList)?? Constants.settingDefaultServerList;
     final localPort = settings.getSetting(Constants.settingKeyLocalPort)?? Constants.settingDefaultLocalPort;
     _receivePort.listen((data) {
@@ -44,24 +48,75 @@ class NetworkController {
     });
   }
 
-  void sendNewVersionTree(List<VersionData> versionData) {
+  /// Pack versionData in VersionChain, encrypt it, and sign it
+  void sendNewVersionTree(List<VersionData> versionData, int timestamp) {
+    //TODO better to move encryption and signing to Village isolate
     var dag = _buildDag(versionData);
     VersionChain versionChain = VersionChain(
       versionDag: dag,
     );
-    String json = jsonEncode(versionChain);
-    _sendPort?.send(Message(cmd: Command.sendVersionTree, parameter: json));
+    String chainJson = jsonEncode(versionChain);
+    String encryptedChainJson = _encrypt.encrypt(timestamp, chainJson);
+    var rawResource = UnsignedResource(
+      key: Constants.resourceKeyVersionTree,
+      subKey: '',
+      timestamp: timestamp,
+      data: encryptedChainJson,
+    );
+    String signature = _signing.sign(rawResource.getFeature());
+    var signedResource = SignedResource.fromRaw(rawResource, signature);
+
+    List<SignedResource> resourceList = [signedResource];
+    String signatureOfList = _signing.sign(SignedResources.getFeature(resourceList));
+    SignedResources signedResources = SignedResources(userPublicId: _signing.getCompressedPublicKey(), resources: resourceList, signature: signatureOfList);
+    String signedResourcesJson = jsonEncode(signedResources);
+    _sendPort?.send(Message(cmd: Command.sendVersionTree, parameter: signedResourcesJson));
   }
 
   void sendRequireVersions(List<String> versions) {
     var requiredVersions = RequireVersions(requiredVersions: versions);
     String json = jsonEncode(requiredVersions);
-    _sendPort?.send(Message(cmd: Command.sendRequireVersions, parameter: json));
+    String signature = _signing.sign(json);
+    SignedMessage signedMessage = SignedMessage(userPublicId: _signing.getCompressedPublicKey(), data: json, signature: signature);
+    String signedMessageJson = jsonEncode(signedMessage);
+    _sendPort?.send(Message(cmd: Command.sendRequireVersions, parameter: signedMessageJson));
   }
 
   void sendVersions(List<SendVersionsNode> versions) {
-    var sendVersions = SendVersions(versions: versions);
-    String json = jsonEncode(sendVersions);
+    List<SignedResource> resourceList = [];
+    for(var version in versions) {
+      int timestamp = version.createdAt;
+      String encryptedContent = _encrypt.encrypt(timestamp, version.versionContent);
+      UnsignedResource unsignedResource = UnsignedResource(
+        key: version.versionHash,
+        subKey: '',
+        timestamp: timestamp,
+        data: encryptedContent,
+      );
+      String signature = _signing.sign(unsignedResource.getFeature());
+      SignedResource signedResource = SignedResource.fromRaw(unsignedResource, signature);
+
+      resourceList.add(signedResource);
+
+      for(var item in version.requiredObjects.entries) {
+        String hash = item.key;
+        var (timestamp, value) = item.value;
+        String encryptedContent = _encrypt.encrypt(timestamp, value);
+        UnsignedResource rawObject = UnsignedResource(
+          key: hash,
+          subKey: '',
+          timestamp: timestamp,
+          data: encryptedContent,
+        );
+        String signature = _signing.sign(rawObject.getFeature());
+        SignedResource signedObject = SignedResource.fromRaw(rawObject, signature);
+
+        resourceList.add(signedObject);
+      }
+    }
+    String signature = _signing.sign(SignedResources.getFeature(resourceList));
+    final signedResources = SignedResources(userPublicId: _signing.getCompressedPublicKey(), resources: resourceList, signature: signature);
+    String json = jsonEncode(signedResources);
     _sendPort?.send(Message(cmd: Command.sendVersions, parameter: json));
   }
   
@@ -111,17 +166,58 @@ class NetworkController {
           }
         }
         break;
-      case Command.receiveVersionTree:
-        final data = msg.parameter as List<VersionNode>;
-        Controller.instance.receiveVersionTree(data);
+      case Command.receiveProvide:
+        /// 1. Check public key is the same
+        /// 2. Verify message and every single resource
+        /// 3. Decrypt resources
+        /// 4. notify upper layer
+        final data = msg.parameter as String;
+        final signedResources = SignedResources.fromJson(jsonDecode(data));
+        final publicKey = signedResources.userPublicId;
+        if(publicKey != _signing.getCompressedPublicKey()) {
+          MyLogger.info('Receive provide message from other user: $publicKey');
+          break;
+        }
+        String feature = SignedResources.getFeature(signedResources.resources);
+        final ok = _verify.ver(feature, signedResources.signature);
+        if(!ok) {
+          MyLogger.info('Verify provide message failed');
+          break;
+        }
+        List<UnsignedResource> unsignedResourceList = [];
+        for(var resource in signedResources.resources) {
+          UnsignedResource rawResource = UnsignedResource(
+            key: resource.key,
+            subKey: resource.subKey,
+            timestamp: resource.timestamp,
+            data: resource.data,
+          );
+          if(!_verify.ver(rawResource.getFeature(), resource.signature)) {
+            continue;
+          }
+          var plainText = _encrypt.decrypt(rawResource.timestamp, rawResource.data);
+          rawResource.data = plainText;
+          unsignedResourceList.add(rawResource);
+        }
+        Controller.instance.receiveResources(unsignedResourceList);
         break;
-      case Command.receiveRequiredVersions:
-        final data = msg.parameter as List<String>;
-        Controller.instance.receiveRequireVersions(data);
-        break;
-      case Command.receiveVersions:
-        final data = msg.parameter as List<SendVersionsNode>;
-        Controller.instance.receiveVersions(data);
+      case Command.receiveQuery:
+        /// 1. Check public key is the same
+        /// 2. Verify message
+        /// 3. notify upper layer
+        final data = msg.parameter as String;
+        SignedMessage signedMessage = SignedMessage.fromJson(jsonDecode(data));
+        final publicKey = signedMessage.userPublicId;
+        if(publicKey != _signing.getCompressedPublicKey()) {
+          MyLogger.info('Receive verify message from other user: $publicKey');
+          break;
+        }
+        if(!_verify.ver(signedMessage.data, signedMessage.signature)) {
+          MyLogger.info('Verify query message failed');
+          break;
+        }
+        var requiredVersions = RequireVersions.fromJson(jsonDecode(signedMessage.data));
+        Controller.instance.receiveRequireVersions(requiredVersions.requiredVersions);
         break;
     }
   }

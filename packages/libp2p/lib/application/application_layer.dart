@@ -48,35 +48,36 @@ class Village implements ApplicationController {
   void onData(VillagerNode node, String app, String type, String data) {
     MyLogger.info('efantest: receive village data: $data of type($type)');
     switch(type) {
-      case VersionTreeAppType:
-        _onVersionTree(data);
+      case ProvideAppType:
+        _onProvide(data);
         break;
-      case RequireVersionsAppType:
-        _onRequiredVersions(data);
-        break;
-      case SendVersionsAppType:
-        _onSendVersions(data);
-        break;
+      case QueryAppType:
+        _onQuery(data);
       default:
         MyLogger.info('onData: receive unrecognized app type: $type, data=$data');
         break;
     }
   }
 
-  void sendVersionTree(String versionTree) {
-    MyLogger.info('efantest: Preparing to send version_tree: $versionTree');
+  void sendVersionTree(String resourceJson) {
+    MyLogger.info('efantest: Preparing to send resource: $resourceJson');
     //TODO Optimize the code below to only send message to selected nodes
-    _overlay.sendToAllNodesOfUser(this, _userId, VersionTreeAppType, versionTree);
+    _overlay.sendToAllNodesOfUser(this, _userId, ProvideAppType, resourceJson);
   }
 
   void sendRequireVersions(String requiredVersions) {
     MyLogger.info('efantest: Preparing to send require_versions: $requiredVersions');
-    _overlay.sendToAllNodesOfUser(this, _userId, RequireVersionsAppType, requiredVersions);
+    _overlay.sendToAllNodesOfUser(this, _userId, QueryAppType, requiredVersions);
   }
 
   void sendVersions(String sendVersions) {
     MyLogger.info('efantest: Preparing to send send_versions: $sendVersions');
-    _overlay.sendToAllNodesOfUser(this, _userId, SendVersionsAppType, sendVersions);
+    _overlay.sendToAllNodesOfUser(this, _userId, ProvideAppType, sendVersions);
+  }
+
+  void sendProvide(String userKey, List<String> resources) {
+    ProvideMessage msg = ProvideMessage(userPubKey: userKey, resources: resources);
+    _overlay.sendToAllNodesOfUser(this, _userId, ProvideAppType, jsonEncode(msg));
   }
 
   void _timerHandler(Timer _t) {
@@ -109,44 +110,10 @@ class Village implements ApplicationController {
     // TODO Sync data to warehouses indicated by nodeIds
   }
 
-  void _onVersionTree(String data) {
-    final versionChain = VersionChain.fromJson(jsonDecode(data));
-    final versionDag = versionChain.versionDag;
-    messageHandler.handleNewVersionTree?.call(versionDag);
+  void _onProvide(String data) {
+    messageHandler.handleProvide?.call(data);
   }
-
-  void _onRequiredVersions(String data) {
-    var requiredVersions = RequireVersions.fromJson(jsonDecode(data));
-    messageHandler.handleRequireVersions?.call(requiredVersions.requiredVersions);
-  }
-
-  void _onSendVersions(String data) {
-    var sendVersions = SendVersions.fromJson(jsonDecode(data));
-    messageHandler.handleSendVersions?.call(sendVersions.versions);
-  }
-
-  void _onVersions(String data) {
-    // final versionChain = VersionChain.fromJson(jsonDecode(data));
-    // final versionHash = versionChain.versionHash;
-    // final versionStr = versionChain.versionStr;
-    // final parents = versionChain.parents;
-    // final requiredObjects = versionChain.requiredObjects;
-    //
-    // int now = DateTime.now().millisecondsSinceEpoch;
-    // _db.storeObject(versionHash, versionStr);
-    // _db.storeNewVersion(versionHash, parents.join(','), now);
-    // for(final e in requiredObjects.entries) {
-    //   var objHash = e.key;
-    //   var objData = e.value;
-    //   if(!_villageObjectCache.containsKey(objHash)) {
-    //     var object = VillageObject(objHash: objHash);
-    //     if(objData.isNotEmpty) {
-    //       object.setData(objData);
-    //       _db.storeObject(e.key, e.value);
-    //     }
-    //     _villageObjectCache[objHash] = object;
-    //   }
-    // }
-    // messageHandler.handleNewVersion?.call(versionHash, versionStr, requiredObjects);
+  void _onQuery(String data) {
+    messageHandler.handleQuery?.call(data);
   }
 }

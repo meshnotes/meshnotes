@@ -89,28 +89,13 @@ class DocumentManager {
     return docId;
   }
 
-  List<VersionData> genAndSaveNewVersionTree() {
-    if(!hasModified()) return [];
+  (List<VersionData>, int) genAndSaveNewVersionTree() {
+    if(!hasModified()) return ([], 0);
     final now = Util.getTimeStamp();
     var version = _genVersionAndClearModified(now);
     _saveVersion(version, _currentVersion, now);
-    return _getVersionMap();
+    return (_getVersionMap(), now);
   }
-  /// Generate version and returns version and required objects
-  ///
-  /// returns version and required objects
-  // Map<String, VersionTreeItem> genAndSaveNewVersion() {
-  //   if(!hasModified()) return {};
-  //
-  //   // generate and save version
-  //   final now = Util.getTimeStamp();
-  //   var version = _genVersionAndClearModified(now);
-  //   _saveVersion(version, now);
-  //
-  //   // generate required objects list
-  //   var requiredObjects = _genRequiredObjects();
-  //   return (version, requiredObjects);
-  // }
 
   /// Generate new version tree by merging local and remote version tree.
   /// If missing any version, require it from remote nodes.
@@ -118,35 +103,24 @@ class DocumentManager {
   /// Once assembling, set syncing status to stop other nodes sending version_tree concurrently.
   void assembleVersionTree(List<VersionNode> versionDag) {
     setSyncing();
-    Map<String, DagNode> remoteDagMap = _buildRemoteVersionTreeMap(versionDag);
-    Map<String, DagNode> localDagMap = _genVersionMap();
-    Map<String, DagNode> newMap = _mergeLocalAndRemoteMap(localDagMap, remoteDagMap);
-    _tryToMergeVersionTree(newMap);
+    _storeVersions(versionDag);
+    // Map<String, DagNode> remoteDagMap = _buildRemoteVersionTreeMap(versionDag);
+    Map<String, DagNode> localDagMap = _genVersionMapFromDb();
+    // Map<String, DagNode> newMap = _mergeLocalAndRemoteMap(localDagMap, remoteDagMap);
+    _tryToMergeVersionTree(localDagMap);
   }
-  /// Assemble new version into current version
-  /// 
-  /// 1. Store all required objects(including version object itself) into database
-  /// 2. Get common ancestor version of current version and new version
-  /// 3. Merge these two version based on common version, and we get a new merged version
-  /// 4. Update current version to merged version
-  /// 5. Save version flags and refresh view
-  void assembleVersion(String versionHash, String versionStr, List<String> parents, Map<String, String> requiredObjects) {
-    // requiredObjects[versionHash] = versionStr;
-    // _storeAllObjects(requiredObjects);
-    //
-    // String ancestorVersion = _getCommonAncestor(_currentVersion, versionHash, {});
-    // var mergedVersion = _merge(_currentVersion, versionHash, ancestorVersion);
-    // mergedVersion = VersionContent.fromJson(jsonDecode(versionStr));
-    //
-    // for(var item in mergedVersion.table) {
-    //   _updateDoc(item, requiredObjects);
-    // }
-    //
-    // var now = Util.getTimeStamp();
-    // _saveVersion(mergedVersion, now);
-    //
-    // Controller.instance.refreshDocNavigator();
+  void _storeVersions(List<VersionNode> versionDag) {
+    for(var node in versionDag) {
+      String versionHash = node.versionHash;
+      String parents = _buildParents(node.parents);
+      int timestamp = node.createdAt;
+      var oldVersion = _db.getVersionData(versionHash);
+      if(oldVersion == null) {
+        _db.storeVersion(versionHash, parents, timestamp);
+      }
+    }
   }
+
   List<SendVersionsNode> assembleRequireVersions(List<String> requiredVersions) {
     List<SendVersionsNode> result = [];
     for(var versionHash in requiredVersions) {
@@ -155,9 +129,10 @@ class DocumentManager {
         MyLogger.warn('assembleRequireVersions: version(hash=$versionHash) not found!!!');
         continue;
       }
-      final json = _db.getObject(versionHash);
+      final object = _db.getObject(versionHash);
+      final json = object!.data;
       final versionContent = VersionContent.fromJson(jsonDecode(json));
-      Map<String, String> requiredObjects = _genRequiredObjects(versionContent);
+      Map<String, (int, String)> requiredObjects = _genRequiredObjects(versionContent);
 
       var node = SendVersionsNode(
           versionHash: versionHash,
@@ -170,24 +145,20 @@ class DocumentManager {
     }
     return result;
   }
-  /// Assemble new version into current version
+
+  /// Assemble resources, and try to merge if all required resources are ready
   ///
-  /// 1. Store all required objects(including version object itself) into database
-  /// 2. Try to merge entire version tree
-  void assembleVersions(List<SendVersionsNode> versions) {
-    for(var item in versions) {
-      var versionHash = item.versionHash;
-      var versionContent = item.versionContent;
-      var timestamp = item.createdAt;
-      var parents = item.parents;
-      _db.storeVersion(versionHash, parents, timestamp);
-      _db.storeObject(versionHash, versionContent);
-      MyLogger.info('assembleVersions: storing objects for version $versionHash');
-      var requiredObjects = item.requiredObjects;
-      _storeAllObjects(requiredObjects);
+  /// 1. Store all resources into objects
+  /// 2. Load version tree
+  /// 3. Try to merge entire version tree
+  void assembleResources(List<UnsignedResource> resources) {
+    for(var res in resources) {
+      String key = res.key;
+      int timestamp = res.timestamp;
+      String content = res.data;
+      _db.storeObject(key, content, timestamp);
     }
-    var _versionMap = _genVersionMap();
-    MyLogger.info('efantest: _versionMap=$_versionMap');
+    var _versionMap = _genVersionMapFromDb();
     _tryToMergeVersionTree(_versionMap);
   }
 
@@ -293,9 +264,10 @@ class DocumentManager {
 
     // Store doc content into objects
     // var docContentStr = objects[found.hash]!;
-    var docContentStr = _db.getObject(found.hash);
+    var docObject = _db.getObject(found.hash);
+    var docContentStr = docObject!.data;
     MyLogger.info('efantest: docContent=$docContentStr');
-    _db.storeObject(found.hash, docContentStr);
+    _db.storeObject(found.hash, docContentStr, found.timestamp);
     var docContent = DocContent.fromJson(jsonDecode(docContentStr));
 
     // Store blocks into objects
@@ -304,7 +276,8 @@ class DocumentManager {
       var blockHash = content.blockHash;
       // Not support .children
       // String blockStr = objects[blockHash]!;
-      String blockStr = _db.getObject(blockHash);
+      var blockObject = _db.getObject(blockHash);
+      var blockStr = blockObject!.data;
       MyLogger.info('efantest: docId=$docId, blockId=$blockId, blockHash=$blockHash, blockStr=$blockStr');
       if(blockId == Constants.keyTitleId) {
         BlockContent blockContent = BlockContent.fromJson(jsonDecode(blockStr));
@@ -378,7 +351,7 @@ class DocumentManager {
     } else {
       final jsonStr = jsonEncode(version);
       // Save version object, version tree, current_version flag, and current_version_timestamp flag
-      _db.storeObject(hash, jsonStr);
+      _db.storeObject(hash, jsonStr, now);
       _db.storeVersion(hash, parents, now);
       _db.setFlag(Constants.flagNameCurrentVersion, hash);
       _db.setFlag(Constants.flagNameCurrentVersionTimestamp, now.toString());
@@ -424,29 +397,31 @@ class DocumentManager {
     return version;
   }
 
-  Map<String, String> _genRequiredObjects(VersionContent versionContent) {
-    Map<String, String> result = {};
+  Map<String, (int, String)> _genRequiredObjects(VersionContent versionContent) {
+    Map<String, (int, String)> result = {};
 
     for(var item in versionContent.table) {
       var docId = item.docId;
       var docHash = item.docHash;
-      var docContentStr = _db.getObject(docHash);
-      MyLogger.info('_genRequiredObjects: docId=$docId, docHash=$docHash, docStr=$docContentStr');
-      result[docHash] = docContentStr;
+      var docObject = _db.getObject(docHash);
+      if(docObject == null) continue;
+      MyLogger.info('_genRequiredObjects: docId=$docId, docHash=$docHash, docStr=$docObject');
+      result[docHash] = (docObject.timestamp, docObject.data);
 
       //TODO should load history document by docHash
-      var docContent = DocContent.fromJson(jsonDecode(docContentStr));
+      var docContent = DocContent.fromJson(jsonDecode(docObject.data));
       for(var block in docContent.contents) {
         _recursiveAddToMap(block, result);
       }
     }
     return result;
   }
-  void _recursiveAddToMap(DocContentItem block, Map<String, String> map) {
+  void _recursiveAddToMap(DocContentItem block, Map<String, (int, String)> map) {
     var blockHash = block.blockHash;
     if(!map.containsKey(blockHash)) {
-      var blockContent = _db.getObject(blockHash);
-      map[blockHash] = blockContent;
+      var blockObject = _db.getObject(blockHash);
+      if(blockObject == null) return;
+      map[blockHash] = (blockObject.timestamp, blockObject.data);
     }
     for(var item in block.children) {
       _recursiveAddToMap(item, map);
@@ -508,16 +483,9 @@ class DocumentManager {
     _hasModified = false;
   }
 
-  void _storeAllObjects(Map<String, String> objects) {
-    for(var entry in objects.entries) {
-      var hash = entry.key;
-      var value = entry.value;
-      _db.storeObject(hash, value);
-    }
-  }
   String _getCommonAncestor(String version1, String version2, Map<String, DagNode> _versionMap) {
     if(_versionMap.isEmpty) {
-      _versionMap = _genVersionMap();
+      _versionMap = _genVersionMapFromDb();
     }
     var verNode1 = _versionMap[version1];
     var verNode2 = _versionMap[version2];
@@ -527,7 +495,7 @@ class DocumentManager {
     DagNode? resultNode = vm.findNearestCommonAncestor([verNode1, verNode2], _versionMap);
     return resultNode?.versionHash??'';
   }
-  Map<String, DagNode> _genVersionMap() {
+  Map<String, DagNode> _genVersionMapFromDb() {
     var _allVersions = _db.getAllVersions();
 
     // Generate version map
@@ -567,6 +535,17 @@ class DocumentManager {
         var parentNode = result[p];
         if(parentNode == null) continue;
         currentNode.parents.add(parentNode);
+      }
+    }
+    return result;
+  }
+  String _buildParents(List<String> parents) {
+    String result = '';
+    for(var p in parents) {
+      if(result.isEmpty) {
+        result = p;
+      } else {
+        result += ',' + p;
       }
     }
     return result;
@@ -619,18 +598,22 @@ class DocumentManager {
     }
     return true;
   }
+  /// Find all versions that has no corresponding object.
+  /// That means, these versions are from remote peer, but the objects are not syncing yet.
+  /// Should sync these objects using 'query' message
   List<String> _findMissingVersions(Map<String, DagNode> map) {
-    List<String> result = [];
-    final versionHashList = _db.getAllValidVersionHashes();
-    Set<String> hashSet = {};
-    hashSet.addAll(versionHashList);
+    List<String> missing = [];
+    // final versionHashList = _db.getAllValidVersionHashes();
+    // Set<String> hashSet = {};
+    // hashSet.addAll(versionHashList);
     for(final e in map.entries) {
       final versionHash = e.key;
-      if(!hashSet.contains(versionHash)) {
-        result.add(versionHash);
+      var content = _db.getObject(versionHash);
+      if(content == null) {
+        missing.add(versionHash);
       }
     }
-    return result;
+    return missing;
   }
   VersionContent? _merge(String version1, String version2, String commonVersion) {
     MyLogger.info('_merge: merging version($version1) and version($version2) based on version($commonVersion)');
@@ -670,7 +653,7 @@ class DocumentManager {
   VersionContent? _loadVersionContent(String versionHash) {
     var data = _db.getObject(versionHash);
     MyLogger.info('_loadVersionContent: ($data)');
-    return data.isEmpty? null: VersionContent.fromJson(jsonDecode(data));
+    return data == null? null: VersionContent.fromJson(jsonDecode(data.data));
   }
 
   List<VersionData> _getVersionMap() {
@@ -722,9 +705,9 @@ class DocumentManager {
         MyLogger.warn('mergeOperations: should not have any conflict here!');
       }
       var newDoc = cm.mergeDocument(totalOperations);
-      var newDocHash = newDoc.getHash();
-      _db.storeObject(newDocHash, jsonEncode(newDoc));
       var now = Util.getTimeStamp();
+      var newDocHash = newDoc.getHash();
+      _db.storeObject(newDocHash, jsonEncode(newDoc), now);
       var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: newDocHash, timestamp: now);
       MyLogger.info('Solve conflict of document($docHash1) and document($docHash2) based on document($baseHash), generate new document($newDocHash)');
       resolvedOperations.add(op);
@@ -733,9 +716,9 @@ class DocumentManager {
   }
 
   DocContent? _loadDocContent(String docHash) {
-    String str = _db.getObject(docHash);
-    if(str.isEmpty) return null;
-    return DocContent.fromJson(jsonDecode(str));
+    var obj = _db.getObject(docHash);
+    if(obj == null) return null;
+    return DocContent.fromJson(jsonDecode(obj.data));
   }
 
   List<DocData> _getAllDocumentAndTitles() {

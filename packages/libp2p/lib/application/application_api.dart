@@ -1,17 +1,17 @@
+import 'dart:convert';
+
 typedef OnHandleNewVersion = Function(String versionHash, String versionStr, Map<String, String> objects);
 typedef OnHandleNewVersionTree = Function(List<VersionNode> dag);
 typedef OnHandleRequireVersions = Function(List<String> requiredVersions);
 typedef OnHandleSendVersions = Function(List<SendVersionsNode> versions);
+typedef OnHandleStringFunction = Function(String data);
 
-const String VersionTreeAppType = 'version_tree';
-const String RequireVersionsAppType = 'require_versions';
-const String SendVersionsAppType = 'send_versions';
+const String ProvideAppType = 'provide';
+const String QueryAppType = 'query';
 
 class VillageMessageHandler {
-  OnHandleNewVersionTree? handleNewVersion;
-  OnHandleNewVersionTree? handleNewVersionTree;
-  OnHandleRequireVersions? handleRequireVersions;
-  OnHandleSendVersions? handleSendVersions;
+  OnHandleStringFunction? handleProvide;
+  OnHandleStringFunction? handleQuery;
 }
 
 class VersionNode {
@@ -46,6 +46,164 @@ class VersionNode {
     return result;
   }
 }
+
+class SignedMessage {
+  String userPublicId;
+  String data;
+  String signature;
+
+  SignedMessage({
+    required this.userPublicId,
+    required this.data,
+    required this.signature,
+  });
+
+  SignedMessage.fromJson(Map<String, dynamic> map):
+        userPublicId = map['user'],
+        data = map['data'],
+        signature = map['sign'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user': userPublicId,
+      'data': data,
+      'sign': signature,
+    };
+  }
+}
+
+class UnsignedResource {
+  String key;
+  String subKey;
+  int timestamp;
+  String data;
+
+  UnsignedResource({
+    required this.key,
+    required this.subKey,
+    required this.timestamp,
+    required this.data,
+  });
+
+  String getFeature() {
+    return 'key: $key\n'
+        'sub_key: $subKey\n'
+        'timestamp: $timestamp\n'
+        'data: $data';
+  }
+}
+
+class SignedResource {
+  String key;
+  String subKey;
+  int timestamp;
+  String data;
+  String signature;
+
+  SignedResource({
+    required this.key,
+    required this.subKey,
+    required this.timestamp,
+    required this.data,
+    required this.signature,
+  });
+
+  SignedResource.fromRaw(UnsignedResource raw, String signature):
+        key = raw.key,
+        subKey = raw.subKey,
+        timestamp = raw.timestamp,
+        data = raw.data,
+        signature = signature;
+  SignedResource.fromJson(Map<String, dynamic> map):
+        key = map['key'],
+        subKey = map['sub_key'],
+        timestamp = map['timestamp'],
+        data = map['data'],
+        signature = map['sign'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'key': key,
+      'sub_key': subKey,
+      'timestamp': timestamp,
+      'data': data,
+      'sign': signature
+    };
+  }
+}
+
+class SignedResources {
+  String userPublicId;
+  List<SignedResource> resources;
+  String signature;
+
+  SignedResources({
+    required this.userPublicId,
+    required this.resources,
+    required this.signature,
+  });
+
+  static String getFeature(List<SignedResource> resources) {
+    String feature = '';
+    for(var r in resources) {
+      String json = jsonEncode(r);
+      feature += 'resource: $json\n';
+    }
+    return feature;
+  }
+
+  SignedResources.fromJson(Map<String, dynamic> map):
+        userPublicId = map['user'],
+        resources = _recursiveList(map['resources']),
+        signature = map['sign'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user': userPublicId,
+      'resources': resources,
+      'sign': signature,
+    };
+  }
+
+  static List<SignedResource> _recursiveList(List<dynamic> list) {
+    List<SignedResource> result = [];
+    for(var item in list) {
+      SignedResource signedResource = SignedResource.fromJson(item);
+      result.add(signedResource);
+    }
+    return result;
+  }
+}
+
+class ProvideMessage {
+  String userPubKey;
+  List<String> resources;
+
+  ProvideMessage({
+    required this.userPubKey,
+    required this.resources,
+  });
+
+  ProvideMessage.fromJson(Map<String, dynamic> map): userPubKey = map['user'], resources = map['resources'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user': userPubKey,
+      'resources': resources,
+    };
+  }
+}
+
+class EncryptedVersionChain {
+  String versionChainEncrypted;
+  int timestamp;
+
+  EncryptedVersionChain({
+    required this.versionChainEncrypted,
+    required this.timestamp,
+  });
+}
+
 class VersionChain {
   List<VersionNode> versionDag;
 
@@ -65,13 +223,6 @@ class VersionChain {
     final result = <VersionNode>[];
     for(var item in list) {
       result.add(VersionNode.fromJson(item));
-    }
-    return result;
-  }
-  static Map<String, String> _recursiveMap(Map<String, dynamic> map) {
-    final result = <String, String>{};
-    for(var entry in map.entries) {
-      result[entry.key] = entry.value as String;
     }
     return result;
   }
@@ -106,7 +257,7 @@ class SendVersionsNode {
   String versionContent;
   int createdAt;
   String parents;
-  Map<String, String> requiredObjects;
+  Map<String, (int, String)> requiredObjects;
 
   SendVersionsNode({
     required this.versionHash,
@@ -133,12 +284,12 @@ class SendVersionsNode {
     };
   }
 
-  static Map<String, String> _recursiveMap(Map<String, dynamic> map) {
-    Map<String, String> result = {};
+  static Map<String, (int, String)> _recursiveMap(Map<String, dynamic> map) {
+    Map<String, (int, String)> result = {};
     for(var e in map.entries) {
       String key = e.key;
-      String value = e.value as String;
-      result[key] = value;
+      var (timestamp, value) = e.value as (int, String);
+      result[key] = (timestamp, value);
     }
     return result;
   }

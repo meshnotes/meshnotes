@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:android_id/android_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -15,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
 import '../document/dal/fake_db_helper.dart';
 import '../document/paragraph_desc.dart';
+import '../setting/constants.dart';
 import '../setting/setting.dart';
 import 'device.dart';
 import 'gesture_handler.dart';
@@ -35,6 +37,7 @@ class Controller {
   late final SelectionController selectionController;
   String simpleDeviceId = '';
   String userKey = '166f826179b0b077c90efe9bda61506844e658bba43f7edc67f741c1ccfccdfe';
+  // String userKey = 'a0a46f73fd42aba7b8bd24c8cc373694e98246b9de37515766972e5eb34dcbbe';
 
   // Getters
   DocumentManager get docManager => _docManager!;
@@ -202,12 +205,12 @@ class Controller {
   bool sendVersionTree() {
     // If there is any modification, generate a new version tree, and try to sync this version
     if(!docManager.hasModified() || docManager.isSyncing()) return false;
-    var versionData = docManager.genAndSaveNewVersionTree();
+    var (versionData, timestamp) = docManager.genAndSaveNewVersionTree();
     if(versionData.isEmpty) {
       return false;
     }
     MyLogger.info('syncVersionTree: $versionData');
-    network.sendNewVersionTree(versionData);
+    network.sendNewVersionTree(versionData, timestamp);
     return true;
   }
 
@@ -230,8 +233,23 @@ class Controller {
     MyLogger.info('efantest: preparing to send versions: $versions');
     network.sendVersions(versions);
   }
-  void receiveVersions(List<SendVersionsNode> versions) {
-    MyLogger.info('efantest: receive versions message: $versions');
-    docManager.assembleVersions(versions);
+  void receiveResources(List<UnsignedResource> resources) {
+    List<VersionChain> versionChains = [];
+    List<UnsignedResource> nonChainResources = [];
+    for(var res in resources) {
+      final key = res.key;
+      // Gather version_tree resources together and solve it in the end
+      if(key == Constants.resourceKeyVersionTree) {
+        var versionChain = VersionChain.fromJson(jsonDecode(res.data));
+        versionChains.add(versionChain);
+      } else {
+        nonChainResources.add(res);
+      }
+    }
+    docManager.assembleResources(nonChainResources);
+
+    for(var chain in versionChains) {
+      receiveVersionTree(chain.versionDag);
+    }
   }
 }

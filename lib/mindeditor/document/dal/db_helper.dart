@@ -34,8 +34,8 @@ abstract class DbHelper {
   List<String> getAllValidVersionHashes();
   Map<String, String> getAllTitles();
   List<DocData> getAllDocuments();
-  String getObject(String hash);
-  void storeObject(String hash, String data);
+  ObjectData? getObject(String hash);
+  void storeObject(String hash, String data, int updatedAt);
   void storeVersion(String hash, String parents, int timestamp);
   String getFlag(String name);
   void setFlag(String name, String value);
@@ -276,19 +276,20 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  String getObject(String hash) {
-    const sql = 'SELECT data FROM objects WHERE obj_hash=?';
+  ObjectData? getObject(String hash) {
+    const sql = 'SELECT obj_hash, data, updated_at FROM objects WHERE obj_hash=?';
     final resultSet = _database.select(sql, [hash]);
     if(resultSet.isEmpty) {
-      return '';
+      return null;
     }
-    return resultSet.first['data'];
+    final row = resultSet.first;
+    return ObjectData(key: row['obj_hash'], data: row['data'], timestamp: row['updated_at']);
   }
   @override
-  void storeObject(String hash, String data) {
+  void storeObject(String hash, String data, int updatedAt) {
     //TODO Log an error while conflict
-    const sql = 'INSERT INTO objects(obj_hash, data) VALUES(?, ?) ON CONFLICT(obj_hash) DO UPDATE SET data=excluded.data';
-    _database.execute(sql, [hash, data]);
+    const sql = 'INSERT INTO objects(obj_hash, data, updated_at) VALUES(?, ?, ?) ON CONFLICT(obj_hash) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at';
+    _database.execute(sql, [hash, data, updatedAt]);
   }
 
   @override
