@@ -1,9 +1,5 @@
 import 'dart:convert';
 
-typedef OnHandleNewVersion = Function(String versionHash, String versionStr, Map<String, String> objects);
-typedef OnHandleNewVersionTree = Function(List<VersionNode> dag);
-typedef OnHandleRequireVersions = Function(List<String> requiredVersions);
-typedef OnHandleSendVersions = Function(List<SendVersionsNode> versions);
 typedef OnHandleStringFunction = Function(String data);
 
 const String ProvideAppType = 'provide';
@@ -12,39 +8,6 @@ const String QueryAppType = 'query';
 class VillageMessageHandler {
   OnHandleStringFunction? handleProvide;
   OnHandleStringFunction? handleQuery;
-}
-
-class VersionNode {
-  String versionHash;
-  int createdAt;
-  List<String> parents;
-
-  VersionNode({
-    required this.versionHash,
-    required this.createdAt,
-    required this.parents,
-  });
-
-  VersionNode.fromJson(Map<String, dynamic> map):
-    versionHash = map['hash'],
-    createdAt = map['created_at'],
-    parents = _recursiveList(map['parents']);
-
-  Map<String, dynamic> toJson() {
-    return {
-      'hash': versionHash,
-      'created_at': createdAt,
-      'parents': parents,
-    };
-  }
-
-  static List<String> _recursiveList(List<dynamic> list) {
-    final result = <String>[];
-    for(var item in list) {
-      result.add(item as String);
-    }
-    return result;
-  }
 }
 
 class SignedMessage {
@@ -204,30 +167,6 @@ class EncryptedVersionChain {
   });
 }
 
-class VersionChain {
-  List<VersionNode> versionDag;
-
-  VersionChain({
-    required this.versionDag,
-  });
-
-  VersionChain.fromJson(Map<String, dynamic> map): versionDag = _recursiveList(map['dag']);
-
-  Map<String, dynamic> toJson() {
-    return {
-      'dag': versionDag,
-    };
-  }
-
-  static List<VersionNode> _recursiveList(List<dynamic> list) {
-    final result = <VersionNode>[];
-    for(var item in list) {
-      result.add(VersionNode.fromJson(item));
-    }
-    return result;
-  }
-}
-
 class RequireVersions {
   List<String> requiredVersions;
 
@@ -252,75 +191,77 @@ class RequireVersions {
   }
 }
 
-class SendVersionsNode {
-  String versionHash;
-  String versionContent;
-  int createdAt;
-  String parents;
-  Map<String, (int, String)> requiredObjects;
+class UserPublicInfo {
+  String publicKey;
+  String userName;
+  int timestamp;
+  String signature;
 
-  SendVersionsNode({
-    required this.versionHash,
-    required this.versionContent,
-    required this.requiredObjects,
-    required this.createdAt,
-    required this.parents,
+  UserPublicInfo({
+    required this.publicKey,
+    required this.userName,
+    required this.timestamp,
+    this.signature = '',
   });
 
-  SendVersionsNode.fromJson(Map<String, dynamic> map):
-        versionHash = map['hash'],
-        versionContent = map['content'],
-        createdAt = map['created_at'],
-        parents = map['parents'],
-        requiredObjects = _recursiveMap(map['required_objects']);
+  String getFeature() {
+    return 'public_key: $publicKey\n'
+        'name: $userName\n'
+        'timestamp: $timestamp\n';
+  }
+
+  UserPublicInfo.fromJson(Map<String, dynamic> map):
+        publicKey = map['public_key'],
+        userName = map['name'],
+        timestamp = map['timestamp'],
+        signature = map['sign'];
 
   Map<String, dynamic> toJson() {
     return {
-      'hash': versionHash,
-      'content': versionContent,
-      'created_at': createdAt,
-      'parents': parents,
-      'required_objects': requiredObjects,
+      'public_key': publicKey,
+      'name': userName,
+      'timestamp': timestamp,
+      'sign': signature,
     };
-  }
-
-  static Map<String, (int, String)> _recursiveMap(Map<String, dynamic> map) {
-    Map<String, (int, String)> result = {};
-    for(var e in map.entries) {
-      String key = e.key;
-      var (timestamp, value) = e.value as (int, String);
-      result[key] = (timestamp, value);
-    }
-    return result;
-  }
-
-  @override
-  String toString() {
-    return '$versionHash: $requiredObjects';
   }
 }
 
-class SendVersions {
-  List<SendVersionsNode> versions;
+class UserPrivateInfo {
+  String publicKey;
+  String userName;
+  String privateKey;
+  int timestamp;
+  String signature;
 
-  SendVersions({
-    required this.versions,
+  UserPrivateInfo({
+    required this.publicKey,
+    required this.userName,
+    required this.privateKey,
+    required this.timestamp,
+    this.signature = '',
   });
 
-  SendVersions.fromJson(Map<String, dynamic> map): versions = _recursiveList(map['versions']);
+  String getFeature() {
+    return 'public_key: $publicKey\n'
+        'name: $userName\n'
+        'private_key: $privateKey\n'
+        'timestamp: $timestamp\n';
+  }
+
+  UserPrivateInfo.fromJson(Map<String, dynamic> map):
+        publicKey = map['public_key'],
+        userName = map['name'],
+        privateKey = map['private_key'],
+        timestamp = map['timestamp'],
+        signature = map['sign'];
 
   Map<String, dynamic> toJson() {
     return {
-      'versions': versions,
+      'public_key': publicKey,
+      'name': userName,
+      'private_key': privateKey,
+      'timestamp': timestamp,
+      'sign': signature,
     };
-  }
-
-  static List<SendVersionsNode> _recursiveList(List<dynamic> list) {
-    final result = <SendVersionsNode>[];
-    for(var item in list) {
-      var node = SendVersionsNode.fromJson(item);
-      result.add(node);
-    }
-    return result;
   }
 }

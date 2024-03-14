@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:libp2p/overlay/villager_node.dart';
 import 'package:my_log/my_log.dart';
@@ -19,6 +20,7 @@ void main() {
     VillagerNode? clientNode;
     VillagerNode.defaultReconnectInterval = 1;
     var clientOverlay = VillageOverlay(
+      userInfo: UserPublicInfo(publicKey: 'test_key', userName: 'test', timestamp: 0),
       sponsors: [nonExistsNode],
       port: 0,
       deviceId: clientDeviceId,

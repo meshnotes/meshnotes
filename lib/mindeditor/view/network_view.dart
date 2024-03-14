@@ -67,7 +67,8 @@ class NetworkDetailView extends StatelessWidget {
         final item = nodes[idx];
         return Column(
           children: [
-            Text(item.id),
+            Text(item.peer),
+            Text(item.device),
             Text(item.name),
             Text(item.status.toString()),
           ],

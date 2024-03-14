@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/overlay_msg.dart';
 import 'package:libp2p/utils.dart';
 import 'package:my_log/my_log.dart';
@@ -18,10 +19,11 @@ class VillageOverlay implements ApplicationController {
   // List<String> sponsors;
   String _deviceId = '';
   int _localPort;
+  UserPublicInfo userInfo;
   SOTPNetworkLayer? __network;
   SOTPNetworkLayer get _network => __network!;
+  ApplicationController? _defaultApp;
   Map<String, ApplicationController> _keyToApp = {};
-  Map<ApplicationController, String> _appToKey = {};
 
   // Villager node properties
   List<VillagerNode> _villagers = [];
@@ -31,6 +33,7 @@ class VillageOverlay implements ApplicationController {
   OnNodeChangedCallbackType onNodeChanged;
 
   VillageOverlay({
+    required this.userInfo,
     required List<String> sponsors,
     required this.onNodeChanged,
     String deviceId = '',
@@ -79,33 +82,38 @@ class VillageOverlay implements ApplicationController {
   }
 
   /// @return true - success, false - failed
-  bool registerApplication(String key, ApplicationController app) {
+  bool registerApplication(String key, ApplicationController app, {bool setDefault=false}) {
     if(_keyToApp.containsKey(key)) { // Only the unregistered key could be registered successfully
       return false;
     }
     _keyToApp[key] = app;
-    _appToKey[app] = key;
+    if(setDefault) {
+      _defaultApp = app;
+    }
     return true;
   }
 
-  void sendData(ApplicationController app, VillagerNode node, String type, String data) {
-    final key = _appToKey[app];
-    if(key == null) return;
+  void sendData(String appKey, ApplicationController app, VillagerNode node, String type, String data) {
+    ApplicationController? _checkedApp = _keyToApp[appKey];
+    if(_checkedApp != app) {
+      MyLogger.warn('Application($_checkedApp) not compliance with key($appKey)');
+      return;
+    }
 
     final peer = node.getPeer();
     if(peer == null) return;
 
-    final packData = AppData(key, type, data);
+    final packData = AppData(appKey, type, data);
     final jsonStr = jsonEncode(packData);
     MyLogger.verbose('${logPrefix} Send message $jsonStr');
     peer.sendData(utf8.encode(jsonStr));
   }
-  void sendToAllNodesOfUser(ApplicationController app, String userId, String type, String data) {
+  void sendToAllNodesOfUser(String appKey, ApplicationController app, String userId, String type, String data) {
     final nodes = _findAllNodesOfUser(userId);
     MyLogger.info('efantest: find nodes: $nodes');
     for(var node in nodes) {
       MyLogger.info('efantest: send to node: $node, type: $type, data: $data');
-      sendData(app, node, type, data);
+      sendData(appKey, app, node, type, data);
     }
   }
 
@@ -148,7 +156,7 @@ class VillageOverlay implements ApplicationController {
   void _addHelloTask(VillagerNode node) {
     Future.delayed(Duration.zero, () {
       MyLogger.debug('${logPrefix} Send hello message to new node');
-      sendData(this, node, overlayMessageTypeHello, _introduceMyselfMessage());
+      sendData(_appName, this, node, overlayMessageTypeHello, _introduceMyselfMessage());
     });
   }
 
@@ -237,10 +245,8 @@ class VillageOverlay implements ApplicationController {
 
     // Find the application that matches the key, and execute onData() callback
     final appName = appData.app;
-    if(!_keyToApp.containsKey(appName)) return;
-
-    final app = _keyToApp[appName]!;
-    app.onData(node, appName, appData.type, appData.data);
+    var app = _keyToApp[appName]?? _defaultApp;
+    app?.onData(node, appName, appData.type, appData.data);
   }
 
   void _checkSponsors() {
@@ -300,14 +306,14 @@ class VillageOverlay implements ApplicationController {
   }
 
   String _introduceMyselfMessage() {
-    final hello = HelloMessage(_deviceId);
+    final hello = HelloMessage(_deviceId, userInfo.userName, userInfo.publicKey);
     return jsonEncode(hello);
   }
 
   void _handleHelloMessage(VillagerNode node, String msg) {
     var hello = HelloMessage.fromJson(jsonDecode(msg));
-    var deviceId = hello.deviceId;
-    node.id = deviceId;
+    node.id = hello.deviceId;
+    node.name = '${hello.publicKey.substring(0, 6)}(${hello.name})';
     onNodeChanged(node);
   }
 

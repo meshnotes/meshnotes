@@ -27,8 +27,8 @@ abstract class VillageDbScript {
 class VillageDbVersion1 extends VillageDbScript {
   static int ver = 1;
   static Map<String, String> sql = {
-    'Create objects': 'CREATE TABLE IF NOT EXISTS objects(obj_hash TEXT PRIMARY KEY, data TEXT)',
-    'Create versions': 'CREATE TABLE IF NOT EXISTS versions(version_hash TEXT PRIMARY KEY, parents TEXT, created_at INTEGER)',
+    'Create resources': 'CREATE TABLE IF NOT EXISTS resources(user_key TEXT, key TEXT, sub_key TEXT, updated_at INT, data TEXT, CONSTRAINT resources_pk PRIMARY KEY(user_key, key, sub_key))',
+    'Create users': 'CREATE TABLE IF NOT EXISTS users(user_key TEXT PRIMARY KEY, name TEXT, updated_at INT, signature TEXT)',
   };
   VillageDbVersion1(): super(version: ver, createSql: sql);
 }

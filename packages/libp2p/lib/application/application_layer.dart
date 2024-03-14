@@ -19,9 +19,9 @@ class Village implements ApplicationController {
   VillageOverlay _overlay;
   VillageMode _mode;
   int localPort;
+  String upperAppName;
   VillageMessageHandler messageHandler;
   VillageDbHelper _db;
-  Map<String, VillageObject> _villageObjectCache = {};
 
   // Villager properties
   String _userId;
@@ -34,9 +34,11 @@ class Village implements ApplicationController {
     VillageMode mode = VillageMode.loneWolf,
     required VillageOverlay overlay,
     required VillageDbHelper db,
+    required this.upperAppName,
   }): _mode = mode, _userId = userId, _overlay = overlay, _db = db {
     MyLogger.info('${logPrefix} register app=$_appName');
-    _overlay.registerApplication(_appName, this);
+    _overlay.registerApplication(_appName, this, setDefault: true);
+    _overlay.registerApplication(upperAppName, this);
   }
 
   Future<void> start() async {
@@ -45,14 +47,22 @@ class Village implements ApplicationController {
   }
 
   @override
-  void onData(VillagerNode node, String app, String type, String data) {
-    MyLogger.info('efantest: receive village data: $data of type($type)');
+  void onData(VillagerNode node, String appName, String type, String data) {
+    MyLogger.info('${logPrefix}: Receive village data($data) of type($type) to application($appName)');
     switch(type) {
       case ProvideAppType:
-        _onProvide(data);
+        if(upperAppName == appName) {
+          messageHandler.handleProvide?.call(data);
+        } else {
+          _onDefaultProvide(data);
+        }
         break;
       case QueryAppType:
-        _onQuery(data);
+        if(upperAppName == appName) {
+          messageHandler.handleQuery?.call(data);
+        } else {
+          _onDefaultQuery(data);
+        }
       default:
         MyLogger.info('onData: receive unrecognized app type: $type, data=$data');
         break;
@@ -62,22 +72,22 @@ class Village implements ApplicationController {
   void sendVersionTree(String resourceJson) {
     MyLogger.info('efantest: Preparing to send resource: $resourceJson');
     //TODO Optimize the code below to only send message to selected nodes
-    _overlay.sendToAllNodesOfUser(this, _userId, ProvideAppType, resourceJson);
+    _overlay.sendToAllNodesOfUser(upperAppName, this, _userId, ProvideAppType, resourceJson);
   }
 
   void sendRequireVersions(String requiredVersions) {
     MyLogger.info('efantest: Preparing to send require_versions: $requiredVersions');
-    _overlay.sendToAllNodesOfUser(this, _userId, QueryAppType, requiredVersions);
+    _overlay.sendToAllNodesOfUser(upperAppName, this, _userId, QueryAppType, requiredVersions);
   }
 
   void sendVersions(String sendVersions) {
     MyLogger.info('efantest: Preparing to send send_versions: $sendVersions');
-    _overlay.sendToAllNodesOfUser(this, _userId, ProvideAppType, sendVersions);
+    _overlay.sendToAllNodesOfUser(upperAppName, this, _userId, ProvideAppType, sendVersions);
   }
 
   void sendProvide(String userKey, List<String> resources) {
     ProvideMessage msg = ProvideMessage(userPubKey: userKey, resources: resources);
-    _overlay.sendToAllNodesOfUser(this, _userId, ProvideAppType, jsonEncode(msg));
+    _overlay.sendToAllNodesOfUser(upperAppName, this, _userId, ProvideAppType, jsonEncode(msg));
   }
 
   void _timerHandler(Timer _t) {
@@ -110,10 +120,10 @@ class Village implements ApplicationController {
     // TODO Sync data to warehouses indicated by nodeIds
   }
 
-  void _onProvide(String data) {
-    messageHandler.handleProvide?.call(data);
+  /// Not implemented yet
+  void _onDefaultProvide(String data) {
   }
-  void _onQuery(String data) {
-    messageHandler.handleQuery?.call(data);
+  /// Not implemented yet
+  void _onDefaultQuery(String data) {
   }
 }

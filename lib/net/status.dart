@@ -10,18 +10,20 @@ enum NodeStatus {
 }
 
 class NodeInfo {
-  String id;
+  String peer;
+  String device;
   String name;
   NodeStatus status;
 
   NodeInfo({
-    required this.id,
+    required this.peer,
+    required this.device,
     required this.name,
     required this.status,
   });
 
   @override
   String toString() {
-    return '$id:$name';
+    return '$peer:$device:$name';
   }
 }

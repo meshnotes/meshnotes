@@ -14,6 +14,7 @@ import 'package:mesh_note/net/net_controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
+import '../../net/version_chain_api.dart';
 import '../document/dal/fake_db_helper.dart';
 import '../document/paragraph_desc.dart';
 import '../setting/constants.dart';
@@ -37,6 +38,8 @@ class Controller {
   late final SelectionController selectionController;
   String simpleDeviceId = '';
   String userKey = '166f826179b0b077c90efe9bda61506844e658bba43f7edc67f741c1ccfccdfe';
+  String userName = 'efan';
+  int userCreateTime = 0;
   // String userKey = 'a0a46f73fd42aba7b8bd24c8cc373694e98246b9de37515766972e5eb34dcbbe';
 
   // Getters
@@ -76,7 +79,17 @@ class Controller {
 
     MyLogger.debug('initAll: start network');
     network = _net;
-    network.start(setting, deviceId, userKey);
+    SigningWrapper _sign = SigningWrapper.loadKey(userKey);
+    network.start(
+      setting,
+      deviceId,
+      UserPrivateInfo(
+        publicKey: _sign.getCompressedPublicKey(),
+        userName: userName,
+        privateKey: _sign.getPrivateKey(),
+        timestamp: userCreateTime,
+      ),
+    );
     selectionController = SelectionController();
 
     MyLogger.debug('initAll: finish initialization');

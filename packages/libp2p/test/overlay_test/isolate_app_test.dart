@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/overlay_controller.dart';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:libp2p/overlay/villager_node.dart';
@@ -22,6 +23,7 @@ void main() {
 
     bool firstConnected = true;
     var overlay1 = VillageOverlay(
+      userInfo: UserPublicInfo(publicKey: 'test_key', userName: 'test', timestamp: 0),
       sponsors: [],
       onNodeChanged: (VillagerNode _node) {
         if(firstConnected) {
@@ -37,6 +39,7 @@ void main() {
       port: port1,
     );
     var overlay2 = VillageOverlay(
+      userInfo: UserPublicInfo(publicKey: 'test_key', userName: 'test', timestamp: 0),
       sponsors: ['127.0.0.1:$port1'],
       onNodeChanged: (VillagerNode _node) {
       },
@@ -88,7 +91,7 @@ class MockApp implements ApplicationController {
       expect(_node != null, true);
       final appData = TestData(number: _testNum, name: _testName);
       String jsonStr = jsonEncode(appData);
-      _overlay!.sendData(this, _node!, _testType, jsonStr);
+      _overlay!.sendData(_appName, this, _node!, _testType, jsonStr);
       completer.complete(true);
     });
   }

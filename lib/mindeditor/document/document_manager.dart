@@ -13,6 +13,7 @@ import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:mesh_note/mindeditor/document/text_desc.dart';
 import 'package:my_log/my_log.dart';
+import '../../net/version_chain_api.dart';
 import '../../util/util.dart';
 import '../setting/constants.dart';
 import 'collaborate/diff_manager.dart';
@@ -121,8 +122,8 @@ class DocumentManager {
     }
   }
 
-  List<SendVersionsNode> assembleRequireVersions(List<String> requiredVersions) {
-    List<SendVersionsNode> result = [];
+  List<SendVersions> assembleRequireVersions(List<String> requiredVersions) {
+    List<SendVersions> result = [];
     for(var versionHash in requiredVersions) {
       final versionData = _db.getVersionData(versionHash);
       if(versionData == null) {
@@ -132,9 +133,9 @@ class DocumentManager {
       final object = _db.getObject(versionHash);
       final json = object!.data;
       final versionContent = VersionContent.fromJson(jsonDecode(json));
-      Map<String, (int, String)> requiredObjects = _genRequiredObjects(versionContent);
+      Map<String, RelatedObject> requiredObjects = _genRequiredObjects(versionContent);
 
-      var node = SendVersionsNode(
+      var node = SendVersions(
           versionHash: versionHash,
           versionContent: json,
           createdAt: versionData.createdAt,
@@ -397,8 +398,8 @@ class DocumentManager {
     return version;
   }
 
-  Map<String, (int, String)> _genRequiredObjects(VersionContent versionContent) {
-    Map<String, (int, String)> result = {};
+  Map<String, RelatedObject> _genRequiredObjects(VersionContent versionContent) {
+    Map<String, RelatedObject> result = {};
 
     for(var item in versionContent.table) {
       var docId = item.docId;
@@ -406,7 +407,7 @@ class DocumentManager {
       var docObject = _db.getObject(docHash);
       if(docObject == null) continue;
       MyLogger.info('_genRequiredObjects: docId=$docId, docHash=$docHash, docStr=$docObject');
-      result[docHash] = (docObject.timestamp, docObject.data);
+      result[docHash] = RelatedObject(objHash: docHash, objContent: docObject.data, createdAt: docObject.timestamp);
 
       //TODO should load history document by docHash
       var docContent = DocContent.fromJson(jsonDecode(docObject.data));
@@ -416,12 +417,12 @@ class DocumentManager {
     }
     return result;
   }
-  void _recursiveAddToMap(DocContentItem block, Map<String, (int, String)> map) {
+  void _recursiveAddToMap(DocContentItem block, Map<String, RelatedObject> map) {
     var blockHash = block.blockHash;
     if(!map.containsKey(blockHash)) {
       var blockObject = _db.getObject(blockHash);
       if(blockObject == null) return;
-      map[blockHash] = (blockObject.timestamp, blockObject.data);
+      map[blockHash] = RelatedObject(objHash: blockHash, objContent: blockObject.data, createdAt: blockObject.timestamp);
     }
     for(var item in block.children) {
       _recursiveAddToMap(item, map);
@@ -519,26 +520,26 @@ class DocumentManager {
     }
     return _map;
   }
-  Map<String, DagNode> _buildRemoteVersionTreeMap(List<VersionNode> dagList) {
-    Map<String, DagNode> result = {};
-    for(var item in dagList) {
-      final versionHash = item.versionHash;
-      final timestamp = item.createdAt;
-      var node = DagNode(versionHash: versionHash, createdAt: timestamp, parents: []);
-      result[versionHash] = node;
-    }
-    for(var item in dagList) {
-      final versionHash = item.versionHash;
-      final parents = item.parents;
-      final currentNode = result[versionHash]!;
-      for(var p in parents) {
-        var parentNode = result[p];
-        if(parentNode == null) continue;
-        currentNode.parents.add(parentNode);
-      }
-    }
-    return result;
-  }
+  // Map<String, DagNode> _buildRemoteVersionTreeMap(List<VersionNode> dagList) {
+  //   Map<String, DagNode> result = {};
+  //   for(var item in dagList) {
+  //     final versionHash = item.versionHash;
+  //     final timestamp = item.createdAt;
+  //     var node = DagNode(versionHash: versionHash, createdAt: timestamp, parents: []);
+  //     result[versionHash] = node;
+  //   }
+  //   for(var item in dagList) {
+  //     final versionHash = item.versionHash;
+  //     final parents = item.parents;
+  //     final currentNode = result[versionHash]!;
+  //     for(var p in parents) {
+  //       var parentNode = result[p];
+  //       if(parentNode == null) continue;
+  //       currentNode.parents.add(parentNode);
+  //     }
+  //   }
+  //   return result;
+  // }
   String _buildParents(List<String> parents) {
     String result = '';
     for(var p in parents) {
@@ -554,50 +555,51 @@ class DocumentManager {
     List<String> _sp = parents.split(',');
     return _sp;
   }
-  Map<String, DagNode> _mergeLocalAndRemoteMap(Map<String, DagNode> localMap, Map<String, DagNode> remoteMap) {
-    for(var e in remoteMap.entries) {
-      var key = e.key;
-      var remoteNode = e.value;
-      if(localMap.containsKey(key)) {
-        var localNode = localMap[key]!;
-        if(!_isParentsEqual(localNode.parents, remoteNode.parents)) {
-          MyLogger.err('_mergeLocalAndRemoteMap: find unmatched node, may be caused by hash conflict!!! '
-              'local node $key(parents=${localNode.parents}), remote node $key(parents=${remoteNode.parents})');
-        }
-        continue;
-      } else { // New version node
-        localMap[key] = remoteNode;
-        // var parentsStr = remoteNode.parents.map((e) => e.versionHash).join(',');
-        // MyLogger.info('_mergeLocalAndRemoteMap: add new version node: hash=${remoteNode.versionHash}, parents=$parentsStr, created=${remoteNode.createdAt}');
-        // _db.storeVersion(remoteNode.versionHash, parentsStr, remoteNode.createdAt);
-      }
-    }
-    return localMap;
-  }
-  bool _isParentsEqual(List<DagNode> p1, List<DagNode> p2) {
-    /// 1. Build a map containing all the values in p1
-    /// 2. traverse p2, if there is any item that is not contained in map, then p2 has something not in p1, returns false
-    /// 3. traverse map, if there is any item that is not traversed in step 2, then p1 has something not in p2, returns false
-    /// 4. Otherwise, returns true
-    Map<String, bool> traverseMap = {};
-    for(final item in p1) {
-      final hash = item.versionHash;
-      traverseMap[hash] = false;
-    }
-    for(final item in p2) {
-      final hash = item.versionHash;
-      if(!traverseMap.containsKey(hash)) {
-        return false;
-      }
-      traverseMap[hash] = true;
-    }
-    for(final e in traverseMap.entries) {
-      if(e.value == false) {
-        return false;
-      }
-    }
-    return true;
-  }
+  // Map<String, DagNode> _mergeLocalAndRemoteMap(Map<String, DagNode> localMap, Map<String, DagNode> remoteMap) {
+  //   for(var e in remoteMap.entries) {
+  //     var key = e.key;
+  //     var remoteNode = e.value;
+  //     if(localMap.containsKey(key)) {
+  //       var localNode = localMap[key]!;
+  //       if(!_isParentsEqual(localNode.parents, remoteNode.parents)) {
+  //         MyLogger.err('_mergeLocalAndRemoteMap: find unmatched node, may be caused by hash conflict!!! '
+  //             'local node $key(parents=${localNode.parents}), remote node $key(parents=${remoteNode.parents})');
+  //       }
+  //       continue;
+  //     } else { // New version node
+  //       localMap[key] = remoteNode;
+  //       // var parentsStr = remoteNode.parents.map((e) => e.versionHash).join(',');
+  //       // MyLogger.info('_mergeLocalAndRemoteMap: add new version node: hash=${remoteNode.versionHash}, parents=$parentsStr, created=${remoteNode.createdAt}');
+  //       // _db.storeVersion(remoteNode.versionHash, parentsStr, remoteNode.createdAt);
+  //     }
+  //   }
+  //   return localMap;
+  // }
+  // bool _isParentsEqual(List<DagNode> p1, List<DagNode> p2) {
+  //   /// 1. Build a map containing all the values in p1
+  //   /// 2. traverse p2, if there is any item that is not contained in map, then p2 has something not in p1, returns false
+  //   /// 3. traverse map, if there is any item that is not traversed in step 2, then p1 has something not in p2, returns false
+  //   /// 4. Otherwise, returns true
+  //   Map<String, bool> traverseMap = {};
+  //   for(final item in p1) {
+  //     final hash = item.versionHash;
+  //     traverseMap[hash] = false;
+  //   }
+  //   for(final item in p2) {
+  //     final hash = item.versionHash;
+  //     if(!traverseMap.containsKey(hash)) {
+  //       return false;
+  //     }
+  //     traverseMap[hash] = true;
+  //   }
+  //   for(final e in traverseMap.entries) {
+  //     if(e.value == false) {
+  //       return false;
+  //     }
+  //   }
+  //   return true;
+  // }
+  
   /// Find all versions that has no corresponding object.
   /// That means, these versions are from remote peer, but the objects are not syncing yet.
   /// Should sync these objects using 'query' message

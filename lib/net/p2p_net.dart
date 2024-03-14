@@ -14,13 +14,14 @@ runServer() {
   MyLogger.info('Run as server');
 }
 
-Future<Village> startVillage(String localPort, String serverList, String deviceId, Function(VillagerNode) connectedCallback, VillageMessageHandler messageHandler) async {
+Future<Village> startVillage(String localPort, String serverList, String deviceId, UserPublicInfo userInfo, Function(VillagerNode) connectedCallback, VillageMessageHandler messageHandler) async {
   VillageDbHelper db = VillageDbHelper();
   db.init();
 
   int _localPort = int.tryParse(localPort)?? 0;
   var sponsors = _parseSponsors(serverList);
   final _overlay = VillageOverlay(
+    userInfo: userInfo,
     sponsors: sponsors,
     port: _localPort,
     deviceId: deviceId,
@@ -33,6 +34,7 @@ Future<Village> startVillage(String localPort, String serverList, String deviceI
     overlay: _overlay,
     messageHandler: messageHandler,
     db: db,
+    upperAppName: 'mesh_note',
   );
   await village.start();
   return village;

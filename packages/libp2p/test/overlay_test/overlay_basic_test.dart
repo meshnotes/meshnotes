@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
+import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:libp2p/overlay/villager_node.dart';
 import 'package:my_log/my_log.dart';
@@ -101,6 +102,7 @@ class IsolateTester {
   static Future<void> func1() async {
     bool first = true;
     var overlay = VillageOverlay(
+      userInfo: UserPublicInfo(publicKey: 'test_key', userName: 'test', timestamp: 0),
       sponsors: ['127.0.0.1:8888'],
       onNodeChanged: (VillagerNode _node) {
         expect(_node.port, port2);
@@ -118,6 +120,7 @@ class IsolateTester {
   }
   static Future<void> func2() async {
     var overlay = VillageOverlay(
+      userInfo: UserPublicInfo(publicKey: 'test_key', userName: 'test', timestamp: 0),
       sponsors: [],
       onNodeChanged: (VillagerNode _node) {
         MyLogger.info('New incoming connection(${_node.ip.toString()}:${_node.port.toString()}, ${_node.id}, ${_node.getStatus()})');
