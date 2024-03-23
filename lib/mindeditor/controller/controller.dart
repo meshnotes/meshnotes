@@ -37,10 +37,9 @@ class Controller {
   String deviceId = 'Unknown';
   late final SelectionController selectionController;
   String simpleDeviceId = '';
-  String userKey = '166f826179b0b077c90efe9bda61506844e658bba43f7edc67f741c1ccfccdfe';
-  String userName = 'efan';
+  // String userKey = '166f826179b0b077c90efe9bda61506844e658bba43f7edc67f741c1ccfccdfe';
+  // String userName = 'efan';
   UserPrivateInfo? userPrivateInfo;
-  int userCreateTime = 0;
   // String userKey = 'a0a46f73fd42aba7b8bd24c8cc373694e98246b9de37515766972e5eb34dcbbe';
 
   // Getters
@@ -65,12 +64,6 @@ class Controller {
   Future<bool> initAll(NetworkController _net, {bool test=false}) async {
     MyLogger.debug('initAll: init db');
 
-    // Will failed in flutter test mode, so disabled it
-    if(!test) {
-      await _genDeviceId();
-      MyLogger.info('initAll: device_id=$deviceId, simple_device_id=$simpleDeviceId');
-    }
-
     await dbHelper.init();
     _docManager = DocumentManager(db: dbHelper);
 
@@ -78,22 +71,45 @@ class Controller {
     MyLogger.debug('initAll: load settings');
     setting.loadFromDb(dbHelper);
 
-    MyLogger.debug('initAll: start network');
-    network = _net;
-    SigningWrapper _sign = SigningWrapper.loadKey(userKey);
-    network.start(
-      setting,
-      deviceId,
-      UserPrivateInfo(
+    // Load user information from setting
+    final userName = setting.getSetting(Constants.settingKeyUserName);
+    final userKey = setting.getSetting(Constants.settingKeyUserPrivateKey);
+    if(userName != null && userName.isNotEmpty && userKey != null && userKey.isNotEmpty) {
+      SigningWrapper _sign = SigningWrapper.loadKey(userKey);
+      userPrivateInfo = UserPrivateInfo(
         publicKey: _sign.getCompressedPublicKey(),
         userName: userName,
-        privateKey: _sign.getPrivateKey(),
-        timestamp: userCreateTime,
-      ),
-    );
+        privateKey: userKey,
+        timestamp: 0,
+      );
+    }
+    // Will failed in flutter test mode, so disabled it
+    if(!test) {
+      await _genDeviceId();
+      MyLogger.info('initAll: device_id=$deviceId, simple_device_id=$simpleDeviceId');
+    }
+
+    network = _net;
+    if(!tryStartingNetwork()) {
+      MyLogger.info('initAll: try starting network failed');
+    }
+
     selectionController = SelectionController();
 
     MyLogger.debug('initAll: finish initialization');
+    return true;
+  }
+
+  /// Network could be starting only when the user information is ready
+  bool tryStartingNetwork() {
+    if(userPrivateInfo == null) return false;
+
+    network.start(
+      setting,
+      deviceId,
+      userPrivateInfo!,
+    );
+    MyLogger.info('Network layer started');
     return true;
   }
 
@@ -103,7 +119,8 @@ class Controller {
     if(platformDeviceId != null) {
       deviceId = platformDeviceId;
     } else {
-      deviceId = HashUtil.hashText(userKey) + ':Unknown';
+      final userKey = setting.getSetting(Constants.settingCommentUserPrivateKey);
+      deviceId = HashUtil.hashText(userKey?? '') + ':Unknown';
     }
 
     // simpleDeviceId is composed of first 8 character of deviceId and first 8 character of SHA256 of deviceId

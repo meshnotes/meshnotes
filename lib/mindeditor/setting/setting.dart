@@ -83,6 +83,14 @@ class Setting {
       name: Constants.settingKeyTest,
       comment: Constants.settingCommentTest,
     ),
+    SettingData(
+      name: Constants.settingKeyUserName,
+      comment: Constants.settingCommentUserName,
+    ),
+    SettingData(
+      name: Constants.settingKeyUserPrivateKey,
+      comment: Constants.settingCommentUserPrivateKey,
+    ),
   ];
   final Map<String, SettingData> _settingMap = {};
 
