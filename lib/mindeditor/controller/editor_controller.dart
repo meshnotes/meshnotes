@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:my_log/my_log.dart';
 import 'package:super_clipboard/super_clipboard.dart';
+
+import '../../util/util.dart';
 
 class EditorController {
   static String getSelectedContent() {
@@ -19,13 +20,13 @@ class EditorController {
   }
   static Future<void> copyToClipboard() async {
     var content = getSelectedContent();
-    await _writeToClipboard(content);
+    await ClipboardUtil.writeToClipboard(content);
     checkIfReadyToPaste();
   }
 
   static cutToClipboard() async {
     String content = getSelectedContent();
-    await _writeToClipboard(content);
+    await ClipboardUtil.writeToClipboard(content);
     deleteSelectedContent();
     checkIfReadyToPaste();
   }
@@ -44,16 +45,6 @@ class EditorController {
         }
       });
     }
-  }
-
-  static Future<void> _writeToClipboard(String content) async {
-    final clipboard = SystemClipboard.instance;
-    if (clipboard == null) {
-      return;
-    }
-    final item = DataWriterItem();
-    item.add(Formats.plainText(content));
-    await clipboard.write([item]);
   }
 
   static void checkIfReadyToPaste() {

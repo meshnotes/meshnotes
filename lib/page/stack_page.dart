@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:libp2p/application/application_api.dart';
+import 'signin_view.dart';
+import '../mindeditor/controller/controller.dart';
 import '../mindeditor/setting/constants.dart';
 import 'doc_navigator.dart';
 import 'doc_view.dart';
@@ -21,11 +24,26 @@ class _StackPageViewState extends State<StackPageView> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final smallView = screenWidth <= Constants.widthThreshold;
+    var userInfo = Controller.instance.userPrivateInfo;
+    if(userInfo == null) {
+      return _buildSignInView(context);
+    }
     if(smallView) {
       return _buildForSmallView(context);
     } else {
       return _buildForLargeView(context);
     }
+  }
+
+  void _update(UserPrivateInfo userInfo) {
+    setState(() {
+      Controller.instance.userPrivateInfo = userInfo;
+    });
+  }
+  Widget _buildSignInView(BuildContext context) {
+    return SignInView(
+      update: _update,
+    );
   }
 
   Widget _buildForSmallView(BuildContext context) {

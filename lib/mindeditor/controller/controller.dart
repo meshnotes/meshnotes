@@ -39,6 +39,7 @@ class Controller {
   String simpleDeviceId = '';
   String userKey = '166f826179b0b077c90efe9bda61506844e658bba43f7edc67f741c1ccfccdfe';
   String userName = 'efan';
+  UserPrivateInfo? userPrivateInfo;
   int userCreateTime = 0;
   // String userKey = 'a0a46f73fd42aba7b8bd24c8cc373694e98246b9de37515766972e5eb34dcbbe';
 
