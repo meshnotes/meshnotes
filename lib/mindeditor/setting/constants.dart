@@ -66,10 +66,10 @@ class Constants {
   static const String settingDefaultLocalPort = '17974';
   static const String settingKeyTest = 'just_for_test';
   static const String settingCommentTest = 'Just for test';
-  static const String settingKeyUserName = 'user_name';
-  static const String settingCommentUserName = 'User name';
-  static const String settingKeyUserPrivateKey = 'user_private_key';
-  static const String settingCommentUserPrivateKey = 'User private key';
+  static const String settingKeyUserInfo = 'user_info';
+  static const String settingCommentUserInfo = 'User name and private key information(formated in base64)';
+
+  static const String userNameAndKeyOfGuest = 'guest';
 
   static const String resourceKeyVersionTree = 'version_tree';
 }

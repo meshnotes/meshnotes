@@ -15,6 +15,7 @@ import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
 import '../../net/version_chain_api.dart';
+import '../../util/idgen.dart';
 import '../document/dal/fake_db_helper.dart';
 import '../document/paragraph_desc.dart';
 import '../setting/constants.dart';
@@ -72,17 +73,9 @@ class Controller {
     setting.loadFromDb(dbHelper);
 
     // Load user information from setting
-    final userName = setting.getSetting(Constants.settingKeyUserName);
-    final userKey = setting.getSetting(Constants.settingKeyUserPrivateKey);
-    if(userName != null && userName.isNotEmpty && userKey != null && userKey.isNotEmpty) {
-      SigningWrapper _sign = SigningWrapper.loadKey(userKey);
-      userPrivateInfo = UserPrivateInfo(
-        publicKey: _sign.getCompressedPublicKey(),
-        userName: userName,
-        privateKey: userKey,
-        timestamp: 0,
-      );
-    }
+    userPrivateInfo = _loadUserInfo(setting);
+    MyLogger.info('initAll: load user(${userPrivateInfo?.userName}) from setting');
+
     // Will failed in flutter test mode, so disabled it
     if(!test) {
       await _genDeviceId();
@@ -101,8 +94,10 @@ class Controller {
   }
 
   /// Network could be starting only when the user information is ready
+  /// And user private key should not be 'guest'
   bool tryStartingNetwork() {
     if(userPrivateInfo == null) return false;
+    if(userPrivateInfo!.privateKey == Constants.userNameAndKeyOfGuest) return false;
 
     network.start(
       setting,
@@ -119,8 +114,8 @@ class Controller {
     if(platformDeviceId != null) {
       deviceId = platformDeviceId;
     } else {
-      final userKey = setting.getSetting(Constants.settingCommentUserPrivateKey);
-      deviceId = HashUtil.hashText(userKey?? '') + ':Unknown';
+      final userKey = userPrivateInfo?.privateKey;
+      deviceId = HashUtil.hashText(userKey?? IdGen.getUid()) + ':Unknown';
     }
 
     // simpleDeviceId is composed of first 8 character of deviceId and first 8 character of SHA256 of deviceId
@@ -154,6 +149,17 @@ class Controller {
       return winInfo.deviceId;
     }
     return null;
+  }
+  UserPrivateInfo? _loadUserInfo(Setting _setting) {
+    final userInfo = _setting.getSetting(Constants.settingKeyUserInfo);
+    if(userInfo == null) return null;
+
+    try {
+      return UserPrivateInfo.fromBase64(userInfo);
+    } catch(e) {
+      MyLogger.warn('Error loading user info from setting: $e');
+      return null;
+    }
   }
 
   MouseCursor getHandCursor() {

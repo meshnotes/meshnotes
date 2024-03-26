@@ -232,6 +232,7 @@ class UserPrivateInfo {
   String privateKey;
   int timestamp;
   String signature;
+  bool isEncrypted;
 
   UserPrivateInfo({
     required this.publicKey,
@@ -239,6 +240,7 @@ class UserPrivateInfo {
     required this.privateKey,
     required this.timestamp,
     this.signature = '',
+    this.isEncrypted = false,
   });
 
   String getFeature() {
@@ -253,7 +255,8 @@ class UserPrivateInfo {
         userName = map['name'],
         privateKey = map['private_key'],
         timestamp = map['timestamp'],
-        signature = map['sign'];
+        signature = map['sign'],
+        isEncrypted = map['encrypted'];
 
   Map<String, dynamic> toJson() {
     return {
@@ -262,6 +265,18 @@ class UserPrivateInfo {
       'private_key': privateKey,
       'timestamp': timestamp,
       'sign': signature,
+      'encrypted': isEncrypted,
     };
+  }
+
+  factory UserPrivateInfo.fromBase64(String str) {
+    final bytes = base64Decode(str.trim());
+    final json = utf8.decode(bytes);
+    return UserPrivateInfo.fromJson(jsonDecode(json));
+  }
+  String toBase64() {
+    final json = jsonEncode(this);
+    final base64 = base64Encode(utf8.encode(json));
+    return base64;
   }
 }

@@ -211,6 +211,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     switch(status) {
       case NetworkStatus.unknown:
         return _NetworkStatus.lost;
+      case NetworkStatus.starting:
+        return _NetworkStatus.lost;
       case NetworkStatus.running:
         return _NetworkStatus.connected;
     }

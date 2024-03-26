@@ -1,5 +1,6 @@
 enum NetworkStatus {
   unknown,
+  starting,
   running,
 }
 

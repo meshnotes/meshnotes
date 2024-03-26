@@ -72,12 +72,12 @@ class _AppLifecyclePageState extends State<MeshApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.grey.shade50,
-          // TRY THIS: Change to "Brightness.light"
-          //           and see that all colors change
-          //           to better contrast a light background.
+          seedColor: Colors.black,
           brightness: Brightness.light,
           primary: Colors.black,
+          background: Colors.white,
+          // onPrimary: Colors.black,
+          // primarySwatch: Colors.grey,
         ),
       ),
       debugShowCheckedModeBanner: false,
@@ -133,11 +133,14 @@ class _AppLifecyclePageState extends State<MeshApp> {
   }
 
   Future<bool> _beforeClose() async {
-    if(Controller.instance.sendVersionTree()) {
-      await Future.delayed(const Duration(seconds: 1));
+    final controller = Controller.instance;
+    if(controller.network.isStarted()) {
+      if(controller.sendVersionTree()) {
+        await Future.delayed(const Duration(seconds: 1));
+      }
+      final completer = controller.network.gracefulTerminate();
+      await completer?.future;
     }
-    final completer = Controller.instance.network.gracefulTerminate();
-    await completer.future;
     return true;
   }
 }

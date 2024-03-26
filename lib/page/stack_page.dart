@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
@@ -40,10 +42,10 @@ class _StackPageViewState extends State<StackPageView> {
     /// 1. Update user name and key settings
     /// 2. Try to start network again
     /// 3. set state to update UI
-    final userNameSetting = SettingData(name: Constants.settingKeyUserName, comment: Constants.settingCommentUserName, value: userInfo.userName);
-    final userKeySetting = SettingData(name: Constants.settingKeyUserPrivateKey, comment: Constants.settingCommentUserPrivateKey, value: userInfo.privateKey);
     Controller.instance.userPrivateInfo = userInfo;
-    Controller.instance.setting.saveSettings([userNameSetting, userKeySetting]);
+    final base64Str = userInfo.toBase64();
+    final userNameSetting = SettingData(name: Constants.settingKeyUserInfo, comment: Constants.settingCommentUserInfo, value: base64Str);
+    Controller.instance.setting.saveSettings([userNameSetting]);
     Controller.instance.tryStartingNetwork();
     setState(() {
     });

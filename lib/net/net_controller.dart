@@ -25,9 +25,12 @@ class NetworkController {
   NetworkController(Isolate isolate, ReceivePort port): _isolate = isolate, _receivePort = port;
 
   void start(Setting settings, String deviceId, UserPrivateInfo userPrivateInfo) {
+    if(isStarted()) return;
+
     MyLogger.info('Spawning isolate and start listening');
     final serverList = settings.getSetting(Constants.settingKeyServerList)?? Constants.settingDefaultServerList;
     final localPort = settings.getSetting(Constants.settingKeyLocalPort)?? Constants.settingDefaultLocalPort;
+    _networkStatus = NetworkStatus.starting;
     _receivePort.listen((data) {
       if(data is SendPort) {
         MyLogger.info('Get SendPort from network isolate, start village protocol');
@@ -43,6 +46,7 @@ class NetworkController {
 
   /// Pack versionData in VersionChain, encrypt it, and sign it
   void sendNewVersionTree(List<VersionData> versionData, int timestamp) {
+    if(!isStarted()) return;
     var dag = _buildDag(versionData);
     VersionChain versionChain = VersionChain(
       versionDag: dag,
@@ -59,6 +63,7 @@ class NetworkController {
   }
 
   void sendRequireVersions(List<String> versions) {
+    if(!isStarted()) return;
     _sendPort?.send(
       Message(
         cmd: Command.sendRequireVersions,
@@ -70,6 +75,7 @@ class NetworkController {
   }
 
   void sendVersions(List<SendVersions> versions) {
+    if(!isStarted()) return;
     _sendPort?.send(
       Message(
         cmd: Command.sendVersions,
@@ -80,9 +86,10 @@ class NetworkController {
     );
   }
   
-  Completer<bool> gracefulTerminate() {
-    _sendPort?.send(Message(cmd: Command.terminate, parameter: null));
+  Completer<bool>? gracefulTerminate() {
+    if(!isStarted()) return null;
     finished = Completer();
+    _sendPort?.send(Message(cmd: Command.terminate, parameter: null));
     return finished!;
   }
 
@@ -93,6 +100,8 @@ class NetworkController {
   List<NodeInfo> getNetworkDetails() {
     return _nodes.values.toList();
   }
+
+  bool isStarted() => _networkStatus != NetworkStatus.unknown;
 
   void _onMessage(Message msg) {
     switch(msg.cmd) {
