@@ -44,7 +44,7 @@ class BlockListingButton extends StatelessWidget {
         if(currentListing == listing) { // 重复点击将清除列表
           newListing = Constants.blockListTypeNone;
         }
-        MyLogger.debug('Setting block(id=${blockState.widget.texts.getBlockId()}\'s listing to: $newListing');
+        MyLogger.debug('Setting block(id=${blockState.getBlockId()}\'s listing to: $newListing');
         var ok = blockState.setBlockListing(newListing);
         if(ok) {
           var block = blockState.widget.texts;

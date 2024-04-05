@@ -5,56 +5,53 @@ import 'controller.dart';
 
 class GestureHandler {
   int _lastTapDownTime = 0;
-  String _lastBlockId = '';
+  Offset? _lastClickOffset;
   static const int _doubleTapInterval = 300;
+  static const double _maxOffsetDelta = 10.0;
   Controller controller;
 
   GestureHandler({
     required this.controller,
   });
 
-  void onTapOrDoubleTap(TapDownDetails details, String blockId) {
+  void onTapOrDoubleTap(TapDownDetails details) {
     int now = Util.getTimeStamp();
-    if(_lastBlockId == blockId && now - _lastTapDownTime < _doubleTapInterval) {
-      _onDoubleTapDown(details, blockId);
+    var globalOffset = details.globalPosition;
+    if(_lastClickOffset != null && (_lastClickOffset! - globalOffset).distance < _maxOffsetDelta && now - _lastTapDownTime < _doubleTapInterval) {
+      _onDoubleTapDown(details);
+      _lastClickOffset = null;
       _lastTapDownTime = 0;
-      _lastBlockId = '';
     } else {
-      _onTapDown(details, blockId);
-      _lastBlockId = blockId;
+      _onTapDown(details);
+      _lastClickOffset = globalOffset;
       _lastTapDownTime = now;
     }
   }
 
-  void _onTapDown(TapDownDetails details, String blockId) {
-    MyLogger.debug('efantest: onTapDown, blockId=$blockId');
-    var offset = details.localPosition;
-    final block = controller.getBlockState(blockId)!;
-    int pos = block.getRender()!.getPositionByOffset(offset);
-    block.requestCursorAtPosition(pos);
+  void _onTapDown(TapDownDetails details) {
+    final globalOffset = details.globalPosition;
+    MyLogger.debug('onTapDown, offset=$globalOffset');
+    controller.selectionController.requestCursorAtGlobalOffset(globalOffset);
   }
 
-  void onPanStart(DragStartDetails details, String blockId) {
+  void onPanStart(DragStartDetails details) {
     _setShouldShowHandles(details.kind);
 
-    MyLogger.debug('efantest: onPanStart');
-    var offset = details.localPosition;
-    final block = controller.getBlockState(blockId)!;
-    int pos = block.getRender()!.getPositionByOffset(offset);
-    block.requestCursorAtPosition(pos);
+    final globalOffset = details.globalPosition;
+    MyLogger.debug('onPanStart, offset=$globalOffset');
+    controller.selectionController.updateSelectionByOffset(globalOffset);
   }
 
-  void onPanUpdate(DragUpdateDetails details, String blockId) {
-    final offset = details.localPosition;
-    controller.selectionController.updateSelectionByOffset(blockId, offset);
+  void onPanUpdate(DragUpdateDetails details) {
+    final globalOffset = details.globalPosition;
+    MyLogger.debug('onPanUpdate, offset=$globalOffset');
+    controller.selectionController.updateSelectionByOffset(globalOffset);
   }
 
-  void onPanDown(DragDownDetails details, String blockId) {
-    // MyLogger.info('efantest onPanDown');
-    // var offset = details.localPosition;
-    // final block = controller.getBlockState(blockId)!;
-    // int pos = block.getRender()!.getPositionByOffset(offset);
-    // block.requestCursorAtPosition(pos);
+  void onPanDown(DragDownDetails details) {
+    var globalOffset = details.globalPosition;
+    MyLogger.debug('onPanDown: offset=$globalOffset');
+    controller.selectionController.requestCursorAtGlobalOffset(globalOffset);
   }
 
   void onPanCancel(String blockId) {
@@ -71,13 +68,13 @@ class GestureHandler {
   }
 
   void onLongPressStart(LongPressStartDetails details, String blockId) {
-    _onSelectWord(details.localPosition, blockId);
+    _onSelectWord(details.globalPosition);
   }
 
-  void _onDoubleTapDown(TapDownDetails details, String blockId) {
+  void _onDoubleTapDown(TapDownDetails details) {
     _setShouldShowHandles(details.kind);
 
-    _onSelectWord(details.localPosition, blockId);
+    _onSelectWord(details.globalPosition);
   }
 
   void _setShouldShowHandles(PointerDeviceKind? kind) {
@@ -85,7 +82,7 @@ class GestureHandler {
     controller.selectionController.setShouldShowSelectionHandle(_shouldShowSelectionHandle);
   }
 
-  void _onSelectWord(Offset offset, String blockId) {
-    controller.selectionController.updateSelectionByPosRange(offset, blockId);
+  void _onSelectWord(Offset offset) {
+    controller.selectionController.updateSelectionByPosRange(offset);
   }
 }

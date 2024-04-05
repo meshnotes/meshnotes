@@ -6,7 +6,6 @@ import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mesh_note/mindeditor/view/selection_controller.dart';
 import 'package:my_log/my_log.dart';
 import '../document/paragraph_desc.dart';
 
@@ -72,8 +71,34 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         child: listView,
       );
     }
-    var expanded = Expanded(
+    var gesture = GestureDetector(
       child: listView,
+      onTapDown: (TapDownDetails details) {
+        MyLogger.debug('MindEditFieldState: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onTapOrDoubleTap(details);
+      },
+      onPanStart: (DragStartDetails details) {
+        MyLogger.info('MindEditFieldState: on pan start, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onPanStart(details);
+      },
+      onPanUpdate: (DragUpdateDetails details) {
+        MyLogger.info('MindEditFieldState: on pan update, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onPanUpdate(details);
+      },
+      onPanDown: (DragDownDetails details) {
+        MyLogger.info('MindEditFieldState: on pan down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onPanDown(details);
+      },
+      onPanCancel: () {
+        MyLogger.info('MindEditFieldState: on pan cancel, id=${widget.key}');
+        // widget.controller.gestureHandler.onPanCancel(widget.texts.getBlockId());
+      },
+      onPanEnd: (DragEndDetails details) {
+        MyLogger.info('MindEditFieldState: on pan end');
+      },
+    );
+    var expanded = Expanded(
+      child: gesture,
     );
     return expanded;
   }
@@ -113,7 +138,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   void _attachFocus() {
     _focusAttachment = widget.focusNode.attach(
       context,
-      onKey: _onFocusKey,
+      onKeyEvent: _onFocusKey,
     );
     widget.focusNode.addListener(_handleFocusChanged);
   }
@@ -133,17 +158,17 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   // 按键会先在这里处理，如果返回ignored，再由系统处理
-  KeyEventResult _onFocusKey(FocusNode node, RawKeyEvent _event) {
+  KeyEventResult _onFocusKey(FocusNode node, KeyEvent _event) {
     MyLogger.debug('efantest: onFocusKey: event is $_event');
-    if(_event is! RawKeyDownEvent) {
+    if(_event is! KeyDownEvent) {
       return KeyEventResult.ignored;
     }
-    RawKeyDownEvent evt = _event;
+    KeyEvent evt = _event;
     final key = evt.logicalKey;
-    var alt = evt.isAltPressed;
-    var shift = evt.isShiftPressed;
-    var ctrl = evt.isControlPressed;
-    var meta = evt.isMetaPressed;
+    var alt = HardwareKeyboard.instance.isAltPressed;
+    var shift = HardwareKeyboard.instance.isShiftPressed;
+    var ctrl = HardwareKeyboard.instance.isControlPressed;
+    var meta = HardwareKeyboard.instance.isMetaPressed;
     var result = KeyboardControl.handleKeyDown(key, alt, ctrl, meta, shift);
     return result? KeyEventResult.handled: KeyEventResult.ignored;
   }
@@ -212,7 +237,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       return;
     }
     _lastEditingValue = widget.controller.getCurrentTextEditingValue();
-    MyLogger.debug('efantest: Refreshing editingValue to $_lastEditingValue');
+    MyLogger.info('efantest: Refreshing editingValue to $_lastEditingValue');
     _textInputConnection!.setEditingState(_lastEditingValue!);
   }
 
@@ -329,12 +354,12 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   @override
   void updateEditingValue(TextEditingValue value) {
-    MyLogger.debug('updateEditingValue: updating editing value: $value, $_lastEditingValue');
-    // 跟上一次没有区别，什么也不做
+    MyLogger.info('updateEditingValue: updating editing value: $value, $_lastEditingValue');
+    // Do nothing if the editing value is same as last time
     if(_lastEditingValue == value) {
       return;
     }
-    // 如果只是输入法的区别（composing改变），直接更新，不需要改变行为
+    // Just update value if only composing changed(caused by input method)
     var sameText = _lastEditingValue!.text == value.text;
     if(sameText && _lastEditingValue!.selection == value.selection) {
       _lastEditingValue = value;
@@ -345,7 +370,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       CallbackRegistry.showSnackBar(
         SnackBar(
           backgroundColor: Colors.orangeAccent,
-          content: Text('文字太长，超过${Controller.instance.setting.blockMaxCharacterLength}个字符'),
+          content: Text('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(milliseconds: 2000),
         )
@@ -353,9 +378,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       refreshTextEditingValue();
       return;
     }
+    var controller = widget.controller;
     final oldEditingValue = _lastEditingValue!;
     _lastEditingValue = value;
-    var controller = widget.controller;
     var currentBlock = controller.getEditingBlockState();
     currentBlock?.updateAndSaveText(oldEditingValue, value, sameText);
   }

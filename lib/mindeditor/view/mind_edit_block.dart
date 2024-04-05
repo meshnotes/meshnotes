@@ -47,18 +47,18 @@ class MindEditBlockState extends State<MindEditBlock> {
   void initState() {
     super.initState();
     if(!widget.readOnly) {
-      MyLogger.info('efantest: initializing MindEditBlockState for block(id=${widget.texts.getBlockId()})');
-      widget.controller.setBlockStateToTreeNode(widget.texts.getBlockId(), this);
+      MyLogger.info('MindEditBlockState: initializing MindEditBlockState for block(id=${getBlockId()})');
+      widget.controller.setBlockStateToTreeNode(getBlockId(), this);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    MyLogger.info('efantest: build MindEditBlockState for block(id=${widget.texts.getBlockId()})');
+    MyLogger.info('MindEditBlockState: build MindEditBlockState for block(id=${getBlockId()})');
     if(!widget.readOnly) {
-      var myId = widget.texts.getBlockId();
+      var myId = getBlockId();
       if(widget.texts.getTextSelection() != null) {
-        MyLogger.debug('efantest: editing position is not null: ${widget.texts.getPlainText()}');
+        MyLogger.debug('MindEditBlockState: editing position is not null: ${widget.texts.getPlainText()}');
         // 如果在initState阶段发现editingPosition不为空，则此block必须负责自己的激活
         widget.controller.setEditingBlockId(myId);
         CallbackRegistry.requestKeyboard();
@@ -147,41 +147,18 @@ class MindEditBlockState extends State<MindEditBlock> {
     );
     var gesture = GestureDetector(
       child: block,
-      onTapDown: (TapDownDetails details) {
-        MyLogger.debug('efantest: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
-        widget.controller.gestureHandler.onTapOrDoubleTap(details, widget.texts.getBlockId());
-      },
-      onPanStart: (DragStartDetails details) {
-        MyLogger.debug('efantest: on pan start, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
-        widget.controller.gestureHandler.onPanStart(details, widget.texts.getBlockId());
-      },
-      onPanUpdate: (DragUpdateDetails details) {
-        MyLogger.debug('efantest: on pan update, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
-        widget.controller.gestureHandler.onPanUpdate(details, widget.texts.getBlockId());
-      },
-      onPanDown: (DragDownDetails details) {
-        MyLogger.debug('efantest: on pan down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
-        widget.controller.gestureHandler.onPanDown(details, widget.texts.getBlockId());
-      },
-      onPanCancel: () {
-        MyLogger.debug('efantest: on pan cancel, id=${widget.key}');
-        widget.controller.gestureHandler.onPanCancel(widget.texts.getBlockId());
-      },
-      onPanEnd: (DragEndDetails details) {
-        MyLogger.debug('efantest: on pan end');
-      },
-      onLongPressDown: (LongPressDownDetails details) {
-        var blockId = widget.texts.getBlockId();
-        MyLogger.info('Long press down on block($blockId)');
-        widget.controller.gestureHandler.onLongPressDown(details, blockId);
-      },
-      onLongPressStart: (LongPressStartDetails details) {
-        var blockId = widget.texts.getBlockId();
-        widget.controller.gestureHandler.onLongPressStart(details, blockId);
-      },
-      onLongPressCancel: () {
-        MyLogger.info('long press cancel');
-      },
+      // onLongPressDown: (LongPressDownDetails details) {
+      //   var blockId = widget.texts.getBlockId();
+      //   MyLogger.info('Long press down on block($blockId)');
+      //   widget.controller.gestureHandler.onLongPressDown(details, blockId);
+      // },
+      // onLongPressStart: (LongPressStartDetails details) {
+      //   var blockId = widget.texts.getBlockId();
+      //   widget.controller.gestureHandler.onLongPressStart(details, blockId);
+      // },
+      // onLongPressCancel: () {
+      //   MyLogger.info('long press cancel');
+      // },
       // This will cause 300ms delay of onTapDown event
       // onDoubleTapDown: (TapDownDetails details) {
       //   var blockId = widget.texts.getBlockId();
@@ -361,7 +338,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       return;
     }
 
-    // 文本不同，需要更新文本。更新的方法是：
+    // 如果文本不同，需要更新文本。更新的方法是：
     // 1）从左开始找到第一个不同的位置leftCount
     // 2）从右开始找到第一个不同的位置rightCount
     // 3）原字符串中的leftCount到length - rightCount，是被删除的部分
@@ -447,7 +424,12 @@ class MindEditBlockState extends State<MindEditBlock> {
 
     MyLogger.verbose('efantest: texts=$texts, texts.length=${texts.length}');
     widget.texts.updateTexts(texts); // 刷新文字，重新计算plainText，并保存到数据库
-    block.setTextSelection(newValue.selection);
+    final selectionController = widget.controller.selectionController;
+    if(selectionController.isInSingleBlock()) {
+      selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection);
+    } else {
+      selectionController.deleteSelectedContent(isExtentEditing: true, newExtentPos: newValue.selection.extentOffset);
+    }
     _triggerBlockModified();
 
     if(insertStr == '\n') {
@@ -468,138 +450,9 @@ class MindEditBlockState extends State<MindEditBlock> {
     _render?.releaseCursor();
   }
 
-  void moveCursorLeft(FunctionKeys funcKeys) {
-    var block = widget.texts;
-    var selection = block.getTextSelection();
-    if(selection == null) {
-      MyLogger.warn('Unbelievable!!! moveCursorLeft(): getTextSelection returns null!');
-      return;
-    }
-    // 如果当前在选择状态，且没有按下任何功能键，则取消选区并移到选区左侧
-    if(!selection.isCollapsed) {
-      if(funcKeys.nothing()) {
-        requestCursorAtPosition(selection.start);
-        return;
-      }
-    }
-
-    // 尝试在本block内左移，如果失败，找到上一个block，并将光标置于最后一个字符
-    var pos = selection.extentOffset;
-    if(pos > 0) {
-      var newPos = pos - 1;
-      if(funcKeys.shiftPressed) { // shift pressed
-        block.setTextSelection(selection.copyWith(extentOffset: newPos));
-        CallbackRegistry.refreshTextEditingValue();
-        // 停止光标闪烁
-        _render!.releaseCursor();
-        _render!.markNeedsPaint();
-      } else {
-        requestCursorAtPosition(newPos);
-      }
-    } else {
-      var previousBlockState = widget.texts.getPrevious()?.getEditState();
-      previousBlockState?.updateCursorToLastCharacter();
-    }
-  }
-  void moveCursorRight(FunctionKeys funcKeys) {
-    var block = widget.texts;
-    var selection = block.getTextSelection();
-    if(selection == null) {
-      MyLogger.warn('Unbelievable!!! moveCursorRight(): getTextSelection returns null!');
-      return;
-    }
-    // 如果当前在选择状态，且没有按下任何功能键，则取消选区并移到选区右侧
-    if(!selection.isCollapsed) {
-      if(funcKeys.nothing()) {
-        requestCursorAtPosition(selection.end);
-        return;
-      }
-    }
-
-    // 尝试在本block内右移，如果失败，找到下一个block，并将光标置于首字符
-    var totalLength = widget.texts.getTotalLength();
-    var pos = selection.extentOffset;
-    if(pos < totalLength) {
-      var newPos = pos + 1;
-      if(funcKeys.shiftPressed) {
-        block.setTextSelection(selection.copyWith(extentOffset: newPos));
-        CallbackRegistry.refreshTextEditingValue();
-        // 停止光标闪烁
-        _render!.releaseCursor();
-        _render!.markNeedsPaint();
-      } else {
-        requestCursorAtPosition(newPos);
-      }
-    } else {
-      var nextBlockState = widget.texts.getNext()?.getEditState();
-      nextBlockState?.updateCursorToFirstCharacter();
-    }
-  }
-  void moveCursorUp(FunctionKeys funcKeys) {
-    var block = widget.texts;
-    var selection = block.getTextSelection();
-    if(selection == null) {
-      MyLogger.warn('Unbelievable!!! moveCursorUp(): getTextSelection returns null!');
-      return;
-    }
-    // 尝试在本block上移，如果失败，尝试移到上一个block的最后一行，如果没有上一个block,则移到本block首字符
-    var newPos = _render!.getTextPositionOfPreviousLine();
-    if(newPos >= 0) {
-      if(funcKeys.shiftPressed) {
-        block.setTextSelection(selection.copyWith(extentOffset: newPos));
-        CallbackRegistry.refreshTextEditingValue();
-        // 停止光标闪烁
-        _render!.releaseCursor();
-        _render!.markNeedsPaint();
-      } else {
-        requestCursorAtPosition(newPos);
-      }
-    } else {
-      var previousBlockState = widget.texts.getPrevious()?.getEditState();
-      if(previousBlockState == null) {
-        updateCursorToFirstCharacter();
-      } else {
-        var n = selection.extentOffset;
-        var offset = _render!.getOffsetOfNthCharacter(n);
-        previousBlockState.updateCursorToLastLineByDx(offset.dx);
-      }
-    }
-  }
-  void moveCursorDown(FunctionKeys funcKeys) {
-    var block = widget.texts;
-    var selection = block.getTextSelection();
-    if(selection == null) {
-      MyLogger.warn('Unbelievable!!! moveCursorDown(): getTextSelection returns null!');
-      return;
-    }
-    var totalLength = widget.texts.getTotalLength();
-    // 尝试在本block下移，如果失败，尝试移到下一个block的第一行，如果没有下一个block,则移到本block末尾字符
-    var newPos = _render!.getTextPositionOfNextLine();
-    if(newPos >= 0 && newPos <= totalLength) {
-      if(funcKeys.shiftPressed) {
-        block.setTextSelection(selection.copyWith(extentOffset: newPos));
-        CallbackRegistry.refreshTextEditingValue();
-        // 停止光标闪烁
-        _render!.releaseCursor();
-        _render!.markNeedsPaint();
-      } else {
-        requestCursorAtPosition(newPos);
-      }
-    } else {
-      var nextBlockState = widget.texts.getNext()?.getEditState();
-      if(nextBlockState == null) {
-        updateCursorToLastCharacter();
-      } else {
-        var n = selection.extentOffset;
-        var offset = _render!.getOffsetOfNthCharacter(n);
-        nextBlockState.updateCursorToFirstLineByDx(offset.dx);
-      }
-    }
-  }
-
   void deletePreviousCharacter() {
+    /// Try to delete previous character in editing block, but if it is the start of a block, should merge with to previous block
     final block = widget.texts;
-    // 尝试在本block删除，如果已经是第一个字符，则合并到前一个block
     var selection = block.getTextSelection();
     if(selection == null) {
       MyLogger.warn('Unbelievable!!! deletePreviousCharacter(): getTextSelection returns null!');
@@ -607,7 +460,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     }
     var currentTextPos = selection.extentOffset;
     if(currentTextPos > 0) { // 可以在本block完成删除
-      // 找到上一个字符所在的TextDesc块，再将其删除
+      // Find the TextDesc of previous character, and delete it
       var offset = currentTextPos - 1;
       var clonedTexts = block.getTextsClone();
       for(var t in clonedTexts) {
@@ -628,13 +481,13 @@ class MindEditBlockState extends State<MindEditBlock> {
       _render!.updateParagraph();
       _render!.markNeedsLayout();
       CallbackRegistry.refreshTextEditingValue();
-    } else { // 需要合并到上一个block
+    } else { // Should be merge into previous block
       var previousBlock = widget.texts.getPrevious();
-      if(previousBlock == null) { // 已经是第一个block，什么都不做
+      if(previousBlock == null) { // Do nothing if it is the first block
         return;
       } else {
         var previousBlockState = previousBlock.getEditState();
-        // 记下上一block的文本长度，光标要定位在这里
+        // Get the text length of previous block, at which the cursor should be located
         var length = previousBlock.getTotalLength();
         previousBlockState!.mergeParagraph(widget.texts.getBlockId());
         CallbackRegistry.refreshDoc(activeBlockId: previousBlock.getBlockId(), position: length);
@@ -644,7 +497,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     _triggerBlockModified();
   }
   void deleteCurrentCharacter() {
-    // 尝试在本block删除，如果已经是最后一个字符，则将下一个block合并进来
+    // Try to delete character in editing block, but if it is the end of a block, should merge with next block
     var selection = widget.texts.getTextSelection();
     if(selection == null) {
       MyLogger.warn('Unbelievable!!! deleteCurrentCharacter(): getTextSelection returns null!');
@@ -652,7 +505,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     }
     var currentTextPos = selection.extentOffset;
     if(currentTextPos < widget.texts.getTotalLength()) {
-      // 找到当前字符所在的TextDesc，并删除
+      // Find the TextDesc of current character, and delete it
       var offset = currentTextPos;
       var clonedTexts = widget.texts.getTextsClone();
       for(var t in clonedTexts) {
@@ -674,7 +527,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       CallbackRegistry.refreshTextEditingValue();
     } else {
       var nextBlockId = widget.texts.getNext()?.getBlockId();
-      if(nextBlockId == null) { // 已经是最后一个block，什么都不做
+      if(nextBlockId == null) { // Do nothing if it is the last block
         return;
       } else {
         mergeParagraph(nextBlockId);
@@ -732,13 +585,17 @@ class MindEditBlockState extends State<MindEditBlock> {
     block.newTextSelection(selectionStart);
     _render!.updateParagraph();
     _render!.markNeedsLayout();
-    CallbackRegistry.refreshTextEditingValue();
+    if(block.hasCursor()) {
+      CallbackRegistry.refreshTextEditingValue();
+    }
 
     _updateNavigatorViewIfNeeded();
     _triggerBlockModified();
   }
 
-  (int, int) selectWord(Offset offset) {
+  String getBlockId() => widget.texts.getBlockId();
+
+  (int, int) getWordPosRange(Offset offset) {
     int pos = _render!.getPositionByOffset(offset);
     MyLogger.info('efantest: pos=$pos');
     var plainText = widget.texts.getPlainText();
@@ -780,12 +637,12 @@ class MindEditBlockState extends State<MindEditBlock> {
   void mergeParagraph(String nextBlockId) {
     var doc = widget.controller.document!;
     var myParagraph = doc.getParagraph(widget.texts.getBlockId())!;
-    int lastPosition = myParagraph.getTotalLength();
+    // int lastPosition = myParagraph.getTotalLength();
     var nextParagraph = doc.getParagraph(nextBlockId)!;
     myParagraph.appendNonEmptyTexts(nextParagraph.getTextsClone());
     doc.removeParagraph(nextBlockId);
 
-    requestCursorAtPosition(lastPosition);
+    // requestCursorAtPosition(lastPosition);
     _render!.redraw();
     _triggerBlockModified();
   }

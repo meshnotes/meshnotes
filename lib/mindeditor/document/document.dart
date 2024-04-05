@@ -70,7 +70,8 @@ class Document {
     _hasModified = newDoc._hasModified;
     _lastUpdate = newDoc._lastUpdate;
 
-    // Set saved state and position
+    // Restore saved state and position
+    //TODO Should be optimized
     for(var entry in _mapOfParagraphs.entries) {
       var blockId = entry.key;
       var block = entry.value;
@@ -83,7 +84,8 @@ class Document {
 
       var oldPosition = oldBlock?.getTextSelection();
       if(oldPosition != null) {
-        block.setTextSelection(oldPosition);
+        bool hasCursor = oldBlock!.hasCursor();
+        block.setTextSelection(oldPosition, isEditing: hasCursor);
       }
     }
   }

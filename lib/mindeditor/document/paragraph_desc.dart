@@ -49,6 +49,7 @@ class ParagraphDesc {
   Document get parent => _parent!;
   ParagraphDesc? _previous, _next;
   TextSelection? _editingPosition;
+  bool _hasCursor = false;
   MindEditBlockState? _state;
   int _lastUpdate = 0;
 
@@ -112,9 +113,7 @@ class ParagraphDesc {
   String getPlainText() {
     return _plainText!;
   }
-  String getBlockId() {
-    return _id;
-  }
+  String getBlockId() => _id;
 
   String getType() {
     return _convertBlockType(_type);
@@ -150,13 +149,19 @@ class ParagraphDesc {
   }
   void clearTextSelection() {
     _setTextSelection(null);
+    _hasCursor = false;
   }
-  void setTextSelection(TextSelection _t) {
+  void setTextSelection(TextSelection _t, {bool isEditing = true}) {
     _setTextSelection(_t);
+    _hasCursor = isEditing;
+    if(isEditing) {
+      Controller.instance.setEditingBlockId(getBlockId());
+    }
   }
   bool isCollapsed() {
     return _editingPosition != null && _editingPosition!.isCollapsed;
   }
+  bool hasCursor() => _hasCursor;
 
   void setEditState(MindEditBlockState state) {
     _state = state;
@@ -355,12 +360,13 @@ class ParagraphDesc {
   void _setTextSelection(TextSelection? _t) {
     TextSelection? old = _editingPosition;
     _editingPosition = _t;
-    // 如果TextSelection没变，或本节点并非编辑中的节点（比如焦点从当前节点跳到其他节点的情况），就跳过SelectionChanged触发器
+    // If TextSelection did not changed, or current node is not being editing(for example, focus node
+    // jumped from current node to other node), don't trigger SelectionChanged event
     if(old == _t || this != parent.getEditingBlockDesc()) {
       return;
     }
     var block = parent.getBlockState(_id);
-    _triggerSelectionChanged(block?.widget.texts, _t);
+    _triggerSelectionChanged(block?.widget.texts, _editingPosition);
   }
   void _triggerSelectionChanged(ParagraphDesc? para, TextSelection? selection) {
     var controller = Controller.instance;

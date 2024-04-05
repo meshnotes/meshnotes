@@ -59,7 +59,7 @@ class BlockTypeButton extends StatelessWidget {
         if(currentType == type) { // 重复点击将清除字体
           newType = Constants.blockTypeTextTag;
         }
-        MyLogger.debug('Setting block(id=${blockState.widget.texts.getBlockId()}\'s type to: $newType');
+        MyLogger.debug('Setting block(id=${blockState.getBlockId()}\'s type to: $newType');
         var ok = blockState.setBlockType(newType);
         if(ok) {
           var block = blockState.widget.texts;

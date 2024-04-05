@@ -49,7 +49,6 @@ class MindEditBlockImpl extends SingleChildRenderObjectWidget {
 
 class MindBlockImplRenderObject extends RenderBox {
   bool readOnly;
-  final UniqueKey uniqueKey = UniqueKey();
   MindEditBlockState block;
   ParagraphDesc texts;
   late MyRenderParagraph paragraph;
@@ -58,6 +57,7 @@ class MindBlockImplRenderObject extends RenderBox {
   EditCursor? editCursor;
   Rect? currentCursorRect;
   double fontSize;
+  Rect? currentBox;
 
   MindBlockImplRenderObject({
     Key? key,
@@ -205,33 +205,36 @@ class MindBlockImplRenderObject extends RenderBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    bool hasCursor = false;
+    final _firstPoint = localToGlobal(Offset.zero);
+    final _lastPoint = localToGlobal(Offset(size.width, size.height));
+    currentBox = Rect.fromPoints(_firstPoint, _lastPoint);
     List<Rect>? boxes;
-    if(!readOnly) {
-      final canvas = context.canvas;
-      var textSelection = texts.getTextSelection();
-      if(textSelection != null) {
-        var currentTextPos = TextPosition(offset: textSelection.extentOffset);
-        final _lineHeight = paragraph.getPreferredHeight();
-        MyLogger.verbose('efantest: lineHeight=$_lineHeight');
-        // currentCursorRect用于计算上一行、下一行的位置，所以必须更新
-        currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
-        if(!textSelection.isCollapsed) {
-          boxes = _drawSelectionBoxes(canvas, offset, textSelection, _lineHeight);
-        }
+    final canvas = context.canvas;
+    final hasCursor = texts.hasCursor();
+    var textSelection = texts.getTextSelection();
+    if(textSelection != null) {
+      var currentTextPos = TextPosition(offset: textSelection.extentOffset);
+      final _lineHeight = paragraph.getPreferredHeight();
+      MyLogger.verbose('efantest: lineHeight=$_lineHeight');
+      // currentCursorRect用于计算上一行、下一行的位置，所以必须更新
+      currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
+      if(!textSelection.isCollapsed) {
+        boxes = _drawSelectionBoxes(canvas, offset, textSelection, _lineHeight);
+      }
+
+      if(!readOnly && hasCursor) {
         _drawCursor(canvas, offset, _lineHeight);
         _drawComposing(canvas, offset, _lineHeight); // 如果处于输入法状态中，在输入中的文字下方画线
-        hasCursor = true;
       }
     }
     // 如果没有文字，则当鼠标悬停时、或光标定位在此block时，要显示place holder。如果是标题，则不管鼠标和光标都显示place holder
-    if(texts.getPlainText().isEmpty && (block.isMouseEntered() || hasCursor || texts.isTitle())) {
+    if(!readOnly && texts.getPlainText().isEmpty && (block.isMouseEntered() || hasCursor || texts.isTitle())) {
       placeHolder.paint(context, offset);
     } else {
       paragraph.paint(context, offset);
     }
     if(boxes != null && boxes.isNotEmpty) {
-      _drawLeaderLayer(context, boxes, offset);
+      // _drawLeaderLayer(context, boxes, offset);
     }
   }
   void _drawCursor(Canvas canvas, Offset offset, double height) {

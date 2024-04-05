@@ -306,7 +306,7 @@ class DocumentManager {
     if(currentDocId == docId) {
       MyLogger.info('efantest: refresh current document');
       var blockState = Controller.instance.getEditingBlockState();
-      var currentBlockId = blockState?.widget.texts.getBlockId();
+      var currentBlockId = blockState?.getBlockId();
       var position = blockState?.widget.texts.getTextSelection()?.extentOffset;
       CallbackRegistry.refreshDoc(activeBlockId: currentBlockId, position: position?? 0);
     }

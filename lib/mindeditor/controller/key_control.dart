@@ -1,6 +1,8 @@
 import 'package:my_log/my_log.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:flutter/services.dart';
+import '../document/paragraph_desc.dart';
+import '../view/selection_controller.dart';
 
 const _leftKey   = LogicalKeyboardKey.arrowLeft;
 const _rightKey  = LogicalKeyboardKey.arrowRight;
@@ -58,30 +60,26 @@ class KeyboardControl {
       return false;
     }
     if(_key == _leftKey) {
-      editingState.moveCursorLeft(funcKeys);
+      _moveCursorLeft(funcKeys);
     } else if(_key == _rightKey) {
-      editingState.moveCursorRight(funcKeys);
+      _moveCursorRight(funcKeys);
     } else if(_key == _upKey) {
-      editingState.moveCursorUp(funcKeys);
+      _moveCursorUp(funcKeys);
     } else if(_key == _downKey) {
-      editingState.moveCursorDown(funcKeys);
+      _moveCursorDown(funcKeys);
     }
     return true;
   }
 
   static bool _handleDelKeys(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
+    final selectionController = Controller.instance.selectionController;
+    if(!selectionController.isCollapsed()) {
+      selectionController.deleteSelectedContent();
+      return true;
+    }
     var editingState = Controller.instance.getEditingBlockState();
     if(editingState == null) {
       return false;
-    }
-    var block = editingState.widget.texts;
-    if(block.getTextSelection() == null) {
-      MyLogger.warn('Unbelievable!!! _handleDelKeys(): getTextSelection returns null!');
-      return false;
-    }
-    if(block.isCollapsed() == false) {
-      editingState.deleteSelection();
-      return true;
     }
     if(_key == _backspaceKey) {
       editingState.deletePreviousCharacter();
@@ -92,11 +90,170 @@ class KeyboardControl {
   }
 
   static bool _handleNewLine(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
+    MyLogger.info('_handleNewLine: spawn new line');
+    if(!Controller.instance.selectionController.isCollapsed()) {
+      Controller.instance.selectionController.deleteSelectedContent();
+    }
     var editingState = Controller.instance.getEditingBlockState();
     if(editingState == null) {
       return false;
     }
     editingState.spawnNewLine();
     return true;
+  }
+
+  static void _moveCursorLeft(FunctionKeys funcKeys) {
+    final selectionController = Controller.instance.selectionController;
+    // If currently in selection state, and SHIFT key is not pressed, cancel selection and move to left side of selection
+    if(!selectionController.isCollapsed() && funcKeys.nothing()) {
+      selectionController.collapseToStart();
+      return;
+    }
+
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+    // Find the left position, it may at the end of previous block
+    var (newBlockIndex, newPos) = _findPreviousBlockIdAndPos(selectionController, paragraphs);
+    if(newBlockIndex < 0 || newPos < 0) return; // Invalid return values
+
+    if(!funcKeys.shiftPressed) {
+      selectionController.collapseTo(newBlockIndex, newPos);
+    } else {
+      selectionController.updateSelectionByIndexAndPos(newBlockIndex, newPos);
+    }
+  }
+  static void _moveCursorRight(FunctionKeys funcKeys) {
+    final selectionController = Controller.instance.selectionController;
+    // If currently in selection state, and SHIFT key is not pressed, cancel selection and move to right side of selection
+    if(!selectionController.isCollapsed() && funcKeys.nothing()) {
+      selectionController.collapseToEnd();
+      return;
+    }
+
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+    // Find the right position, it may at the beginning of next block
+    var (newBlockIndex, newPos) = _findNextBlockIdAndPos(selectionController, paragraphs);
+    if(newBlockIndex < 0 || newPos < 0) return;
+
+    if(!funcKeys.shiftPressed) {
+      selectionController.collapseTo(newBlockIndex, newPos);
+    } else {
+      selectionController.updateSelectionByIndexAndPos(newBlockIndex, newPos);
+    }
+  }
+  static void _moveCursorUp(FunctionKeys funcKeys) {
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+    final selectionController = Controller.instance.selectionController;
+    // Find the position at the previous line
+    var (newBlockIndex, newPos) = _findBlockIdAndPosAtPreviousLine(selectionController, paragraphs);
+    if(newBlockIndex < 0 || newPos < 0) return;
+
+    if(!funcKeys.shiftPressed) {
+      selectionController.collapseTo(newBlockIndex, newPos);
+    } else {
+      selectionController.updateSelectionByIndexAndPos(newBlockIndex, newPos);
+    }
+  }
+  static void _moveCursorDown(FunctionKeys funcKeys) {
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+    final selectionController = Controller.instance.selectionController;
+    // Find the position at the next line
+    var (newBlockIndex, newPos) = _findBlockIdAndPosAtNextLine(selectionController, paragraphs);
+    if(newBlockIndex < 0 || newPos < 0) return;
+
+    if(!funcKeys.shiftPressed) {
+      selectionController.collapseTo(newBlockIndex, newPos);
+    } else {
+      selectionController.updateSelectionByIndexAndPos(newBlockIndex, newPos);
+    }
+  }
+
+  static (int, int) _findPreviousBlockIdAndPos(SelectionController selectionController, List<ParagraphDesc> paragraphs) {
+    int blockIndex = selectionController.lastExtentBlockIndex;
+    int pos = selectionController.lastExtentBlockPos;
+    if(pos > 0) {
+      pos--;
+    } else {
+      if(blockIndex > 0) {
+        blockIndex--;
+        pos = paragraphs[blockIndex].getTotalLength();
+      }
+    }
+    return (blockIndex, pos);
+  }
+  static (int, int) _findNextBlockIdAndPos(SelectionController selectionController, List<ParagraphDesc> paragraphs) {
+    int blockIndex = selectionController.lastExtentBlockIndex;
+    int pos = selectionController.lastExtentBlockPos;
+    int totalLength = paragraphs[blockIndex].getTotalLength();
+    if(pos < totalLength) {
+      pos++;
+    } else {
+      if(blockIndex < paragraphs.length - 1) {
+        blockIndex++;
+        pos = 0;
+      }
+    }
+    return (blockIndex, pos);
+  }
+  /// Find the blockIndex and pos of previous line.
+  /// If it is not at the same block, calculate the corresponding block index and pos of previous block.
+  /// If it is already at the first block, locate at the start position of first block.
+  static (int, int) _findBlockIdAndPosAtPreviousLine(SelectionController selectionController, List<ParagraphDesc> paragraphs) {
+    int blockIndex = selectionController.lastExtentBlockIndex;
+    int pos = selectionController.lastExtentBlockPos;
+    var blockState = paragraphs[blockIndex].getEditState()!;
+    var render = blockState.getRender()!;
+    var offset = render.getOffsetOfNthCharacter(pos);
+    var lineHeight = render.fontSize;
+    var offsetOfPreviousLine = Offset(offset.dx, offset.dy - lineHeight);
+    // Previous line is in the same block
+    if(render.paragraph.size.contains(offsetOfPreviousLine)) {
+      int newPos = render.getPositionByOffset(offsetOfPreviousLine);
+      return (blockIndex, newPos);
+    }
+    // Not in the same block, but still has previous block, so locate to the last line of previous block, and try to keep dx unchanged
+    if(blockIndex > 0) {
+      int newBlockIndex = blockIndex - 1;
+      var newBlockState = paragraphs[newBlockIndex].getEditState()!;
+      var newRender = newBlockState.getRender()!;
+      var globalOffset = render.localToGlobal(offsetOfPreviousLine);
+      var newOffset = newRender.globalToLocal(globalOffset);
+      int newPos = newRender.getPositionByOffset(newOffset);
+      return (newBlockIndex, newPos);
+    }
+    // Not in the same block, and it is already the first block, locate to the start position of current block
+    return (0, 0);
+  }
+  /// Find the blockIndex and pos of next line.
+  /// If it is not at the same block, calculate the corresponding block index and pos of new block.
+  /// If it is already at the last block, locate at the end position of last block.
+  static (int, int) _findBlockIdAndPosAtNextLine(SelectionController selectionController, List<ParagraphDesc> paragraphs) {
+    int blockIndex = selectionController.lastExtentBlockIndex;
+    int pos = selectionController.lastExtentBlockPos;
+    var blockState = paragraphs[blockIndex].getEditState()!;
+    var render = blockState.getRender()!;
+    var offset = render.getOffsetOfNthCharacter(pos);
+    var lineHeight = render.fontSize;
+    var offsetOfNextLine = Offset(offset.dx, offset.dy + lineHeight);
+    // Previous line is in the same block
+    if(render.paragraph.size.contains(offsetOfNextLine)) {
+      int newPos = render.getPositionByOffset(offsetOfNextLine);
+      return (blockIndex, newPos);
+    }
+    // Not in the same block, but still has next block, so locate to the first line of next block, and try to keep dx unchanged
+    if(blockIndex < paragraphs.length - 1) {
+      int newBlockIndex = blockIndex + 1;
+      var newBlockState = paragraphs[newBlockIndex].getEditState()!;
+      var newRender = newBlockState.getRender()!;
+      var globalOffset = render.localToGlobal(offsetOfNextLine);
+      var newOffset = newRender.globalToLocal(globalOffset);
+      int newPos = newRender.getPositionByOffset(newOffset);
+      return (newBlockIndex, newPos);
+    }
+    // Not in the same block, and it is already the last block, locate to the end position of current block
+    return (blockIndex, paragraphs[blockIndex].getTotalLength());
   }
 }
