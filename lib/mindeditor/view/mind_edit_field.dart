@@ -186,8 +186,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       return;
     }
     widget.focusNode.unfocus();
-    var block = widget.controller.getEditingBlockState()!;
-    block.releaseCursor();
+    Controller.instance.selectionController.releaseCursor();
     widget.controller.clearEditingBlock();
   }
 

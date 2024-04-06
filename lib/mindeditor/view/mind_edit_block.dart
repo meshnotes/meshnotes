@@ -231,25 +231,12 @@ class MindEditBlockState extends State<MindEditBlock> {
 
   void requestCursorAtPosition(int position) {
     var myId = widget.texts.getBlockId();
-    var oldEditingBlockId = widget.controller.getEditingBlockId();
-
     // Update editing block id
     widget.controller.setEditingBlockId(myId);
 
-    // If block is changed, hide the cursor in old block, and then update TextEditingValue
-    if(oldEditingBlockId != null && oldEditingBlockId != myId) {
-      MyLogger.verbose('requestCursorAtPosition: oldEditingBlockId=$oldEditingBlockId, myId=$myId');
-      var lastBlock = widget.controller.getBlockState(oldEditingBlockId);
-      lastBlock?.releaseCursor();
-    }
-    // If already has the cursor, just reset the timer
-    if(oldEditingBlockId == myId) {
-      _render!.resetCursor();
-    } else {
-      _render!.activeCursor(position);
-    }
+    widget.controller.selectionController.resetCursor();
 
-    // 如果需要的话，唤起键盘
+    // Show keyboard if needed
     CallbackRegistry.requestKeyboard();
   }
 
@@ -408,18 +395,17 @@ class MindEditBlockState extends State<MindEditBlock> {
       MyLogger.verbose('efantest: spawnNewLine at $leftCount');
       spawnNewLineAtOffset(leftCount);
     }
-    _render!.resetCursor();
+    selectionController.resetCursor();
     _render!.updateParagraph();
     _render!.markNeedsLayout();
     _updateNavigatorViewIfNeeded();
   }
 
-  void releaseCursor() {
-    // 先释放editingPosition，再调用releaseCursor()，因为releaseCursor()里面会调用markNeedPaint()
+  void clearSelectionAndReleaseCursor() {
+    // Just mark render as need paint
     var block = widget.texts;
-    MyLogger.debug('efantest: releasing editingPosition of node(id=${block.getBlockId()})');
     block.clearTextSelection();
-    _render?.releaseCursor();
+    _render?.markNeedsPaint();
   }
 
   void deletePreviousCharacter() {

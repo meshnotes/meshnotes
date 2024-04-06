@@ -5,6 +5,7 @@ import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block_impl.dart';
 import 'package:my_log/my_log.dart';
+import '../view/edit_cursor.dart';
 import 'callback_registry.dart';
 import 'controller.dart';
 
@@ -21,8 +22,11 @@ class SelectionController {
   int lastExtentBlockIndex = -1;
   int lastBaseBlockPos = -1;
   int lastExtentBlockPos = -1;
+  EditCursor? _editCursor;
 
   void dispose() {
+    _editCursor?.stopCursor();
+    _editCursor = null;
     hideTextSelectionHandles();
     _context = null;
     _shouldShowSelectionHandle = false;
@@ -34,6 +38,7 @@ class SelectionController {
   }
 
   void clearSelection() {
+    _editCursor?.stopCursor();
     _shouldShowSelectionHandle = false;
     lastBaseBlockIndex = -1;
     lastExtentBlockIndex = -1;
@@ -43,6 +48,18 @@ class SelectionController {
 
   LayerLink? getLayerLinkOfStartHandle() => _layerLinkOfStartHandle;
   LayerLink? getLayerLinkOfEndHandle() => _layerLinkOfEndHandle;
+
+  EditCursor getCursor() {
+    _editCursor ??= EditCursor(timeoutFunc: _refreshCursor);
+    return _editCursor!;
+  }
+  void resetCursor() {
+    getCursor().resetCursor();
+  }
+  void releaseCursor() {
+    getCursor().stopCursor();
+    _releaseCursor();
+  }
 
   void showTextSelectionHandles() {
     if(!_shouldShowSelectionHandle) {
@@ -265,7 +282,7 @@ class SelectionController {
     for(int idx = startBlockIndex; idx <= endBlockIndex; idx++) {
       final blockState = paragraphs[idx].getEditState();
       if(idx != blockIndex) {
-        blockState?.releaseCursor();
+        blockState?.clearSelectionAndReleaseCursor();
       }
     }
     _updateSelection(blockIndex, pos, blockIndex, pos, paragraphs);
@@ -338,6 +355,31 @@ class SelectionController {
     lastExtentBlockPos = lastBaseBlockPos = startBlockPos + newExtentPos;
   }
 
+  void _refreshCursor() {
+    if(lastExtentBlockIndex < 0) return;
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+    final block = paragraphs[lastExtentBlockIndex];
+    if(!block.hasCursor()) {
+      MyLogger.warn('_refreshCursor: Incorrect state! last extent block(id=${block.getBlockId()}, index=$lastExtentBlockIndex) has no cursor!');
+      return;
+    }
+    final blockState = block.getEditState();
+    final readOnly = blockState?.widget.readOnly;
+    if(readOnly == null || readOnly) return;
+
+    final render = blockState?.getRender();
+    render?.markNeedsPaint();
+  }
+  void _releaseCursor() {
+    if(lastExtentBlockIndex < 0) return;
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+    final block = paragraphs[lastExtentBlockIndex];
+    if(!block.hasCursor()) return;
+    final render = block.getEditState()?.getRender();
+    render?.markNeedsPaint();
+  }
   void _updateSelection(int baseBlockIndex, int baseBlockPos, int extentBlockIndex, int extentBlockPos, List<ParagraphDesc> paragraphs) {
     /// startBlockIndex: minimal block index in selection
     /// endBlockIndex: maximum block index in selection
@@ -364,7 +406,7 @@ class SelectionController {
       /// 4. If start and end block is the same, set the selection to be [startBlockPos, endBlockPos]
       final node = paragraphs[idx];
       if(idx < startBlockIndex || idx > endBlockIndex) {
-        node.getEditState()?.releaseCursor();
+        node.getEditState()?.clearSelectionAndReleaseCursor();
         continue;
       }
       int startPos = 0, endPos = paragraphs[idx].getPlainText().length;
@@ -408,6 +450,7 @@ class SelectionController {
     lastExtentBlockIndex = extentBlockIndex;
     lastExtentBlockPos = extentBlockPos;
     CallbackRegistry.refreshTextEditingValue();
+    resetCursor();
     Controller.instance.selectionController.showTextSelectionHandles();
   }
 

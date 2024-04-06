@@ -7,7 +7,6 @@ import 'package:my_log/my_log.dart';
 import '../document/paragraph_desc.dart';
 import '../document/text_desc.dart';
 import '../setting/constants.dart';
-import 'edit_cursor.dart';
 import 'my_paragraph.dart';
 
 class MindEditBlockImpl extends SingleChildRenderObjectWidget {
@@ -54,7 +53,6 @@ class MindBlockImplRenderObject extends RenderBox {
   late MyRenderParagraph paragraph;
   late MyRenderParagraph placeHolder;
   Controller controller;
-  EditCursor? editCursor;
   Rect? currentCursorRect;
   double fontSize;
   Rect? currentBox;
@@ -238,9 +236,8 @@ class MindBlockImplRenderObject extends RenderBox {
     // _tryToDrawLeaderLayer(context, baseOffsetRect, currentCursorRect, offset);
   }
   void _drawCursor(Canvas canvas, Offset offset, double height) {
-    // 如果editCursor不存在，新建之
-    editCursor ??= EditCursor(timeoutFunc: markNeedsPaint);
-    editCursor!.paint(canvas, currentCursorRect!, offset);
+    final editCursor = Controller.instance.selectionController.getCursor();
+    editCursor.paint(canvas, currentCursorRect!, offset);
   }
   void _drawSelectionBoxes(Canvas canvas, Offset offset, TextSelection textSelection, double height) {
     var boxes = paragraph.getBoxesForSelection(textSelection);
@@ -300,37 +297,8 @@ class MindBlockImplRenderObject extends RenderBox {
   }
 
   @override
-  void dispose() {
-    editCursor?.stopCursor();
-    editCursor = null;
-    super.dispose();
-  }
-
-  @override
   bool hitTestSelf(Offset position) {
     return true;
-  }
-
-  // 光标相关
-  // position表示文字位置
-  void activeCursor(int position) {
-    editCursor?.stopCursor();
-    editCursor = EditCursor(timeoutFunc: markNeedsPaint);
-    currentCursorRect = _calculateCursorRectByPosition(TextPosition(offset: position));
-    markNeedsPaint();
-  }
-  void releaseCursor() {
-    if(editCursor != null) {
-      editCursor!.stopCursor();
-      editCursor = null;
-      markNeedsPaint();
-    }
-  }
-  void resetCursor() {
-    if(editCursor != null) {
-      editCursor!.resetCursor();
-      markNeedsPaint();
-    }
   }
 
   Rect _calculateCursorRectByPosition(TextPosition pos, {double? height}) {
