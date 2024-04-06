@@ -413,8 +413,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     setState(() {
       initDocAndControlBlock();
       if(activeBlockId != null) { // If activeId is not null, make the cursor appear on the block with activeId
-        var node = widget.document.getParagraph(activeBlockId);
-        node?.newTextSelection(position);
+        widget.controller.selectionController.updateSelectionInBlock(activeBlockId, TextSelection(baseOffset: position, extentOffset: position));
       }
     });
   }

@@ -7,16 +7,14 @@ import '../../util/util.dart';
 
 class EditorController {
   static String getSelectedContent() {
-    final controller = Controller.instance;
-    var blockState = controller.getEditingBlockState();
-    var content = blockState?.getSelectedContent();
-    return content?? '';
+    final selectionController = Controller.instance.selectionController;
+    var content = selectionController.getSelectedContent();
+    return content;
   }
 
   static void deleteSelectedContent() {
-    final controller = Controller.instance;
-    var blockState = controller.getEditingBlockState();
-    blockState?.deleteSelection();
+    final selectionController = Controller.instance.selectionController;
+    selectionController.deleteSelectedContent();
   }
   static Future<void> copyToClipboard() async {
     var content = getSelectedContent();

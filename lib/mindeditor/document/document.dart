@@ -158,6 +158,7 @@ class Document {
   }
 
   void clearTextSelection() {
+    Controller.instance.selectionController.clearSelection();
     for(var p in paragraphs) {
       p.clearTextSelection();
     }

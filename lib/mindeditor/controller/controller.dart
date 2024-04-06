@@ -9,7 +9,7 @@ import 'package:mesh_note/mindeditor/controller/environment.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/document_manager.dart';
-import 'package:mesh_note/mindeditor/view/selection_controller.dart';
+import 'package:mesh_note/mindeditor/controller/selection_controller.dart';
 import 'package:mesh_note/net/net_controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
@@ -38,10 +38,7 @@ class Controller {
   String deviceId = 'Unknown';
   late final SelectionController selectionController;
   String simpleDeviceId = '';
-  // String userKey = '166f826179b0b077c90efe9bda61506844e658bba43f7edc67f741c1ccfccdfe';
-  // String userName = 'efan';
   UserPrivateInfo? userPrivateInfo;
-  // String userKey = 'a0a46f73fd42aba7b8bd24c8cc373694e98246b9de37515766972e5eb34dcbbe';
 
   // Getters
   DocumentManager get docManager => _docManager!;

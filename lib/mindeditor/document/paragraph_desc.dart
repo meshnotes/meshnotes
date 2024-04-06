@@ -50,6 +50,8 @@ class ParagraphDesc {
   ParagraphDesc? _previous, _next;
   TextSelection? _editingPosition;
   bool _hasCursor = false;
+  bool _showBaseLeader = false;
+  bool _showExtentLeader = false;
   MindEditBlockState? _state;
   int _lastUpdate = 0;
 
@@ -141,6 +143,14 @@ class ParagraphDesc {
     _storeBlock();
   }
 
+  String getSelectedPlainText() {
+    var selection = getTextSelection();
+    if(selection == null || selection.isCollapsed) return '';
+
+    var startPos = selection.start;
+    var endPos = selection.end;
+    return getPlainText().substring(startPos, endPos);
+  }
   void newTextSelection(int pos) {
     setTextSelection(TextSelection.collapsed(offset: pos));
   }
@@ -150,10 +160,14 @@ class ParagraphDesc {
   void clearTextSelection() {
     _setTextSelection(null);
     _hasCursor = false;
+    _showBaseLeader = false;
+    _showExtentLeader = false;
   }
-  void setTextSelection(TextSelection _t, {bool isEditing = true}) {
+  void setTextSelection(TextSelection _t, {bool isEditing = true, bool showBaseLeader = false, bool showExtentLeader = false}) {
     _setTextSelection(_t);
     _hasCursor = isEditing;
+    _showBaseLeader = showBaseLeader;
+    _showExtentLeader = showExtentLeader;
     if(isEditing) {
       Controller.instance.setEditingBlockId(getBlockId());
     }
@@ -162,6 +176,8 @@ class ParagraphDesc {
     return _editingPosition != null && _editingPosition!.isCollapsed;
   }
   bool hasCursor() => _hasCursor;
+  bool showBaseLeader() => _showBaseLeader;
+  bool showExtentLeader() => _showExtentLeader;
 
   void setEditState(MindEditBlockState state) {
     _state = state;

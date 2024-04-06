@@ -208,18 +208,19 @@ class MindBlockImplRenderObject extends RenderBox {
     final _firstPoint = localToGlobal(Offset.zero);
     final _lastPoint = localToGlobal(Offset(size.width, size.height));
     currentBox = Rect.fromPoints(_firstPoint, _lastPoint);
-    List<Rect>? boxes;
     final canvas = context.canvas;
     final hasCursor = texts.hasCursor();
     var textSelection = texts.getTextSelection();
+    Rect? baseOffsetRect;
     if(textSelection != null) {
-      var currentTextPos = TextPosition(offset: textSelection.extentOffset);
       final _lineHeight = paragraph.getPreferredHeight();
-      MyLogger.verbose('efantest: lineHeight=$_lineHeight');
-      // currentCursorRect用于计算上一行、下一行的位置，所以必须更新
+      MyLogger.verbose('MindEditBlockImplRenderObject: lineHeight=$_lineHeight');
+      var currentTextPos = TextPosition(offset: textSelection.extentOffset);
       currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
+      var baseTextPos = TextPosition(offset: textSelection.baseOffset);
+      baseOffsetRect = _calculateCursorRectByPosition(baseTextPos, height: _lineHeight);
       if(!textSelection.isCollapsed) {
-        boxes = _drawSelectionBoxes(canvas, offset, textSelection, _lineHeight);
+        _drawSelectionBoxes(canvas, offset, textSelection, _lineHeight);
       }
 
       if(!readOnly && hasCursor) {
@@ -233,28 +234,24 @@ class MindBlockImplRenderObject extends RenderBox {
     } else {
       paragraph.paint(context, offset);
     }
-    if(boxes != null && boxes.isNotEmpty) {
-      // _drawLeaderLayer(context, boxes, offset);
-    }
+    // Try to draw leader layer if needed
+    // _tryToDrawLeaderLayer(context, baseOffsetRect, currentCursorRect, offset);
   }
   void _drawCursor(Canvas canvas, Offset offset, double height) {
     // 如果editCursor不存在，新建之
     editCursor ??= EditCursor(timeoutFunc: markNeedsPaint);
     editCursor!.paint(canvas, currentCursorRect!, offset);
   }
-  List<Rect> _drawSelectionBoxes(Canvas canvas, Offset offset, TextSelection textSelection, double height) {
+  void _drawSelectionBoxes(Canvas canvas, Offset offset, TextSelection textSelection, double height) {
     var boxes = paragraph.getBoxesForSelection(textSelection);
-    List<Rect> result = [];
     if(boxes.isNotEmpty) {
       final paint = Paint()
         ..color = Colors.blue[100]!; //.withOpacity(0.5);
       for (final box in boxes) {
         Rect rect = Rect.fromLTRB(box.left, box.top, box.right, box.bottom);
         canvas.drawRect(rect.shift(offset), paint);
-        result.add(rect);
       }
     }
-    return result;
   }
   void _drawComposing(Canvas canvas, Offset offset, double height) {
     final editingValue = CallbackRegistry.getLastEditingValue();
@@ -269,29 +266,37 @@ class MindBlockImplRenderObject extends RenderBox {
     Offset to = endPos.translate(0, height) + offset;
     canvas.drawLine(from, to, paint);
   }
-  void _drawLeaderLayer(PaintingContext context, List<Rect> boxes, Offset offset) {
-    // Add start handle layer, which is linked with CompositedTransformFollower by linkOfStartHandle
-    var linkOfStartHandle = controller.selectionController.getLayerLinkOfStartHandle();
-    if(linkOfStartHandle == null) {
-      return;
+  void _tryToDrawLeaderLayer(PaintingContext context, Rect? baseRect, Rect? extentRect, Offset offset) {
+    // Add start handle layer if needed, which is linked with CompositedTransformFollower by linkOfStartHandle
+    if(texts.showBaseLeader() && baseRect != null) {
+      var linkOfStartHandle = controller.selectionController.getLayerLinkOfStartHandle();
+      if (linkOfStartHandle == null) {
+        return;
+      }
+      var startPoint = Offset(baseRect.left, baseRect.bottom);
+      var leaderLayer = LeaderLayer(link: linkOfStartHandle, offset: startPoint + offset);
+      controller.selectionController.updateLeaderLayerOfStartHandle(leaderLayer);
+      context.pushLayer(
+        leaderLayer,
+        super.paint,
+        Offset.zero,
+      );
     }
-    var startPoint = Offset(boxes.first.left, boxes.first.top);
-    context.pushLayer(
-      LeaderLayer(link: linkOfStartHandle, offset: startPoint + offset),
-      super.paint,
-      Offset.zero,
-    );
-    // Add end handle layer, which is linked with CompositedTransformFollower by linkOfEndHandle
-    var linkOfEndHandle = controller.selectionController.getLayerLinkOfEndHandle();
-    if(linkOfEndHandle == null) {
-      return;
+    // Add end handle layer if needed, which is linked with CompositedTransformFollower by linkOfEndHandle
+    if(texts.showExtentLeader() && extentRect != null) {
+      var linkOfEndHandle = controller.selectionController.getLayerLinkOfEndHandle();
+      if (linkOfEndHandle == null) {
+        return;
+      }
+      var endPoint = Offset(extentRect.right, extentRect.bottom);
+      var leaderLayer = LeaderLayer(link: linkOfEndHandle, offset: endPoint + offset);
+      controller.selectionController.updateLeaderLayerOfEndHandle(leaderLayer);
+      context.pushLayer(
+        leaderLayer,
+        super.paint,
+        Offset.zero,
+      );
     }
-    var endPoint = Offset(boxes.last.right, boxes.last.bottom);
-    context.pushLayer(
-      LeaderLayer(link: linkOfEndHandle, offset: endPoint + offset),
-      super.paint,
-      Offset.zero,
-    );
   }
 
   @override
@@ -372,24 +377,6 @@ class MindBlockImplRenderObject extends RenderBox {
   Offset _calcOffsetOfTextPosition(TextPosition pos) {
     var offset = _convertOffsetFromPosition(pos);
     return Offset(offset.dx, offset.dy + fontSize / 2); // 稍微偏下一点，不然会定位到上一行的位置
-  }
-
-  int getTextPositionOfPreviousLine() {
-    var offset = Offset(currentCursorRect!.left, currentCursorRect!.top - fontSize / 2);
-    if(!paragraph.size.contains(offset)) {
-      return -1;
-    }
-    var pos = paragraph.getPositionForOffset(offset);
-    MyLogger.debug('efantest: new pos=$pos for offset($offset)');
-    return pos.offset;
-  }
-  int getTextPositionOfNextLine() {
-    var offset = Offset(currentCursorRect!.left, currentCursorRect!.bottom + fontSize / 2);
-    if(!paragraph.size.contains(offset)) {
-      return -1;
-    }
-    var pos = paragraph.getPositionForOffset(offset);
-    return pos.offset;
   }
 
   void redraw() {

@@ -1,6 +1,5 @@
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/controller/key_control.dart';
 import 'package:mesh_note/mindeditor/view/view_helper.dart' as helper;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -234,20 +233,16 @@ class MindEditBlockState extends State<MindEditBlock> {
     var myId = widget.texts.getBlockId();
     var oldEditingBlockId = widget.controller.getEditingBlockId();
 
-    // 更新编辑中的block Id
+    // Update editing block id
     widget.controller.setEditingBlockId(myId);
 
-    // 更新当前选区的位置，这个必须在更新完block ID之后，因为需要判断当前ID来决定是否要发送事件
-    var block = widget.texts;
-    block.newTextSelection(position);
-
-    // 如果切换了block，先隐藏光标，再在新block显示，并且更新TextEditingValue
+    // If block is changed, hide the cursor in old block, and then update TextEditingValue
     if(oldEditingBlockId != null && oldEditingBlockId != myId) {
-      MyLogger.verbose('efantest: oldEditingBlockId=$oldEditingBlockId, myId=$myId');
+      MyLogger.verbose('requestCursorAtPosition: oldEditingBlockId=$oldEditingBlockId, myId=$myId');
       var lastBlock = widget.controller.getBlockState(oldEditingBlockId);
       lastBlock?.releaseCursor();
     }
-    // 如果光标就在本block，只需要重置定时器。否则启动光标闪烁
+    // If already has the cursor, just reset the timer
     if(oldEditingBlockId == myId) {
       _render!.resetCursor();
     } else {
@@ -256,29 +251,6 @@ class MindEditBlockState extends State<MindEditBlock> {
 
     // 如果需要的话，唤起键盘
     CallbackRegistry.requestKeyboard();
-  }
-  void requestCursorAtOffset(Offset offset) {
-    int totalPosition = _render!.getPositionByOffset(offset);
-    requestCursorAtPosition(totalPosition);
-  }
-
-  void updateCursorToLastCharacter() {
-    var length = widget.texts.getTotalLength();
-    requestCursorAtPosition(length);
-  }
-  void updateCursorToFirstCharacter() {
-    requestCursorAtPosition(0);
-  }
-  void updateCursorToLastLineByDx(double dx) {
-    var lastPosition = widget.texts.getTotalLength();
-    _updateCursorToDxAndDyOfNthCharacter(dx, lastPosition);
-  }
-  void updateCursorToFirstLineByDx(double dx) {
-    _updateCursorToDxAndDyOfNthCharacter(dx, 0);
-  }
-  void _updateCursorToDxAndDyOfNthCharacter(double dx, int n) {
-    var offset = _render!.getOffsetOfNthCharacter(n);
-    requestCursorAtOffset(Offset(dx, offset.dy));
   }
 
   void _showHandler() {
@@ -453,13 +425,18 @@ class MindEditBlockState extends State<MindEditBlock> {
   void deletePreviousCharacter() {
     /// Try to delete previous character in editing block, but if it is the start of a block, should merge with to previous block
     final block = widget.texts;
-    var selection = block.getTextSelection();
-    if(selection == null) {
-      MyLogger.warn('Unbelievable!!! deletePreviousCharacter(): getTextSelection returns null!');
+    final selectionController = widget.controller.selectionController;
+    if(!selectionController.isCollapsed()) {
+      MyLogger.warn('deletePreviousCharacter() should be called only when selection is collapsed!');
       return;
     }
-    var currentTextPos = selection.extentOffset;
-    if(currentTextPos > 0) { // 可以在本block完成删除
+    var currentTextPos = selectionController.lastExtentBlockPos;
+    int blockIndex = _findBlockIndex(getBlockId());
+    if(blockIndex < 0) {
+      MyLogger.warn('deletePreviousCharacter: could not find the index of block(id=${getBlockId()})');
+      return;
+    }
+    if(currentTextPos > 0) { // Could be operated in the current block
       // Find the TextDesc of previous character, and delete it
       var offset = currentTextPos - 1;
       var clonedTexts = block.getTextsClone();
@@ -477,7 +454,7 @@ class MindEditBlockState extends State<MindEditBlock> {
         }
         offset -= t.text.length;
       }
-      requestCursorAtPosition(selection.extentOffset - 1);
+      selectionController.updateSelectionInBlock(getBlockId(), TextSelection(baseOffset: currentTextPos - 1, extentOffset: currentTextPos - 1));
       _render!.updateParagraph();
       _render!.markNeedsLayout();
       CallbackRegistry.refreshTextEditingValue();
@@ -632,6 +609,15 @@ class MindEditBlockState extends State<MindEditBlock> {
     }
     int end = t;
     return (start, end);
+  }
+  int _findBlockIndex(String blockId) {
+    final paragraphs = widget.texts.parent.paragraphs;
+    for(int idx = 0; idx < paragraphs.length; idx++) {
+      if(paragraphs[idx].getBlockId() == blockId) {
+        return idx;
+      }
+    }
+    return -1;
   }
 
   void mergeParagraph(String nextBlockId) {

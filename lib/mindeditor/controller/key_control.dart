@@ -2,7 +2,7 @@ import 'package:my_log/my_log.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:flutter/services.dart';
 import '../document/paragraph_desc.dart';
-import '../view/selection_controller.dart';
+import 'selection_controller.dart';
 
 const _leftKey   = LogicalKeyboardKey.arrowLeft;
 const _rightKey  = LogicalKeyboardKey.arrowRight;

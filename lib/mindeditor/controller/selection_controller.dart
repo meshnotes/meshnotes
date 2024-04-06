@@ -1,16 +1,18 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block_impl.dart';
 import 'package:my_log/my_log.dart';
-import '../controller/callback_registry.dart';
-import '../controller/controller.dart';
-import '../document/document.dart';
+import 'callback_registry.dart';
+import 'controller.dart';
 
 class SelectionController {
   LayerLink? _layerLinkOfStartHandle;
   LayerLink? _layerLinkOfEndHandle;
+  LeaderLayer? _leaderLayerOfStartHandle;
+  LeaderLayer? _leaderLayerOfEndHandle;
   BuildContext? _context;
   OverlayEntry? _handleOfStart;
   OverlayEntry? _handleOfEnd;
@@ -24,8 +26,15 @@ class SelectionController {
     hideTextSelectionHandles();
     _context = null;
     _shouldShowSelectionHandle = false;
-    _layerLinkOfStartHandle = null;
-    _layerLinkOfEndHandle = null;
+    _layerLinkOfStartHandle = _layerLinkOfEndHandle = null;
+    lastBaseBlockIndex = -1;
+    lastExtentBlockIndex = -1;
+    lastBaseBlockPos = -1;
+    lastExtentBlockPos = -1;
+  }
+
+  void clearSelection() {
+    _shouldShowSelectionHandle = false;
     lastBaseBlockIndex = -1;
     lastExtentBlockIndex = -1;
     lastBaseBlockPos = -1;
@@ -92,8 +101,8 @@ class SelectionController {
       },
       onPanUpdate: (DragUpdateDetails details) {
         MyLogger.debug('selection handle: drag update');
-        // handle circle has an offset from actual point of text line, depending on start handle or end handle.
-        var globalOffset = details.globalPosition + (type == _HandleType.start? Offset(0, _handleSize): Offset(0, -_handleSize));
+        // Handle circle has an offset from actual point of text line because it is at the bottom of cursor.
+        var globalOffset = details.globalPosition + Offset(0, -_handleSize);
         var modifyType = type == _HandleType.start? _ExtendType.base: _ExtendType.extend;
         updateSelectionByOffset(globalOffset, type: modifyType);
       },
@@ -105,12 +114,7 @@ class SelectionController {
       },
       child: container,
     );
-    Offset offset;
-    if(type == _HandleType.start) {
-      offset = Offset(-_handleSize / 2, -_handleSize);
-    } else {
-      offset = Offset(-_handleSize / 2, 0);
-    }
+    Offset offset = Offset(-_handleSize / 2, 0);
     return OverlayEntry(
       builder: (BuildContext context) {
         var result = CompositedTransformFollower(
@@ -125,56 +129,41 @@ class SelectionController {
   }
 
   void requestCursorAtGlobalOffset(Offset offset) {
-    final document = Controller.instance.document;
-    if(document == null) return;
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
 
-    final block = _findBlockState(document.paragraphs, offset, _ExtendType.extend);
-    if(block == null) return;
+    final blockState = _findBlockState(paragraphs, offset, _ExtendType.extend);
+    if(blockState == null) return;
 
-    final blockId = block.getBlockId();
-    final render = block.getRender();
+    final blockId = blockState.getBlockId();
+    final render = blockState.getRender();
     if(render == null) return;
 
     int index = _getIndexOfBlock(blockId);
     int pos = _getPosFromRender(render, offset);
-    if(lastBaseBlockIndex != -1 && lastExtentBlockIndex != -1) {
-      int startIndex = min(lastBaseBlockIndex, lastExtentBlockIndex);
-      int endIndex = max(lastBaseBlockIndex, lastExtentBlockIndex);
-      for(int idx = startIndex; idx <= endIndex; idx++) {
-        if(idx != index) {
-          // document.paragraphs[idx].clearTextSelection();
-          document.paragraphs[idx].getEditState()?.releaseCursor();
-        }
-      }
-    }
-    lastBaseBlockIndex = index;
-    lastExtentBlockIndex = index;
-    lastBaseBlockPos = pos;
-    lastExtentBlockPos = pos;
-    block.requestCursorAtPosition(pos);
+    _updateSelection(index, pos, index, pos, paragraphs);
+    blockState.requestCursorAtPosition(pos);
   }
 
   void updateSelectionInBlock(String blockId, TextSelection newSelection) {
     var paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
 
-    for(int idx = 0; idx < paragraphs.length; idx++) {
-      if(paragraphs[idx].getBlockId() == blockId) {
-        lastBaseBlockIndex = idx;
-        lastExtentBlockIndex = idx;
-        lastBaseBlockPos = newSelection.baseOffset;
-        lastExtentBlockPos = newSelection.extentOffset;
-        paragraphs[idx].setTextSelection(newSelection);
-        return;
-      }
+    int blockIndex = 0;
+    for(; blockIndex < paragraphs.length; blockIndex++) {
+      if(paragraphs[blockIndex].getBlockId() == blockId) break;
     }
+    if(blockIndex >= paragraphs.length) return;
+    _updateSelection(blockIndex, newSelection.baseOffset, blockIndex, newSelection.extentOffset, paragraphs);
+    var blockState = paragraphs[blockIndex].getEditState();
+    blockState?.requestCursorAtPosition(newSelection.extentOffset);
   }
 
   void updateSelectionByOffset(Offset offset, {_ExtendType type = _ExtendType.extend}) {
-    final document = Controller.instance.document;
-    if(document == null) return;
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
 
-    final block = _findBlockState(document.paragraphs, offset, type);
+    final block = _findBlockState(paragraphs, offset, type);
     final render = block?.getRender();
     if(render != null) {
       final blockId = block!.getBlockId();
@@ -194,13 +183,13 @@ class SelectionController {
           extentBlockPos = pos;
           break;
       }
-      MyLogger.info('efantest: baseBlockIndex=$baseBlockIndex, baseBlockPos=$baseBlockPos, extentBlockIndex=$extentBlockIndex, extentBlockPos=$extentBlockPos');
-      _updateSelection(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos, document);
+      MyLogger.info('updateSelectionByOffset: baseBlockIndex=$baseBlockIndex, baseBlockPos=$baseBlockPos, extentBlockIndex=$extentBlockIndex, extentBlockPos=$extentBlockPos');
+      _updateSelection(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos, paragraphs);
     }
   }
   void updateSelectionByIndexAndPos(int blockIndex, int pos, {_ExtendType type = _ExtendType.extend}) {
-    final document = Controller.instance.document;
-    if(document == null) return;
+    final paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
 
     int baseBlockIndex = lastBaseBlockIndex;
     int baseBlockPos = lastBaseBlockPos;
@@ -216,66 +205,11 @@ class SelectionController {
         extentBlockPos = pos;
         break;
     }
-    _updateSelection(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos, document);
+    _updateSelection(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos, paragraphs);
+    var blockState = paragraphs[blockIndex].getEditState();
+    blockState?.requestCursorAtPosition(pos);
   }
 
-  void _updateSelection(int baseBlockIndex, int baseBlockPos, int extentBlockIndex, int extentBlockPos, Document document) {
-    /// startBlockIndex: minimal block index in selection
-    /// endBlockIndex: maximum block index in selection
-    /// startBlockPos: position in start block
-    /// endBlockPos: position in end block
-    /// * If in the same block, startBlockPos should be the minimal position, and endBlockPos should be the maximum position
-    var (startBlockIndex, startBlockPos) = _getStartIndexAndPos(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos);
-    var (endBlockIndex, endBlockPos) = _getEndIndexAndPos(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos);
-    int startIndex = startBlockIndex;
-    int endIndex = endBlockIndex;
-    if(lastBaseBlockIndex != -1) {
-      startIndex = min(startIndex, lastBaseBlockIndex);
-      endIndex = max(endIndex, lastBaseBlockIndex);
-    }
-    if(lastExtentBlockIndex != -1) {
-      startIndex = min(startIndex, lastExtentBlockIndex);
-      endIndex = max(endIndex, lastExtentBlockIndex);
-    }
-    for(int idx = startIndex; idx <= endIndex; idx++) {
-      /// 1. Clear selection in blocks which are out of range [startBlockIndex, endBlockIndex]
-      /// 2. Set selection in start block to be [startBlockPos, length]
-      /// 3. Set selection in end block to be [0, endBlockPos]
-      /// 4. If start and end block is the same, set the selection to be [startBlockPos, endBlockPos]
-      final node = document.paragraphs[idx];
-      final blockState = node.getEditState();
-      if(blockState == null) continue;
-
-      if(idx < startBlockIndex || idx > endBlockIndex) {
-        blockState.releaseCursor();
-        continue;
-      }
-      int startPos = 0, endPos = document.paragraphs[idx].getPlainText().length;
-      if(idx == startBlockIndex) {
-        startPos = startBlockPos;
-      }
-      if(idx == endBlockIndex) {
-        endPos = endBlockPos;
-      }
-
-      if(idx == extentBlockIndex) {
-        if(endPos == extentBlockPos) {
-          node.setTextSelection(TextSelection(baseOffset: startPos, extentOffset: endPos), isEditing: true);
-        } else {
-          node.setTextSelection(TextSelection(baseOffset: endPos, extentOffset: startPos), isEditing: true);
-        }
-      } else {
-        node.setTextSelection(TextSelection(baseOffset: startPos, extentOffset: endPos), isEditing: false);
-      }
-      node.getEditState()?.getRender()?.markNeedsPaint();
-    }
-    lastBaseBlockIndex = baseBlockIndex;
-    lastBaseBlockPos = baseBlockPos;
-    lastExtentBlockIndex = extentBlockIndex;
-    lastExtentBlockPos = extentBlockPos;
-    CallbackRegistry.refreshTextEditingValue();
-    Controller.instance.selectionController.showTextSelectionHandles();
-  }
   void updateSelectionByPosRange(Offset globalOffset) {
     final controller = Controller.instance;
     final document = controller.document;
@@ -287,18 +221,28 @@ class SelectionController {
     if(render == null) return;
 
     final localOffset = render.globalToLocal(globalOffset);
-    var (startPos, endPos) = blockState.getWordPosRange(localOffset);
+    var (wordStartPos, wordEndPos) = blockState.getWordPosRange(localOffset);
     final blockId = blockState.getBlockId();
-    blockState.requestCursorAtPosition(startPos);
-    if(startPos != endPos) {
-      final node = controller.getBlockDesc(blockId)!;
-      var newTextSelection = node.getTextSelection(extentOffset: endPos)!;
-      node.setTextSelection(newTextSelection);
-      CallbackRegistry.refreshTextEditingValue();
-      var render = blockState.getRender()!;
-      render.markNeedsPaint();
-      Controller.instance.selectionController.showTextSelectionHandles();
+    updateSelectionInBlock(blockId, TextSelection(baseOffset: wordStartPos, extentOffset: wordEndPos));
+    showTextSelectionHandles();
+  }
+
+  String getSelectedContent() {
+    var paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return '';
+
+    var (startBlockIndex, _) = _getStartIndexAndPosFromLastMember();
+    var (endBlockIndex, _) = _getEndIndexAndPosFromLastMember();
+    String result = '';
+    for(int idx = startBlockIndex; idx <= endBlockIndex; idx++) {
+      String plainText = paragraphs[idx].getSelectedPlainText();
+      if(result.isNotEmpty) {
+        result += '\n' + plainText;
+      } else {
+        result = plainText;
+      }
     }
+    return result;
   }
 
   /// Cancel selection and move cursor to the start position
@@ -316,7 +260,7 @@ class SelectionController {
     final paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
 
-    var (startBlockIndex, startBlockPos) = _getStartIndexAndPosFromLastMember();
+    var (startBlockIndex, _) = _getStartIndexAndPosFromLastMember();
     var (endBlockIndex, _) = _getEndIndexAndPosFromLastMember();
     for(int idx = startBlockIndex; idx <= endBlockIndex; idx++) {
       final blockState = paragraphs[idx].getEditState();
@@ -324,9 +268,11 @@ class SelectionController {
         blockState?.releaseCursor();
       }
     }
-    lastBaseBlockIndex = lastExtentBlockIndex = blockIndex;
-    lastBaseBlockPos = lastExtentBlockPos = pos;
-    paragraphs[blockIndex].getEditState()?.requestCursorAtPosition(pos);
+    _updateSelection(blockIndex, pos, blockIndex, pos, paragraphs);
+    // lastBaseBlockIndex = lastExtentBlockIndex = blockIndex;
+    // lastBaseBlockPos = lastExtentBlockPos = pos;
+    var blockState = paragraphs[blockIndex].getEditState();
+    blockState?.requestCursorAtPosition(pos);
   }
 
   bool isCollapsed() {
@@ -343,6 +289,12 @@ class SelectionController {
   void updateLayerLink(LayerLink startHandle, LayerLink endHandle) {
     _layerLinkOfStartHandle = startHandle;
     _layerLinkOfEndHandle = endHandle;
+  }
+  void updateLeaderLayerOfStartHandle(LeaderLayer _layer) {
+    _leaderLayerOfStartHandle = _layer;
+  }
+  void updateLeaderLayerOfEndHandle(LeaderLayer _layer) {
+    _leaderLayerOfEndHandle = _layer;
   }
   void setShouldShowSelectionHandle(bool _b) {
     _shouldShowSelectionHandle = _b;
@@ -384,6 +336,79 @@ class SelectionController {
     }
     lastExtentBlockIndex = lastBaseBlockIndex = startBlockIndex;
     lastExtentBlockPos = lastBaseBlockPos = startBlockPos + newExtentPos;
+  }
+
+  void _updateSelection(int baseBlockIndex, int baseBlockPos, int extentBlockIndex, int extentBlockPos, List<ParagraphDesc> paragraphs) {
+    /// startBlockIndex: minimal block index in selection
+    /// endBlockIndex: maximum block index in selection
+    /// startBlockPos: position in start block
+    /// endBlockPos: position in end block
+    /// * If in the same block, startBlockPos should be the minimal position, and endBlockPos should be the maximum position
+    var (startBlockIndex, startBlockPos) = _getStartIndexAndPos(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos);
+    var (endBlockIndex, endBlockPos) = _getEndIndexAndPos(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos);
+    int startIndex = startBlockIndex;
+    int endIndex = endBlockIndex;
+    if(lastBaseBlockIndex != -1) {
+      startIndex = min(startIndex, lastBaseBlockIndex);
+      endIndex = max(endIndex, lastBaseBlockIndex);
+    }
+    if(lastExtentBlockIndex != -1) {
+      startIndex = min(startIndex, lastExtentBlockIndex);
+      endIndex = max(endIndex, lastExtentBlockIndex);
+    }
+    // Clear selection first
+    for(int idx = startIndex; idx <= endIndex; idx++) {
+      /// 1. Clear selection in blocks which are out of range [startBlockIndex, endBlockIndex]
+      /// 2. Set selection in start block to be [startBlockPos, length]
+      /// 3. Set selection in end block to be [0, endBlockPos]
+      /// 4. If start and end block is the same, set the selection to be [startBlockPos, endBlockPos]
+      final node = paragraphs[idx];
+      if(idx < startBlockIndex || idx > endBlockIndex) {
+        node.getEditState()?.releaseCursor();
+        continue;
+      }
+      int startPos = 0, endPos = paragraphs[idx].getPlainText().length;
+      if(idx == startBlockIndex) {
+        startPos = startBlockPos;
+      }
+      if(idx == endBlockIndex) {
+        endPos = endBlockPos;
+      }
+
+      bool showBaseLeader = false;
+      bool showExtentLeader = false;
+      bool isEditing = false;
+      int basePos = startPos;
+      int extentPos = endPos;
+      if(idx == baseBlockIndex) {
+        showBaseLeader = true;
+        if(startPos != baseBlockPos) {
+          basePos = endPos;
+          extentPos = startPos;
+        }
+      }
+      if(idx == extentBlockIndex) {
+        showExtentLeader = true;
+        isEditing = true;
+        if(endPos != extentBlockPos) {
+          basePos = endPos;
+          extentPos = startPos;
+        }
+      }
+      node.setTextSelection(
+          TextSelection(baseOffset: basePos, extentOffset: extentPos),
+          isEditing: isEditing,
+          showBaseLeader: showBaseLeader,
+          showExtentLeader: showExtentLeader
+      );
+      node.getEditState()?.getRender()?.markNeedsPaint();
+    }
+    lastBaseBlockIndex = baseBlockIndex;
+    lastBaseBlockPos = baseBlockPos;
+    lastExtentBlockIndex = extentBlockIndex;
+    lastExtentBlockPos = extentBlockPos;
+    CallbackRegistry.refreshTextEditingValue();
+    Controller.instance.selectionController.showTextSelectionHandles();
   }
 
   /// Find which block contains the globalPosition
