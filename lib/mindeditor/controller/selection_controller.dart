@@ -1,40 +1,30 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block_impl.dart';
 import 'package:my_log/my_log.dart';
 import '../view/edit_cursor.dart';
+import '../view/selection_handle_layer.dart';
 import 'callback_registry.dart';
 import 'controller.dart';
 
 class SelectionController {
-  LayerLink? _layerLinkOfStartHandle;
-  LayerLink? _layerLinkOfEndHandle;
-  LeaderLayer? _leaderLayerOfStartHandle;
-  LeaderLayer? _leaderLayerOfEndHandle;
-  BuildContext? _context;
-  OverlayEntry? _handleOfStart;
-  OverlayEntry? _handleOfEnd;
   bool _shouldShowSelectionHandle = false;
   int lastBaseBlockIndex = -1;
   int lastExtentBlockIndex = -1;
   int lastBaseBlockPos = -1;
   int lastExtentBlockPos = -1;
   EditCursor? _editCursor;
+  Offset baseHandleOffset = Offset.zero;
+  Offset extentHandleOffset = Offset.zero;
+  final SelectionHandleLayer _selectionHandleLayer = SelectionHandleLayer();
 
   void dispose() {
-    _editCursor?.stopCursor();
+    _selectionHandleLayer.dispose();
+    clearSelection();
+    releaseCursor();
     _editCursor = null;
-    hideTextSelectionHandles();
-    _context = null;
-    _shouldShowSelectionHandle = false;
-    _layerLinkOfStartHandle = _layerLinkOfEndHandle = null;
-    lastBaseBlockIndex = -1;
-    lastExtentBlockIndex = -1;
-    lastBaseBlockPos = -1;
-    lastExtentBlockPos = -1;
   }
 
   void clearSelection() {
@@ -44,10 +34,9 @@ class SelectionController {
     lastExtentBlockIndex = -1;
     lastBaseBlockPos = -1;
     lastExtentBlockPos = -1;
+    baseHandleOffset = Offset.zero;
+    extentHandleOffset = Offset.zero;
   }
-
-  LayerLink? getLayerLinkOfStartHandle() => _layerLinkOfStartHandle;
-  LayerLink? getLayerLinkOfEndHandle() => _layerLinkOfEndHandle;
 
   EditCursor getCursor() {
     _editCursor ??= EditCursor(timeoutFunc: _refreshCursor);
@@ -57,99 +46,15 @@ class SelectionController {
     getCursor().resetCursor();
   }
   void releaseCursor() {
-    getCursor().stopCursor();
+    _editCursor?.stopCursor();
     _releaseCursor();
-  }
-
-  void showTextSelectionHandles() {
-    if(!_shouldShowSelectionHandle) {
-      return;
-    }
-    if(_context == null || _handleOfStart != null || _handleOfEnd != null) { // No context or already displayed handles
-      return;
-    }
-    if(_layerLinkOfStartHandle == null || _layerLinkOfEndHandle == null) {
-      return;
-    }
-    MyLogger.info('SelectionController: add selection overlay handle');
-    double _handleSize = 22;
-    _handleOfStart = _buildStartHandle(_handleSize);
-    _handleOfEnd = _buildEndHandle(_handleSize);
-    Overlay.of(_context!).insert(_handleOfStart!);
-    Overlay.of(_context!).insert(_handleOfEnd!);
-  }
-  void hideTextSelectionHandles() {
-    if(_handleOfStart != null) {
-      _handleOfStart!.remove();
-      _handleOfStart!.dispose();
-      _handleOfStart = null;
-    }
-    if(_handleOfEnd != null) {
-      _handleOfEnd!.remove();
-      _handleOfEnd!.dispose();
-      _handleOfEnd = null;
-    }
-    lastBaseBlockIndex = -1;
-    lastExtentBlockIndex = -1;
-    lastBaseBlockPos = -1;
-    lastExtentBlockPos = -1;
-  }
-
-  OverlayEntry _buildStartHandle(double _handleSize) {
-    return _buildHandle(_handleSize, _layerLinkOfStartHandle!, _HandleType.start);
-  }
-  OverlayEntry _buildEndHandle(double _handleSize) {
-    return _buildHandle(_handleSize, _layerLinkOfEndHandle!, _HandleType.end);
-  }
-  OverlayEntry _buildHandle(double _handleSize, LayerLink _link, _HandleType type) {
-    var container = Container(
-      alignment: Alignment.topLeft,
-      child: SizedBox(
-        width: _handleSize,
-        height: _handleSize,
-        child: CustomPaint(
-          painter: _HandlePainter(),
-        ),
-      ),
-    );
-    var gesture = GestureDetector(
-      onPanStart: (DragStartDetails details) {
-        MyLogger.info('selection handle: drag start');
-      },
-      onPanUpdate: (DragUpdateDetails details) {
-        MyLogger.debug('selection handle: drag update');
-        // Handle circle has an offset from actual point of text line because it is at the bottom of cursor.
-        var globalOffset = details.globalPosition + Offset(0, -_handleSize);
-        var modifyType = type == _HandleType.start? _ExtendType.base: _ExtendType.extend;
-        updateSelectionByOffset(globalOffset, type: modifyType);
-      },
-      onPanEnd: (DragEndDetails details) {
-        MyLogger.info('selection handle: drag end');
-      },
-      onPanCancel: () {
-        MyLogger.info('selection handle: drag cancel');
-      },
-      child: container,
-    );
-    Offset offset = Offset(-_handleSize / 2, 0);
-    return OverlayEntry(
-      builder: (BuildContext context) {
-        var result = CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          offset: offset,
-          child: gesture,
-        );
-        return result;
-      },
-    );
   }
 
   void requestCursorAtGlobalOffset(Offset offset) {
     final paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
 
-    final blockState = _findBlockState(paragraphs, offset, _ExtendType.extend);
+    final blockState = _findBlockState(paragraphs, offset, SelectionExtentType.extent);
     if(blockState == null) return;
 
     final blockId = blockState.getBlockId();
@@ -176,7 +81,7 @@ class SelectionController {
     blockState?.requestCursorAtPosition(newSelection.extentOffset);
   }
 
-  void updateSelectionByOffset(Offset offset, {_ExtendType type = _ExtendType.extend}) {
+  void updateSelectionByOffset(Offset offset, {SelectionExtentType type = SelectionExtentType.extent}) {
     final paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
 
@@ -191,11 +96,11 @@ class SelectionController {
       int extentBlockIndex = lastExtentBlockIndex;
       int extentBlockPos = lastExtentBlockPos;
       switch(type) {
-        case _ExtendType.base:
+        case SelectionExtentType.base:
           baseBlockIndex = index;
           baseBlockPos = pos;
           break;
-        case _ExtendType.extend:
+        case SelectionExtentType.extent:
           extentBlockIndex = index;
           extentBlockPos = pos;
           break;
@@ -204,7 +109,7 @@ class SelectionController {
       _updateSelection(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos, paragraphs);
     }
   }
-  void updateSelectionByIndexAndPos(int blockIndex, int pos, {_ExtendType type = _ExtendType.extend}) {
+  void updateSelectionByIndexAndPos(int blockIndex, int pos, {SelectionExtentType type = SelectionExtentType.extent}) {
     final paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
 
@@ -213,11 +118,11 @@ class SelectionController {
     int extentBlockIndex = lastExtentBlockIndex;
     int extentBlockPos = lastExtentBlockPos;
     switch(type) {
-      case _ExtendType.base:
+      case SelectionExtentType.base:
         baseBlockIndex = blockIndex;
         baseBlockPos = pos;
         break;
-      case _ExtendType.extend:
+      case SelectionExtentType.extent:
         extentBlockIndex = blockIndex;
         extentBlockPos = pos;
         break;
@@ -232,7 +137,7 @@ class SelectionController {
     final document = controller.document;
     if(document == null) return;
 
-    final blockState = _findBlockState(document.paragraphs, globalOffset, _ExtendType.extend);
+    final blockState = _findBlockState(document.paragraphs, globalOffset, SelectionExtentType.extent);
     if(blockState == null) return;
     final render = blockState.getRender();
     if(render == null) return;
@@ -241,7 +146,7 @@ class SelectionController {
     var (wordStartPos, wordEndPos) = blockState.getWordPosRange(localOffset);
     final blockId = blockState.getBlockId();
     updateSelectionInBlock(blockId, TextSelection(baseOffset: wordStartPos, extentOffset: wordEndPos));
-    showTextSelectionHandles();
+    // _showOrHideSelectionHandles();
   }
 
   String getSelectedContent() {
@@ -286,8 +191,6 @@ class SelectionController {
       }
     }
     _updateSelection(blockIndex, pos, blockIndex, pos, paragraphs);
-    // lastBaseBlockIndex = lastExtentBlockIndex = blockIndex;
-    // lastBaseBlockPos = lastExtentBlockPos = pos;
     var blockState = paragraphs[blockIndex].getEditState();
     blockState?.requestCursorAtPosition(pos);
   }
@@ -301,17 +204,13 @@ class SelectionController {
 
   // Setters
   void updateContext(BuildContext context) {
-    _context = context;
+    _selectionHandleLayer.updateContext(context);
   }
-  void updateLayerLink(LayerLink startHandle, LayerLink endHandle) {
-    _layerLinkOfStartHandle = startHandle;
-    _layerLinkOfEndHandle = endHandle;
+  void updateBaseHandlePoint(Offset offset) {
+    _selectionHandleLayer.updateBaseHandleOffset(offset);
   }
-  void updateLeaderLayerOfStartHandle(LeaderLayer _layer) {
-    _leaderLayerOfStartHandle = _layer;
-  }
-  void updateLeaderLayerOfEndHandle(LeaderLayer _layer) {
-    _leaderLayerOfEndHandle = _layer;
+  void updateExtentHandlePoint(Offset offset) {
+    _selectionHandleLayer.updateExtentHandleOffset(offset);
   }
   void setShouldShowSelectionHandle(bool _b) {
     _shouldShowSelectionHandle = _b;
@@ -428,6 +327,8 @@ class SelectionController {
           basePos = endPos;
           extentPos = startPos;
         }
+        // final globalOffsetOfBaseHandle = node.getEditState()?.getRender()?.getGlobalOffsetOfNthCharacterBottom(basePos);
+        // _selectionHandleLayer.updateBaseHandleOffset(globalOffsetOfBaseHandle);
       }
       if(idx == extentBlockIndex) {
         showExtentLeader = true;
@@ -436,12 +337,14 @@ class SelectionController {
           basePos = endPos;
           extentPos = startPos;
         }
+        // final globalOffsetOfExtentHandle = node.getEditState()?.getRender()?.getGlobalOffsetOfNthCharacterBottom(extentPos);
+        // _selectionHandleLayer.updateExtentHandleOffset(globalOffsetOfExtentHandle);
       }
       node.setTextSelection(
-          TextSelection(baseOffset: basePos, extentOffset: extentPos),
-          isEditing: isEditing,
-          showBaseLeader: showBaseLeader,
-          showExtentLeader: showExtentLeader
+        TextSelection(baseOffset: basePos, extentOffset: extentPos),
+        isEditing: isEditing,
+        showBaseLeader: showBaseLeader,
+        showExtentLeader: showExtentLeader
       );
       node.getEditState()?.getRender()?.markNeedsPaint();
     }
@@ -451,7 +354,7 @@ class SelectionController {
     lastExtentBlockPos = extentBlockPos;
     CallbackRegistry.refreshTextEditingValue();
     resetCursor();
-    Controller.instance.selectionController.showTextSelectionHandles();
+    _showOrHideSelectionHandles();
   }
 
   /// Find which block contains the globalPosition
@@ -467,7 +370,7 @@ class SelectionController {
   ///   2.1 If the type is base, that means we should return block 2
   ///   2.2 If the type is extend, that means we should return block 1
   ///   * block 1 or block 2 could be null when the position is at the edge
-  MindEditBlockState? _findBlockState(List<ParagraphDesc> paragraphs, Offset globalPosition, _ExtendType type) {
+  MindEditBlockState? _findBlockState(List<ParagraphDesc> paragraphs, Offset globalPosition, SelectionExtentType type) {
     ParagraphDesc? lastPara;
     for(var para in paragraphs) {
       final state = para.getEditState();
@@ -484,7 +387,7 @@ class SelectionController {
       }
 
       if(box.top > globalPosition.dy) {
-        if(type == _ExtendType.base) {
+        if(type == SelectionExtentType.base) {
           return state; // Case 2.1
         } else {
           return lastPara?.getEditState(); // Case 2.2
@@ -493,6 +396,16 @@ class SelectionController {
       lastPara = para;
     }
     return lastPara?.getEditState(); // Case 2.1 or 2.2
+  }
+
+  void _showOrHideSelectionHandles() {
+    if(_shouldShowSelectionHandle && !isCollapsed()) {
+      _selectionHandleLayer.showTextSelectionHandles();
+    } else {
+      if(!_selectionHandleLayer.isDragging()) {
+        _selectionHandleLayer.hide();
+      }
+    }
   }
 
   int _getPosFromRender(MindBlockImplRenderObject render, Offset offset) {
@@ -538,32 +451,7 @@ class SelectionController {
   }
 }
 
-enum _ExtendType {
+enum SelectionExtentType {
   base,
-  extend,
-}
-
-enum _HandleType {
-  start,
-  end,
-}
-
-class _HandlePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    Paint paint = Paint();
-    paint.color = Colors.blueAccent;
-    paint.style = PaintingStyle.fill;
-    paint.strokeCap = StrokeCap.round;
-    paint.strokeJoin = StrokeJoin.round;
-
-    var radius = size.width * 0.5;
-    Offset offset = Offset(radius, radius);
-    canvas.drawCircle(offset, radius, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
-  }
+  extent,
 }

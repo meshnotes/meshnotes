@@ -34,8 +34,6 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   TextEditingValue? _lastEditingValue;
   Rect? _currentSize;
   ScrollController controller = ScrollController();
-  final LayerLink _startHandle = LayerLink();
-  final LayerLink _endHandle = LayerLink();
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -46,13 +44,12 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     super.initState();
     initDocAndControlBlock();
     CallbackRegistry.registerEditFieldState(this);
-    widget.controller.selectionController.updateLayerLink(_startHandle, _endHandle);
     _attachFocus();
   }
 
   @override
   Widget build(BuildContext context) {
-    MyLogger.debug('efantest: build block list');
+    MyLogger.info('MindEditFieldState: build block list');
     widget.controller.selectionController.updateContext(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final render = context.findRenderObject()! as RenderBox;

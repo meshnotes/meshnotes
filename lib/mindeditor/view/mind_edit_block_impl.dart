@@ -1,4 +1,3 @@
-import 'package:flutter/rendering.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
@@ -232,6 +231,7 @@ class MindBlockImplRenderObject extends RenderBox {
     } else {
       paragraph.paint(context, offset);
     }
+    _tryToUpdateHandleOffset(baseOffsetRect, currentCursorRect);
     // Try to draw leader layer if needed
     // _tryToDrawLeaderLayer(context, baseOffsetRect, currentCursorRect, offset);
   }
@@ -263,36 +263,20 @@ class MindBlockImplRenderObject extends RenderBox {
     Offset to = endPos.translate(0, height) + offset;
     canvas.drawLine(from, to, paint);
   }
-  void _tryToDrawLeaderLayer(PaintingContext context, Rect? baseRect, Rect? extentRect, Offset offset) {
-    // Add start handle layer if needed, which is linked with CompositedTransformFollower by linkOfStartHandle
+  void _tryToUpdateHandleOffset(Rect? baseRect, Rect? extentRect) {
     if(texts.showBaseLeader() && baseRect != null) {
-      var linkOfStartHandle = controller.selectionController.getLayerLinkOfStartHandle();
-      if (linkOfStartHandle == null) {
-        return;
-      }
-      var startPoint = Offset(baseRect.left, baseRect.bottom);
-      var leaderLayer = LeaderLayer(link: linkOfStartHandle, offset: startPoint + offset);
-      controller.selectionController.updateLeaderLayerOfStartHandle(leaderLayer);
-      context.pushLayer(
-        leaderLayer,
-        super.paint,
-        Offset.zero,
-      );
+      var basePoint = Offset(baseRect.left, baseRect.bottom);
+      var globalPoint = localToGlobal(basePoint);
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        controller.selectionController.updateBaseHandlePoint(globalPoint);
+      });
     }
-    // Add end handle layer if needed, which is linked with CompositedTransformFollower by linkOfEndHandle
     if(texts.showExtentLeader() && extentRect != null) {
-      var linkOfEndHandle = controller.selectionController.getLayerLinkOfEndHandle();
-      if (linkOfEndHandle == null) {
-        return;
-      }
-      var endPoint = Offset(extentRect.right, extentRect.bottom);
-      var leaderLayer = LeaderLayer(link: linkOfEndHandle, offset: endPoint + offset);
-      controller.selectionController.updateLeaderLayerOfEndHandle(leaderLayer);
-      context.pushLayer(
-        leaderLayer,
-        super.paint,
-        Offset.zero,
-      );
+      var extentPoint = Offset(extentRect.left, extentRect.bottom);
+      var globalPoint = localToGlobal(extentPoint);
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        controller.selectionController.updateExtentHandlePoint(globalPoint);
+      });
     }
   }
 
@@ -332,19 +316,26 @@ class MindBlockImplRenderObject extends RenderBox {
   //   }
   // }
 
-  Offset _convertOffsetFromPosition(TextPosition pos) {
-    var canvasRect = Rect.fromLTWH(0, 0, size.width, size.height);
-    var offset = paragraph.getOffsetForCaret(pos, canvasRect);
-    return offset;
-  }
 
   Offset getOffsetOfNthCharacter(int num) {
     var textPosition = TextPosition(offset: num);
     return _calcOffsetOfTextPosition(textPosition);
   }
+  /// Only for calculating selection handles
+  Offset getGlobalOffsetOfNthCharacterBottom(int num) {
+    final textPosition = TextPosition(offset: num);
+    final offset = _convertOffsetFromPosition(textPosition);
+    final bottomOffset = Offset(offset.dx, offset.dy + fontSize);
+    return localToGlobal(bottomOffset);
+  }
   Offset _calcOffsetOfTextPosition(TextPosition pos) {
     var offset = _convertOffsetFromPosition(pos);
     return Offset(offset.dx, offset.dy + fontSize / 2); // 稍微偏下一点，不然会定位到上一行的位置
+  }
+  Offset _convertOffsetFromPosition(TextPosition pos) {
+    var canvasRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    var offset = paragraph.getOffsetForCaret(pos, canvasRect);
+    return offset;
   }
 
   void redraw() {
