@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_log/my_log.dart';
+import 'view_helper.dart' as helper;
 import '../document/paragraph_desc.dart';
 
 class MindEditField extends StatefulWidget {
@@ -374,11 +375,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       refreshTextEditingValue();
       return;
     }
-    var controller = widget.controller;
     final oldEditingValue = _lastEditingValue!;
     _lastEditingValue = value;
-    var currentBlock = controller.getEditingBlockState();
-    currentBlock?.updateAndSaveText(oldEditingValue, value, sameText);
+    _updateAndSaveText(oldEditingValue, value, sameText);
   }
 
   @override
@@ -413,6 +412,12 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       }
     });
   }
+  void refreshDocWithoutBlockState(String blockId, int position) {
+    setState(() {
+      initDocAndControlBlock();
+      widget.controller.selectionController.updateSelectionWithoutBlockState(blockId, TextSelection(baseOffset: position, extentOffset: position));
+    });
+  }
 
   @override
   void didChangeInputControl(TextInputControl? oldControl, TextInputControl? newControl) {
@@ -430,5 +435,106 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   void insertContent(KeyboardInsertedContent content) {
     // TODO: implement insertContent
     MyLogger.info('efantest insertContent() called');
+  }
+
+  void _updateAndSaveText(TextEditingValue oldValue, TextEditingValue newValue, bool sameText) {
+    MyLogger.verbose('MindEditFieldState: Save $newValue to $oldValue with parameter $sameText');
+    var controller = widget.controller;
+    var currentBlock = controller.getEditingBlockState()!;
+    var block = currentBlock.widget.texts;
+    final _render = currentBlock.getRender()!;
+    // If text is same, only need to modify cursor and selection
+    if(sameText) {
+      MyLogger.warn('_updateAndSaveText: same Text');
+      // block.setTextSelection(newValue.selection);
+      // _render.markNeedsPaint();
+      return;
+    }
+
+    // How to update texts given oldValue and newValue:
+    // 1. Find the first different character from left hand side, remember left same count as leftCount
+    // 2. Find the first different character from right hand side, remember right same count as rightCount
+    // 3. Characters from leftCount to (length-rightCount) in the oldValue are to be deleted(as deleteFrom and deleteTo)
+    // 4. Characters from leftCount to (length-rightCount) in the newValue are to be inserted(as insertStr)
+    //
+    // Shown as the following diagram
+    //           leftCount    rightCount
+    //                 |       |
+    //                 v       v
+    // old string: abcdefghijklmn
+    // new string: abcd123456mn
+    //                ^     ^
+    //                |     |
+    //         leftCount    rightCount
+
+    var oldText = oldValue.text;
+    var newText = newValue.text;
+    // Find the same part in oldValue and newValue
+    var leftCount = helper.findLeftDifferent(oldText, newText, newValue.selection.extentOffset - 1);
+    // Find the same part in newValue. But never exceed newValue.selection.extentOffset, because this position is newly edited
+    var rightCount = helper.findRightDifferent(oldText, newText, newValue.selection.extentOffset);
+    MyLogger.verbose('_updateAndSaveText: oldText=($oldText), newText=($newText)');
+    MyLogger.verbose('_updateAndSaveText: leftCount=$leftCount, rightCount=$rightCount');
+    // Find the positions deleteFrom and deleteTo, and find the insertStr
+    var deleteFrom = leftCount;
+    var deleteTo = oldText.length - rightCount;
+    MyLogger.verbose('_updateAndSaveText: deleteFrom=$deleteFrom');
+    var insertFrom = leftCount;
+    var insertTo = newText.length - rightCount;
+    var insertStr = (insertTo > insertFrom)? newText.substring(insertFrom, insertTo): '';
+    MyLogger.verbose('_updateAndSaveText: insertFrom=$insertFrom, insertTo=$insertTo, insertStr=$insertStr');
+
+    // Split insertStr to handle every line separately
+    insertStr = insertStr.replaceAll('\r', '');
+    var insertStrWithoutNewline = insertStr.split('\n');
+    if(insertStrWithoutNewline.isEmpty) return;
+
+    // If the string is inserted exactly between two TextSpan, the affinity decides the string is in left TextSpan or in the right one:
+    // 1. affinity is upstream, in the left TextSpan
+    // 2. affinity is downstream, in the right TextSpan
+    final affinity = newValue.selection.affinity;
+
+    // For the first line, replace the editing block directly
+    final firstLine = insertStrWithoutNewline[0];
+    final lineCount = insertStrWithoutNewline.length;
+    currentBlock.replaceText(deleteFrom, deleteTo, firstLine, affinity);
+
+    final selectionController = widget.controller.selectionController;
+    if(lineCount <= 1) {
+      // If there is no '\n' in the inserted string, just clear previously selected content
+      if(selectionController.isInSingleBlock()) {
+        selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection);
+      } else {
+        selectionController.deleteSelectedContent(isExtentEditing: true, newExtentPos: newValue.selection.extentOffset);
+      }
+    } else {
+      // If there are '\n' in the inserted string, delete all selected contents with different parameter
+      int newExtentOffset = deleteFrom + firstLine.length;
+      if(selectionController.isInSingleBlock()) {
+        selectionController.updateSelectionInBlock(
+          block.getBlockId(),
+          newValue.selection.copyWith(baseOffset: newExtentOffset, extentOffset: newExtentOffset),
+        );
+      } else {
+        selectionController.deleteSelectedContent(isExtentEditing: true, newExtentPos: newExtentOffset);
+      }
+      // Insert last line and spawn a nwe line
+      final lastLine = insertStrWithoutNewline[lineCount - 1];
+      var newBlockState = controller.getEditingBlockState()!;
+      int currentCursorPosition = selectionController.lastExtentBlockPos;
+      newBlockState.replaceText(currentCursorPosition, currentCursorPosition, lastLine, affinity);
+      String newBlockId = newBlockState.spawnNewLineAtOffset(currentCursorPosition);
+      // Locate the cursor in the last line of inserted string.
+      // We don't have the MindEditBlockState at this time, so could not use refreshDoc directly, which depends on MindEditBlockState
+      refreshDocWithoutBlockState(newBlockId, lastLine.length);
+      // Insert line 1~n-1
+      if(lineCount >= 3) {
+        newBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
+      }
+    }
+
+    selectionController.resetCursor();
+    _render.updateParagraph();
+    _render.markNeedsLayout();
   }
 }

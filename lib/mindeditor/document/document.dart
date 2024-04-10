@@ -129,6 +129,33 @@ class Document {
     _lastUpdate = Util.getTimeStamp();
     return newItem;
   }
+  //TODO merge with the previous function
+  ParagraphDesc insertNewParagraphsAfterId(String _id, List<ParagraphDesc> newItems) {
+    int idx;
+    for(idx = 0; idx < paragraphs.length; idx++) {
+      if(paragraphs[idx].getBlockId() == _id) {
+        break;
+      }
+    }
+    //TODO could be optimized here, reduce IO
+    for(var item in newItems) {
+      item.setDocDesc(this);
+      paragraphs[idx].setNext(item);
+      paragraphs[idx].flushDb();
+      item.setPrevious(paragraphs[idx]);
+      if(idx < paragraphs.length - 1) {
+        paragraphs[idx + 1].setPrevious(item);
+        item.setNext(paragraphs[idx + 1]);
+      }
+      item.flushDb();
+      paragraphs.insert(idx + 1, item);
+      _mapOfParagraphs[item.getBlockId()] = item;
+      idx++;
+    }
+    _flushDocStructure();
+    _lastUpdate = Util.getTimeStamp();
+    return newItems[0];
+  }
 
   void removeParagraph(String _id) {
     var para = getParagraph(_id);

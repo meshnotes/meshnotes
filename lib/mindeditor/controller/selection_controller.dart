@@ -80,6 +80,22 @@ class SelectionController {
     var blockState = paragraphs[blockIndex].getEditState();
     blockState?.requestCursorAtPosition(newSelection.extentOffset);
   }
+  /// Only use when there's no corresponding MindEditBlockState yet.
+  /// This scenario is only happened in editing or pasting multi-line texts.
+  void updateSelectionWithoutBlockState(String blockId, TextSelection newSelection) {
+    var paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+
+    int blockIndex = 0;
+    for(; blockIndex < paragraphs.length; blockIndex++) {
+      if(paragraphs[blockIndex].getBlockId() == blockId) break;
+    }
+    if(blockIndex >= paragraphs.length) return;
+    _updateSelection(blockIndex, newSelection.baseOffset, blockIndex, newSelection.extentOffset, paragraphs);
+    Controller.instance.setEditingBlockId(blockId);
+    resetCursor();
+    CallbackRegistry.requestKeyboard();
+  }
 
   void updateSelectionByOffset(Offset offset, {SelectionExtentType type = SelectionExtentType.extent}) {
     final paragraphs = Controller.instance.document?.paragraphs;
@@ -233,6 +249,8 @@ class SelectionController {
       if(idx != lastBaseBlockIndex && idx != lastExtentBlockIndex) {
         toBeRemove.add(paragraphs[idx].getBlockId());
       } else {
+        // If isExtentEditing is true, that means this method is invoked from _updateAndSaveText() method.
+        // So leave the extent block, because it will be handled in _updateAndSaveText() method.
         if(idx != lastExtentBlockIndex || !isExtentEditing) {
           blockState?.deleteSelection();
         }
@@ -249,6 +267,7 @@ class SelectionController {
     }
     if(lastBaseBlockIndex != lastExtentBlockIndex) {
       CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: startBlockPos + newExtentPos);
+      Controller.instance.setEditingBlockId(startBlockId);
     }
     lastExtentBlockIndex = lastBaseBlockIndex = startBlockIndex;
     lastExtentBlockPos = lastBaseBlockPos = startBlockPos + newExtentPos;

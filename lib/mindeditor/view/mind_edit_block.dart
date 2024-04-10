@@ -1,6 +1,5 @@
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/view/view_helper.dart' as helper;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
@@ -282,49 +281,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     );
   }
 
-  void updateAndSaveText(TextEditingValue oldValue, TextEditingValue newValue, bool sameText) {
-    MyLogger.verbose('efantest: Save $newValue to $oldValue with parameter $sameText');
-    var block = widget.texts;
-    if(block.getTextSelection() == null) {
-      MyLogger.debug('Unbelievable!!! updateAndSaveText(): getTextSelection returns null!');
-      return;
-    }
-    // 如果文本相同，只需要修改光标和选区
-    if(sameText) {
-      MyLogger.warn('efantest: same Text');
-      block.setTextSelection(newValue.selection);
-      _render!.markNeedsPaint();
-      return;
-    }
-
-    // 如果文本不同，需要更新文本。更新的方法是：
-    // 1）从左开始找到第一个不同的位置leftCount
-    // 2）从右开始找到第一个不同的位置rightCount
-    // 3）原字符串中的leftCount到length - rightCount，是被删除的部分
-    // 4）新字符串中的leftCount到length - rightCount，是要添加的部分
-    // 5）新增部分的样式，跟随左边的TextSpan还是右边的TextSpan，由TextSelection.affinity决定
-    // 5.1）对于upstream，跟随左边
-    // 5.2）对于downstream,跟随右边
-
-    var oldText = oldValue.text;
-    var newText = newValue.text;
-    // 对于左半部分，oldValue和newValue都是一样的
-    var leftCount = helper.findLeftDifferent(oldText, newText, newValue.selection.extentOffset - 1);
-    // 对于右半部分，当到达newValue.selection.extentOffset时，无论如何都要停，因为这个位置一定是新编辑的
-    var rightCount = helper.findRightDifferent(oldText, newText, newValue.selection.extentOffset);
-    MyLogger.verbose('efantest: oldText=($oldText), newText=($newText)');
-    MyLogger.verbose('efantest: leftCount=$leftCount, rightCount=$rightCount');
-    // 找到左部分的最后一个TextSpan
-    var deleteFrom = leftCount;
-    var deleteTo = oldText.length - rightCount;
-    var deleteCount = deleteTo - deleteFrom;
-    MyLogger.verbose('efantest: deleteFrom=$deleteFrom, deleteCount=$deleteCount');
-    var insertFrom = leftCount;
-    var insertTo = newText.length - rightCount;
-    MyLogger.verbose('efantest: insertFrom=$insertFrom, insertTo=$insertTo');
-    // 需要插入的新字符串
-    var insertStr = (insertTo > insertFrom)? newText.substring(insertFrom, insertTo): "";
-    MyLogger.verbose('efantest: insertStr=$insertStr');
+  void replaceText(int deleteFrom, int deleteTo, String insertStr, TextAffinity affinity) {
+    int deleteCount = deleteTo - deleteFrom;
     var texts = widget.texts.getTextsClone();
     int idx;
     for(idx = 0; idx < texts.length; idx++) {
@@ -333,71 +291,55 @@ class MindEditBlockState extends State<MindEditBlock> {
       }
       deleteFrom -= texts[idx].text.length;
     }
-    MyLogger.verbose('efantest: idx=$idx, deleteFrom=$deleteFrom');
+    MyLogger.verbose('replaceText: idx=$idx, deleteFrom=$deleteFrom');
     var leftIdx = idx;
-    // 从texts[idx].text的第deleteFrom个字符开始，一直删除deleteCount个字符
+    // Delete deleteCount texts from deleteFrom in texts[idx].text
     while(deleteCount > 0) {
       var len = texts[idx].text.length;
       var remaining = len - deleteFrom;
-      MyLogger.verbose('efantest: len=$len, remaining=$remaining');
+      MyLogger.verbose('replaceText: len=$len, remaining=$remaining');
       if(deleteCount > remaining) {
         texts[idx].text = texts[idx].text.substring(0, deleteFrom);
-        MyLogger.verbose('efantest: In 1, deleteFrom=$deleteFrom, new text=${texts[idx].text}');
+        MyLogger.verbose('replaceText: In 1, deleteFrom=$deleteFrom, new text=${texts[idx].text}');
         if(texts[idx].text.isEmpty) {
           texts.removeAt(idx); // TODO 这里如果把最后一个TextDesc删除掉，可能会有bug
-          MyLogger.verbose('efantest: remove index $idx, remains=$texts, new length=${texts.length}');
+          MyLogger.verbose('replaceText: remove index $idx, remains=$texts, new length=${texts.length}');
         } else {
           idx++;
         }
         deleteCount -= remaining;
         deleteFrom = 0;
-        MyLogger.verbose('efantest: Now deleteCount=$deleteCount, deleteFrom=$deleteFrom');
+        MyLogger.verbose('replaceText: Now deleteCount=$deleteCount, deleteFrom=$deleteFrom');
       } else {
         var leftPart = texts[idx].text.substring(0, deleteFrom);
         var rightPart = texts[idx].text.substring(deleteFrom + deleteCount);
         texts[idx].text = leftPart + rightPart;
-        MyLogger.verbose('efantest: In 2, deleteFrom=$deleteFrom, new text=${texts[idx].text}');
+        MyLogger.verbose('replaceText: In 2, deleteFrom=$deleteFrom, new text=${texts[idx].text}');
         deleteCount = 0;
       }
     }
 
     if(insertStr.isNotEmpty && insertStr != '\n') {
-      // 如果替换是在同一个text span下，直接在这里插入。否则需要根据TextAffinity来决定新字符串应该在哪个TextSpan
+      // If the deleted text does not cross TextSpan, then insert the insertStr directly in this position.
+      // Otherwise, use affinity to decide in which TextSpan the insertStr is inserted.
       if(leftIdx == idx) {
         var leftPart = texts[idx].text.substring(0, deleteFrom);
         var rightPart = texts[idx].text.substring(deleteFrom);
         texts[idx].text = leftPart + insertStr + rightPart;
-        MyLogger.verbose('efantest: In the same text span, new text=${texts[idx].text}');
+        MyLogger.verbose('replaceText: In the same text span, new text=${texts[idx].text}');
       } else {
-        if(newValue.selection.affinity == TextAffinity.upstream) {
+        if(affinity == TextAffinity.upstream) {
           texts[leftIdx].text = texts[leftIdx].text + insertStr;
-          MyLogger.verbose(
-              'efantest: affinity upstream, new text=${texts[leftIdx].text}');
+          MyLogger.verbose('replaceText: affinity upstream, new text=${texts[leftIdx].text}');
         } else {
           texts[idx].text = insertStr + texts[idx].text;
-          MyLogger.verbose(
-              'efantest: affinity downstream, new text=${texts[idx].text}');
+          MyLogger.verbose('replaceText: affinity downstream, new text=${texts[idx].text}');
         }
       }
     }
-
-    MyLogger.verbose('efantest: texts=$texts, texts.length=${texts.length}');
-    widget.texts.updateTexts(texts); // 刷新文字，重新计算plainText，并保存到数据库
-    final selectionController = widget.controller.selectionController;
-    if(selectionController.isInSingleBlock()) {
-      selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection);
-    } else {
-      selectionController.deleteSelectedContent(isExtentEditing: true, newExtentPos: newValue.selection.extentOffset);
-    }
+    MyLogger.verbose('replaceText: texts=$texts, texts.length=${texts.length}');
+    widget.texts.updateTexts(texts); // Update text, re-calculate plainText, and save to db
     _triggerBlockModified();
-
-    if(insertStr == '\n') {
-      MyLogger.verbose('efantest: spawnNewLine at $leftCount');
-      spawnNewLineAtOffset(leftCount);
-    }
-    selectionController.resetCursor();
-    _render!.updateParagraph();
-    _render!.markNeedsLayout();
     _updateNavigatorViewIfNeeded();
   }
 
@@ -775,7 +717,7 @@ class MindEditBlockState extends State<MindEditBlock> {
 
     spawnNewLineAtOffset(offset);
   }
-  void spawnNewLineAtOffset(int offset) {
+  String spawnNewLineAtOffset(int offset) {
     // 将TextSpan切分，然后生成新的ParagraphDesc
     var newTexts = _cutCurrentPositionAndGetRemains(offset);
     var currentBlockId = widget.texts.getBlockId();
@@ -791,11 +733,21 @@ class MindEditBlockState extends State<MindEditBlock> {
     final blockOffset = render.localToGlobal(Offset.zero);
     final currentSize = Rect.fromLTWH(blockOffset.dx, blockOffset.dy, render.size.width, render.size.height);
     final totalSize = CallbackRegistry.getEditStateSize();
-    MyLogger.info('efantest: currentSize=$currentSize, totalSize=$totalSize');
+    MyLogger.info('spawnNewLineAtOffset: currentSize=$currentSize, totalSize=$totalSize');
     if(totalSize != null && totalSize.bottom - currentSize.bottom <= 5 + Controller.instance.setting.blockNormalLineHeight + 5 + 10) {
-      MyLogger.info('efantest: need scroll');
+      MyLogger.info('spawnNewLineAtOffset: need scroll');
       CallbackRegistry.scrollDown(5 + Controller.instance.setting.blockNormalLineHeight + 5 + 10);
     }
+    return newItem.getBlockId();
+  }
+  void insertBlocksWithTexts(List<String> texts) {
+    List<ParagraphDesc> paragraphs = [];
+    for(var line in texts) {
+      var textDesc = TextDesc()..text = line;
+      var para = ParagraphDesc(texts: [textDesc], listing: _getCurrentListing(), level: _getCurrentLevel());
+      paragraphs.add(para);
+    }
+    widget.controller.document!.insertNewParagraphsAfterId(widget.texts.getBlockId(), paragraphs);
   }
 
   String _getCurrentListing() {
