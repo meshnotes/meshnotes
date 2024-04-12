@@ -123,6 +123,8 @@ class SelectionController {
       }
       MyLogger.info('updateSelectionByOffset: baseBlockIndex=$baseBlockIndex, baseBlockPos=$baseBlockPos, extentBlockIndex=$extentBlockIndex, extentBlockPos=$extentBlockPos');
       _updateSelection(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos, paragraphs);
+      var blockState = paragraphs[extentBlockIndex].getEditState();
+      blockState?.requestCursorAtPosition(extentBlockPos);
     }
   }
   void updateSelectionByIndexAndPos(int blockIndex, int pos, {SelectionExtentType type = SelectionExtentType.extent}) {
@@ -266,11 +268,16 @@ class SelectionController {
       startBlockState?.mergeParagraph(endBlockId);
     }
     if(lastBaseBlockIndex != lastExtentBlockIndex) {
-      CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: startBlockPos + newExtentPos);
+      // If select from up to bottom, the the new extent position should consider the start position of base block.
+      // Because start block and end block has merged.
+      if(lastBaseBlockIndex < lastExtentBlockIndex || newExtentPos == 0) {
+        newExtentPos += startBlockPos;
+      }
+      CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: newExtentPos);
       Controller.instance.setEditingBlockId(startBlockId);
     }
     lastExtentBlockIndex = lastBaseBlockIndex = startBlockIndex;
-    lastExtentBlockPos = lastBaseBlockPos = startBlockPos + newExtentPos;
+    lastExtentBlockPos = lastBaseBlockPos = newExtentPos;
   }
 
   void _refreshCursor() {

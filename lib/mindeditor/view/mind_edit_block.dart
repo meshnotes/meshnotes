@@ -55,7 +55,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     MyLogger.info('MindEditBlockState: build MindEditBlockState for block(id=${getBlockId()})');
     if(!widget.readOnly) {
       var myId = getBlockId();
-      if(widget.texts.getTextSelection() != null) {
+      if(widget.texts.getTextSelection() != null && widget.texts.hasCursor()) {
         MyLogger.debug('MindEditBlockState: editing position is not null: ${widget.texts.getPlainText()}');
         // 如果在initState阶段发现editingPosition不为空，则此block必须负责自己的激活
         widget.controller.setEditingBlockId(myId);
