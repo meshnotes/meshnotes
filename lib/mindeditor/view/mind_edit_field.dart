@@ -505,18 +505,18 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       if(selectionController.isInSingleBlock()) {
         selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection);
       } else {
-        selectionController.deleteSelectedContent(isExtentEditing: true, newExtentPos: newValue.selection.extentOffset);
+        selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length);
       }
     } else {
       // If there are '\n' in the inserted string, delete all selected contents with different parameter
-      int newExtentOffset = deleteFrom + firstLine.length;
       if(selectionController.isInSingleBlock()) {
+        int newExtentOffset = deleteFrom + firstLine.length;
         selectionController.updateSelectionInBlock(
           block.getBlockId(),
           newValue.selection.copyWith(baseOffset: newExtentOffset, extentOffset: newExtentOffset),
         );
       } else {
-        selectionController.deleteSelectedContent(isExtentEditing: true, newExtentPos: newExtentOffset);
+        selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length);
       }
       // Insert last line and spawn a nwe line
       final lastLine = insertStrWithoutNewline[lineCount - 1];
@@ -524,13 +524,13 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       int currentCursorPosition = selectionController.lastExtentBlockPos;
       newBlockState.replaceText(currentCursorPosition, currentCursorPosition, lastLine, affinity);
       String newBlockId = newBlockState.spawnNewLineAtOffset(currentCursorPosition);
-      // Locate the cursor in the last line of inserted string.
-      // We don't have the MindEditBlockState at this time, so could not use refreshDoc directly, which depends on MindEditBlockState
-      refreshDocWithoutBlockState(newBlockId, lastLine.length);
       // Insert line 1~n-1
       if(lineCount >= 3) {
         newBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
       }
+      // Locate the cursor in the last line of inserted string.
+      // We don't have the MindEditBlockState at this time, so could not use refreshDoc directly, which depends on MindEditBlockState
+      refreshDocWithoutBlockState(newBlockId, lastLine.length);
     }
 
     selectionController.resetCursor();

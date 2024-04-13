@@ -234,7 +234,7 @@ class SelectionController {
     _shouldShowSelectionHandle = _b;
   }
 
-  void deleteSelectedContent({bool isExtentEditing = false, int newExtentPos = 0}) {
+  void deleteSelectedContent({bool keepExtentBlock = false, int deltaPos = 0}) {
     if(isCollapsed()) return;
     final paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
@@ -253,7 +253,7 @@ class SelectionController {
       } else {
         // If isExtentEditing is true, that means this method is invoked from _updateAndSaveText() method.
         // So leave the extent block, because it will be handled in _updateAndSaveText() method.
-        if(idx != lastExtentBlockIndex || !isExtentEditing) {
+        if(idx != lastExtentBlockIndex || !keepExtentBlock) {
           blockState?.deleteSelection();
         }
       }
@@ -270,14 +270,11 @@ class SelectionController {
     if(lastBaseBlockIndex != lastExtentBlockIndex) {
       // If select from up to bottom, the the new extent position should consider the start position of base block.
       // Because start block and end block has merged.
-      if(lastBaseBlockIndex < lastExtentBlockIndex || newExtentPos == 0) {
-        newExtentPos += startBlockPos;
-      }
-      CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: newExtentPos);
+      CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: startBlockPos + deltaPos);
       Controller.instance.setEditingBlockId(startBlockId);
     }
     lastExtentBlockIndex = lastBaseBlockIndex = startBlockIndex;
-    lastExtentBlockPos = lastBaseBlockPos = newExtentPos;
+    lastExtentBlockPos = lastBaseBlockPos = startBlockPos + deltaPos;
   }
 
   void _refreshCursor() {
