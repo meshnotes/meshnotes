@@ -67,7 +67,10 @@ class Constants {
   static const String settingKeyTest = 'just_for_test';
   static const String settingCommentTest = 'Just for test';
   static const String settingKeyUserInfo = 'user_info';
-  static const String settingCommentUserInfo = 'User name and private key information(formated in base64)';
+  static const String settingCommentUserInfo = 'User name and private key information(formatted in base64)';
+  static const String settingKeyPluginPrefix = 'plugin/';
+  static const String settingKeyPluginKimiApiKey = '${settingKeyPluginPrefix}kimi_api_key';
+  static const String settingCommentPluginKimiApiKey = 'API Key of kimi.ai';
 
   static const String userNameAndKeyOfGuest = 'guest';
 

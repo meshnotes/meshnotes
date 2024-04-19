@@ -5,9 +5,9 @@ import '../controller/controller.dart';
 import '../setting/constants.dart';
 
 class NetworkDetailView extends StatelessWidget {
-  List<NodeInfo> nodes;
+  final List<NodeInfo> nodes;
 
-  NetworkDetailView({
+  const NetworkDetailView({
     super.key,
     required this.nodes,
   });
@@ -30,19 +30,19 @@ class NetworkDetailView extends StatelessWidget {
     var topButtons = _buildTopButtons(context);
     var viewBody = _buildNetworkDetails(context);
     return Scaffold(
-        body: Column(
-          children: [
-            const Padding(padding: EdgeInsets.fromLTRB(0, 10, 0, 0)),
-            topButtons,
-            Expanded(
-              child: Container(
-                padding: EdgeInsets.all(padding),
-                child: viewBody,
-              ),
+      body: Column(
+        children: [
+          const Padding(padding: EdgeInsets.fromLTRB(0, 10, 0, 0)),
+          topButtons,
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              child: viewBody,
             ),
-            const Padding(padding: EdgeInsets.fromLTRB(0, 0, 0, 10),),
-          ],
-        )
+          ),
+          const Padding(padding: EdgeInsets.fromLTRB(0, 0, 0, 10),),
+        ],
+      ),
     );
   }
 

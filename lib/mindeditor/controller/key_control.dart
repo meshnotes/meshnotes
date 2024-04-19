@@ -11,6 +11,7 @@ const _downKey   = LogicalKeyboardKey.arrowDown;
 const _backspaceKey = LogicalKeyboardKey.backspace;
 const _deleteKey    = LogicalKeyboardKey.delete;
 const _newLineKey   = LogicalKeyboardKey.enter;
+const _cancelKey    = LogicalKeyboardKey.escape;
 
 class FunctionKeys {
   bool altPressed;
@@ -50,6 +51,10 @@ class KeyboardControl {
     }
     if(_newLineKey == _key) {
       return _handleNewLine(_key, funcKeys);
+    }
+    if(_cancelKey == _key) {
+      MyLogger.info('ESC pressed');
+      return false;
     }
     return false;
   }

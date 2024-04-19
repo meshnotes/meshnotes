@@ -51,7 +51,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   @override
   Widget build(BuildContext context) {
     MyLogger.info('MindEditFieldState: build block list');
-    widget.controller.selectionController.updateContext(context);
+    _updateContext(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final render = context.findRenderObject()! as RenderBox;
       _currentSize = render.localToGlobal(Offset.zero) & render.size;
@@ -458,14 +458,14 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     // 4. Characters from leftCount to (length-rightCount) in the newValue are to be inserted(as insertStr)
     //
     // Shown as the following diagram
-    //           leftCount    rightCount
-    //                 |       |
-    //                 v       v
-    // old string: abcdefghijklmn
-    // new string: abcd123456mn
-    //                ^     ^
-    //                |     |
-    //         leftCount    rightCount
+    //           leftCount=5    rightCount=2
+    //                 |         |
+    //                 v         v
+    // old string: Hello_xyz_bit_mn
+    // new string: Hello123456789mn
+    //                 ^         ^
+    //                 |         |
+    //         leftCount=5    rightCount=2
 
     var oldText = oldValue.text;
     var newText = newValue.text;
@@ -536,5 +536,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     selectionController.resetCursor();
     _render.updateParagraph();
     _render.markNeedsLayout();
+  }
+
+  void _updateContext(BuildContext context) {
+    widget.controller.selectionController.updateContext(context);
+    widget.controller.pluginManager.updateContext(context);
   }
 }

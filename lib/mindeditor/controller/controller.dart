@@ -15,6 +15,7 @@ import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
 import '../../net/version_chain_api.dart';
+import '../../plugin/plugin_manager.dart';
 import '../../util/idgen.dart';
 import '../document/dal/fake_db_helper.dart';
 import '../document/paragraph_desc.dart';
@@ -39,10 +40,19 @@ class Controller {
   late final SelectionController selectionController;
   String simpleDeviceId = '';
   UserPrivateInfo? userPrivateInfo;
+  late final PluginManager _pluginManager;
+  double? _toolbarHeight;
 
   // Getters
   DocumentManager get docManager => _docManager!;
   Document? get document => docManager.getCurrentDoc();
+
+  PluginManager get pluginManager => _pluginManager;
+
+  double? getToolbarHeight() => _toolbarHeight;
+  void setToolbarHeight(double height) {
+    _toolbarHeight = height;
+  }
 
   // 为了避免Controller在各种Widget被重新创建，使用全局唯一实例
   static final Controller _theOne = Controller();
@@ -85,6 +95,9 @@ class Controller {
     }
 
     selectionController = SelectionController();
+
+    _pluginManager = PluginManager();
+    _pluginManager.initPluginManager();
 
     MyLogger.debug('initAll: finish initialization');
     return true;

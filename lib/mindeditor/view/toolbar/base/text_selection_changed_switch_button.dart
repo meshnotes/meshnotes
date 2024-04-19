@@ -12,7 +12,7 @@ class TextSelectionChangedButton extends StatefulWidget {
   final Widget icon;
   final String tip;
   final String buttonKey;
-  final bool Function(TextSelection?) showOrNot;
+  final bool Function(TextSelection?) trigger;
   final Function() onPressed;
 
   const TextSelectionChangedButton({
@@ -22,7 +22,7 @@ class TextSelectionChangedButton extends StatefulWidget {
     required this.icon,
     required this.tip,
     required this.buttonKey,
-    required this.showOrNot,
+    required this.trigger,
     required this.onPressed,
   }) : super(key: key);
 
@@ -38,7 +38,7 @@ class _TextSelectionChangedButtonState extends State<TextSelectionChangedButton>
     super.initState();
     MyLogger.debug('efantest: building selection_changed button key=${widget.buttonKey}');
     CallbackRegistry.registerSelectionChangedWatcher(widget.buttonKey, (TextSelection? selection) {
-      _setOn(widget.showOrNot(selection));
+      _setOn(widget.trigger(selection));
     });
   }
   @override

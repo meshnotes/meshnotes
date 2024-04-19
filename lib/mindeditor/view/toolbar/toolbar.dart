@@ -35,12 +35,7 @@ class MindToolBar extends StatelessWidget {
     required Controller controller,
     required BuildContext context,
   }) {
-    var defaultAppearance = AppearanceSetting(
-      iconSize: 18,
-      size: 36,
-      fillColor: Theme.of(context).canvasColor,
-      hoverColor: Theme.of(context).colorScheme.background,
-    );
+    AppearanceSetting defaultAppearance = _buildDefaultAppearance(context);
     var buttons = <Widget>[
       IconAndTextButton(
         appearance: defaultAppearance,
@@ -129,6 +124,16 @@ class MindToolBar extends StatelessWidget {
     );
   }
 
+  static AppearanceSetting _buildDefaultAppearance(BuildContext context) {
+    var defaultAppearance = AppearanceSetting(
+      iconSize: 18,
+      size: 36,
+      fillColor: Theme.of(context).canvasColor,
+      hoverColor: Theme.of(context).colorScheme.background,
+    );
+    return defaultAppearance;
+  }
+
   @override
   Widget build(BuildContext context) {
     // var toolbar = Wrap(
@@ -152,28 +157,33 @@ class MindToolBar extends StatelessWidget {
       );
     }
     Widget scroll = _buildScrollable(toolbar);
+    List<Widget> pluginButtons = _buildPluginButtons();
+    List<Widget> allButtons = [
+      Expanded(child: scroll),
+      VerticalDivider(
+        indent: 8.0,
+        endIndent: 8.0,
+        width: 1.0,
+        thickness: 1.0,
+        color: Colors.grey[350],
+      ),
+      ...pluginButtons,
+    ];
     if(controller.environment.isMobile()) {
       Widget hideKeyboardButton = HideKeyboardButton(
         appearance: appearance,
         controller: controller,
       );
+      allButtons.add(hideKeyboardButton);
       return IntrinsicHeight(
         child: Row(
-          children: [
-            Expanded(child: scroll),
-            VerticalDivider(
-              indent: 8.0,
-              endIndent: 8.0,
-              width: 1.0,
-              thickness: 1.0,
-              color: Colors.grey[350],
-            ),
-            hideKeyboardButton,
-          ],
+          children: allButtons,
         ),
       );
     }
-    return scroll;
+    return Row(
+      children: allButtons,
+    );
   }
 
   Widget _buildScrollable(Widget toolbar) {
@@ -188,6 +198,14 @@ class MindToolBar extends StatelessWidget {
       );
       return scroll;
     }
+  }
+
+  List<Widget> _buildPluginButtons() {
+    var pluginButton = Controller.instance.pluginManager.buildButtons(
+      appearance: appearance,
+      controller: controller,
+    );
+    return pluginButton;
   }
 }
 
@@ -221,6 +239,7 @@ class _MovableToolbarState extends State<MovableToolbar> {
         child: widget.child,
         onChange: (Size size) {
           MyLogger.verbose('Measure Toolbar size=$size');
+          Controller.instance.setToolbarHeight(size.height);
           onToolbarSize(size.width);
         }
     );

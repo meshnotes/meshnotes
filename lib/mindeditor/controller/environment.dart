@@ -1,4 +1,6 @@
 import 'dart:io' show Platform;
+import 'package:flutter/cupertino.dart';
+import '../setting/constants.dart';
 
 class Environment {
   bool isDesktop() {
@@ -22,5 +24,10 @@ class Environment {
   }
   bool isIos() {
     return Platform.isIOS;
+  }
+
+  bool isSmallView(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return screenWidth <= Constants.widthThreshold;
   }
 }

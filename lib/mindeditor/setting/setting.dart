@@ -87,6 +87,10 @@ class Setting {
       name: Constants.settingKeyUserInfo,
       comment: Constants.settingCommentUserInfo,
     ),
+    SettingData(
+      name: Constants.settingKeyPluginKimiApiKey,
+      comment: Constants.settingCommentPluginKimiApiKey,
+    ),
   ];
   final Map<String, SettingData> _settingMap = {};
 

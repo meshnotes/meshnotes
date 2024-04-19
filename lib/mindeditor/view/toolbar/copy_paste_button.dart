@@ -24,7 +24,7 @@ class CopyButton extends StatelessWidget {
       controller: controller,
       tip: 'Copy',
       buttonKey: 'copy',
-      showOrNot: (TextSelection? selection) {
+      trigger: (TextSelection? selection) {
         return (selection != null && !selection.isCollapsed);
       },
       onPressed: () async {
@@ -53,7 +53,7 @@ class CutButton extends StatelessWidget {
       controller: controller,
       tip: 'Cut',
       buttonKey: 'cut',
-      showOrNot: (TextSelection? selection) {
+      trigger: (TextSelection? selection) {
         return (selection != null && !selection.isCollapsed);
       },
       onPressed: () {

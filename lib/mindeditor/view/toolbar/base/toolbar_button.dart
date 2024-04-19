@@ -11,6 +11,7 @@ class ToolbarButton extends StatefulWidget {
   final double? width;
   final double? height;
   final bool isOn;
+  final bool isActive;
 
   const ToolbarButton({
     Key? key,
@@ -20,6 +21,7 @@ class ToolbarButton extends StatefulWidget {
     required this.controller,
     required this.onPressed,
     this.isOn = false,
+    this.isActive = false,
     this.width,
     this.height,
   }): super(key: key);
@@ -29,12 +31,18 @@ class ToolbarButton extends StatefulWidget {
 }
 
 class _ToolbarButtonState extends State<ToolbarButton> {
-  Color backgroundColor = Colors.transparent;
+  late Color backgroundColor;
+  late final Color _defaultBackgroundColor;
+  late final Color _hoveredBackgroundColor;
+  late final Color _triggeredBackgroundColor;
 
   @override
   void initState() {
     super.initState();
-    backgroundColor = widget.controller.setting.toolbarButtonDefaultBackgroundColor;
+    _defaultBackgroundColor = widget.controller.setting.toolbarButtonDefaultBackgroundColor;
+    _hoveredBackgroundColor = widget.controller.setting.toolbarButtonHoverBackgroundColor;
+    _triggeredBackgroundColor = widget.controller.setting.toolBarButtonTriggerOnColor;
+    backgroundColor = _defaultBackgroundColor;
   }
 
   @override
@@ -45,19 +53,19 @@ class _ToolbarButtonState extends State<ToolbarButton> {
         minHeight: widget.appearance.size,
       ),
       alignment: Alignment.center,
-      color: widget.isOn? widget.controller.setting.toolBarButtonTriggerOnColor: backgroundColor,
+      color: widget.isOn? _triggeredBackgroundColor: backgroundColor,
       padding: const EdgeInsets.all(4),
       child: widget.icon,
     );
     var mouseRegion = MouseRegion(
       onEnter: (_) {
         setState(() {
-          backgroundColor = widget.controller.setting.toolbarButtonHoverBackgroundColor;
+          backgroundColor = _hoveredBackgroundColor;
         });
       },
       onExit: (_) {
         setState(() {
-          backgroundColor = widget.controller.setting.toolbarButtonDefaultBackgroundColor;
+          backgroundColor = _defaultBackgroundColor;
         });
       },
       child: container,

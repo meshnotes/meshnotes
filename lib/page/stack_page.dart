@@ -1,9 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
-import 'signin_view.dart';
+import 'sign_in_view.dart';
 import '../mindeditor/controller/controller.dart';
 import '../mindeditor/setting/constants.dart';
 import 'doc_navigator.dart';
@@ -25,8 +23,7 @@ class _StackPageViewState extends State<StackPageView> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final smallView = screenWidth <= Constants.widthThreshold;
+    final smallView = Controller.instance.environment.isSmallView(context);
     var userInfo = Controller.instance.userPrivateInfo;
     if(userInfo == null) {
       return _buildSignInView(context);

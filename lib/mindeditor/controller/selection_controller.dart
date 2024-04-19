@@ -174,6 +174,7 @@ class SelectionController {
     var (startBlockIndex, _) = _getStartIndexAndPosFromLastMember();
     var (endBlockIndex, _) = _getEndIndexAndPosFromLastMember();
     String result = '';
+    if(startBlockIndex < 0) return result;
     for(int idx = startBlockIndex; idx <= endBlockIndex; idx++) {
       String plainText = paragraphs[idx].getSelectedPlainText();
       if(result.isNotEmpty) {

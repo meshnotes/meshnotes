@@ -61,6 +61,7 @@ dependencies:
   device_info_plus: ^9.1.1
   android_id: ^0.3.6
   super_clipboard: ^0.8.5
+  dart_openai: ^3.0.0
   libp2p:
     path: packages/libp2p
   my_log:
