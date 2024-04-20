@@ -67,7 +67,7 @@ class SelectionController {
     blockState.requestCursorAtPosition(pos);
   }
 
-  void updateSelectionInBlock(String blockId, TextSelection newSelection) {
+  void updateSelectionInBlock(String blockId, TextSelection newSelection, bool requestKeyboard) {
     var paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
 
@@ -78,7 +78,7 @@ class SelectionController {
     if(blockIndex >= paragraphs.length) return;
     _updateSelection(blockIndex, newSelection.baseOffset, blockIndex, newSelection.extentOffset, paragraphs);
     var blockState = paragraphs[blockIndex].getEditState();
-    blockState?.requestCursorAtPosition(newSelection.extentOffset);
+    blockState?.requestCursorAtPosition(newSelection.extentOffset, requestKeyboard: requestKeyboard);
   }
   /// Only use when there's no corresponding MindEditBlockState yet.
   /// This scenario is only happened in editing or pasting multi-line texts.
@@ -163,7 +163,7 @@ class SelectionController {
     final localOffset = render.globalToLocal(globalOffset);
     var (wordStartPos, wordEndPos) = blockState.getWordPosRange(localOffset);
     final blockId = blockState.getBlockId();
-    updateSelectionInBlock(blockId, TextSelection(baseOffset: wordStartPos, extentOffset: wordEndPos));
+    updateSelectionInBlock(blockId, TextSelection(baseOffset: wordStartPos, extentOffset: wordEndPos), true);
     // _showOrHideSelectionHandles();
   }
 
@@ -235,7 +235,7 @@ class SelectionController {
     _shouldShowSelectionHandle = _b;
   }
 
-  void deleteSelectedContent({bool keepExtentBlock = false, int deltaPos = 0}) {
+  void deleteSelectedContent({bool keepExtentBlock = false, int deltaPos = 0, bool refreshDoc=true}) {
     if(isCollapsed()) return;
     final paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
@@ -255,7 +255,7 @@ class SelectionController {
         // If isExtentEditing is true, that means this method is invoked from _updateAndSaveText() method.
         // So leave the extent block, because it will be handled in _updateAndSaveText() method.
         if(idx != lastExtentBlockIndex || !keepExtentBlock) {
-          blockState?.deleteSelection();
+          blockState?.deleteSelection(needRefreshEditingValue: false);
         }
       }
     }
@@ -268,7 +268,7 @@ class SelectionController {
       final startBlockState = paragraphs[startBlockIndex].getEditState();
       startBlockState?.mergeParagraph(endBlockId);
     }
-    if(lastBaseBlockIndex != lastExtentBlockIndex) {
+    if(lastBaseBlockIndex != lastExtentBlockIndex && refreshDoc) {
       // If select from up to bottom, the the new extent position should consider the start position of base block.
       // Because start block and end block has merged.
       CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: startBlockPos + deltaPos);
@@ -376,7 +376,7 @@ class SelectionController {
     lastBaseBlockPos = baseBlockPos;
     lastExtentBlockIndex = extentBlockIndex;
     lastExtentBlockPos = extentBlockPos;
-    CallbackRegistry.refreshTextEditingValue();
+    // CallbackRegistry.refreshTextEditingValue();
     resetCursor();
     _showOrHideSelectionHandles();
   }

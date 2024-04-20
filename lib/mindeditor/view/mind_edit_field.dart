@@ -201,6 +201,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       return;
     }
     _lastEditingValue = widget.controller.getCurrentTextEditingValue();
+    MyLogger.info('_openConnectionIfNeeded: current text editing: $_lastEditingValue, _hasConnection=$_hasConnection');
     if(!_hasConnection) {
       _textInputConnection = TextInput.attach(
         this,
@@ -224,6 +225,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(!_hasConnection) {
       return;
     }
+    MyLogger.info('_closeConnectionIfNeeded: now close _textInputConnection');
     _textInputConnection!.close();
     _textInputConnection = null;
     _lastEditingValue = null;
@@ -234,7 +236,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       return;
     }
     _lastEditingValue = widget.controller.getCurrentTextEditingValue();
-    MyLogger.info('efantest: Refreshing editingValue to $_lastEditingValue');
+    MyLogger.info('refreshTextEditingValue: Refreshing editingValue to $_lastEditingValue');
     _textInputConnection!.setEditingState(_lastEditingValue!);
   }
 
@@ -315,6 +317,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(!_hasConnection) {
       return;
     }
+    MyLogger.info('connectionClosed');
     _textInputConnection!.connectionClosedReceived();
     _textInputConnection = null;
     // _lastKnownRemoteTextEditingValue = null;
@@ -326,23 +329,23 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   @override
   TextEditingValue? get currentTextEditingValue {
-    MyLogger.debug('efantest: currentTextEditingValue called');
+    MyLogger.info('TextInputClient.currentTextEditingValue called');
     return _lastEditingValue;
   }
 
   @override
   void performAction(TextInputAction action) {
-    MyLogger.debug('efantest: performAction: action=$action');
+    MyLogger.info('TextInputClient.performAction: action=$action');
   }
 
   @override
   void performPrivateCommand(String action, Map<String, dynamic> data) {
-    MyLogger.debug('efantest: performPrivateCommand');
+    MyLogger.info('TextInputClient.performPrivateCommand');
   }
 
   @override
   void showAutocorrectionPromptRect(int start, int end) {
-    MyLogger.debug('efantest: showAutocorrectionPromptRect');
+    MyLogger.info('TextInputClient.showAutocorrectionPromptRect');
   }
 
   TextEditingValue? getLastEditingValue() {
@@ -408,7 +411,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     setState(() {
       initDocAndControlBlock();
       if(activeBlockId != null) { // If activeId is not null, make the cursor appear on the block with activeId
-        widget.controller.selectionController.updateSelectionInBlock(activeBlockId, TextSelection(baseOffset: position, extentOffset: position));
+        widget.controller.selectionController.updateSelectionInBlock(activeBlockId, TextSelection(baseOffset: position, extentOffset: position), true);
       }
     });
   }
@@ -443,9 +446,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     var currentBlock = controller.getEditingBlockState()!;
     var block = currentBlock.widget.texts;
     final _render = currentBlock.getRender()!;
+    final selectionController = widget.controller.selectionController;
     // If text is same, only need to modify cursor and selection
     if(sameText) {
-      MyLogger.warn('_updateAndSaveText: same Text');
+      MyLogger.info('_updateAndSaveText: same Text, only modify cursor and selection');
+      selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection, false);
       // block.setTextSelection(newValue.selection);
       // _render.markNeedsPaint();
       return;
@@ -499,11 +504,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     final lineCount = insertStrWithoutNewline.length;
     currentBlock.replaceText(deleteFrom, deleteTo, firstLine, affinity);
 
-    final selectionController = widget.controller.selectionController;
     if(lineCount <= 1) {
       // If there is no '\n' in the inserted string, just clear previously selected content
       if(selectionController.isInSingleBlock()) {
-        selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection);
+        selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection, false);
       } else {
         selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length);
       }
@@ -514,9 +518,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         selectionController.updateSelectionInBlock(
           block.getBlockId(),
           newValue.selection.copyWith(baseOffset: newExtentOffset, extentOffset: newExtentOffset),
+          false,
         );
       } else {
-        selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length);
+        selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length, refreshDoc: false);
       }
       // Insert last line and spawn a nwe line
       final lastLine = insertStrWithoutNewline[lineCount - 1];

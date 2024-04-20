@@ -228,15 +228,17 @@ class MindEditBlockState extends State<MindEditBlock> {
     );
   }
 
-  void requestCursorAtPosition(int position) {
+  void requestCursorAtPosition(int position, {bool requestKeyboard=true}) {
     var myId = widget.texts.getBlockId();
     // Update editing block id
     widget.controller.setEditingBlockId(myId);
 
     widget.controller.selectionController.resetCursor();
 
-    // Show keyboard if needed
-    CallbackRegistry.requestKeyboard();
+    // Show keyboard and update TextEditingValue only when user request position actively(by clicking or moving cursor)
+    if(requestKeyboard) {
+      CallbackRegistry.requestKeyboard();
+    }
   }
 
   void _showHandler() {
@@ -264,16 +266,16 @@ class MindEditBlockState extends State<MindEditBlock> {
       MyLogger.warn('Unbelievable!!! getCurrentTextEditingValue(): getTextSelection returns null!');
       return const TextEditingValue(text: '');
     }
-    MyLogger.debug('efantest: getCurrentTextEditingValue: nodeId=${block.getBlockId()}, text=${block.getPlainText()}, selection=$selection');
     var composing = TextRange.empty;
     var _lastValue = CallbackRegistry.getLastEditingValue();
     if(Controller.instance.environment.isDesktop() && (_lastValue != null && _lastValue.composing.isValid)) {
       final start = _lastValue.composing.start;
       final end = _lastValue.composing.end;
       final len = end - start;
-      composing = TextRange(start: selection.baseOffset, end: selection.baseOffset + len);
-      MyLogger.debug('efantest: text len=${block.getPlainText().length}, selection=$selection, composing=$composing');
+      final delta = _lastValue.composing.start - _lastValue.selection.extentOffset;
+      composing = TextRange(start: selection.baseOffset + delta, end: selection.baseOffset + delta + len);
     }
+    MyLogger.info('getCurrentTextEditingValue: nodeId=${block.getBlockId()}, text=${block.getPlainText()}, selection=$selection, composing=$composing');
     return TextEditingValue(
       text: block.getPlainText(),
       selection: selection,
@@ -382,7 +384,7 @@ class MindEditBlockState extends State<MindEditBlock> {
         }
         offset -= t.text.length;
       }
-      selectionController.updateSelectionInBlock(getBlockId(), TextSelection(baseOffset: currentTextPos - 1, extentOffset: currentTextPos - 1));
+      selectionController.updateSelectionInBlock(getBlockId(), TextSelection(baseOffset: currentTextPos - 1, extentOffset: currentTextPos - 1), true);
       _render!.updateParagraph();
       _render!.markNeedsLayout();
       CallbackRegistry.refreshTextEditingValue();
@@ -467,7 +469,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
 
   /// Delete selected content, and update view
-  void deleteSelection() {
+  void deleteSelection({bool needRefreshEditingValue=true}) {
     var block = widget.texts;
     var selection = block.getTextSelection();
     if(selection == null) {
@@ -490,7 +492,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     block.newTextSelection(selectionStart);
     _render!.updateParagraph();
     _render!.markNeedsLayout();
-    if(block.hasCursor()) {
+    if(block.hasCursor() && needRefreshEditingValue) {
       CallbackRegistry.refreshTextEditingValue();
     }
 
