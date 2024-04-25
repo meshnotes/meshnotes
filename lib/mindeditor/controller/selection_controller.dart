@@ -15,6 +15,7 @@ class SelectionController {
   int lastExtentBlockIndex = -1;
   int lastBaseBlockPos = -1;
   int lastExtentBlockPos = -1;
+  int leadingPositionBeforeInput = 0;
   EditCursor? _editCursor;
   Offset baseHandleOffset = Offset.zero;
   Offset extentHandleOffset = Offset.zero;
@@ -67,6 +68,24 @@ class SelectionController {
     blockState.requestCursorAtPosition(pos);
   }
 
+  void updateSelectionByTextSelection(String blockId, TextSelection newSelection, bool requestKeyboard) {
+    var paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+
+    int blockIndex = 0;
+    for(; blockIndex < paragraphs.length; blockIndex++) {
+      if(paragraphs[blockIndex].getBlockId() == blockId) break;
+    }
+    if(blockIndex >= paragraphs.length) return;
+    _updateSelection(blockIndex,
+      leadingPositionBeforeInput + newSelection.baseOffset,
+      blockIndex,
+      leadingPositionBeforeInput + newSelection.extentOffset,
+      paragraphs,
+    );
+    var blockState = paragraphs[blockIndex].getEditState();
+    blockState?.requestCursorAtPosition(leadingPositionBeforeInput + newSelection.extentOffset, requestKeyboard: requestKeyboard);
+  }
   void updateSelectionInBlock(String blockId, TextSelection newSelection, bool requestKeyboard) {
     var paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
@@ -79,6 +98,20 @@ class SelectionController {
     _updateSelection(blockIndex, newSelection.baseOffset, blockIndex, newSelection.extentOffset, paragraphs);
     var blockState = paragraphs[blockIndex].getEditState();
     blockState?.requestCursorAtPosition(newSelection.extentOffset, requestKeyboard: requestKeyboard);
+  }
+
+  void collapseInBlock(String blockId, int position, bool requestKeyboard) {
+    var paragraphs = Controller.instance.document?.paragraphs;
+    if(paragraphs == null) return;
+
+    int blockIndex = 0;
+    for(; blockIndex < paragraphs.length; blockIndex++) {
+      if(paragraphs[blockIndex].getBlockId() == blockId) break;
+    }
+    if(blockIndex >= paragraphs.length) return;
+    _updateSelection(blockIndex, position, blockIndex, position, paragraphs);
+    var blockState = paragraphs[blockIndex].getEditState();
+    blockState?.requestCursorAtPosition(position, requestKeyboard: requestKeyboard);
   }
   /// Only use when there's no corresponding MindEditBlockState yet.
   /// This scenario is only happened in editing or pasting multi-line texts.
@@ -167,6 +200,10 @@ class SelectionController {
     // _showOrHideSelectionHandles();
   }
 
+  int getStartPos() {
+    var (_, startPos) = _getStartIndexAndPosFromLastMember();
+    return startPos;
+  }
   String getSelectedContent() {
     var paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return '';
@@ -268,14 +305,16 @@ class SelectionController {
       final startBlockState = paragraphs[startBlockIndex].getEditState();
       startBlockState?.mergeParagraph(endBlockId);
     }
-    if(lastBaseBlockIndex != lastExtentBlockIndex && refreshDoc) {
-      // If select from up to bottom, the the new extent position should consider the start position of base block.
-      // Because start block and end block has merged.
-      CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: startBlockPos + deltaPos);
+    if(lastBaseBlockIndex != lastExtentBlockIndex) {
       Controller.instance.setEditingBlockId(startBlockId);
+      if(refreshDoc) {
+        // If select from up to bottom, the the new extent position should consider the start position of base block.
+        // Because start block and end block has merged.
+        CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: startBlockPos + deltaPos);
+      }
     }
     lastExtentBlockIndex = lastBaseBlockIndex = startBlockIndex;
-    lastExtentBlockPos = lastBaseBlockPos = startBlockPos + deltaPos;
+    leadingPositionBeforeInput = lastExtentBlockPos = lastBaseBlockPos = startBlockPos + deltaPos;
   }
 
   void _refreshCursor() {
@@ -454,7 +493,7 @@ class SelectionController {
   (int, int) _getStartIndexAndPosFromLastMember() {
     return _getStartIndexAndPos(lastBaseBlockIndex, lastBaseBlockPos, lastExtentBlockIndex, lastExtentBlockPos);
   }
-  (int, int) _getStartIndexAndPos(int baseIndex, int basePos, int extentIndex, int extentPos) {
+  static (int, int) _getStartIndexAndPos(int baseIndex, int basePos, int extentIndex, int extentPos) {
     if(baseIndex < extentIndex) {
       return (baseIndex, basePos);
     } else if(baseIndex > extentIndex) {

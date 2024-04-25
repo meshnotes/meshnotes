@@ -213,6 +213,7 @@ class MindBlockImplRenderObject extends RenderBox {
       final _lineHeight = paragraph.getPreferredHeight();
       MyLogger.verbose('MindEditBlockImplRenderObject: lineHeight=$_lineHeight');
       var currentTextPos = TextPosition(offset: textSelection.extentOffset);
+      // MyLogger.info('MindEditBlockImplRenderObject: currentTextPos=$currentTextPos, extent=${textSelection.extentOffset}, leading=${Controller.instance.selectionController.leadingPositionBeforeInput}');
       currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
       var baseTextPos = TextPosition(offset: textSelection.baseOffset);
       baseOffsetRect = _calculateCursorRectByPosition(baseTextPos, height: _lineHeight);
@@ -256,9 +257,10 @@ class MindBlockImplRenderObject extends RenderBox {
       return;
     }
     final composing = editingValue.composing;
+    final leadingPos = Controller.instance.selectionController.leadingPositionBeforeInput;
     final paint = Paint()..color = Colors.black..style = PaintingStyle.stroke;
-    Offset startPos = _convertOffsetFromPosition(TextPosition(offset: composing.start));
-    Offset endPos = _convertOffsetFromPosition(TextPosition(offset: composing.end));
+    Offset startPos = _convertOffsetFromPosition(TextPosition(offset: composing.start + leadingPos));
+    Offset endPos = _convertOffsetFromPosition(TextPosition(offset: composing.end + leadingPos));
     Offset from = startPos.translate(0, height) + offset;
     Offset to = endPos.translate(0, height) + offset;
     canvas.drawLine(from, to, paint);

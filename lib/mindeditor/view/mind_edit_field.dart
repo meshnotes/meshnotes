@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_log/my_log.dart';
+import '../document/text_desc.dart';
 import 'view_helper.dart' as helper;
 import '../document/paragraph_desc.dart';
 
@@ -200,8 +201,8 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(!_shouldCreateInputConnection) {
       return;
     }
-    _lastEditingValue = widget.controller.getCurrentTextEditingValue();
-    MyLogger.info('_openConnectionIfNeeded: current text editing: $_lastEditingValue, _hasConnection=$_hasConnection');
+    // _lastEditingValue = widget.controller.getCurrentTextEditingValue();
+
     if(!_hasConnection) {
       _textInputConnection = TextInput.attach(
         this,
@@ -217,7 +218,33 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
       // _sentRemoteValues.add(_lastKnownRemoteTextEditingValue);
     }
-    _textInputConnection!.setEditingState(_lastEditingValue!);
+
+    // If there's any text in composing, it should be keep in any block
+    TextEditingValue? newEditingValue;
+    if(_lastEditingValue != null && _lastEditingValue!.composing.isValid) {
+      // _textInputConnection!.close();
+      // _textInputConnection = TextInput.attach(
+      //   this,
+      //   TextInputConfiguration(
+      //     inputType: TextInputType.multiline,
+      //     readOnly: widget.isReadOnly,
+      //     inputAction: TextInputAction.newline,
+      //     enableSuggestions: !widget.isReadOnly,
+      //     keyboardAppearance: Brightness.light,
+      //   ),
+      // );
+      newEditingValue = _lastEditingValue!;
+    } else {
+      newEditingValue = const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+        composing: TextRange.empty,
+      );
+    }
+    MyLogger.info('_openConnectionIfNeeded: current text editing: $newEditingValue, _hasConnection=$_hasConnection');
+    _textInputConnection!.setEditingState(newEditingValue);
+    _lastEditingValue = newEditingValue;
+    widget.controller.selectionController.leadingPositionBeforeInput = widget.controller.selectionController.lastExtentBlockPos;
     _textInputConnection!.show();
   }
 
@@ -357,12 +384,14 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     MyLogger.info('updateEditingValue: updating editing value: $value, $_lastEditingValue');
     // Do nothing if the editing value is same as last time
     if(_lastEditingValue == value) {
+      MyLogger.warn('updateEditingValue: Totally the same');
       return;
     }
     // Just update value if only composing changed(caused by input method)
     var sameText = _lastEditingValue!.text == value.text;
     if(sameText && _lastEditingValue!.selection == value.selection) {
-      _lastEditingValue = value;
+      MyLogger.warn('updateEditingValue: Only composing different');
+      _resetEditingValue(value);
       return;
     }
     if(value.text.length > Controller.instance.setting.blockMaxCharacterLength) {
@@ -379,28 +408,45 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       return;
     }
     final oldEditingValue = _lastEditingValue!;
-    _lastEditingValue = value;
     _updateAndSaveText(oldEditingValue, value, sameText);
   }
 
   @override
   void updateFloatingCursor(RawFloatingCursorPoint point) {
-    MyLogger.debug('efantest: updateFloatingCursor');
+    MyLogger.debug('TextInputClient: updateFloatingCursor');
   }
 
   @override
   void insertTextPlaceholder(Size size) {
-    MyLogger.debug('efantest: insertTextPlaceholder');
+    MyLogger.debug('TextInputClient: insertTextPlaceholder');
   }
 
   @override
   void removeTextPlaceholder() {
-    MyLogger.debug('efantest: removeTextPlaceholder');
+    MyLogger.debug('TextInputClient: removeTextPlaceholder');
   }
 
   @override
   void showToolbar() {
-    MyLogger.debug('efantest: showToolbar');
+    MyLogger.debug('TextInputClient: showToolbar');
+  }
+
+  @override
+  void didChangeInputControl(TextInputControl? oldControl, TextInputControl? newControl) {
+    // TODO: implement didChangeInputControl
+    MyLogger.info('TextInputClient didChangeInputControl() called');
+  }
+
+  @override
+  void performSelector(String selectorName) {
+    // TODO: implement performSelector
+    MyLogger.info('TextInputClient performSelector() called');
+  }
+
+  @override
+  void insertContent(KeyboardInsertedContent content) {
+    // TODO: implement insertContent
+    MyLogger.info('TextInputClient insertContent() called');
   }
 
   void initDocAndControlBlock() {
@@ -411,7 +457,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     setState(() {
       initDocAndControlBlock();
       if(activeBlockId != null) { // If activeId is not null, make the cursor appear on the block with activeId
-        widget.controller.selectionController.updateSelectionInBlock(activeBlockId, TextSelection(baseOffset: position, extentOffset: position), true);
+        widget.controller.selectionController.collapseInBlock(activeBlockId, position, true);
       }
     });
   }
@@ -422,40 +468,24 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     });
   }
 
-  @override
-  void didChangeInputControl(TextInputControl? oldControl, TextInputControl? newControl) {
-    // TODO: implement didChangeInputControl
-    MyLogger.info('efantest didChangeInputControl() called');
-  }
-
-  @override
-  void performSelector(String selectorName) {
-    // TODO: implement performSelector
-    MyLogger.info('efantest performSelector() called');
-  }
-
-  @override
-  void insertContent(KeyboardInsertedContent content) {
-    // TODO: implement insertContent
-    MyLogger.info('efantest insertContent() called');
-  }
-
   void _updateAndSaveText(TextEditingValue oldValue, TextEditingValue newValue, bool sameText) {
-    MyLogger.verbose('MindEditFieldState: Save $newValue to $oldValue with parameter $sameText');
+    MyLogger.info('MindEditFieldState: Save $newValue to $oldValue with parameter $sameText');
     var controller = widget.controller;
     var currentBlock = controller.getEditingBlockState()!;
     var block = currentBlock.widget.texts;
     final _render = currentBlock.getRender()!;
     final selectionController = widget.controller.selectionController;
     // If text is same, only need to modify cursor and selection
-    if(sameText) {
+    if(sameText && selectionController.isCollapsed()) {
       MyLogger.info('_updateAndSaveText: same Text, only modify cursor and selection');
-      selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection, false);
+      selectionController.updateSelectionByTextSelection(block.getBlockId(), newValue.selection, false);
+      _resetEditingValue(newValue);
       // block.setTextSelection(newValue.selection);
       // _render.markNeedsPaint();
       return;
     }
 
+    //TODO update: rightCount should always be ZERO
     // How to update texts given oldValue and newValue:
     // 1. Find the first different character from left hand side, remember left same count as leftCount
     // 2. Find the first different character from right hand side, remember right same count as rightCount
@@ -483,11 +513,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     // Find the positions deleteFrom and deleteTo, and find the insertStr
     var deleteFrom = leftCount;
     var deleteTo = oldText.length - rightCount;
-    MyLogger.verbose('_updateAndSaveText: deleteFrom=$deleteFrom');
+    MyLogger.info('_updateAndSaveText: deleteFrom=$deleteFrom, deleteTo=$deleteTo');
     var insertFrom = leftCount;
     var insertTo = newText.length - rightCount;
     var insertStr = (insertTo > insertFrom)? newText.substring(insertFrom, insertTo): '';
-    MyLogger.verbose('_updateAndSaveText: insertFrom=$insertFrom, insertTo=$insertTo, insertStr=$insertStr');
+    MyLogger.info('_updateAndSaveText: insertFrom=$insertFrom, insertTo=$insertTo, insertStr=$insertStr');
 
     // Split insertStr to handle every line separately
     insertStr = insertStr.replaceAll('\r', '');
@@ -499,48 +529,106 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     // 2. affinity is downstream, in the right TextSpan
     final affinity = newValue.selection.affinity;
 
-    // For the first line, replace the editing block directly
-    final firstLine = insertStrWithoutNewline[0];
+    // Determine if the selection is in the same block, and the line count of new text. Save these flags, will be used in the following code
+    final inSelection = !selectionController.isCollapsed();
+    final selectionInSingleBlock = selectionController.isInSingleBlock();
     final lineCount = insertStrWithoutNewline.length;
-    currentBlock.replaceText(deleteFrom, deleteTo, firstLine, affinity);
 
-    if(lineCount <= 1) {
-      // If there is no '\n' in the inserted string, just clear previously selected content
-      if(selectionController.isInSingleBlock()) {
-        selectionController.updateSelectionInBlock(block.getBlockId(), newValue.selection, false);
-      } else {
-        selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length);
-      }
-    } else {
-      // If there are '\n' in the inserted string, delete all selected contents with different parameter
-      if(selectionController.isInSingleBlock()) {
-        int newExtentOffset = deleteFrom + firstLine.length;
-        selectionController.updateSelectionInBlock(
-          block.getBlockId(),
-          newValue.selection.copyWith(baseOffset: newExtentOffset, extentOffset: newExtentOffset),
-          false,
-        );
-      } else {
-        selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length, refreshDoc: false);
-      }
-      // Insert last line and spawn a nwe line
-      final lastLine = insertStrWithoutNewline[lineCount - 1];
-      var newBlockState = controller.getEditingBlockState()!;
-      int currentCursorPosition = selectionController.lastExtentBlockPos;
-      newBlockState.replaceText(currentCursorPosition, currentCursorPosition, lastLine, affinity);
-      String newBlockId = newBlockState.spawnNewLineAtOffset(currentCursorPosition);
-      // Insert line 1~n-1
-      if(lineCount >= 3) {
-        newBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
-      }
-      // Locate the cursor in the last line of inserted string.
-      // We don't have the MindEditBlockState at this time, so could not use refreshDoc directly, which depends on MindEditBlockState
-      refreshDocWithoutBlockState(newBlockId, lastLine.length);
+    // 1. If in selection, delete the selected content
+    // 2. Insert new text line by line
+    //   2.1 Insert last line at the current position of editing block
+    //   2.2 If there are at least 2 lines, spawn a new line, and insert first line
+    //   2.3 If there are more than 2 lines, insert other lines at the end of first line
+    // The reason for using such a complex procedure is that the last line contains *COMPOSING* by IME,
+    // which require using MindEditBlockState
+    if(inSelection) { // Step 1
+      selectionController.deleteSelectedContent(refreshDoc: false);
     }
+
+    final firstLineBlockState = widget.controller.getEditingBlockState()!;
+    String lastLineBlockId = firstLineBlockState.getBlockId(); //TODO should change the name
+    final leadingPosition = selectionController.leadingPositionBeforeInput;
+    final firstLine = insertStrWithoutNewline[0];
+    int lastLineLength = firstLine.length; //TODO should change the name
+    MyLogger.info('_updateAndSaveText: leadingPosition=$leadingPosition');
+    firstLineBlockState.replaceText(leadingPosition + deleteFrom, leadingPosition + deleteTo, firstLine, affinity);
+    if(lineCount == 1) {
+      MyLogger.info('_updateAndSaveText: collapse in block: ${firstLineBlockState.getBlockId()}, pos=${leadingPosition + deleteFrom + firstLine.length}');
+      selectionController.collapseInBlock(firstLineBlockState.getBlockId(), leadingPosition + deleteFrom + firstLine.length, false);
+    }
+    if(lineCount >= 2) {
+      final lastLine = insertStrWithoutNewline[lineCount - 1];
+      lastLineLength = lastLine.length;
+      firstLineBlockState.replaceText(leadingPosition + firstLine.length, leadingPosition + firstLine.length, lastLine, affinity);
+      lastLineBlockId = firstLineBlockState.spawnNewLineAtOffset(leadingPosition + firstLine.length);
+      firstLineBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
+      selectionController.leadingPositionBeforeInput = 0;
+    }
+    _lastEditingValue = newValue;
+    if(lineCount >= 2 || !selectionInSingleBlock) {
+      refreshDocWithoutBlockState(lastLineBlockId, lastLineLength);
+    }
+    //
+    //
+    //
+    //
+    // // For the first line, replace the editing block directly
+    // final firstLine = insertStrWithoutNewline[0];
+    // currentBlock.replaceText(_leadingPositionBeforeComposing + deleteFrom, _leadingPositionBeforeComposing + deleteTo, firstLine, affinity);
+    //
+    // if(lineCount <= 1) {
+    //   // If there is no '\n' in the inserted string, just clear previously selected content
+    //   if(selectionController.isInSingleBlock()) {
+    //     selectionController.updateSelectionByTextSelection(block.getBlockId(), _leadingPositionBeforeComposing, newValue.selection, false);
+    //   } else {
+    //     selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length);
+    //     _leadingPositionBeforeComposing = selectionController.getStartPos();
+    //   }
+    // } else {
+    //   // If there are '\n' in the inserted string, delete all selected contents with different parameter
+    //   if(selectionController.isInSingleBlock()) {
+    //     int newExtentOffset = deleteFrom + firstLine.length;
+    //     selectionController.updateSelectionByTextSelection(
+    //       block.getBlockId(),
+    //       newValue.selection.copyWith(baseOffset: newExtentOffset, extentOffset: newExtentOffset),
+    //       false,
+    //     );
+    //   } else {
+    //     selectionController.deleteSelectedContent(keepExtentBlock: true, deltaPos: firstLine.length, refreshDoc: false);
+    //     _leadingPositionBeforeComposing = selectionController.getStartPos();
+    //   }
+    //   // Insert last line and spawn a nwe line
+    //   final lastLine = insertStrWithoutNewline[lineCount - 1];
+    //   var newBlockState = controller.getEditingBlockState()!;
+    //   int currentCursorPosition = selectionController.lastExtentBlockPos;
+    //   newBlockState.replaceText(currentCursorPosition, currentCursorPosition, lastLine, affinity);
+    //   String newBlockId = newBlockState.spawnNewLineAtOffset(currentCursorPosition);
+    //   // Insert line 1~n-1
+    //   if(lineCount >= 3) {
+    //     newBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
+    //   }
+    //   // Locate the cursor in the last line of inserted string.
+    //   // We don't have the MindEditBlockState at this time, so could not use refreshDoc directly, which depends on MindEditBlockState
+    //   refreshDocWithoutBlockState(newBlockId, lastLine.length);
+    // }
 
     selectionController.resetCursor();
     _render.updateParagraph();
     _render.markNeedsLayout();
+  }
+
+  void _resetEditingValue(TextEditingValue newValue) {
+    if(!newValue.isComposingRangeValid) {
+      widget.controller.selectionController.leadingPositionBeforeInput += newValue.text.length;
+      newValue = const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+        composing: TextRange.empty,
+      );
+      _textInputConnection!.setEditingState(newValue);
+      MyLogger.info('_resetEditingValue: cut composing and reset leading position=${widget.controller.selectionController.leadingPositionBeforeInput}');
+    }
+    _lastEditingValue = newValue;
   }
 
   void _updateContext(BuildContext context) {

@@ -384,7 +384,7 @@ class MindEditBlockState extends State<MindEditBlock> {
         }
         offset -= t.text.length;
       }
-      selectionController.updateSelectionInBlock(getBlockId(), TextSelection(baseOffset: currentTextPos - 1, extentOffset: currentTextPos - 1), true);
+      selectionController.collapseInBlock(getBlockId(), currentTextPos - 1, true);
       _render!.updateParagraph();
       _render!.markNeedsLayout();
       CallbackRegistry.refreshTextEditingValue();
@@ -749,7 +749,9 @@ class MindEditBlockState extends State<MindEditBlock> {
       var para = ParagraphDesc(texts: [textDesc], listing: _getCurrentListing(), level: _getCurrentLevel());
       paragraphs.add(para);
     }
-    widget.controller.document!.insertNewParagraphsAfterId(widget.texts.getBlockId(), paragraphs);
+    if(paragraphs.isNotEmpty) {
+      widget.controller.document!.insertNewParagraphsAfterId(widget.texts.getBlockId(), paragraphs);
+    }
   }
 
   String _getCurrentListing() {
