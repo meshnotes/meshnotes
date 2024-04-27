@@ -2,13 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 class EditCursor {
-  Function timeoutFunc;
+  Function refreshFunc;
   bool show = true;
   Timer? _cursorTimer;
   static const duration = Duration(milliseconds: 600);
 
   EditCursor({
-    required this.timeoutFunc,
+    required this.refreshFunc,
   }) {
     _init();
   }
@@ -21,13 +21,13 @@ class EditCursor {
   void _onDisappear(Timer timer) {
     timer.cancel();
     show = false;
-    timeoutFunc();
+    refreshFunc();
     _cursorTimer = Timer.periodic(duration, _onShow);
   }
   void _onShow(Timer timer) {
     timer.cancel();
     show = true;
-    timeoutFunc();
+    refreshFunc();
     _cursorTimer = Timer.periodic(duration, _onDisappear);
   }
 

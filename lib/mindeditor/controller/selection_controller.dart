@@ -15,7 +15,6 @@ class SelectionController {
   int lastExtentBlockIndex = -1;
   int lastBaseBlockPos = -1;
   int lastExtentBlockPos = -1;
-  int leadingPositionBeforeInput = 0;
   EditCursor? _editCursor;
   Offset baseHandleOffset = Offset.zero;
   Offset extentHandleOffset = Offset.zero;
@@ -40,7 +39,7 @@ class SelectionController {
   }
 
   EditCursor getCursor() {
-    _editCursor ??= EditCursor(timeoutFunc: _refreshCursor);
+    _editCursor ??= EditCursor(refreshFunc: _refreshCursor);
     return _editCursor!;
   }
   void resetCursor() {
@@ -65,10 +64,10 @@ class SelectionController {
     int index = _getIndexOfBlock(blockId);
     int pos = _getPosFromRender(render, offset);
     _updateSelection(index, pos, index, pos, paragraphs);
-    blockState.requestCursorAtPosition(pos);
+    blockState.setEditingBlockAndResetCursor();
   }
 
-  void updateSelectionByTextSelection(String blockId, TextSelection newSelection, bool requestKeyboard) {
+  void updateSelectionByIMESelection(String blockId, int leadingPositionBeforeIME, TextSelection newSelection) {
     var paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
 
@@ -78,13 +77,13 @@ class SelectionController {
     }
     if(blockIndex >= paragraphs.length) return;
     _updateSelection(blockIndex,
-      leadingPositionBeforeInput + newSelection.baseOffset,
+      leadingPositionBeforeIME + newSelection.baseOffset,
       blockIndex,
-      leadingPositionBeforeInput + newSelection.extentOffset,
+      leadingPositionBeforeIME + newSelection.extentOffset,
       paragraphs,
     );
     var blockState = paragraphs[blockIndex].getEditState();
-    blockState?.requestCursorAtPosition(leadingPositionBeforeInput + newSelection.extentOffset, requestKeyboard: requestKeyboard);
+    blockState?.setEditingBlockAndResetCursor(requestKeyboard: false);
   }
   void updateSelectionInBlock(String blockId, TextSelection newSelection, bool requestKeyboard) {
     var paragraphs = Controller.instance.document?.paragraphs;
@@ -97,7 +96,7 @@ class SelectionController {
     if(blockIndex >= paragraphs.length) return;
     _updateSelection(blockIndex, newSelection.baseOffset, blockIndex, newSelection.extentOffset, paragraphs);
     var blockState = paragraphs[blockIndex].getEditState();
-    blockState?.requestCursorAtPosition(newSelection.extentOffset, requestKeyboard: requestKeyboard);
+    blockState?.setEditingBlockAndResetCursor(requestKeyboard: requestKeyboard);
   }
 
   void collapseInBlock(String blockId, int position, bool requestKeyboard) {
@@ -111,7 +110,7 @@ class SelectionController {
     if(blockIndex >= paragraphs.length) return;
     _updateSelection(blockIndex, position, blockIndex, position, paragraphs);
     var blockState = paragraphs[blockIndex].getEditState();
-    blockState?.requestCursorAtPosition(position, requestKeyboard: requestKeyboard);
+    blockState?.setEditingBlockAndResetCursor(requestKeyboard: requestKeyboard);
   }
   /// Only use when there's no corresponding MindEditBlockState yet.
   /// This scenario is only happened in editing or pasting multi-line texts.
@@ -157,7 +156,7 @@ class SelectionController {
       MyLogger.info('updateSelectionByOffset: baseBlockIndex=$baseBlockIndex, baseBlockPos=$baseBlockPos, extentBlockIndex=$extentBlockIndex, extentBlockPos=$extentBlockPos');
       _updateSelection(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos, paragraphs);
       var blockState = paragraphs[extentBlockIndex].getEditState();
-      blockState?.requestCursorAtPosition(extentBlockPos);
+      blockState?.setEditingBlockAndResetCursor();
     }
   }
   void updateSelectionByIndexAndPos(int blockIndex, int pos, {SelectionExtentType type = SelectionExtentType.extent}) {
@@ -180,7 +179,7 @@ class SelectionController {
     }
     _updateSelection(baseBlockIndex, baseBlockPos, extentBlockIndex, extentBlockPos, paragraphs);
     var blockState = paragraphs[blockIndex].getEditState();
-    blockState?.requestCursorAtPosition(pos);
+    blockState?.setEditingBlockAndResetCursor();
   }
 
   void updateSelectionByPosRange(Offset globalOffset) {
@@ -248,7 +247,7 @@ class SelectionController {
     }
     _updateSelection(blockIndex, pos, blockIndex, pos, paragraphs);
     var blockState = paragraphs[blockIndex].getEditState();
-    blockState?.requestCursorAtPosition(pos);
+    blockState?.setEditingBlockAndResetCursor();
   }
 
   bool isCollapsed() {
@@ -314,7 +313,7 @@ class SelectionController {
       }
     }
     lastExtentBlockIndex = lastBaseBlockIndex = startBlockIndex;
-    leadingPositionBeforeInput = lastExtentBlockPos = lastBaseBlockPos = startBlockPos + deltaPos;
+    lastExtentBlockPos = lastBaseBlockPos = startBlockPos + deltaPos;
   }
 
   void _refreshCursor() {

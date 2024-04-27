@@ -228,7 +228,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     );
   }
 
-  void requestCursorAtPosition(int position, {bool requestKeyboard=true}) {
+  void setEditingBlockAndResetCursor({bool requestKeyboard=true}) {
     var myId = widget.texts.getBlockId();
     // Update editing block id
     widget.controller.setEditingBlockId(myId);
@@ -258,30 +258,6 @@ class MindEditBlockState extends State<MindEditBlock> {
     });
   }
   bool isMouseEntered() => _mouseEntered;
-
-  TextEditingValue getCurrentTextEditingValue() {
-    final block = widget.texts;
-    var selection = block.getTextSelection();
-    if(selection == null) {
-      MyLogger.warn('Unbelievable!!! getCurrentTextEditingValue(): getTextSelection returns null!');
-      return const TextEditingValue(text: '');
-    }
-    var composing = TextRange.empty;
-    var _lastValue = CallbackRegistry.getLastEditingValue();
-    if(Controller.instance.environment.isDesktop() && (_lastValue != null && _lastValue.composing.isValid)) {
-      final start = _lastValue.composing.start;
-      final end = _lastValue.composing.end;
-      final len = end - start;
-      final delta = _lastValue.composing.start - _lastValue.selection.extentOffset;
-      composing = TextRange(start: selection.baseOffset + delta, end: selection.baseOffset + delta + len);
-    }
-    MyLogger.info('getCurrentTextEditingValue: nodeId=${block.getBlockId()}, text=${block.getPlainText()}, selection=$selection, composing=$composing');
-    return TextEditingValue(
-      text: block.getPlainText(),
-      selection: selection,
-      composing: composing,
-    );
-  }
 
   void replaceText(int deleteFrom, int deleteTo, String insertStr, TextAffinity affinity) {
     int deleteCount = deleteTo - deleteFrom;

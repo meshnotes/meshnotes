@@ -87,8 +87,10 @@ class KeyboardControl {
       return false;
     }
     if(_key == _backspaceKey) {
+      MyLogger.debug('_handleDelKeys: try to delete previous character');
       editingState.deletePreviousCharacter();
     } else if(_key == _deleteKey) {
+      MyLogger.debug('_handleDelKeys: try to delete current character');
       editingState.deleteCurrentCharacter();
     }
     return true;

@@ -207,17 +207,6 @@ class Controller {
     return document?.getEditingBlockState();
   }
 
-  TextEditingValue getCurrentTextEditingValue() {
-    var currentState = getEditingBlockState();
-    if(currentState == null) {
-      MyLogger.warn('Current Block is null, something is wrong!!!');
-      return const TextEditingValue(
-        text: '',
-      );
-    }
-    return currentState.getCurrentTextEditingValue();
-  }
-
   // Document
   void _refreshDocumentView() {
     CallbackRegistry.resetTitleBar(document!.getTitlePath());
