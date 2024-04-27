@@ -269,7 +269,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       }
       deleteFrom -= texts[idx].text.length;
     }
-    MyLogger.verbose('replaceText: idx=$idx, deleteFrom=$deleteFrom');
+    MyLogger.info('replaceText: idx=$idx, deleteFrom=$deleteFrom');
     var leftIdx = idx;
     // Delete deleteCount texts from deleteFrom in texts[idx].text
     while(deleteCount > 0) {

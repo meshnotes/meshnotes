@@ -458,7 +458,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     var block = currentBlock.widget.texts;
     final _render = currentBlock.getRender()!;
     final selectionController = widget.controller.selectionController;
-    var leadingPosition = selectionController.lastExtentBlockPos - oldValue.text.length;
+    var leadingPosition = selectionController.lastExtentBlockPos - oldValue.selection.extentOffset;
     // If text is same, and the selection is collapsed, only need to modify cursor and selection
     if(sameText && selectionController.isCollapsed()) {
       MyLogger.info('_updateAndSaveText: same Text, only modify cursor and selection');
@@ -535,7 +535,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     final firstLine = insertStrWithoutNewline[0];
     MyLogger.info('_updateAndSaveText: leadingPosition=$leadingPosition');
     firstLineBlockState.replaceText(leadingPosition + changeFrom, leadingPosition + changeTo, firstLine, affinity);
-    int lastLineLength = leadingPosition + changeFrom + firstLine.length; // Assume the first line is also the last line
+    int lastLineLength = leadingPosition + newValue.selection.extentOffset; // Assume the first line is also the last line
     String lastLineBlockId = firstLineBlockState.getBlockId(); // Assume the first line is also the last line
     if(lineCount == 1) {
       MyLogger.info('_updateAndSaveText: collapse in block: ${firstLineBlockState.getBlockId()}, pos=$lastLineLength');

@@ -257,7 +257,7 @@ class MindBlockImplRenderObject extends RenderBox {
       return;
     }
     final composing = editingValue.composing;
-    final leadingPos = Controller.instance.selectionController.lastExtentBlockPos - editingValue.text.length;
+    final leadingPos = Controller.instance.selectionController.lastExtentBlockPos - editingValue.selection.extentOffset;
     final paint = Paint()..color = Colors.black..style = PaintingStyle.stroke;
     Offset startPos = _convertOffsetFromPosition(TextPosition(offset: composing.start + leadingPos));
     Offset endPos = _convertOffsetFromPosition(TextPosition(offset: composing.end + leadingPos));
