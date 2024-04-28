@@ -690,9 +690,8 @@ class MindEditBlockState extends State<MindEditBlock> {
       MyLogger.warn('Unbelievable!!! spawnNewLine(): getTextSelection returns null!');
       return;
     }
-    // 找到当前光标所在的TextDesc下标idx，以及在该TextDesc下的偏移offset
+    CallbackRegistry.activeCursorClear();
     var offset = selection.extentOffset;
-
     spawnNewLineAtOffset(offset);
   }
   String spawnNewLineAtOffset(int offset) {

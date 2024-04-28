@@ -74,6 +74,9 @@ class CallbackRegistry {
   static void pasteText(String text) {
     _editFieldState?.pasteText(text);
   }
+  static void activeCursorClear() {
+    _editFieldState?.activeCursorClear();
+  }
 
   static registerMessengerKey(GlobalKey<State<ScaffoldMessenger>> _k) {
     _messengerKey = _k;

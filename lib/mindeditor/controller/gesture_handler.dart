@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import 'controller.dart';
@@ -31,6 +32,7 @@ class GestureHandler {
   void _onTapDown(TapDownDetails details) {
     final globalOffset = details.globalPosition;
     MyLogger.debug('onTapDown, offset=$globalOffset');
+    CallbackRegistry.activeCursorClear();
     controller.selectionController.requestCursorAtGlobalOffset(globalOffset);
   }
 
@@ -39,6 +41,7 @@ class GestureHandler {
 
     final globalOffset = details.globalPosition;
     MyLogger.debug('onPanStart, offset=$globalOffset');
+    CallbackRegistry.activeCursorClear();
     controller.selectionController.updateSelectionByOffset(globalOffset);
   }
 
@@ -51,6 +54,7 @@ class GestureHandler {
   void onPanDown(DragDownDetails details) {
     var globalOffset = details.globalPosition;
     MyLogger.debug('onPanDown: offset=$globalOffset');
+    CallbackRegistry.activeCursorClear();
     controller.selectionController.requestCursorAtGlobalOffset(globalOffset);
   }
 
@@ -73,7 +77,7 @@ class GestureHandler {
 
   void _onDoubleTapDown(TapDownDetails details) {
     _setShouldShowHandles(details.kind);
-
+    CallbackRegistry.activeCursorClear();
     _onSelectWord(details.globalPosition);
   }
 

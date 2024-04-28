@@ -216,6 +216,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       );
       // _textInputConnection!.updateConfig(const TextInputConfiguration(inputAction: TextInputAction.done));
 
+      MyLogger.info('_openConnectionIfNeeded: calling _resetEditingState');
       // _sentRemoteValues.add(_lastKnownRemoteTextEditingValue);
       _resetEditingState();
     } else {
@@ -432,6 +433,16 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     MyLogger.info('TextInputClient insertContent() called');
   }
 
+  /// User move cursor actively.
+  /// Including mouse click, gesture tap, arrow key pressed, enter pressed, etc...
+  void activeCursorClear() {
+    _textInputConnection?.close();
+    _lastEditingValue = const TextEditingValue(
+      text: '',
+      selection: TextSelection.collapsed(offset: 0),
+      composing: TextRange.empty,
+    );
+  }
   void initDocAndControlBlock() {
     widget.document.clearEditingBlock();
     widget.document.clearTextSelection();
@@ -570,17 +581,18 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     );
     _textInputConnection!.setEditingState(newEditingValue);
     _lastEditingValue = newEditingValue;
+    MyLogger.info('_resetEditingState: newEditingValue=$newEditingValue');
   }
   void _tryToResetEditingValueAfterComposed(TextEditingValue newValue) {
-    if(!newValue.isComposingRangeValid) {
-      newValue = const TextEditingValue(
-        text: '',
-        selection: TextSelection.collapsed(offset: 0),
-        composing: TextRange.empty,
-      );
-      _textInputConnection!.setEditingState(newValue);
-      MyLogger.info('_tryToResetEditingValue: cut composing and reset editing value');
-    }
+    // if(!newValue.isComposingRangeValid) {
+    //   newValue = const TextEditingValue(
+    //     text: '',
+    //     selection: TextSelection.collapsed(offset: 0),
+    //     composing: TextRange.empty,
+    //   );
+    //   _textInputConnection!.setEditingState(newValue);
+    //   MyLogger.info('_tryToResetEditingValue: cut composing and reset editing value');
+    // }
     _lastEditingValue = newValue;
   }
 
