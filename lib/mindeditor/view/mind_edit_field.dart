@@ -321,6 +321,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
     // _textInputConnection?.setEditingState(newEditingValue);
     updateEditingValue(newEditingValue);
+    activeCursorClear();
   }
 
   @override
@@ -546,18 +547,19 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     final firstLine = insertStrWithoutNewline[0];
     MyLogger.info('_updateAndSaveText: leadingPosition=$leadingPosition');
     firstLineBlockState.replaceText(leadingPosition + changeFrom, leadingPosition + changeTo, firstLine, affinity);
-    int lastLineLength = leadingPosition + newValue.selection.extentOffset; // Assume the first line is also the last line
+    int firstLineLength = leadingPosition + changeFrom + firstLine.length;
+    int newExtentPosition = leadingPosition + newValue.selection.extentOffset;
     String lastLineBlockId = firstLineBlockState.getBlockId(); // Assume the first line is also the last line
     if(lineCount == 1) {
-      MyLogger.info('_updateAndSaveText: collapse in block: ${firstLineBlockState.getBlockId()}, pos=$lastLineLength');
-      selectionController.collapseInBlock(firstLineBlockState.getBlockId(), lastLineLength, false);
+      MyLogger.info('_updateAndSaveText: collapse in block: ${firstLineBlockState.getBlockId()}, pos=$newExtentPosition');
+      selectionController.collapseInBlock(firstLineBlockState.getBlockId(), newExtentPosition, false);
     }
     // Step 2.2
     if(lineCount >= 2) {
       final lastLine = insertStrWithoutNewline[lineCount - 1];
-      firstLineBlockState.replaceText(lastLineLength, lastLineLength, lastLine, affinity);
+      firstLineBlockState.replaceText(firstLineLength, firstLineLength, lastLine, affinity);
       lastLineBlockId = firstLineBlockState.spawnNewLineAtOffset(leadingPosition + firstLine.length);
-      lastLineLength = lastLine.length;
+      newExtentPosition = lastLine.length;
       // Step 2.3
       firstLineBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
     }
@@ -565,7 +567,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     _tryToResetEditingValueAfterComposed(newValue);
     // Step 3
     if(lineCount >= 2 || !selectionInSingleBlock) {
-      refreshDocWithoutBlockState(lastLineBlockId, lastLineLength);
+      refreshDocWithoutBlockState(lastLineBlockId, newExtentPosition);
     }
 
     selectionController.resetCursor();
