@@ -61,7 +61,8 @@ class KeyboardControl {
   }
 
   static bool _handleMoveKeys(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
-    CallbackRegistry.activeCursorClear();
+    // Should close IME to clear the composing texts
+    CallbackRegistry.rudelyCloseIME();
     if(_key == _leftKey) {
       _moveCursorLeft(funcKeys);
     } else if(_key == _rightKey) {

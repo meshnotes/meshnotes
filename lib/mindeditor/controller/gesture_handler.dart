@@ -32,7 +32,8 @@ class GestureHandler {
   void _onTapDown(TapDownDetails details) {
     final globalOffset = details.globalPosition;
     MyLogger.debug('onTapDown, offset=$globalOffset');
-    CallbackRegistry.activeCursorClear();
+    // Should close IME to clear the composing texts
+    CallbackRegistry.rudelyCloseIME();
     controller.selectionController.requestCursorAtGlobalOffset(globalOffset);
   }
 
@@ -41,7 +42,8 @@ class GestureHandler {
 
     final globalOffset = details.globalPosition;
     MyLogger.debug('onPanStart, offset=$globalOffset');
-    CallbackRegistry.activeCursorClear();
+    // Should close IME to clear the composing texts
+    CallbackRegistry.rudelyCloseIME();
     controller.selectionController.updateSelectionByOffset(globalOffset);
   }
 
@@ -54,7 +56,8 @@ class GestureHandler {
   void onPanDown(DragDownDetails details) {
     var globalOffset = details.globalPosition;
     MyLogger.debug('onPanDown: offset=$globalOffset');
-    CallbackRegistry.activeCursorClear();
+    // Should close IME to clear the composing texts
+    CallbackRegistry.rudelyCloseIME();
     controller.selectionController.requestCursorAtGlobalOffset(globalOffset);
   }
 
@@ -77,7 +80,8 @@ class GestureHandler {
 
   void _onDoubleTapDown(TapDownDetails details) {
     _setShouldShowHandles(details.kind);
-    CallbackRegistry.activeCursorClear();
+    // Should close IME to clear the composing texts
+    CallbackRegistry.rudelyCloseIME();
     _onSelectWord(details.globalPosition);
   }
 

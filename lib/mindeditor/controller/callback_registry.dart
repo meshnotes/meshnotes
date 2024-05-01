@@ -74,8 +74,8 @@ class CallbackRegistry {
   static void pasteText(String text) {
     _editFieldState?.pasteText(text);
   }
-  static void activeCursorClear() {
-    _editFieldState?.activeCursorClear();
+  static void rudelyCloseIME() {
+    _editFieldState?.rudelyCloseIME();
   }
 
   static registerMessengerKey(GlobalKey<State<ScaffoldMessenger>> _k) {
@@ -148,8 +148,7 @@ class CallbackRegistry {
   }
   static void triggerEditingBlockFormatEvent(String? blockType, String? listing, int? level) {
     for(var item in _editingBlockFormatWatcher.values) {
-      // 为了避免在build的时候被调用，这里不直接调用item()，而是放在addPostAFrameCallback时
-      // 因为item很可能用了setState()，与build冲突
+      // items in _editingBlockFormatWatcher may invoke setState(), so we need to invoke callbacks in post frame phase
       WidgetsBinding.instance.addPostFrameCallback((_) {
         item(blockType, listing, level);
       });

@@ -67,24 +67,6 @@ class SelectionController {
     blockState.setEditingBlockAndResetCursor();
   }
 
-  void updateSelectionByIMESelection(String blockId, int leadingPositionBeforeIME, TextSelection newSelection) {
-    var paragraphs = Controller.instance.document?.paragraphs;
-    if(paragraphs == null) return;
-
-    int blockIndex = 0;
-    for(; blockIndex < paragraphs.length; blockIndex++) {
-      if(paragraphs[blockIndex].getBlockId() == blockId) break;
-    }
-    if(blockIndex >= paragraphs.length) return;
-    _updateSelection(blockIndex,
-      leadingPositionBeforeIME + newSelection.baseOffset,
-      blockIndex,
-      leadingPositionBeforeIME + newSelection.extentOffset,
-      paragraphs,
-    );
-    var blockState = paragraphs[blockIndex].getEditState();
-    blockState?.setEditingBlockAndResetCursor(requestKeyboard: false);
-  }
   void updateSelectionInBlock(String blockId, TextSelection newSelection, bool requestKeyboard) {
     var paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
@@ -98,19 +80,25 @@ class SelectionController {
     var blockState = paragraphs[blockIndex].getEditState();
     blockState?.setEditingBlockAndResetCursor(requestKeyboard: requestKeyboard);
   }
-
   void collapseInBlock(String blockId, int position, bool requestKeyboard) {
-    var paragraphs = Controller.instance.document?.paragraphs;
-    if(paragraphs == null) return;
-
-    int blockIndex = 0;
-    for(; blockIndex < paragraphs.length; blockIndex++) {
-      if(paragraphs[blockIndex].getBlockId() == blockId) break;
-    }
-    if(blockIndex >= paragraphs.length) return;
-    _updateSelection(blockIndex, position, blockIndex, position, paragraphs);
-    var blockState = paragraphs[blockIndex].getEditState();
-    blockState?.setEditingBlockAndResetCursor(requestKeyboard: requestKeyboard);
+    updateSelectionInBlock(
+      blockId,
+      TextSelection(
+        baseOffset: position,
+        extentOffset: position,
+      ),
+      requestKeyboard,
+    );
+  }
+  void updateSelectionByIMESelection(String blockId, int leadingPositionBeforeIME, TextSelection selection) {
+    updateSelectionInBlock(
+      blockId,
+      TextSelection(
+        baseOffset: leadingPositionBeforeIME + selection.baseOffset,
+        extentOffset: leadingPositionBeforeIME + selection.extentOffset,
+      ),
+      false,
+    );
   }
   /// Only use when there's no corresponding MindEditBlockState yet.
   /// This scenario is only happened in editing or pasting multi-line texts.

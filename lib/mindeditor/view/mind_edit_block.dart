@@ -16,7 +16,7 @@ class MindEditBlock extends StatefulWidget {
     this.readOnly = false,
     this.ignoreLevel = false,
   }): super(key: key) {
-    MyLogger.info('efantest: new MindEditBlock for block(id=${texts.getBlockId()})');
+    MyLogger.info('MindEditBlock: create new block(id=${texts.getBlockId()})');
   }
 
   final ParagraphDesc texts;
@@ -28,7 +28,6 @@ class MindEditBlock extends StatefulWidget {
   State<StatefulWidget> createState() => MindEditBlockState();
 }
 
-// 代理MindEditBlockImpl的按键操作
 class MindEditBlockState extends State<MindEditBlock> {
   bool _mouseEntered = false;
   MindBlockImplRenderObject? _render;
@@ -55,9 +54,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     MyLogger.info('MindEditBlockState: build MindEditBlockState for block(id=${getBlockId()})');
     if(!widget.readOnly) {
       var myId = getBlockId();
+      // If this block has cursor, current editing block id should be set, and the IME should be active
       if(widget.texts.getTextSelection() != null && widget.texts.hasCursor()) {
-        MyLogger.debug('MindEditBlockState: editing position is not null: ${widget.texts.getPlainText()}');
-        // 如果在initState阶段发现editingPosition不为空，则此block必须负责自己的激活
         widget.controller.setEditingBlockId(myId);
         CallbackRegistry.requestKeyboard();
       }
@@ -91,7 +89,7 @@ class MindEditBlockState extends State<MindEditBlock> {
             width: Constants.tabWidth,
             child: const Align(
               alignment: Alignment.bottomCenter,
-              child: Icon(Icons.circle, size: Constants.bulletedSize), //Text('A'),//Text('•'),
+              child: Icon(Icons.circle, size: Constants.bulletedSize), //Text('•'),
             ),
           );
           break;
@@ -184,7 +182,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
 
   Widget? _buildHandler() {
-    // 只有在桌面端，并且不是readOnly模式，才显示抓手
+    // Display block handler only on desktop environment and non-readonly mode
     if(Controller.instance.environment.isDesktop() && !widget.readOnly) {
       return BlockHandler(
         show: _mouseEntered,
@@ -199,7 +197,6 @@ class MindEditBlockState extends State<MindEditBlock> {
     if(_leading != null) {
       items.insert(0, _leading!);
     }
-    // 只有在桌面端，并且不是标题行时，才显示block左侧的handler
     if(handler != null) {
       items.insert(0, handler);
       var row = Row(
@@ -210,6 +207,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       if(widget.texts.isTitle()) {
         return row;
       }
+      // Hide or display block handler only on non-title block
       var blockMouseRegion = MouseRegion(
         child: row,
         onHover: (PointerHoverEvent event) {
@@ -264,7 +262,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     var texts = widget.texts.getTextsClone();
     int idx;
     for(idx = 0; idx < texts.length; idx++) {
-      if(texts[idx].text.length >= deleteFrom) { // 找到要删除的TextSpan
+      if(texts[idx].text.length >= deleteFrom) { // Find the TextSpan containing content to be deleted
         break;
       }
       deleteFrom -= texts[idx].text.length;
@@ -280,7 +278,7 @@ class MindEditBlockState extends State<MindEditBlock> {
         texts[idx].text = texts[idx].text.substring(0, deleteFrom);
         MyLogger.verbose('replaceText: In 1, deleteFrom=$deleteFrom, new text=${texts[idx].text}');
         if(texts[idx].text.isEmpty) {
-          texts.removeAt(idx); // TODO 这里如果把最后一个TextDesc删除掉，可能会有bug
+          texts.removeAt(idx); // TODO A bug may occur if the last TextDesc is deleted
           MyLogger.verbose('replaceText: remove index $idx, remains=$texts, new length=${texts.length}');
         } else {
           idx++;
@@ -480,7 +478,7 @@ class MindEditBlockState extends State<MindEditBlock> {
 
   (int, int) getWordPosRange(Offset offset) {
     int pos = _render!.getPositionByOffset(offset);
-    MyLogger.info('efantest: pos=$pos');
+    MyLogger.info('getWordPosRange: pos=$pos');
     var plainText = widget.texts.getPlainText();
     var currentChar = plainText.codeUnitAt(pos);
     if(_isAlphabet(currentChar)) { // Find English word
@@ -540,19 +538,19 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
 
   bool triggerSelectedBold() {
-    if(widget.texts.isTitle()) { // title不能设置粗体
+    if(widget.texts.isTitle()) { // Cannot set bold style in title block
       return false;
     }
     return _triggerSelectedTextSpanStyle(TextDesc.boldKey);
   }
   bool triggerSelectedItaly() {
-    if(widget.texts.isTitle()) { // title不能设置斜体
+    if(widget.texts.isTitle()) { // Cannot set italic style in title block
       return false;
     }
     return _triggerSelectedTextSpanStyle(TextDesc.italicKey);
   }
   bool triggerSelectedUnderline() {
-    if(widget.texts.isTitle()) { // title不能设置下划线
+    if(widget.texts.isTitle()) { // Cannot set underline style in title block
       return false;
     }
     return _triggerSelectedTextSpanStyle(TextDesc.underlineKey);
@@ -561,7 +559,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     return widget.texts.getType();
   }
   bool setBlockType(String type) {
-    if(widget.texts.isTitle()) { // title不能设置block类型
+    if(widget.texts.isTitle()) { // Cannot set block type in title block
       return false;
     }
     return _setBlockType(type);
@@ -582,7 +580,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     return widget.texts.getListing();
   }
   bool setBlockListing(String l) {
-    if(widget.texts.isTitle()) { // title不有设置listing
+    if(widget.texts.isTitle()) { // Cannot set listing type in title block
       return false;
     }
     return _setBlockListing(l);
@@ -599,13 +597,13 @@ class MindEditBlockState extends State<MindEditBlock> {
     return result;
   }
 
-  // 实现步骤
-  // 1. 找出有效的选择范围
-  // 2. 调用triggerSelectedTextSpanStyle触发风格改变
-  // 3. 刷新显示
+  /// Set span type of selected text
+  /// 1. Find the selection range
+  /// 2. Invoke triggerSelectedTextSpanStyle to change the style
+  /// 3. Refresh rendering
   bool _triggerSelectedTextSpanStyle(String propertyName) {
     final block = widget.texts;
-    // 1. 找出有效的选择范围
+    // 1. Find the selection range
     var selection = block.getTextSelection();
     if(selection == null) {
       MyLogger.warn('Unbelievable!!! _triggerSelectedTextSpanStyle(): getTextSelection returns null!');
@@ -623,10 +621,10 @@ class MindEditBlockState extends State<MindEditBlock> {
       selectionEnd = block.getTotalLength();
     }
 
-    // 2. 改变风格
+    // 2. Invoke triggerSelectedTextSpanStyle to change the style
     bool ret = block.triggerSelectedTextSpanStyle(selectionStart, selectionEnd, propertyName);
 
-    // 3. 刷新
+    // 3. Refresh rendering
     _render!.updateParagraph();
     _render!.markNeedsLayout();
 
@@ -634,6 +632,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     return ret;
   }
 
+  /// Invoke when a new line should be inserted at offset
   List<TextDesc> _cutCurrentPositionAndGetRemains(int offset) {
     var clonedTexts = widget.texts.getTextsClone();
     int idx;
@@ -647,13 +646,13 @@ class MindEditBlockState extends State<MindEditBlock> {
 
     TextDesc? remaining;
     List<TextDesc>? result;
-    if(idx < clonedTexts.length && offset < clonedTexts[idx].text.length) { // 当前TextDesc需要分割
+    if(idx < clonedTexts.length && offset < clonedTexts[idx].text.length) { // Find the TextDesc that should be cut
       var oldText = clonedTexts[idx].text;
       remaining = clonedTexts[idx].clone();
       remaining.text = oldText.substring(offset);
-      clonedTexts[idx].text = oldText.substring(0, offset); // 注意当offset为0的时候，这里会留下一个空的字符串，需要在后面删除
+      clonedTexts[idx].text = oldText.substring(0, offset); // HERE!! If offset is 0, there will be an empty text, should be deleted later
     }
-    if(idx < clonedTexts.length - 1) { // 当前TextDesc后面还有TextDesc
+    if(idx < clonedTexts.length - 1) { // If there are more TextDesc following, copy them to result
       result = [];
       var newList = clonedTexts.sublist(idx + 1);
       for(var item in newList) {
@@ -662,7 +661,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       }
     }
     if(idx > 0 && idx < clonedTexts.length && clonedTexts[idx].text.isEmpty) {
-      // 删除前面留下的空字符串，但如果这是仅存的TextDesc，就不能删除
+      // HERE!! The empty text is deleted here
       clonedTexts.removeAt(idx);
     }
     widget.texts.updateTexts(clonedTexts);
@@ -684,18 +683,22 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
   
   void spawnNewLine() {
-    MyLogger.debug('efantest: spawnNewLine');
+    MyLogger.debug('spawnNewLine() invoked');
     var selection = widget.texts.getTextSelection();
     if(selection == null) {
       MyLogger.warn('Unbelievable!!! spawnNewLine(): getTextSelection returns null!');
       return;
     }
-    CallbackRegistry.activeCursorClear();
     var offset = selection.extentOffset;
     spawnNewLineAtOffset(offset);
+    // Only need to refresh TextEditingValue, don't close TextInputClient, or the Android device will hide the IME and display it again
+    CallbackRegistry.refreshTextEditingValue();
   }
+
+  /// Insert a new block by splitting TextSpan, and generate new ParagraphDesc object.
+  /// Scroll down to make sure the new line is currently visible
+  /// Finally, return the new generated Block ID
   String spawnNewLineAtOffset(int offset) {
-    // 将TextSpan切分，然后生成新的ParagraphDesc
     var newTexts = _cutCurrentPositionAndGetRemains(offset);
     var currentBlockId = widget.texts.getBlockId();
     var doc = widget.controller.document!;

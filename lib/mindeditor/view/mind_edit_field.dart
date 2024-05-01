@@ -156,9 +156,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     // updateKeepAlive();
   }
 
-  // 按键会先在这里处理，如果返回ignored，再由系统处理
+  // If this function returns KeyEventResult.ignored, it will be handled by system
   KeyEventResult _onFocusKey(FocusNode node, KeyEvent _event) {
-    MyLogger.debug('efantest: onFocusKey: event is $_event');
+    MyLogger.debug('_onFocusKey: event is $_event');
     if(_event is! KeyDownEvent) {
       return KeyEventResult.ignored;
     }
@@ -321,7 +321,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
     // _textInputConnection?.setEditingState(newEditingValue);
     updateEditingValue(newEditingValue);
-    activeCursorClear();
+    rudelyCloseIME();
   }
 
   @override
@@ -366,17 +366,17 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   @override
   void updateEditingValue(TextEditingValue value) {
-    MyLogger.info('updateEditingValue: updating editing value: $value, $_lastEditingValue');
+    MyLogger.info('updateEditingValue: updating editing value: new value=$value, old value=$_lastEditingValue');
     // Do nothing if the editing value is same as last time
     if(_lastEditingValue == value) {
-      MyLogger.warn('updateEditingValue: Totally the same');
+      MyLogger.warn('updateEditingValue: Totally identical');
       return;
     }
     // Just update value if only composing changed(caused by input method)
     var sameText = _lastEditingValue!.text == value.text;
     if(sameText && _lastEditingValue!.selection == value.selection) {
-      MyLogger.warn('updateEditingValue: Only composing different');
-      _tryToResetEditingValueAfterComposed(value);
+      MyLogger.info('updateEditingValue: Only composing different');
+      _updateLastEditingValue(value);
       return;
     }
     if(value.text.length > Controller.instance.setting.blockMaxCharacterLength) {
@@ -434,9 +434,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     MyLogger.info('TextInputClient insertContent() called');
   }
 
-  /// User move cursor actively.
+  /// Close IME forcibly, used when User move cursor actively.
   /// Including mouse click, gesture tap, arrow key pressed, enter pressed, etc...
-  void activeCursorClear() {
+  void rudelyCloseIME() {
     _textInputConnection?.close();
     _lastEditingValue = const TextEditingValue(
       text: '',
@@ -464,7 +464,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   void _updateAndSaveText(TextEditingValue oldValue, TextEditingValue newValue, bool sameText) {
-    MyLogger.info('MindEditFieldState: Save $newValue to $oldValue with parameter $sameText');
+    // MyLogger.info('MindEditFieldState: Save $newValue to $oldValue with parameter $sameText');
     var controller = widget.controller;
     var currentBlock = controller.getEditingBlockState()!;
     var block = currentBlock.widget.texts;
@@ -475,12 +475,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(sameText && selectionController.isCollapsed()) {
       MyLogger.info('_updateAndSaveText: same Text, only modify cursor and selection');
       selectionController.updateSelectionByIMESelection(block.getBlockId(), leadingPosition, newValue.selection);
-      _tryToResetEditingValueAfterComposed(newValue);
+      _updateLastEditingValue(newValue);
       _render.markNeedsPaint();
       return;
     }
 
-    //TODO update: rightCount should always be ZERO
     // How to update texts given oldValue and newValue:
     // 1. Find the first different character from left hand side, remember left same count as leftCommonCount
     // 2. Find the first different character from right hand side, remember right same count as rightCount
@@ -496,7 +495,6 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     //                 ^         ^
     //                 |         |
     //    leftCommonCount=5    rightCount=2
-
     var oldText = oldValue.text;
     var newText = newValue.text;
     // Find the same part in oldValue and newValue
@@ -564,7 +562,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       firstLineBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
     }
 
-    _tryToResetEditingValueAfterComposed(newValue);
+    _updateLastEditingValue(newValue);
     // Step 3
     if(lineCount >= 2 || !selectionInSingleBlock) {
       refreshDocWithoutBlockState(lastLineBlockId, newExtentPosition);
@@ -585,16 +583,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     _lastEditingValue = newEditingValue;
     MyLogger.info('_resetEditingState: newEditingValue=$newEditingValue');
   }
-  void _tryToResetEditingValueAfterComposed(TextEditingValue newValue) {
-    // if(!newValue.isComposingRangeValid) {
-    //   newValue = const TextEditingValue(
-    //     text: '',
-    //     selection: TextSelection.collapsed(offset: 0),
-    //     composing: TextRange.empty,
-    //   );
-    //   _textInputConnection!.setEditingState(newValue);
-    //   MyLogger.info('_tryToResetEditingValue: cut composing and reset editing value');
-    // }
+  void _updateLastEditingValue(TextEditingValue newValue) {
     _lastEditingValue = newValue;
   }
 
