@@ -556,13 +556,17 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(lineCount >= 2) {
       final lastLine = insertStrWithoutNewline[lineCount - 1];
       firstLineBlockState.replaceText(firstLineLength, firstLineLength, lastLine, affinity);
-      lastLineBlockId = firstLineBlockState.spawnNewLineAtOffset(leadingPosition + firstLine.length);
+      lastLineBlockId = firstLineBlockState.spawnNewLineAtOffset(firstLineLength);
       newExtentPosition = lastLine.length;
       // Step 2.3
       firstLineBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
     }
 
-    _updateLastEditingValue(newValue);
+    if(lineCount <= 1) {
+      _updateLastEditingValue(newValue);
+    } else {
+      _resetEditingState();
+    }
     // Step 3
     if(lineCount >= 2 || !selectionInSingleBlock) {
       refreshDocWithoutBlockState(lastLineBlockId, newExtentPosition);
