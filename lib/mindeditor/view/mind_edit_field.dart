@@ -36,6 +36,8 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   TextEditingValue? _lastEditingValue;
   Rect? _currentSize;
   ScrollController controller = ScrollController();
+  String _initialTextValue = ''; // In iOS, use this prefix to detect backspace in soft keyboard
+  static const String _iosInitialTextValue = '\u200b';
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -44,6 +46,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   @override
   void initState() {
     super.initState();
+    if(widget.controller.environment.isIos()) {
+      _initialTextValue = _iosInitialTextValue;
+    }
     initDocAndControlBlock();
     CallbackRegistry.registerEditFieldState(this);
     _attachFocus();
@@ -366,7 +371,22 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   @override
   void updateEditingValue(TextEditingValue value) {
+    // Check following situations first:
+    // 1. In iOS environment, using _initialTextValue to detect deletion in soft keyboard
+    //   1.1. Check deletion
+    //   1.2. Stripe _initialTextValue before later processing
+    // 2. Check if the block text length exceeds maximum limitation
+
+    // Step 1.1
+    if(_initialTextValue.isNotEmpty && value.text.isEmpty) {
+      MyLogger.info('updateEditingValue: detected backspace entered, isCollapsed=${widget.controller.selectionController.isCollapsed()}');
+      _deleteSelectionOrCharacter();
+      return;
+    }
+    // Step 1.2
+    value = _stripeInitialText(value);
     MyLogger.info('updateEditingValue: updating editing value: new value=$value, old value=$_lastEditingValue');
+
     // Do nothing if the editing value is same as last time
     if(_lastEditingValue == value) {
       MyLogger.warn('updateEditingValue: Totally identical');
@@ -379,7 +399,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       _updateLastEditingValue(value);
       return;
     }
-    if(value.text.length > Controller.instance.setting.blockMaxCharacterLength) {
+    if(value.text.length > widget.controller.setting.blockMaxCharacterLength) {
       // CallbackRegistry.unregisterCurrentSnackBar();
       CallbackRegistry.showSnackBar(
         SnackBar(
@@ -389,7 +409,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
           duration: const Duration(milliseconds: 2000),
         )
       );
-      refreshTextEditingValue();
+      // refreshTextEditingValue();
       return;
     }
     final oldEditingValue = _lastEditingValue!;
@@ -535,8 +555,12 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     // 3. If the structure of document has been changed, refresh it.
 
     // Step 1
-    if(inSelection) {
-      selectionController.deleteSelectedContent(refreshDoc: false);
+    MyLogger.info('_updateAndSaveText: inSelection=$inSelection, old selection=${oldValue.selection}');
+    // If oldValue's selection is not collapsed,
+    // the deleted selection should be handled by replaceText method in the following code
+    if(inSelection && oldValue.selection.isCollapsed) {
+      MyLogger.info('_updateAndSaveText: delete selection');
+      selectionController.deleteSelectedContent(refreshView: false);
       leadingPosition = selectionController.lastExtentBlockPos;
     }
 
@@ -578,21 +602,50 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   void _resetEditingState() {
-    var newEditingValue = const TextEditingValue(
-      text: '',
-      selection: TextSelection.collapsed(offset: 0),
+    var newEditingValue = _createTextEditingValue(_initialTextValue);
+    _textInputConnection!.setEditingState(newEditingValue);
+    _lastEditingValue = _createTextEditingValue('');
+    MyLogger.info('_resetEditingState: newEditingValue=$newEditingValue');
+  }
+  TextEditingValue _createTextEditingValue(String text) {
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
       composing: TextRange.empty,
     );
-    _textInputConnection!.setEditingState(newEditingValue);
-    _lastEditingValue = newEditingValue;
-    MyLogger.info('_resetEditingState: newEditingValue=$newEditingValue');
   }
   void _updateLastEditingValue(TextEditingValue newValue) {
     _lastEditingValue = newValue;
   }
-
   void _updateContext(BuildContext context) {
     widget.controller.selectionController.updateContext(context);
     widget.controller.pluginManager.updateContext(context);
+  }
+  void _deleteSelectionOrCharacter() {
+    if(!widget.controller.selectionController.isCollapsed()) {
+      widget.controller.selectionController.deleteSelectedContent();
+    } else {
+      var editingState = widget.controller.getEditingBlockState();
+      editingState?.deletePreviousCharacter();
+    }
+  }
+  TextEditingValue _stripeInitialText(TextEditingValue value) {
+    if(_initialTextValue.isNotEmpty && value.text.startsWith(_initialTextValue)) {
+      MyLogger.info('_stripeInitialText: initialTextValue detected, original value=$value');
+      var newText = value.text.substring(1); // stripe _initialTextValue
+
+      var baseOffset = value.selection.baseOffset - 1 > 0? value.selection.baseOffset - 1: 0;
+      var extentOffset = value.selection.extentOffset - 1 > 0? value.selection.extentOffset - 1: 0;
+      var newSelection = TextSelection(baseOffset: baseOffset, extentOffset: extentOffset);
+
+      var newComposing = TextRange.empty;
+      if(value.composing.isValid) {
+        var start = value.composing.start - 1 > 0? value.composing.start - 1: 0;
+        var end = value.composing.end - 1 > 0? value.composing.end - 1: 0;
+        newComposing = TextRange(start: start, end: end);
+      }
+      value = TextEditingValue(text: newText, selection: newSelection, composing: newComposing);
+    }
+    return value;
   }
 }

@@ -371,6 +371,7 @@ class MindEditBlockState extends State<MindEditBlock> {
         // Get the text length of previous block, at which the cursor should be located
         var length = previousBlock.getTotalLength();
         previousBlockState!.mergeParagraph(widget.texts.getBlockId());
+        CallbackRegistry.rudelyCloseIME();
         CallbackRegistry.refreshDoc(activeBlockId: previousBlock.getBlockId(), position: length);
       }
     }
@@ -412,6 +413,7 @@ class MindEditBlockState extends State<MindEditBlock> {
         return;
       } else {
         mergeParagraph(nextBlockId);
+        CallbackRegistry.rudelyCloseIME();
         CallbackRegistry.refreshDoc(activeBlockId: widget.texts.getBlockId(), position: currentTextPos);
       }
     }

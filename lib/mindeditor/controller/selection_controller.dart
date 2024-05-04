@@ -259,7 +259,7 @@ class SelectionController {
     _shouldShowSelectionHandle = _b;
   }
 
-  void deleteSelectedContent({bool keepExtentBlock = false, int deltaPos = 0, bool refreshDoc=true}) {
+  void deleteSelectedContent({bool keepExtentBlock = false, int deltaPos = 0, bool refreshView=true}) {
     if(isCollapsed()) return;
     final paragraphs = Controller.instance.document?.paragraphs;
     if(paragraphs == null) return;
@@ -294,7 +294,7 @@ class SelectionController {
     }
     if(lastBaseBlockIndex != lastExtentBlockIndex) {
       Controller.instance.setEditingBlockId(startBlockId);
-      if(refreshDoc) {
+      if(refreshView) {
         // If select from up to bottom, the the new extent position should consider the start position of base block.
         // Because start block and end block has merged.
         CallbackRegistry.refreshDoc(activeBlockId: startBlockId, position: startBlockPos + deltaPos);
@@ -302,6 +302,9 @@ class SelectionController {
     }
     lastExtentBlockIndex = lastBaseBlockIndex = startBlockIndex;
     lastExtentBlockPos = lastBaseBlockPos = startBlockPos + deltaPos;
+    if(refreshView) {
+      _showOrHideSelectionHandles();
+    }
   }
 
   void _refreshCursor() {
