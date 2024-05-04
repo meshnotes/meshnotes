@@ -628,6 +628,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       var editingState = widget.controller.getEditingBlockState();
       editingState?.deletePreviousCharacter();
     }
+    _resetEditingState();
   }
   TextEditingValue _stripeInitialText(TextEditingValue value) {
     if(_initialTextValue.isNotEmpty && value.text.startsWith(_initialTextValue)) {
