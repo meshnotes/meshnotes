@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 abstract class PluginProxy {
   void registerPlugin(PluginRegisterInformation registerInformation);
   void showDialog(String title, Widget child);
-  String getSelectedContent();
+  String getSelectedOrFocusedContent();
   String? getSettingValue(String key);
+  String? getEditingBlockId();
+  void sendTextToClipboard(String text);
+  String? appendTextToNextBlock(String blockId, String text);
 }
 
 abstract class PluginInstance {

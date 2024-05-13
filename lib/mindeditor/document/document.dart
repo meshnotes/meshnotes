@@ -107,7 +107,7 @@ class Document {
     insertNewParagraphAfterId(id, para);
     return para;
   }
-  ParagraphDesc insertNewParagraphAfterId(String _id, ParagraphDesc newItem) {
+  void insertNewParagraphAfterId(String _id, ParagraphDesc newItem) {
     int idx;
     for(idx = 0; idx < paragraphs.length; idx++) {
       if(paragraphs[idx].getBlockId() == _id) {
@@ -127,10 +127,10 @@ class Document {
     _mapOfParagraphs[newItem.getBlockId()] = newItem;
     _flushDocStructure();
     _lastUpdate = Util.getTimeStamp();
-    return newItem;
+    return;
   }
   //TODO merge with the previous function
-  ParagraphDesc insertNewParagraphsAfterId(String _id, List<ParagraphDesc> newItems) {
+  void insertNewParagraphsAfterId(String _id, List<ParagraphDesc> newItems) {
     int idx;
     for(idx = 0; idx < paragraphs.length; idx++) {
       if(paragraphs[idx].getBlockId() == _id) {
@@ -154,7 +154,6 @@ class Document {
     }
     _flushDocStructure();
     _lastUpdate = Util.getTimeStamp();
-    return newItems[0];
   }
 
   void removeParagraph(String _id) {

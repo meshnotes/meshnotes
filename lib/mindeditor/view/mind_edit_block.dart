@@ -57,7 +57,8 @@ class MindEditBlockState extends State<MindEditBlock> {
       // If this block has cursor, current editing block id should be set, and the IME should be active
       if(widget.texts.getTextSelection() != null && widget.texts.hasCursor()) {
         widget.controller.setEditingBlockId(myId);
-        CallbackRegistry.requestKeyboard();
+        // Don't request keyboard if not having focus, the AI plugin may has the focus
+        // CallbackRegistry.requestKeyboard();
       }
     }
     var blockImpl = _buildBlockImpl();
@@ -421,27 +422,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     _triggerBlockModified();
   }
 
-  /// Return plain text of selected range
-  String getSelectedContent() {
-    const invalidResult = '';
-    var block = widget.texts;
-    var selection = block.getTextSelection();
-    if(selection == null) {
-      MyLogger.warn('Unbelievable!!! getSelectedContent(): getTextSelection returns null!');
-      return invalidResult;
-    }
-    int selectionStart = selection.start;
-    int selectionEnd = selection.end;
-    if(selectionStart >= selectionEnd) {
-      return invalidResult;
-    }
-    if(selectionStart < 0) {
-      selectionStart = 0;
-    }
-    if(selectionEnd > widget.texts.getTotalLength()) {
-      selectionEnd = widget.texts.getTotalLength();
-    }
-    return widget.texts.getPlainText().substring(selectionStart, selectionEnd);
+  String getPlainText() {
+    return widget.texts.getPlainText();
   }
 
   /// Delete selected content, and update view
@@ -704,7 +686,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     var newTexts = _cutCurrentPositionAndGetRemains(offset);
     var currentBlockId = widget.texts.getBlockId();
     var doc = widget.controller.document!;
-    var newItem = doc.insertNewParagraphAfterId(currentBlockId, ParagraphDesc(texts: newTexts, listing: _getCurrentListing(), level: _getCurrentLevel()));
+    var newItem = ParagraphDesc(texts: newTexts, listing: _getCurrentListing(), level: _getCurrentLevel());
+    doc.insertNewParagraphAfterId(currentBlockId, newItem);
 
     CallbackRegistry.refreshDoc(activeBlockId: newItem.getBlockId());
     _triggerBlockModified();
@@ -722,16 +705,22 @@ class MindEditBlockState extends State<MindEditBlock> {
     }
     return newItem.getBlockId();
   }
-  void insertBlocksWithTexts(List<String> texts) {
+  /// Append texts after this block. Each text stands for a new block
+  /// If success, returns the list of blocks' id
+  /// If not, returns empty list
+  List<String> appendBlocksWithTexts(List<String> texts) {
     List<ParagraphDesc> paragraphs = [];
+    List<String> result = [];
     for(var line in texts) {
       var textDesc = TextDesc()..text = line;
       var para = ParagraphDesc(texts: [textDesc], listing: _getCurrentListing(), level: _getCurrentLevel());
       paragraphs.add(para);
+      result.add(para.getBlockId());
     }
     if(paragraphs.isNotEmpty) {
       widget.controller.document!.insertNewParagraphsAfterId(widget.texts.getBlockId(), paragraphs);
     }
+    return result;
   }
 
   String _getCurrentListing() {

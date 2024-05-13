@@ -38,13 +38,15 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   ScrollController controller = ScrollController();
   String _initialTextValue = ''; // In iOS, use this prefix to detect backspace in soft keyboard
   static const String _iosInitialTextValue = '\u200b';
+  bool _hideKeyboard = false; // Hide keyboard manually
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
-  bool get _shouldCreateInputConnection => kIsWeb || !widget.isReadOnly;
+  bool get _shouldCreateInputConnection => kIsWeb || !(widget.isReadOnly || _hideKeyboard);
 
   @override
   void initState() {
+    MyLogger.debug('MindEditFieldState: init state');
     super.initState();
     if(widget.controller.environment.isIos()) {
       _initialTextValue = _iosInitialTextValue;
@@ -56,13 +58,15 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   @override
   Widget build(BuildContext context) {
-    MyLogger.info('MindEditFieldState: build block list');
+    MyLogger.info('MindEditFieldState: build block list, _hasFocus=$_hasFocus');
     _updateContext(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final render = context.findRenderObject()! as RenderBox;
       _currentSize = render.localToGlobal(Offset.zero) & render.size;
     });
-    _focusAttachment!.reparent();
+    if(_hasFocus) {
+      _focusAttachment!.reparent();
+    }
     Widget listView = _buildBlockList();
     if(Controller.instance.isDebugMode) {
       listView = Container(
@@ -148,6 +152,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   void _handleFocusChanged() {
+    MyLogger.debug('_handleFocusChanged: focus changed: hasFocus=$_hasFocus');
     openOrCloseConnection();
     // _cursorCont.startOrStopCursorTimerIfNeeded(
     //     _hasFocus, widget.controller.selection);
@@ -178,10 +183,13 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   void requestKeyboard() {
+    MyLogger.debug('requestKeyboard: before: has focus=$_hasFocus');
     if(_hasFocus) {
       _openConnectionIfNeeded();
       // _showCaretOnScreen();
     } else {
+      MyLogger.debug('requestKeyboard: now request focus');
+      _focusAttachment!.reparent();
       widget.focusNode.requestFocus();
     }
   }
@@ -190,12 +198,14 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       return;
     }
     widget.focusNode.unfocus();
-    Controller.instance.selectionController.releaseCursor();
-    widget.controller.clearEditingBlock();
+    _hideKeyboard = true;
+    // Controller.instance.selectionController.releaseCursor();
+    // widget.controller.clearEditingBlock();
   }
 
   void openOrCloseConnection() {
-    if(widget.focusNode.hasFocus && widget.focusNode.consumeKeyboardToken()) {
+    MyLogger.debug('openOrCloseConnection: widget.focusNode=${widget.focusNode.hasFocus}');
+    if(!_hideKeyboard && widget.focusNode.hasFocus && widget.focusNode.consumeKeyboardToken()) {
       _openConnectionIfNeeded();
     } else if(!widget.focusNode.hasFocus) {
       _closeConnectionIfNeeded();
@@ -583,7 +593,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       lastLineBlockId = firstLineBlockState.spawnNewLineAtOffset(firstLineLength);
       newExtentPosition = lastLine.length;
       // Step 2.3
-      firstLineBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
+      firstLineBlockState.appendBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
     }
 
     if(lineCount <= 1) {

@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/mindeditor/controller/editor_controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:mesh_note/plugin/ai/plugin_ai.dart';
 import '../mindeditor/controller/controller.dart';
@@ -55,12 +57,34 @@ class PluginManager {
     return result;
   }
 
-  String getSelectedContent() {
-    return Controller.instance.selectionController.getSelectedContent();
+  String getSelectedOrFocusedContent() {
+    var content = Controller.instance.selectionController.getSelectedContent();
+    if(content.isEmpty) {
+      content = Controller.instance.getEditingBlockState()?.getPlainText()?? '';
+    }
+    return content;
   }
   String? getSettingValue(String pluginKey) {
     String key = '${Constants.settingKeyPluginPrefix}$pluginKey';
     return Controller.instance.setting.getSetting(key);
+  }
+  void sendTextToClipboard(String text) {
+    //TODO should add toast notification while finished
+    EditorController.copyTextToClipboard(text);
+  }
+  String? appendTextToNextBlock(String blockId, String text) {
+    var blockState = Controller.instance.getBlockState(blockId);
+    if(blockState == null) return null;
+
+    text = text.replaceAll('\r', '');
+    var splitTexts = text.split('\n');
+    var blockIds = blockState.appendBlocksWithTexts(splitTexts);
+    CallbackRegistry.refreshDoc();
+    return blockIds.isEmpty? null: blockIds[blockIds.length - 1];
+  }
+
+  String? getEditingBlockId() {
+    return Controller.instance.getEditingBlockId();
   }
 
   void closeDialog() {
@@ -95,21 +119,27 @@ class PluginManager {
           ],
         );
         var dialog = Material(
-          elevation: 4.0,
+          elevation: 32.0,
           // type: MaterialType.transparency,
-          child: column,
+          child: Container(
+            padding: const EdgeInsets.all(8.0),
+            child: column,
+          ),
         );
         var box = SizedBox(
           width: width,
           height: height,
           child: dialog,
         );
-        double horizonPadding = 32.0;
-        double verticalPadding = Controller.instance.getToolbarHeight()?? 16.0;
+        // double horizonPadding = 8.0;
+        // double verticalPadding = Controller.instance.getToolbarHeight()?? 16.0;
         var container = Container(
-          margin: EdgeInsets.fromLTRB(horizonPadding, verticalPadding, horizonPadding, verticalPadding),
+          margin: const EdgeInsets.fromLTRB(0, 128, 0, 0),
           alignment: Alignment.bottomRight,
-          child: box,
+          child: Material(
+            elevation: 1.0,
+            child: box,
+          ),
         );
         // var align = Align(
         //   alignment: Alignment.bottomRight,
@@ -159,12 +189,27 @@ class PluginProxyImpl implements PluginProxy {
   }
 
   @override
-  String getSelectedContent() {
-    return _manager.getSelectedContent();
+  String getSelectedOrFocusedContent() {
+    return _manager.getSelectedOrFocusedContent();
   }
 
   @override
   String? getSettingValue(String key) {
     return _manager.getSettingValue(key);
+  }
+
+  @override
+  String? getEditingBlockId() {
+    return _manager.getEditingBlockId();
+  }
+
+  @override
+  void sendTextToClipboard(String text) {
+    return _manager.sendTextToClipboard(text);
+  }
+
+  @override
+  String? appendTextToNextBlock(String blockId, String text) {
+    return _manager.appendTextToNextBlock(blockId, text);
   }
 }
