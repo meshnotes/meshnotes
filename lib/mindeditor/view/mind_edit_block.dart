@@ -36,8 +36,12 @@ class MindEditBlockState extends State<MindEditBlock> {
   void setRender(MindBlockImplRenderObject r) {
     _render = r;
   }
-  MindBlockImplRenderObject? getRender() {
-    return _render;
+  MindBlockImplRenderObject? getRender() => _getRender();
+  MindBlockImplRenderObject? _getRender() {
+    if(_render != null && _render!.attached) {
+      return _render;
+    }
+    return null;
   }
 
   @override
@@ -227,7 +231,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     );
   }
 
-  void setEditingBlockAndResetCursor({bool requestKeyboard=true}) {
+  void setEditingBlockAndResetCursor({bool requestKeyboard=true, bool forceShowKeyboard=false}) {
     var myId = widget.texts.getBlockId();
     // Update editing block id
     widget.controller.setEditingBlockId(myId);
@@ -236,7 +240,11 @@ class MindEditBlockState extends State<MindEditBlock> {
 
     // Show keyboard and update TextEditingValue only when user request position actively(by clicking or moving cursor)
     if(requestKeyboard) {
-      CallbackRegistry.requestKeyboard();
+      if(forceShowKeyboard) {
+        CallbackRegistry.showKeyboard();
+      } else {
+        CallbackRegistry.requestKeyboard();
+      }
     }
   }
 
@@ -324,7 +332,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     // Just mark render as need paint
     var block = widget.texts;
     block.clearTextSelection();
-    _render?.markNeedsPaint();
+    _getRender()?.markNeedsPaint();
   }
 
   void deletePreviousCharacter() {
@@ -360,8 +368,8 @@ class MindEditBlockState extends State<MindEditBlock> {
         offset -= t.text.length;
       }
       selectionController.collapseInBlock(getBlockId(), currentTextPos - 1, true);
-      _render!.updateParagraph();
-      _render!.markNeedsLayout();
+      _getRender()?.updateParagraph();
+      _getRender()?.markNeedsLayout();
       CallbackRegistry.refreshTextEditingValue();
     } else { // Should be merge into previous block
       var previousBlock = widget.texts.getPrevious();
@@ -405,8 +413,8 @@ class MindEditBlockState extends State<MindEditBlock> {
         }
         offset -= t.text.length;
       }
-      _render!.updateParagraph();
-      _render!.markNeedsLayout();
+      _getRender()?.updateParagraph();
+      _getRender()?.markNeedsLayout();
       CallbackRegistry.refreshTextEditingValue();
     } else {
       var nextBlockId = widget.texts.getNext()?.getBlockId();
@@ -448,8 +456,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     widget.texts.deleteRange(selectionStart, selectionEnd);
 
     block.newTextSelection(selectionStart);
-    _render!.updateParagraph();
-    _render!.markNeedsLayout();
+    _getRender()?.updateParagraph();
+    _getRender()?.markNeedsLayout();
     if(block.hasCursor() && needRefreshEditingValue) {
       CallbackRegistry.refreshTextEditingValue();
     }
@@ -461,7 +469,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   String getBlockId() => widget.texts.getBlockId();
 
   (int, int) getWordPosRange(Offset offset) {
-    int pos = _render!.getPositionByOffset(offset);
+    var pos = _getRender()!.getPositionByOffset(offset);
     MyLogger.info('getWordPosRange: pos=$pos');
     var plainText = widget.texts.getPlainText();
     var currentChar = plainText.codeUnitAt(pos);
@@ -517,7 +525,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     doc.removeParagraph(nextBlockId);
 
     // requestCursorAtPosition(lastPosition);
-    _render!.redraw();
+    _getRender()?.redraw();
     _triggerBlockModified();
   }
 
@@ -552,8 +560,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     var paragraph = widget.texts;
     bool result = paragraph.setBlockType(blockType);
     if(result) {
-      _render!.updateParagraph();
-      _render!.markNeedsLayout();
+      _getRender()?.updateParagraph();
+      _getRender()?.markNeedsLayout();
       widget.controller.triggerBlockFormatChanged(paragraph);
       _triggerBlockModified();
     }
@@ -573,8 +581,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     var paragraph = widget.texts;
     bool result = paragraph.setBlockListing(l);
     if(result) {
-      _render!.updateParagraph();
-      _render!.markNeedsLayout();
+      _getRender()?.updateParagraph();
+      _getRender()?.markNeedsLayout();
       widget.controller.triggerBlockFormatChanged(paragraph);
       _triggerBlockModified();
     }
@@ -609,8 +617,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     bool ret = block.triggerSelectedTextSpanStyle(selectionStart, selectionEnd, propertyName);
 
     // 3. Refresh rendering
-    _render!.updateParagraph();
-    _render!.markNeedsLayout();
+    _getRender()?.updateParagraph();
+    _getRender()?.markNeedsLayout();
 
     _triggerBlockModified();
     return ret;
@@ -649,8 +657,8 @@ class MindEditBlockState extends State<MindEditBlock> {
       clonedTexts.removeAt(idx);
     }
     widget.texts.updateTexts(clonedTexts);
-    _render!.updateParagraph();
-    _render!.markNeedsLayout();
+    _getRender()?.updateParagraph();
+    _getRender()?.markNeedsLayout();
 
     if(result == null) {
       if(remaining == null) {
@@ -694,7 +702,7 @@ class MindEditBlockState extends State<MindEditBlock> {
 
     // Scroll list if this block is on the bottom of view
     //TODO should scroll after drawing the new block
-    var render = getRender()!;
+    var render = _getRender()!;
     final blockOffset = render.localToGlobal(Offset.zero);
     final currentSize = Rect.fromLTWH(blockOffset.dx, blockOffset.dy, render.size.width, render.size.height);
     final totalSize = CallbackRegistry.getEditStateSize();

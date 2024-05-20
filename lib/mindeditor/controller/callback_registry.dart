@@ -56,11 +56,14 @@ class CallbackRegistry {
   static void requestKeyboard() {
     _editFieldState?.requestKeyboard();
   }
+  static void requestFocus() {
+    _editFieldState?.widget.focusNode.requestFocus();
+  }
   static void hideKeyboard() {
     _editFieldState?.hideKeyboard();
   }
-  static void requestFocus() {
-    _editFieldState?.widget.focusNode.requestFocus();
+  static void showKeyboard() {
+    _editFieldState?.showKeyboard();
   }
   static List<Widget> getReadOnlyBlocks() {
     return _editFieldState?.getReadOnlyBlocks()?? [];
@@ -76,6 +79,9 @@ class CallbackRegistry {
   }
   static void rudelyCloseIME() {
     _editFieldState?.rudelyCloseIME();
+  }
+  static (int, int)? getActiveBlockIndexRange() {
+    return _editFieldState?.getActiveBlockIndexes();
   }
 
   static registerMessengerKey(GlobalKey<State<ScaffoldMessenger>> _k) {

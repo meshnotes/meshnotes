@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/controller/key_control.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
+import 'package:mesh_note/mindeditor/view/mind_edit_block_impl.dart';
 import 'package:my_log/my_log.dart';
 
 import '../document/paragraph_desc.dart';
@@ -35,10 +37,12 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   TextInputConnection? _textInputConnection;
   TextEditingValue? _lastEditingValue;
   Rect? _currentSize;
-  ScrollController controller = ScrollController();
+  late ScrollController _scrollController;
   String _initialTextValue = ''; // In iOS, use this prefix to detect backspace in soft keyboard
   static const String _iosInitialTextValue = '\u200b';
   bool _hideKeyboard = false; // Hide keyboard manually
+  int _activeBlockFirstIndex = -1;
+  int _activeBlockLastIndex = -1;
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -54,6 +58,12 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     initDocAndControlBlock();
     CallbackRegistry.registerEditFieldState(this);
     _attachFocus();
+    _scrollController = ScrollController();
+    _scrollController.addListener(() {
+      _onScroll();
+    });
+    _activeBlockFirstIndex = 0;
+    _activeBlockLastIndex = widget.controller.document!.paragraphs.length - 1;
   }
 
   @override
@@ -79,29 +89,30 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         child: listView,
       );
     }
+    bool hidePan = Controller.instance.environment.isMobile();
     var gesture = GestureDetector(
       child: listView,
       onTapDown: (TapDownDetails details) {
         MyLogger.debug('MindEditFieldState: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onTapOrDoubleTap(details);
       },
-      onPanStart: (DragStartDetails details) {
+      onPanStart: hidePan? null: (DragStartDetails details) {
         MyLogger.info('MindEditFieldState: on pan start, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onPanStart(details);
       },
-      onPanUpdate: (DragUpdateDetails details) {
+      onPanUpdate: hidePan? null: (DragUpdateDetails details) {
         MyLogger.info('MindEditFieldState: on pan update, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onPanUpdate(details);
       },
-      onPanDown: (DragDownDetails details) {
+      onPanDown: hidePan? null: (DragDownDetails details) {
         MyLogger.info('MindEditFieldState: on pan down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onPanDown(details);
       },
-      onPanCancel: () {
+      onPanCancel: hidePan? null: () {
         MyLogger.info('MindEditFieldState: on pan cancel, id=${widget.key}');
         // widget.controller.gestureHandler.onPanCancel(widget.texts.getBlockId());
       },
-      onPanEnd: (DragEndDetails details) {
+      onPanEnd: hidePan? null: (DragEndDetails details) {
         MyLogger.info('MindEditFieldState: on pan end');
       },
     );
@@ -140,7 +151,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   Rect getCurrentSize() => _currentSize!;
 
   void scrollDown(double delta) {
-    controller.jumpTo(controller.offset + delta);
+    _scrollController.jumpTo(_scrollController.offset + delta);
   }
 
   void _attachFocus() {
@@ -201,6 +212,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     _hideKeyboard = true;
     // Controller.instance.selectionController.releaseCursor();
     // widget.controller.clearEditingBlock();
+  }
+  void showKeyboard() {
+    _hideKeyboard = false;
+    requestKeyboard();
   }
 
   void openOrCloseConnection() {
@@ -268,7 +283,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   Widget _buildBlockList() {
     var builder = ListView.builder(
-      controller: controller,
+      controller: _scrollController,
       itemCount: widget.document.paragraphs.length,
       itemBuilder: (context, index) {
         return _constructBlock(widget.document.paragraphs[index]);
@@ -493,6 +508,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     });
   }
 
+  (int, int) getActiveBlockIndexes() {
+    return (_activeBlockFirstIndex, _activeBlockLastIndex);
+  }
+
   void _updateAndSaveText(TextEditingValue oldValue, TextEditingValue newValue, bool sameText) {
     // MyLogger.info('MindEditFieldState: Save $newValue to $oldValue with parameter $sameText');
     var controller = widget.controller;
@@ -658,5 +677,59 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       value = TextEditingValue(text: newText, selection: newSelection, composing: newComposing);
     }
     return value;
+  }
+
+  void _onScroll() {
+    MyLogger.info('_onScroll: height=${_currentSize?.height}, min=${_scrollController.position.pixels}, extent=${_scrollController.position.viewportDimension}');
+    var paras = widget.controller.document?.paragraphs;
+    if(paras == null) return;
+
+    int minIndex = -1, maxIndex = -1;
+    for(int idx = 0; idx < paras.length; idx++) {
+      final paragraph = paras[idx];
+      var blockState = paragraph.getEditState();
+      if(blockState == null || !blockState.mounted) continue;
+
+      final renderObject = blockState.getRender();
+      // final renderObject = blockState.context.findRenderObject() as MindBlockImplRenderObject;
+      if(renderObject == null || !renderObject.attached) {
+        MyLogger.debug('block[${paragraph.getBlockIndex()}] is not in the view');
+        renderObject?.clearCurrentBox();
+        continue;
+      }
+
+      final viewPort = RenderAbstractViewport.of(renderObject);
+      final vpOffset = viewPort.getOffsetToReveal(renderObject, 0.0);
+      final size = renderObject.semanticBounds.size;
+
+      final widgetTop = vpOffset.offset;
+      final widgetBottom = vpOffset.offset + size.height;
+      final viewPortTop = _scrollController.position.pixels;
+      final viewPortBottom = _scrollController.position.viewportDimension;
+
+      if(_isOverlap(widgetTop, widgetBottom, viewPortTop, viewPortBottom)) {
+        MyLogger.debug('block[${paragraph.getBlockIndex()}] is in the view');
+        if(minIndex == -1) {
+          maxIndex = minIndex = idx;
+        } else {
+          maxIndex = idx;
+        }
+        // WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        renderObject.updateCurrentBox();
+        // });
+      } else {
+        MyLogger.debug('block[${paragraph.getBlockIndex()}] is not in the view');
+        renderObject.clearCurrentBox();
+      }
+    }
+    _activeBlockFirstIndex = minIndex;
+    _activeBlockLastIndex = maxIndex;
+  }
+  bool _isOverlap(double top1, double bottom1, double top2, double bottom2) {
+    if(bottom1 < top2 || bottom1 < top1) {
+      return false;
+    } else {
+      return true;
+    }
   }
 }

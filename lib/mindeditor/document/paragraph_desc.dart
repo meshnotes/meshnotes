@@ -117,6 +117,15 @@ class ParagraphDesc {
   }
   String getBlockId() => _id;
 
+  int getBlockIndex() {
+    for(int idx = 0; idx < parent.paragraphs.length; idx++) {
+      if(getBlockId() == parent.paragraphs[idx].getBlockId()) {
+        return idx;
+      }
+    }
+    return -1;
+  }
+
   String getType() {
     return _convertBlockType(_type);
   }
