@@ -62,8 +62,6 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     _scrollController.addListener(() {
       _onScroll();
     });
-    _activeBlockFirstIndex = 0;
-    _activeBlockLastIndex = widget.controller.document!.paragraphs.length - 1;
     _currentScrollPixel = 0;
   }
 
@@ -494,6 +492,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   void initDocAndControlBlock() {
     widget.document.clearEditingBlock();
     widget.document.clearTextSelection();
+    _resetActiveBlockIndexes();
   }
   void refreshDoc({String? activeBlockId, int position = 0}) {
     setState(() {
@@ -684,6 +683,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   void _onScroll() {
     MyLogger.debug('_onScroll: height=${_currentSize?.height}, min=${_scrollController.position.pixels}, extent=${_scrollController.position.viewportDimension}');
     _updateHandles();
+    _updateActiveBlocks();
+  }
+  void _updateActiveBlocks() {
     var paras = widget.controller.document?.paragraphs;
     if(paras == null) return;
 
@@ -740,5 +742,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     double _pixelDelta = newPixel - _currentScrollPixel;
     _currentScrollPixel = newPixel;
     widget.controller.selectionController.updateHandlesPointByDelta(Offset(0.0, _pixelDelta));
+  }
+  void _resetActiveBlockIndexes() {
+    _activeBlockFirstIndex = 0;
+    _activeBlockLastIndex = widget.controller.document!.paragraphs.length - 1;
   }
 }
