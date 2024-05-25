@@ -91,6 +91,15 @@ class Setting {
       name: Constants.settingKeyPluginKimiApiKey,
       comment: Constants.settingCommentPluginKimiApiKey,
     ),
+    SettingData(
+      name: Constants.settingKeyPluginOpenAiApiKey,
+      comment: Constants.settingCommentPluginOpenAiApiKey,
+    ),
+    SettingData(
+      name: Constants.settingKeyPluginDefaultAiService,
+      comment: Constants.settingCommentPluginDefaultAiService,
+      defaultValue: Constants.settingDefaultPluginDefaultAiService,
+    ),
   ];
   final Map<String, SettingData> _settingMap = {};
 

@@ -1,25 +1,23 @@
 import 'package:dart_openai/dart_openai.dart';
 import 'package:mesh_note/plugin/ai/abstract_agent.dart';
 
-class KimiExecutor implements AiExecutor {
+class OpenAiExecutor implements AiExecutor {
   String apiKey;
   // OpenAICompletionModel? _openAI;
 
-  KimiExecutor({
+  OpenAiExecutor({
     required this.apiKey,
   }) {
-    OpenAI.baseUrl = 'https://api.moonshot.cn';
     OpenAI.apiKey = apiKey;
-    // _initOpenAI(apiKey).then((value) => _openAI = value);
   }
 
   @override
   Future<String> execute(String prompt) async {
-    OpenAI.baseUrl = 'https://api.moonshot.cn';
+    // OpenAI.baseUrl = 'https://api.moonshot.cn';
     OpenAI.apiKey = apiKey;
     OpenAI.showLogs = true;
     OpenAIChatCompletionModel completion = await OpenAI.instance.chat.create(
-      model: 'moonshot-v1-8k',
+      model: 'gpt-4-turbo',
       messages: [
         const OpenAIChatCompletionChoiceMessageModel(
           role: OpenAIChatMessageRole.system,

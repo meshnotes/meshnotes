@@ -71,6 +71,11 @@ class Constants {
   static const String settingKeyPluginPrefix = 'plugin/';
   static const String settingKeyPluginKimiApiKey = '${settingKeyPluginPrefix}kimi_api_key';
   static const String settingCommentPluginKimiApiKey = 'API Key of kimi.ai';
+  static const String settingKeyPluginOpenAiApiKey = '${settingKeyPluginPrefix}openai_api_key';
+  static const String settingCommentPluginOpenAiApiKey = 'API Key of OpenAI';
+  static const String settingKeyPluginDefaultAiService = '${settingKeyPluginPrefix}default_ai_service';
+  static const String settingCommentPluginDefaultAiService = 'Default AI service(e.g. chatgpt, or kimi.ai)';
+  static const String settingDefaultPluginDefaultAiService = 'chatgpt';
 
   static const String userNameAndKeyOfGuest = 'guest';
 

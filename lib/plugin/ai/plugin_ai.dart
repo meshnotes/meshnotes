@@ -4,13 +4,17 @@ import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:my_log/my_log.dart';
 
+import 'abstract_agent.dart';
 import 'kimi_agent.dart';
+import 'openai_agent.dart';
 
 class PluginAI implements PluginInstance {
   static const _dialogTitle = 'AI assistant';
-  static const _settingKeyApiKey = 'kimi_api_key';
+  static const _settingKeyKimiApiKey = 'kimi_api_key';
+  static const _settingKeyOpenAiApiKey = 'openai_api_key';
+  static const _settingKeyDefaultAiService = 'default_ai_service';
   late PluginProxy _proxy;
-  String? _apiKey;
+  // String? _apiKey;
 
   @override
   void initPlugin(PluginProxy proxy) {
@@ -26,13 +30,11 @@ class PluginAI implements PluginInstance {
   }
 
   void _aiAction() {
-    _apiKey = _proxy.getSettingValue(_settingKeyApiKey);
-    MyLogger.info('AI action!');
-    if(_apiKey != null && _apiKey!.isNotEmpty) {
-      AIExecutor kimi = AIExecutor(apiKey: _apiKey!);
+    var _executor = _buildAiExecutor();
+    if(_executor != null) {
       var dialog = _AIDialog(
         proxy: _proxy,
-        executor: kimi,
+        executor: _executor,
       );
       _proxy.showDialog(_dialogTitle, dialog);
     } else {
@@ -41,11 +43,40 @@ class PluginAI implements PluginInstance {
       _proxy.showDialog(_dialogTitle, dialog);
     }
   }
+
+  AiExecutor? _buildAiExecutor() {
+    var service = _proxy.getSettingValue(_settingKeyDefaultAiService);
+    if(service == null || service.isEmpty) return null;
+    switch(service) {
+      case 'kimi.ai':
+        return _buildKimiExecutor();
+      case 'chatgpt':
+        return _buildChatGptExecutor();
+      default:
+        return _buildChatGptExecutor();
+    }
+  }
+  AiExecutor? _buildKimiExecutor() {
+    var _apiKey = _proxy.getSettingValue(_settingKeyKimiApiKey);
+    if(_apiKey == null || _apiKey.isEmpty) {
+      return null;
+    }
+    KimiExecutor kimi = KimiExecutor(apiKey: _apiKey);
+    return kimi;
+  }
+  AiExecutor? _buildChatGptExecutor() {
+    var _apiKey = _proxy.getSettingValue(_settingKeyOpenAiApiKey);
+    if(_apiKey == null || _apiKey.isEmpty) {
+      return null;
+    }
+    OpenAiExecutor openAi = OpenAiExecutor(apiKey: _apiKey);
+    return openAi;
+  }
 }
 
 class _AIDialog extends StatefulWidget {
   final PluginProxy proxy;
-  final AIExecutor executor;
+  final AiExecutor executor;
 
   const _AIDialog({
     required this.proxy,
