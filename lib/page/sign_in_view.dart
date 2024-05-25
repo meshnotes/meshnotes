@@ -30,10 +30,12 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     fontSize: 22.0,
     color: Colors.black54,
   );
+  late _SignInStage _stage;
 
   @override
   void initState() {
     super.initState();
+    _stage = _SignInStage.mainMenu;
     userPrivateInfo = null;
     _animationController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
     userNameController = TextEditingController();
@@ -71,55 +73,64 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     if (userPrivateInfo == null) {
-      return _buildDialog(context);
+      switch(_stage) {
+        case _SignInStage.createKey:
+          return _buildCreateKey(context);
+        case _SignInStage.loadKey:
+          return _buildLoadKey(context);
+        default:
+          return _buildMainDialog(context);
+      }
     }
     return _buildComplete(context);
   }
   
-  Widget _buildDialog(BuildContext context) {
+  Widget _buildMainDialog(BuildContext context) {
     var column = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Spacer(flex: 5,),
-        const Icon(Icons.person_add_alt_outlined, size: _iconSize, color: Colors.black54,),
-        const Text(
-          'Please enter your name to create a new key',
-          style: titleStyle,
-        ),
-        CupertinoTextField(
-          placeholder: 'Enter your name here to generate a new key',
-          controller: userNameController,
-        ),
-        TextButton.icon(
-          icon: const Icon(Icons.note_add_outlined),
-          onPressed: hasName? _onCreateNewKey: null,
-          label: const Text('Create new key'),
-        ),
+        const Icon(Icons.outlined_flag, size: _iconSize, color: Colors.black54,),
         const Spacer(flex: 1,),
         const Text(
-          'Or paste your existing key here to load',
+          'You have to create your personal key, or load an exist one',
           style: titleStyle,
         ),
-        CupertinoTextField(
-          placeholder: 'Paste your old key here to load',
-          controller: privateKeyController,
+        const Spacer(flex: 3,),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(4.0),
+          decoration: BoxDecoration(
+            color: Colors.blueGrey[100],
+            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
+          ),
+          margin: const EdgeInsets.all(4.0),
+          child: TextButton.icon(
+            icon: const Icon(Icons.note_add_outlined),
+            onPressed: _gotoCreate,
+            label: const Text('Create a new key'),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(4.0),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey, width: 1.0),
+            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
+          ),
+          margin: const EdgeInsets.all(4.0),
+          child: TextButton.icon(
+            icon: Icon(Icons.upload_file_outlined, color: Colors.grey[600],),
+            onPressed: _gotoLoad,
+            label: Text('Load an exist key', style: TextStyle(color: Colors.grey[600]),),
+          ),
         ),
         TextButton.icon(
-          icon: const Icon(Icons.upload_file_outlined),
-          onPressed: hasKey? _onLoadKey: null,
-          label: const Text('Load exist key'),
-        ),
-        const Spacer(flex: 1,),
-        const Text(
-          'Or you could just have a try without creating any key',
-          style: titleStyle,
-        ),
-        TextButton.icon(
-          icon: const Icon(Icons.person_off_outlined),
+          icon: Icon(Icons.person_off_outlined, color: Colors.grey[600],),
           onPressed: _justTry,
-          label: const Text('Just have a try'),
+          label: Text('No, I just want to have a try', style: TextStyle(color: Colors.grey[600]),),
         ),
-        const Spacer(flex: 2,),
+        const Spacer(flex: 1,),
       ],
     );
     return Scaffold(
@@ -129,6 +140,130 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
           child: Container(
             padding: const EdgeInsets.all(10),
             child: column,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCreateKey(BuildContext context) {
+    var column = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 5,),
+        const Icon(Icons.person_add_alt_outlined, size: _iconSize, color: Colors.black54,),
+        const Spacer(flex: 1,),
+        const Text(
+          'Please enter your name to generate a new key, and keep it as a secret',
+          style: titleStyle,
+        ),
+        const Spacer(flex: 3,),
+        CupertinoTextField(
+          placeholder: 'your name',
+          controller: userNameController,
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(4.0),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey, width: 1.0),
+            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
+          ),
+          margin: const EdgeInsets.all(4.0),
+          child: TextButton.icon(
+            icon: const Icon(Icons.note_add_outlined),
+            onPressed: hasName? _onCreateNewKey: null,
+            label: const Text('Create new key'),
+          ),
+        ),
+        const Spacer(flex: 1,),
+        TextButton.icon(
+          icon: Icon(Icons.arrow_back, color: Colors.grey[600],),
+          onPressed: _gotoMain,
+          label: Text('Back', style: TextStyle(color: Colors.grey[600]),),
+        ),
+        const Spacer(flex: 1,),
+      ],
+    );
+    var animated = AnimatedBuilder(
+      animation: _animationController,
+      builder: (BuildContext context, Widget? child) {
+        return ScaleTransition(
+          scale: _animationController,
+          child: child,
+        );
+      },
+      child: column,
+    );
+    return Scaffold(
+      body: Align(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _maxWidth),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            child: animated,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadKey(BuildContext context) {
+    var column = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 5,),
+        const Icon(Icons.person_add_alt_outlined, size: _iconSize, color: Colors.black54,),
+        const Spacer(flex: 1,),
+        const Text(
+          'Paste your existing key here to load',
+          style: titleStyle,
+        ),
+        const Spacer(flex: 3,),
+        CupertinoTextField(
+          placeholder: 'Your old key',
+          controller: privateKeyController,
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(4.0),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey, width: 1.0),
+            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
+          ),
+          margin: const EdgeInsets.all(4.0),
+          child: TextButton.icon(
+            icon: const Icon(Icons.upload_file_outlined),
+            onPressed: hasKey? _onLoadKey: null,
+            label: const Text('Load exist key'),
+          ),
+        ),
+        const Spacer(flex: 1,),
+        TextButton.icon(
+          icon: Icon(Icons.arrow_back, color: Colors.grey[600],),
+          onPressed: _gotoMain,
+          label: Text('Back', style: TextStyle(color: Colors.grey[600]),),
+        ),
+        const Spacer(flex: 1,),
+      ],
+    );
+    var animated = AnimatedBuilder(
+      animation: _animationController,
+      builder: (BuildContext context, Widget? child) {
+        return ScaleTransition(
+          scale: _animationController,
+          child: child,
+        );
+      },
+      child: column,
+    );
+    return Scaffold(
+      body: Align(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _maxWidth),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            child: animated,
           ),
         ),
       ),
@@ -166,7 +301,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         TextButton.icon(
           icon: const Icon(Icons.done),
           onPressed: _onComplete,
-          label: const Text('OK, I have saved my key'),
+          label: const Text('OK, I have already saved my key'),
         ),
         const Spacer(flex: 2,),
       ],
@@ -197,6 +332,25 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     // return AnimatedBuilder(animation: animation, builder: builder)
   }
 
+  void _gotoMain() {
+    setState(() {
+      _stage = _SignInStage.mainMenu;
+    });
+  }
+  void _gotoCreate() {
+    setState(() {
+      _animationController.reset();
+      _animationController.forward();
+      _stage = _SignInStage.createKey;
+    });
+  }
+  void _gotoLoad() {
+    setState(() {
+      _animationController.reset();
+      _animationController.forward();
+      _stage = _SignInStage.loadKey;
+    });
+  }
   void _onCreateNewKey() {
     final signing = SigningWrapper.random();
     String publicKey = signing.getCompressedPublicKey();
@@ -225,6 +379,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       userPrivateInfo = userInfo;
       _animationController.reset();
       _animationController.forward();
+      _stage = _SignInStage.complete;
     });
   }
 
@@ -241,4 +396,11 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     if(userPrivateInfo == null) return;
     widget.update(userPrivateInfo!);
   }
+}
+
+enum _SignInStage {
+  mainMenu,
+  createKey,
+  loadKey,
+  complete,
 }

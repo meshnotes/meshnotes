@@ -119,10 +119,10 @@ class PluginManager {
             ),
           ],
         );
-        var dialog = Material(
-          elevation: 32.0,
+        var dialog = Scaffold(
+          // elevation: 32.0,
           // type: MaterialType.transparency,
-          child: Container(
+          body: Container(
             padding: const EdgeInsets.all(8.0),
             child: column,
           ),

@@ -16,7 +16,7 @@ class MindEditBlock extends StatefulWidget {
     this.readOnly = false,
     this.ignoreLevel = false,
   }): super(key: key) {
-    MyLogger.info('MindEditBlock: create new block(id=${texts.getBlockId()})');
+    MyLogger.debug('MindEditBlock: create new block(id=${texts.getBlockId()})');
   }
 
   final ParagraphDesc texts;
@@ -48,14 +48,14 @@ class MindEditBlockState extends State<MindEditBlock> {
   void initState() {
     super.initState();
     if(!widget.readOnly) {
-      MyLogger.info('MindEditBlockState: initializing MindEditBlockState for block(id=${getBlockId()})');
+      MyLogger.debug('MindEditBlockState: initializing MindEditBlockState for block(id=${getBlockId()})');
       widget.controller.setBlockStateToTreeNode(getBlockId(), this);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    MyLogger.info('MindEditBlockState: build MindEditBlockState for block(id=${getBlockId()})');
+    MyLogger.debug('MindEditBlockState: build MindEditBlockState for block(id=${getBlockId()})');
     if(!widget.readOnly) {
       var myId = getBlockId();
       // If this block has cursor, current editing block id should be set, and the IME should be active

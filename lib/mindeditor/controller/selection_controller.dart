@@ -255,6 +255,10 @@ class SelectionController {
   void updateExtentHandlePoint(Offset offset) {
     _selectionHandleLayer.updateExtentHandleOffset(offset);
   }
+  void updateHandlesPointByDelta(Offset delta) {
+    _selectionHandleLayer.updateBaseHandleOffsetByDelta(delta);
+    _selectionHandleLayer.updateExtentHandleOffsetByDelta(delta);
+  }
   void setShouldShowSelectionHandle(bool _b) {
     _shouldShowSelectionHandle = _b;
   }

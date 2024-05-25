@@ -115,20 +115,39 @@ class _AIDialogState extends State<_AIDialog> {
         ),
         CompositedTransformTarget(
           link: _layerLink,
-          child: CupertinoTextField(
-            padding: const EdgeInsets.all(8.0),
-            placeholder: 'Ask AI anything here...',
-            focusNode: _focusNode,
-            onTap: () => _switchActionsLayer(),
-            // onTapOutside: (_) {
-            //   _focusNode.unfocus();
-            //   _triggerActionsLayer(false);
-            // },
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[400]!),
+              // color: Colors.grey[400],
+              borderRadius: BorderRadius.circular(4.0),
+            ),
+            width: double.infinity,
+            child: CupertinoButton(
+              padding: const EdgeInsets.all(8.0),
+              child: const Text('Ask AI anything here', style: TextStyle(color: Colors.grey),),
+              onPressed: () => _switchActionsLayer(),
+            ),
           ),
+          // child: CupertinoTextField(
+          //   padding: const EdgeInsets.all(8.0),
+          //   placeholder: 'Ask AI anything here...',
+          //   focusNode: _focusNode,
+          //   onTap: () => _switchActionsLayer(),
+          //   // onTapOutside: (_) {
+          //   //   _focusNode.unfocus();
+          //   //   _triggerActionsLayer(false);
+          //   // },
+          // ),
         ),
       ],
     );
-    return column;
+    var gestureDetector = GestureDetector(
+      child: column,
+      onTap: () {
+        _triggerActionsLayer(false);
+      },
+    );
+    return gestureDetector;
   }
 
   void _switchActionsLayer() {
@@ -137,7 +156,6 @@ class _AIDialogState extends State<_AIDialog> {
   }
   void _triggerActionsLayer(bool show) {
     if(show != _showSelection) {
-      MyLogger.info('efantest: show=$show');
       setState(() {
         _showSelection = show;
       });
@@ -154,26 +172,39 @@ class _AIDialogState extends State<_AIDialog> {
       padding: const EdgeInsets.all(8.0),
       child: ListView.builder(
         shrinkWrap: true,
-        itemCount: _supportedActions.length,
+        itemCount: _supportedActions.length + 1, // The last item is TextField
         itemBuilder: (context, idx) {
-          return Container(
-            margin: const EdgeInsets.fromLTRB(0, 2.0, 0, 2.0),
-            child: CupertinoButton(
-              padding: const EdgeInsets.all(4.0),
-              minSize: 14.0,
-              child: Text(_supportedActions[idx].displayedText),
-              onPressed: () {
-                _triggerActionsLayer(false);
-                _executeAction(_supportedActions[idx]);
-              },
-            ),
+          if(idx < _supportedActions.length) {
+            return Container(
+              margin: const EdgeInsets.fromLTRB(0, 2.0, 0, 2.0),
+              child: CupertinoButton(
+                padding: const EdgeInsets.all(4.0),
+                minSize: 14.0,
+                child: Text(_supportedActions[idx].displayedText),
+                onPressed: () {
+                  _triggerActionsLayer(false);
+                  _executeAction(_supportedActions[idx]);
+                },
+              ),
+            );
+          }
+          return CupertinoTextField(
+            padding: const EdgeInsets.all(8.0),
+            placeholder: 'Ask AI anything here...',
+            focusNode: _focusNode,
+            onSubmitted: (v) {},
+            // onTap: () => _switchActionsLayer(),
+            // onTapOutside: (_) {
+            //   _focusNode.unfocus();
+            //   _triggerActionsLayer(false);
+            // },
           );
         },
       ),
     );
     var composited = CompositedTransformFollower(
       link: _layerLink,
-      targetAnchor: Alignment.topLeft,
+      targetAnchor: Alignment.bottomLeft,
       followerAnchor: Alignment.bottomLeft,
       child: container,
     );

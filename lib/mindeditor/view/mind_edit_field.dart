@@ -7,7 +7,6 @@ import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/controller/key_control.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
-import 'package:mesh_note/mindeditor/view/mind_edit_block_impl.dart';
 import 'package:my_log/my_log.dart';
 
 import '../document/paragraph_desc.dart';
@@ -43,6 +42,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   bool _hideKeyboard = false; // Hide keyboard manually
   int _activeBlockFirstIndex = -1;
   int _activeBlockLastIndex = -1;
+  double _currentScrollPixel = 0.0;
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -64,6 +64,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     });
     _activeBlockFirstIndex = 0;
     _activeBlockLastIndex = widget.controller.document!.paragraphs.length - 1;
+    _currentScrollPixel = 0;
   }
 
   @override
@@ -89,6 +90,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         child: listView,
       );
     }
+
     bool hidePan = Controller.instance.environment.isMobile();
     var gesture = GestureDetector(
       child: listView,
@@ -680,7 +682,8 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   void _onScroll() {
-    MyLogger.info('_onScroll: height=${_currentSize?.height}, min=${_scrollController.position.pixels}, extent=${_scrollController.position.viewportDimension}');
+    MyLogger.debug('_onScroll: height=${_currentSize?.height}, min=${_scrollController.position.pixels}, extent=${_scrollController.position.viewportDimension}');
+    _updateHandles();
     var paras = widget.controller.document?.paragraphs;
     if(paras == null) return;
 
@@ -731,5 +734,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     } else {
       return true;
     }
+  }
+  void _updateHandles() {
+    var newPixel = _scrollController.position.pixels;
+    double _pixelDelta = newPixel - _currentScrollPixel;
+    _currentScrollPixel = newPixel;
+    widget.controller.selectionController.updateHandlesPointByDelta(Offset(0.0, _pixelDelta));
   }
 }
