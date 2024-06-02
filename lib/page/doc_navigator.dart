@@ -5,9 +5,10 @@ import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/net/status.dart';
-import 'package:mesh_note/mindeditor/view/setting_view.dart';
-import 'package:mesh_note/page/inspired_page.dart';
-import 'package:mesh_note/page/resizable_view.dart';
+import 'large_screen_setting_page.dart';
+import 'small_screen_setting_page.dart';
+import 'inspired_page.dart';
+import 'resizable_view.dart';
 import '../mindeditor/document/dal/doc_data.dart';
 import '../mindeditor/setting/constants.dart';
 
@@ -181,7 +182,11 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       // padding: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 0),
       child: const Icon(CupertinoIcons.gear),
       onPressed: () {
-        SettingView.route(context);
+        if(Controller.instance.environment.isSmallView(context)) {
+          SmallScreenSettingPage.route(context);
+        } else {
+          LargeScreenSettingPage.route(context);
+        }
       },
     );
   }

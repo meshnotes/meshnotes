@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
+import 'package:mesh_note/util/ui_widgets.dart';
 import '../mindeditor/setting/constants.dart';
 import '../util/util.dart';
 
@@ -97,51 +98,16 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
           style: titleStyle,
         ),
         const Spacer(flex: 3,),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            color: Colors.blueGrey[100],
-            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-          ),
-          margin: const EdgeInsets.all(4.0),
-          child: TextButton.icon(
-            icon: const Icon(Icons.note_add_outlined),
-            onPressed: _gotoCreate,
-            label: const Text('Create a new key'),
-          ),
-        ),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey, width: 1.0),
-            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-          ),
-          margin: const EdgeInsets.all(4.0),
-          child: TextButton.icon(
-            icon: Icon(Icons.upload_file_outlined, color: Colors.grey[600],),
-            onPressed: _gotoLoad,
-            label: Text('Load an exist key', style: TextStyle(color: Colors.grey[600]),),
-          ),
-        ),
-        TextButton.icon(
-          icon: Icon(Icons.person_off_outlined, color: Colors.grey[600],),
-          onPressed: _justTry,
-          label: Text('No, I just want to have a try', style: TextStyle(color: Colors.grey[600]),),
-        ),
+        WidgetTemplate.buildDefaultButton(Icons.note_add_outlined, 'Create a new key', _gotoCreate),
+        WidgetTemplate.buildNormalButton(Icons.upload_file_outlined, 'Load an exist key', _gotoLoad),
+        WidgetTemplate.buildInsignificantButton(Icons.person_off_outlined, 'No, I just want to have a try', _justTry),
         const Spacer(flex: 1,),
       ],
     );
     return Scaffold(
-      body: Align(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _maxWidth),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            child: column,
-          ),
-        ),
+      body: Container(
+        padding: const EdgeInsets.all(10),
+        child: column,
       ),
     );
   }
@@ -158,30 +124,10 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
           style: titleStyle,
         ),
         const Spacer(flex: 3,),
-        CupertinoTextField(
-          placeholder: 'your name',
-          controller: userNameController,
-        ),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey, width: 1.0),
-            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-          ),
-          margin: const EdgeInsets.all(4.0),
-          child: TextButton.icon(
-            icon: const Icon(Icons.note_add_outlined),
-            onPressed: hasName? _onCreateNewKey: null,
-            label: const Text('Create new key'),
-          ),
-        ),
+        WidgetTemplate.buildNormalInputField('your name', userNameController),
+        WidgetTemplate.buildNormalButton(Icons.note_add_outlined, 'Create new key', hasName? _onCreateNewKey: null),
         const Spacer(flex: 1,),
-        TextButton.icon(
-          icon: Icon(Icons.arrow_back, color: Colors.grey[600],),
-          onPressed: _gotoMain,
-          label: Text('Back', style: TextStyle(color: Colors.grey[600]),),
-        ),
+        WidgetTemplate.buildInsignificantButton(Icons.arrow_back, 'Back', _gotoMain),
         const Spacer(flex: 1,),
       ],
     );
@@ -220,30 +166,10 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
           style: titleStyle,
         ),
         const Spacer(flex: 3,),
-        CupertinoTextField(
-          placeholder: 'Your old key',
-          controller: privateKeyController,
-        ),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey, width: 1.0),
-            borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-          ),
-          margin: const EdgeInsets.all(4.0),
-          child: TextButton.icon(
-            icon: const Icon(Icons.upload_file_outlined),
-            onPressed: hasKey? _onLoadKey: null,
-            label: const Text('Load exist key'),
-          ),
-        ),
+        WidgetTemplate.buildNormalInputField('Your old key', privateKeyController),
+        WidgetTemplate.buildNormalButton(Icons.upload_file_outlined, 'Load exist key', hasKey? _onLoadKey: null,),
         const Spacer(flex: 1,),
-        TextButton.icon(
-          icon: Icon(Icons.arrow_back, color: Colors.grey[600],),
-          onPressed: _gotoMain,
-          label: Text('Back', style: TextStyle(color: Colors.grey[600]),),
-        ),
+        WidgetTemplate.buildInsignificantButton(Icons.arrow_back, 'Back', _gotoMain),
         const Spacer(flex: 1,),
       ],
     );

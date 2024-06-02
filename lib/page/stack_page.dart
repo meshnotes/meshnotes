@@ -43,7 +43,12 @@ class _StackPageViewState extends State<StackPageView> {
     /// 3. set state to update UI
     Controller.instance.userPrivateInfo = userInfo;
     final base64Str = userInfo.toBase64();
-    final userNameSetting = SettingData(name: Constants.settingKeyUserInfo, comment: Constants.settingCommentUserInfo, value: base64Str);
+    final userNameSetting = SettingData(
+      name: Constants.settingKeyUserInfo,
+      displayName: Constants.settingNameUserInfo,
+      comment: Constants.settingCommentUserInfo,
+      value: base64Str,
+    );
     Controller.instance.setting.saveSettings([userNameSetting]);
     Controller.instance.tryStartingNetwork();
     setState(() {

@@ -5,6 +5,7 @@ import '../controller/controller.dart';
 
 class SettingData {
   final String name;
+  final String displayName;
   String value;
   final String comment;
   final bool isNumber;
@@ -13,6 +14,7 @@ class SettingData {
 
   SettingData({
     required this.name,
+    required this.displayName,
     this.value = '',
     required this.comment,
     this.isNumber = false,
@@ -23,7 +25,7 @@ class SettingData {
     }
   }
   SettingData clone() {
-    return SettingData(name: name, value: value, comment: comment, isNumber: isNumber, defaultValue: defaultValue);
+    return SettingData(name: name, displayName: displayName, value: value, comment: comment, isNumber: isNumber, defaultValue: defaultValue);
   }
 }
 
@@ -59,6 +61,7 @@ class Setting {
   final List<SettingData> _settingsSupported = [
     SettingData(
       name: Constants.settingKeyServerList,
+      displayName: Constants.settingNameServerList,
       comment: Constants.settingCommentServerList,
       defaultValue: Constants.settingDefaultServerList,
     ),
@@ -75,28 +78,34 @@ class Setting {
     // ),
     SettingData(
       name: Constants.settingKeyLocalPort,
+      displayName: Constants.settingNameLocalPort,
       comment: Constants.settingCommentLocalPort,
       isNumber: true,
       defaultValue: Constants.settingDefaultLocalPort,
     ),
     SettingData(
       name: Constants.settingKeyTest,
+      displayName: Constants.settingNameTest,
       comment: Constants.settingCommentTest,
     ),
     SettingData(
       name: Constants.settingKeyUserInfo,
+      displayName: Constants.settingNameUserInfo,
       comment: Constants.settingCommentUserInfo,
     ),
     SettingData(
       name: Constants.settingKeyPluginKimiApiKey,
+      displayName: Constants.settingNamePluginKimiApiKey,
       comment: Constants.settingCommentPluginKimiApiKey,
     ),
     SettingData(
       name: Constants.settingKeyPluginOpenAiApiKey,
+      displayName: Constants.settingNamePluginOpenAiApiKey,
       comment: Constants.settingCommentPluginOpenAiApiKey,
     ),
     SettingData(
       name: Constants.settingKeyPluginDefaultAiService,
+      displayName: Constants.settingNamePluginDefaultAiService,
       comment: Constants.settingCommentPluginDefaultAiService,
       defaultValue: Constants.settingDefaultPluginDefaultAiService,
     ),

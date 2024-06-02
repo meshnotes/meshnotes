@@ -131,7 +131,11 @@ class DocumentManager {
         continue;
       }
       final object = _db.getObject(versionHash);
-      final json = object!.data;
+      if(object == null) {
+        MyLogger.warn('assembleRequireVersions: object(hash=$versionHash) not found!!!, versionData=$versionData');
+        continue;
+      }
+      final json = object.data;
       final versionContent = VersionContent.fromJson(jsonDecode(json));
       Map<String, RelatedObject> requiredObjects = _genRequiredObjects(versionContent);
 

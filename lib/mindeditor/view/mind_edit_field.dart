@@ -145,6 +145,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     widget.focusNode.removeListener(_handleFocusChanged);
     _focusAttachment!.detach();
     widget.controller.selectionController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 

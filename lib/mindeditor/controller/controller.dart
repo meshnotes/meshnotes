@@ -260,13 +260,13 @@ class Controller {
       //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
       return;
     }
-    MyLogger.info('efantest: receive version tree: $dag');
+    MyLogger.info('receiveVersionTree: receive version tree: $dag');
     docManager.assembleVersionTree(dag);
   }
   void receiveRequireVersions(List<String> requiredVersions) {
-    MyLogger.info('efantest: receive require versions message: $requiredVersions');
+    MyLogger.info('receiveRequireVersions: receive require versions message: $requiredVersions');
     var versions = docManager.assembleRequireVersions(requiredVersions);
-    MyLogger.info('efantest: preparing to send versions: $versions');
+    MyLogger.info('receiveRequireVersions: preparing to send versions: $versions');
     network.sendVersions(versions);
   }
   void receiveResources(List<UnsignedResource> resources) {
@@ -282,7 +282,9 @@ class Controller {
         nonChainResources.add(res);
       }
     }
-    docManager.assembleResources(nonChainResources);
+    if(nonChainResources.isNotEmpty) {
+      docManager.assembleResources(nonChainResources);
+    }
 
     for(var chain in versionChains) {
       receiveVersionTree(chain.versionDag);

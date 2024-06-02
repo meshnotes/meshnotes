@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import '../setting/constants.dart';
-import '../setting/setting.dart';
+import '../mindeditor/setting/constants.dart';
+import '../mindeditor/setting/setting.dart';
 
-class SettingView extends StatefulWidget {
+class LargeScreenSettingPage extends StatefulWidget {
   final List<SettingData> settings;
 
-  const SettingView({
+  const LargeScreenSettingPage({
     super.key,
     required this.settings,
   });
@@ -17,17 +17,17 @@ class SettingView extends StatefulWidget {
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return SettingView(settings: Controller.instance.setting.getSettings());
+        return LargeScreenSettingPage(settings: Controller.instance.setting.getSettings());
       },
       fullscreenDialog: true,
     ));
   }
 
   @override
-  State<StatefulWidget> createState() => _SettingViewState();
+  State<StatefulWidget> createState() => _LargeScreenSettingPageState();
 }
 
-class _SettingViewState extends State<SettingView> {
+class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
   List<String> newValue = [];
   List<bool> hasChanged = [];
   final List<TextEditingController> _controllers = [];
@@ -47,10 +47,7 @@ class _SettingViewState extends State<SettingView> {
 
   @override
   Widget build(BuildContext context) {
-    double padding = Constants.settingViewPhonePadding.toDouble();
-    if(Controller.instance.environment.isDesktop()) {
-      padding = Constants.settingViewDesktopPadding.toDouble();
-    }
+    double padding = Constants.settingViewDesktopPadding.toDouble();
     var topButtons = _buildTopButtons(context);
     var settingBody = _buildSettings(context);
     var bottomButtons = _buildBottomButtons(context);
@@ -58,7 +55,6 @@ class _SettingViewState extends State<SettingView> {
       body: Column(
         children: [
           const Padding(padding: EdgeInsets.fromLTRB(0, 10, 0, 0)),
-          topButtons,
           Expanded(
             child: Container(
               padding: EdgeInsets.all(padding),
@@ -71,7 +67,6 @@ class _SettingViewState extends State<SettingView> {
       )
     );
   }
-
   Widget _buildTopButtons(BuildContext context) {
     return Row(
       children: [
@@ -91,7 +86,7 @@ class _SettingViewState extends State<SettingView> {
       children: [
         TextButton.icon(
           icon: const Icon(Icons.check),
-          label: const Text('应用'),
+          label: const Text('Save'),
           style: TextButton.styleFrom(
             foregroundColor: Colors.black,
           ),
@@ -103,7 +98,7 @@ class _SettingViewState extends State<SettingView> {
         const Padding(padding: EdgeInsets.all(10)),
         TextButton.icon(
           icon: const Icon(Icons.clear),
-          label: const Text('关闭'),
+          label: const Text('Exit'),
           style: TextButton.styleFrom(
             foregroundColor: Colors.black,
           ),
@@ -115,7 +110,6 @@ class _SettingViewState extends State<SettingView> {
     );
     return row;
   }
-
   Widget _buildSettings(BuildContext context) {
     var list = ListView.builder(
       itemCount: widget.settings.length,
@@ -134,7 +128,7 @@ class _SettingViewState extends State<SettingView> {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 alignment: Alignment.centerRight,
-                child: Text((hasChanged[index]? '*': '') + settingItem.name),
+                child: Text((hasChanged[index]? '*': '') + settingItem.displayName),
               ),
             ),
             Expanded(
@@ -142,12 +136,13 @@ class _SettingViewState extends State<SettingView> {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 alignment: Alignment.centerLeft,
-                child: TextField(
+                child: CupertinoTextField(
                   controller: _controllers[index],
-                  decoration: InputDecoration(
-                    hintText: settingItem.comment,
-                    border: const OutlineInputBorder(),
-                  ),
+                  placeholder: settingItem.comment,
+                  // decoration: InputDecoration(
+                  //   hintText:
+                  //   border: const OutlineInputBorder(),
+                  // ),
                   autofocus: true,
                   inputFormatters: formatters,
                   onChanged: (text) {
