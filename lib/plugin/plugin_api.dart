@@ -17,10 +17,14 @@ abstract class PluginInstance {
 }
 
 class PluginRegisterInformation {
+  String pluginName;
   ToolbarInformation toolbarInformation;
+  List<PluginSetting> settingsInformation;
 
   PluginRegisterInformation({
+    required this.pluginName,
     required this.toolbarInformation,
+    required this.settingsInformation,
   });
 }
 
@@ -33,5 +37,19 @@ class ToolbarInformation {
     required this.buttonIcon,
     required this.action,
     required this.tip,
+  });
+}
+
+class PluginSetting {
+  String settingKey;
+  String settingName;
+  String settingComment;
+  String settingDefaultValue;
+
+  PluginSetting({
+    required this.settingKey,
+    required this.settingName,
+    required this.settingComment,
+    this.settingDefaultValue = '',
   });
 }

@@ -271,7 +271,7 @@ class DocumentManager {
     // var docContentStr = objects[found.hash]!;
     var docObject = _db.getObject(found.hash);
     var docContentStr = docObject!.data;
-    MyLogger.info('efantest: docContent=$docContentStr');
+    MyLogger.info('_updateDoc: docContent=$docContentStr');
     _db.storeObject(found.hash, docContentStr, found.timestamp);
     var docContent = DocContent.fromJson(jsonDecode(docContentStr));
 
@@ -283,7 +283,7 @@ class DocumentManager {
       // String blockStr = objects[blockHash]!;
       var blockObject = _db.getObject(blockHash);
       var blockStr = blockObject!.data;
-      MyLogger.info('efantest: docId=$docId, blockId=$blockId, blockHash=$blockHash, blockStr=$blockStr');
+      MyLogger.info('_updateDoc: docId=$docId, blockId=$blockId, blockHash=$blockHash, blockStr=$blockStr');
       if(blockId == Constants.keyTitleId) {
         BlockContent blockContent = BlockContent.fromJson(jsonDecode(blockStr));
         var title = '';
@@ -308,7 +308,7 @@ class DocumentManager {
     }
     // If document is currently opening, refresh it
     if(currentDocId == docId) {
-      MyLogger.info('efantest: refresh current document');
+      MyLogger.info('_updateDoc: refresh current document');
       var blockState = Controller.instance.getEditingBlockState();
       var currentBlockId = blockState?.getBlockId();
       var position = blockState?.widget.texts.getTextSelection()?.extentOffset;

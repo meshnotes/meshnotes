@@ -75,17 +75,7 @@ class Constants {
   static const String settingKeyUserInfo = 'user_info';
   static const String settingNameUserInfo = 'User private key';
   static const String settingCommentUserInfo = 'User name and private key information(formatted in base64)';
-  static const String settingKeyPluginPrefix = 'plugin/';
-  static const String settingKeyPluginKimiApiKey = '${settingKeyPluginPrefix}kimi_api_key';
-  static const String settingNamePluginKimiApiKey = 'API key for Kimi.ai';
-  static const String settingCommentPluginKimiApiKey = 'API key for kimi.ai';
-  static const String settingKeyPluginOpenAiApiKey = '${settingKeyPluginPrefix}openai_api_key';
-  static const String settingNamePluginOpenAiApiKey = 'API key for OpenAI';
-  static const String settingCommentPluginOpenAiApiKey = 'API Key for OpenAI';
-  static const String settingKeyPluginDefaultAiService = '${settingKeyPluginPrefix}default_ai_service';
-  static const String settingNamePluginDefaultAiService = 'AI service provider';
-  static const String settingCommentPluginDefaultAiService = 'Default AI service(e.g. chatgpt, or kimi.ai)';
-  static const String settingDefaultPluginDefaultAiService = 'chatgpt';
+  static const String settingKeyPluginPrefix = 'plugin';
 
   static const String userNameAndKeyOfGuest = 'guest';
 

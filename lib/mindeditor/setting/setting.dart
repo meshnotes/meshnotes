@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
+import 'package:my_log/my_log.dart';
 import '../controller/controller.dart';
 
 class SettingData {
@@ -58,6 +59,7 @@ class Setting {
   Color toolBarButtonTriggerOnColor = Colors.grey[400]!;
 
   // Changeable settings
+  final Map<String, SettingData> _settingMap = {};
   final List<SettingData> _settingsSupported = [
     SettingData(
       name: Constants.settingKeyServerList,
@@ -65,17 +67,6 @@ class Setting {
       comment: Constants.settingCommentServerList,
       defaultValue: Constants.settingDefaultServerList,
     ),
-    // SettingData(
-    //   name: Constants.settingKeyServerIp,
-    //   comment: Constants.settingCommentServerIp,
-    //   defaultValue: Constants.settingDefaultServerIp,
-    // ),
-    // SettingData(
-    //   name: Constants.settingKeyServerPort,
-    //   comment: Constants.settingCommentServerPort,
-    //   number: true,
-    //   defaultValue: Constants.settingDefaultServerPort,
-    // ),
     SettingData(
       name: Constants.settingKeyLocalPort,
       displayName: Constants.settingNameLocalPort,
@@ -93,32 +84,13 @@ class Setting {
       displayName: Constants.settingNameUserInfo,
       comment: Constants.settingCommentUserInfo,
     ),
-    SettingData(
-      name: Constants.settingKeyPluginKimiApiKey,
-      displayName: Constants.settingNamePluginKimiApiKey,
-      comment: Constants.settingCommentPluginKimiApiKey,
-    ),
-    SettingData(
-      name: Constants.settingKeyPluginOpenAiApiKey,
-      displayName: Constants.settingNamePluginOpenAiApiKey,
-      comment: Constants.settingCommentPluginOpenAiApiKey,
-    ),
-    SettingData(
-      name: Constants.settingKeyPluginDefaultAiService,
-      displayName: Constants.settingNamePluginDefaultAiService,
-      comment: Constants.settingCommentPluginDefaultAiService,
-      defaultValue: Constants.settingDefaultPluginDefaultAiService,
-    ),
   ];
-  final Map<String, SettingData> _settingMap = {};
 
-  Setting() {
+  void loadFromDb(DbHelper db) {
+    _settingMap.clear();
     for(final item in _settingsSupported) {
       _settingMap[item.name] = item;
     }
-  }
-
-  void loadFromDb(DbHelper db) {
     var settings = db.getSettings();
     for(final key in settings.keys) {
       if(!_settingMap.containsKey(key)) continue;
@@ -150,5 +122,20 @@ class Setting {
     }
     Controller.instance.dbHelper.saveSettings(toBeSave);
     return true;
+  }
+  void addAdditionalSettings(List<SettingData> settings) {
+    for(var item in settings) {
+      bool valid = true;
+      for(var supported in _settingsSupported) {
+        if(item.name == supported.name) {
+          MyLogger.debug('addSupportedSettings: conflict setting, name=${item.name}');
+          valid = false;
+          break;
+        }
+      }
+      if(valid) {
+        _settingsSupported.add(item);
+      }
+    }
   }
 }

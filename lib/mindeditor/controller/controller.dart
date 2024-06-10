@@ -99,6 +99,9 @@ class Controller {
     _pluginManager = PluginManager();
     _pluginManager.initPluginManager();
 
+    setting.addAdditionalSettings(_pluginManager.getPluginSupportedSettings());
+    setting.loadFromDb(dbHelper);
+
     MyLogger.debug('initAll: finish initialization');
     return true;
   }

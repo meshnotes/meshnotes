@@ -2,8 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/editor_controller.dart';
+import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:mesh_note/plugin/ai/plugin_ai.dart';
+import 'package:my_log/my_log.dart';
 import '../mindeditor/controller/controller.dart';
 import '../mindeditor/setting/constants.dart';
 import '../mindeditor/view/toolbar/appearance_setting.dart';
@@ -14,16 +16,17 @@ List<PluginInstance> _plugins = [
 ];
 
 class PluginManager {
-  late PluginProxy _pluginProxy;
   List<ToolbarInformation> toolbarInfo = [];
   BuildContext? _context;
   OverlayEntry? _overlayEntry;
+  final List<SettingData> _pluginSupportedSettings = [];
+  final Map<PluginProxy, PluginRegisterInformation> _pluginInstances = {};
 
   void initPluginManager() {
-    _pluginProxy = PluginProxyImpl(this);
-
     for(var plugin in _plugins) {
+      var _pluginProxy = PluginProxyImpl(this);
       plugin.initPlugin(_pluginProxy);
+      _pluginProxy.init(plugin);
     }
 
     for(var plugin in _plugins) {
@@ -35,8 +38,34 @@ class PluginManager {
     _context = context;
   }
 
-  void addPlugin(PluginRegisterInformation pluginInfo) {
+  /// Register plugin
+  /// 1. Add plugin toolbar
+  /// 2. Add plugin settings
+  void registerPlugin(PluginProxyImpl proxy, PluginRegisterInformation pluginInfo) {
+    if(_pluginInstances.containsKey(proxy)) return; // Duplicated
+
+    _pluginInstances[proxy] = pluginInfo;
     toolbarInfo.add(pluginInfo.toolbarInformation);
+    for(var setting in pluginInfo.settingsInformation) {
+      _addToSupportedSetting(pluginInfo.pluginName, setting);
+    }
+  }
+  void _addToSupportedSetting(String pluginName, PluginSetting setting) {
+    // Add prefix to the key, check duplication, and add the setting item
+    String key = '${Constants.settingKeyPluginPrefix}/$pluginName/${setting.settingKey}';
+    for(var item in _pluginSupportedSettings) {
+      if(item.name == key) {
+        MyLogger.warn('Duplicated plugin key: $key');
+        return;
+      }
+    }
+    SettingData settingData = SettingData(
+      name: key,
+      displayName: setting.settingName,
+      comment: setting.settingComment,
+      defaultValue: setting.settingDefaultValue,
+    );
+    _pluginSupportedSettings.add(settingData);
   }
 
   List<Widget> buildButtons({
@@ -64,8 +93,11 @@ class PluginManager {
     }
     return content;
   }
-  String? getSettingValue(String pluginKey) {
-    String key = '${Constants.settingKeyPluginPrefix}$pluginKey';
+  String? getSettingValue(PluginProxyImpl proxy, String pluginKey) {
+    if(!_pluginInstances.containsKey(proxy)) return null; // Check
+
+    String pluginName = _pluginInstances[proxy]!.pluginName;
+    String key = '${Constants.settingKeyPluginPrefix}/$pluginName/$pluginKey';
     return Controller.instance.setting.getSetting(key);
   }
   void sendTextToClipboard(String text) {
@@ -151,6 +183,10 @@ class PluginManager {
     );
     Overlay.of(_context!).insert(_overlayEntry!);
   }
+
+  List<SettingData> getPluginSupportedSettings() {
+    return _pluginSupportedSettings;
+  }
   Widget _buildTitleBar(String title) {
     var titleText = Text(title);
     var button = CupertinoButton(
@@ -176,12 +212,16 @@ class PluginManager {
 
 class PluginProxyImpl implements PluginProxy {
   final PluginManager _manager;
+  late final PluginInstance _instance;
 
   PluginProxyImpl(PluginManager pluginManager): _manager = pluginManager;
+  PluginInstance getInstance() => _instance;
+
+  void init(PluginInstance instance) => _instance = instance;
 
   @override
   void registerPlugin(PluginRegisterInformation pluginRegisterInfo) {
-    _manager.addPlugin(pluginRegisterInfo);
+    _manager.registerPlugin(this, pluginRegisterInfo);
   }
 
   @override
@@ -196,7 +236,7 @@ class PluginProxyImpl implements PluginProxy {
 
   @override
   String? getSettingValue(String key) {
-    return _manager.getSettingValue(key);
+    return _manager.getSettingValue(this, key);
   }
 
   @override

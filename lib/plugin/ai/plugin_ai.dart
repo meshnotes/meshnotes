@@ -3,24 +3,38 @@ import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:my_log/my_log.dart';
-
 import 'abstract_agent.dart';
 import 'kimi_agent.dart';
 import 'openai_agent.dart';
 
 class PluginAI implements PluginInstance {
   static const _dialogTitle = 'AI assistant';
+  static const _pluginName = 'ai_support';
   static const _settingKeyKimiApiKey = 'kimi_api_key';
   static const _settingKeyOpenAiApiKey = 'openai_api_key';
   static const _settingKeyDefaultAiService = 'default_ai_service';
+  static const String settingKeyPluginKimiApiKey = 'kimi_api_key';
+  static const String settingNamePluginKimiApiKey = 'API key for Kimi.ai';
+  static const String settingCommentPluginKimiApiKey = 'API key for kimi.ai';
+  static const String settingKeyPluginOpenAiApiKey = 'openai_api_key';
+  static const String settingNamePluginOpenAiApiKey = 'API key for OpenAI';
+  static const String settingCommentPluginOpenAiApiKey = 'API Key for OpenAI';
+  static const String settingKeyPluginDefaultAiService = 'default_ai_service';
+  static const String settingNamePluginDefaultAiService = 'AI service provider';
+  static const String settingCommentPluginDefaultAiService = 'Default AI service(e.g. chatgpt, or kimi.ai)';
+  static const String settingDefaultPluginDefaultAiService = 'chatgpt';
   late PluginProxy _proxy;
-  // String? _apiKey;
 
   @override
   void initPlugin(PluginProxy proxy) {
     _proxy = proxy;
     final toolbarInfo = ToolbarInformation(buttonIcon: Icons.wb_incandescent_outlined, action: _aiAction, tip: 'AI assistant');
-    final registerInfo = PluginRegisterInformation(toolbarInformation: toolbarInfo);
+    final settingInfo = _genPluginSettings();
+    final registerInfo = PluginRegisterInformation(
+      pluginName: _pluginName,
+      toolbarInformation: toolbarInfo,
+      settingsInformation: settingInfo,
+    );
     proxy.registerPlugin(registerInfo);
   }
 
@@ -29,6 +43,27 @@ class PluginAI implements PluginInstance {
     // TODO: implement start
   }
 
+  List<PluginSetting> _genPluginSettings() {
+    List<PluginSetting> result = [
+      PluginSetting(
+        settingKey: settingKeyPluginKimiApiKey,
+        settingName: settingNamePluginKimiApiKey,
+        settingComment: settingCommentPluginKimiApiKey,
+      ),
+      PluginSetting(
+        settingKey: settingKeyPluginOpenAiApiKey,
+        settingName: settingNamePluginOpenAiApiKey,
+        settingComment: settingCommentPluginOpenAiApiKey,
+      ),
+      PluginSetting(
+        settingKey: settingKeyPluginDefaultAiService,
+        settingName: settingNamePluginDefaultAiService,
+        settingComment: settingCommentPluginDefaultAiService,
+        settingDefaultValue: settingDefaultPluginDefaultAiService,
+      ),
+    ];
+    return result;
+  }
   void _aiAction() {
     var _executor = _buildAiExecutor();
     if(_executor != null) {
