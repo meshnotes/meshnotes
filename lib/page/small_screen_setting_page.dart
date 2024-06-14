@@ -117,7 +117,7 @@ class _SmallScreenSettingPageState extends State<SmallScreenSettingPage> {
                 padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  settingItem.displayName,
+                  settingItem.displayName!,
                   style: const TextStyle(fontSize: Constants.styleTitleFontSize,),
                 ),
               ),
@@ -211,7 +211,7 @@ class _DetailSettingPage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
           child: Text('Editing ${settingData.displayName}', style: const TextStyle(fontSize: Constants.styleTitleFontSize, fontWeight: FontWeight.bold),),
         ),
-        WidgetTemplate.buildNormalInputField(settingData.comment, _controller),
+        WidgetTemplate.buildNormalInputField(settingData.comment!, _controller),
       ],
     );
     return list;

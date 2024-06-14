@@ -1,9 +1,7 @@
 import 'dart:ffi';
-import 'dart:io';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/dal_version/db_script.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:sqlite3/open.dart';
 import 'package:my_log/my_log.dart';
@@ -58,22 +56,33 @@ class RealDbHelper implements DbHelper {
   };
 
   static DynamicLibrary _openOnLinux() {
-    final scriptDir = File(Platform.script.toFilePath()).parent;
-    final libraryNextToScript = File('${scriptDir.path}/libsqlite3-dev.so');
-    return DynamicLibrary.open(libraryNextToScript.path);
+    return _tryToLoadLibrary('libsqlite3-dev.so');
   }
   static DynamicLibrary _openOnWindows() {
-    final scriptDir = File(Platform.script.toFilePath()).parent;
-    final libraryNextToScript = File('${scriptDir.path}/sqlite3.dll');
-    return DynamicLibrary.open(libraryNextToScript.path);
+    return _tryToLoadLibrary('sqlite3.dll');
+  }
+  static DynamicLibrary _tryToLoadLibrary(String fileName) {
+    final List<String> lookupPath = Controller.instance.environment.getLibraryPaths();
+    dynamic lastError;
+    for(var path in lookupPath) {
+      String fullPath = '$path/$fileName';
+      try {
+        var result = DynamicLibrary.open(fullPath);
+        MyLogger.info('Load library($fullPath) success');
+        return result;
+      } on Error catch(e) {
+        MyLogger.warn('Error loading library($fullPath): $e');
+        lastError = e;
+      }
+    }
+    throw lastError;
   }
 
   @override
   Future<void> init() async {
     open.overrideFor(OperatingSystem.linux, _openOnLinux);
     open.overrideFor(OperatingSystem.windows, _openOnWindows);
-    final directory = await getApplicationDocumentsDirectory();
-    final dbFile = join(directory.path, dbFileName);
+    final dbFile = await Controller.instance.environment.getExistFileFromLibraryPathsByEnvironment(dbFileName);
     MyLogger.info('MeshNotesDB: start opening mesh_notes db: $dbFile');
     final db = sqlite3.open(dbFile);
     MyLogger.debug('MeshNotesDB: finish loading sqlite3');

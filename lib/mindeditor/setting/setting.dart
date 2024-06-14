@@ -1,23 +1,23 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:my_log/my_log.dart';
-import '../controller/controller.dart';
 
 class SettingData {
   final String name;
-  final String displayName;
-  String value;
-  final String comment;
+  String? displayName;
+  String? value;
+  String? comment;
   final bool isNumber;
   String defaultValue;
 
 
   SettingData({
     required this.name,
-    required this.displayName,
-    this.value = '',
-    required this.comment,
+    this.displayName,
+    this.value,
+    this.comment,
     this.isNumber = false,
     this.defaultValue = '',
   }) {
@@ -31,8 +31,10 @@ class SettingData {
 }
 
 class Setting {
+  String settingFileName;
   // Single object
-  static Setting defaultSetting = Setting();
+  // static Setting defaultSetting = Setting();
+  Setting(String fileName): settingFileName = fileName;
 
   // block handler
   double blockHandlerSize = 16.0; // 抓手的大小
@@ -86,23 +88,66 @@ class Setting {
     ),
   ];
 
+  void load() {
+    _settingMap.clear();
+    for(final item in _settingsSupported) {
+      _settingMap[item.name] = item;
+    }
+    var file = File(settingFileName);
+    if(file.existsSync()) {
+      var settings = _getSettingsFromFile(file);
+      for(final key in settings.keys) {
+        if(!_settingMap.containsKey(key)) continue;
+        _settingMap[key]!.value = settings[key]??'';
+      }
+    }
+  }
+  static Map<String, String> _getSettingsFromFile(File file) {
+    Map<String, String> result = {};
+    var lines = file.readAsLinesSync();
+    MyLogger.info('efantest: lines=$lines');
+    for(var line in lines) {
+      var (key, value) = _parseLine(line);
+      if(key == null || value == null) continue;
+      result[key] = value;
+    }
+    return result;
+  }
+  static (String?, String?) _parseLine(String line) {
+    int idx = line.indexOf('=');
+    if(idx == -1) {
+      return (null, null);
+    }
+    String key = line.substring(0, idx).trim();
+    String value = line.substring(idx + 1).trim();
+    return (key, value);
+  }
   void loadFromDb(DbHelper db) {
     _settingMap.clear();
     for(final item in _settingsSupported) {
       _settingMap[item.name] = item;
     }
     var settings = db.getSettings();
-    for(final key in settings.keys) {
-      if(!_settingMap.containsKey(key)) continue;
-      _settingMap[key]!.value = settings[key]??'';
+    for(final e in settings.entries) {
+      String key = e.key;
+      String value = e.value;
+      if(_settingMap.containsKey(key)) {
+        _settingMap[key]!.value = value;
+      } else {
+        _settingMap[key] = SettingData(name: key, value: value);
+      }
     }
   }
 
   List<SettingData> getSettings() {
     var result = <SettingData>[];
-    for(final key in _settingMap.keys) {
-      result.add(_settingMap[key]!.clone());
+    for(final e in _settingMap.entries) {
+      final value = e.value;
+      if(value.displayName != null && value.comment != null) {
+        result.add(value.clone());
+      }
     }
+    MyLogger.info('efantest: result=$result');
     return result;
   }
   String? getSetting(String key) {
@@ -115,13 +160,26 @@ class Setting {
   bool saveSettings(List<SettingData> settings) {
     var toBeSave = <String, String>{};
     for(var item in settings) {
-      final name = item.name;
-      if(!_settingMap.containsKey(name)) continue;
-      _settingMap[name] = item;
-      toBeSave[item.name] = item.value;
+      final key = item.name;
+      final value = item.value;
+      if(!_settingMap.containsKey(key) || value == null) continue;
+      _settingMap[key] = item;
+      toBeSave[item.name] = value;
     }
-    Controller.instance.dbHelper.saveSettings(toBeSave);
+    String content = _genSettingLines(_settingMap);
+    File(settingFileName).writeAsStringSync(content);
     return true;
+  }
+  static String _genSettingLines(Map<String, SettingData> settings) {
+    String result = '';
+    for(var e in settings.entries) {
+      final name = e.key;
+      final value = e.value.value;
+      if(value != null) {
+        result += '$name = $value\n';
+      }
+    }
+    return result;
   }
   void addAdditionalSettings(List<SettingData> settings) {
     for(var item in settings) {

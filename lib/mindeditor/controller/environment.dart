@@ -1,5 +1,6 @@
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
 import 'package:flutter/cupertino.dart';
+import 'package:path_provider/path_provider.dart';
 import '../setting/constants.dart';
 
 class Environment {
@@ -29,5 +30,47 @@ class Environment {
   bool isSmallView(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     return screenWidth <= Constants.widthThreshold;
+  }
+
+  List<String> getLibraryPaths() {
+    return [
+      File(Platform.script.toFilePath()).parent.path,
+      File(Platform.resolvedExecutable).parent.path,
+    ];
+  }
+
+  String getExistFileFromLibraryPaths(String fileName) {
+    final lookupPaths = getLibraryPaths();
+    String? firstChoicePath;
+    for(var path in lookupPaths) {
+      final fullPath = '$path/$fileName';
+      firstChoicePath ??= fullPath;
+      if(File(fullPath).existsSync()) {
+        return fullPath;
+      }
+    }
+    return firstChoicePath!;
+  }
+
+  Future<List<String>> getLibraryPathsByEnvironment() async {
+    if(isWindows() || isLinux() || isMac()) {
+      return [
+        File(Platform.script.toFilePath()).parent.path,
+        File(Platform.resolvedExecutable).parent.path,
+      ];
+    }
+    return [getApplicationDocumentsDirectory().toString()];
+  }
+  Future<String> getExistFileFromLibraryPathsByEnvironment(String fileName) async {
+    final lookupPaths = await getLibraryPathsByEnvironment();
+    String? firstChoicePath;
+    for(var path in lookupPaths) {
+      final fullPath = '$path/$fileName';
+      firstChoicePath ??= fullPath;
+      if(File(fullPath).existsSync()) {
+        return fullPath;
+      }
+    }
+    return firstChoicePath!;
   }
 }

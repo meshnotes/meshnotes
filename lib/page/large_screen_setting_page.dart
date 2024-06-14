@@ -128,7 +128,7 @@ class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 alignment: Alignment.centerRight,
-                child: Text((hasChanged[index]? '*': '') + settingItem.displayName),
+                child: Text((hasChanged[index]? '*': '') + settingItem.displayName!),
               ),
             ),
             Expanded(

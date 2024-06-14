@@ -32,7 +32,7 @@ class Controller {
   final FocusNode globalFocusNode = FocusNode();
   final Environment environment = Environment();
   final Device device = Device();
-  final Setting setting = Setting.defaultSetting;
+  late final Setting setting;// = Setting.defaultSetting;
   // Mouse and gesture handler
   late final GestureHandler gestureHandler;
   late final NetworkController network;
@@ -70,14 +70,15 @@ class Controller {
   }
 
   Future<bool> initAll(NetworkController _net, {bool test=false}) async {
-    MyLogger.debug('initAll: init db');
+    // Load settings before starting network
+    final confFile = environment.getExistFileFromLibraryPaths('setting.conf');
+    MyLogger.info('initAll: load settings from $confFile');
+    setting = Setting(confFile);
+    setting.load();
 
+    MyLogger.debug('initAll: init db');
     await dbHelper.init();
     _docManager = DocumentManager(db: dbHelper);
-
-    // Load settings before starting network
-    MyLogger.debug('initAll: load settings');
-    setting.loadFromDb(dbHelper);
 
     // Load user information from setting
     userPrivateInfo = _loadUserInfo(setting);
@@ -100,7 +101,7 @@ class Controller {
     _pluginManager.initPluginManager();
 
     setting.addAdditionalSettings(_pluginManager.getPluginSupportedSettings());
-    setting.loadFromDb(dbHelper);
+    setting.load();
 
     MyLogger.debug('initAll: finish initialization');
     return true;
