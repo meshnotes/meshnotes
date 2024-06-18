@@ -1,0 +1,19 @@
+name: libp2p
+description: A peer to peer library for MeshNote
+version: 1.0.0
+publish_to: none
+#homepage: http://xxx.yyy.zzz
+
+environment:
+  sdk: ">=3.1.0 <=3.3.4"
+
+dependencies:
+  sqlite3: ^1.10.1
+  sqlite3_flutter_libs: ^0.5.13
+  path_provider: ^2.0.1
+  my_log:
+    path: ../my_log
+
+dev_dependencies:
+  lints: ^2.0.0
+  test: ^1.16.0

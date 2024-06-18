@@ -1,0 +1,652 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/mindeditor/controller/key_control.dart';
+import 'package:mesh_note/mindeditor/document/document.dart';
+import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
+import 'package:my_log/my_log.dart';
+
+import '../document/paragraph_desc.dart';
+import 'view_helper.dart' as helper;
+
+class MindEditField extends StatefulWidget {
+  final Controller controller;
+  final bool isReadOnly;
+  final FocusNode focusNode;
+  final Document document;
+
+  const MindEditField({
+    Key? key,
+    required this.controller,
+    this.isReadOnly = false,
+    required this.focusNode,
+    required this.document,
+  }): super(key: key);
+
+  @override
+  State<StatefulWidget> createState() => MindEditFieldState();
+}
+
+class MindEditFieldState extends State<MindEditField> implements TextInputClient {
+  UniqueKey uniqueKey = UniqueKey();
+  FocusAttachment? _focusAttachment;
+  TextInputConnection? _textInputConnection;
+  TextEditingValue? _lastEditingValue;
+  Rect? _currentSize;
+  ScrollController controller = ScrollController();
+  String _initialTextValue = ''; // In iOS, use this prefix to detect backspace in soft keyboard
+  static const String _iosInitialTextValue = '\u200b';
+
+  bool get _hasFocus => widget.focusNode.hasFocus;
+  bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
+  bool get _shouldCreateInputConnection => kIsWeb || !widget.isReadOnly;
+
+  @override
+  void initState() {
+    super.initState();
+    if(widget.controller.environment.isIos()) {
+      _initialTextValue = _iosInitialTextValue;
+    }
+    initDocAndControlBlock();
+    CallbackRegistry.registerEditFieldState(this);
+    _attachFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    MyLogger.info('MindEditFieldState: build block list');
+    _updateContext(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final render = context.findRenderObject()! as RenderBox;
+      _currentSize = render.localToGlobal(Offset.zero) & render.size;
+    });
+    _focusAttachment!.reparent();
+    Widget listView = _buildBlockList();
+    if(Controller.instance.isDebugMode) {
+      listView = Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Colors.grey,
+            width: 5,
+          ),
+        ),
+        child: listView,
+      );
+    }
+    var gesture = GestureDetector(
+      child: listView,
+      onTapDown: (TapDownDetails details) {
+        MyLogger.debug('MindEditFieldState: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onTapOrDoubleTap(details);
+      },
+      onPanStart: (DragStartDetails details) {
+        MyLogger.info('MindEditFieldState: on pan start, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onPanStart(details);
+      },
+      onPanUpdate: (DragUpdateDetails details) {
+        MyLogger.info('MindEditFieldState: on pan update, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onPanUpdate(details);
+      },
+      onPanDown: (DragDownDetails details) {
+        MyLogger.info('MindEditFieldState: on pan down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+        widget.controller.gestureHandler.onPanDown(details);
+      },
+      onPanCancel: () {
+        MyLogger.info('MindEditFieldState: on pan cancel, id=${widget.key}');
+        // widget.controller.gestureHandler.onPanCancel(widget.texts.getBlockId());
+      },
+      onPanEnd: (DragEndDetails details) {
+        MyLogger.info('MindEditFieldState: on pan end');
+      },
+    );
+    var expanded = Expanded(
+      child: gesture,
+    );
+    return expanded;
+  }
+
+  @override
+  void didUpdateWidget(MindEditField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if(widget.focusNode != oldWidget.focusNode) {
+      oldWidget.focusNode.removeListener(_handleFocusChanged);
+      _focusAttachment?.detach();
+      _attachFocus();
+    }
+    if(!_shouldCreateInputConnection) {
+      _closeConnectionIfNeeded();
+    } else {
+      if(oldWidget.isReadOnly && _hasFocus) {
+        _openConnectionIfNeeded();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _closeConnectionIfNeeded();
+    widget.focusNode.removeListener(_handleFocusChanged);
+    _focusAttachment!.detach();
+    widget.controller.selectionController.dispose();
+    super.dispose();
+  }
+
+  Rect getCurrentSize() => _currentSize!;
+
+  void scrollDown(double delta) {
+    controller.jumpTo(controller.offset + delta);
+  }
+
+  void _attachFocus() {
+    _focusAttachment = widget.focusNode.attach(
+      context,
+      onKeyEvent: _onFocusKey,
+    );
+    widget.focusNode.addListener(_handleFocusChanged);
+  }
+
+  void _handleFocusChanged() {
+    openOrCloseConnection();
+    // _cursorCont.startOrStopCursorTimerIfNeeded(
+    //     _hasFocus, widget.controller.selection);
+    // _updateOrDisposeSelectionOverlayIfNeeded();
+    if(_hasFocus) {
+      // WidgetsBinding.instance!.addObserver(this);
+      // _showCaretOnScreen();
+    } else {
+      // WidgetsBinding.instance!.removeObserver(this);
+    }
+    // updateKeepAlive();
+  }
+
+  // If this function returns KeyEventResult.ignored, it will be handled by system
+  KeyEventResult _onFocusKey(FocusNode node, KeyEvent _event) {
+    MyLogger.debug('_onFocusKey: event is $_event');
+    if(_event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    KeyEvent evt = _event;
+    final key = evt.logicalKey;
+    var alt = HardwareKeyboard.instance.isAltPressed;
+    var shift = HardwareKeyboard.instance.isShiftPressed;
+    var ctrl = HardwareKeyboard.instance.isControlPressed;
+    var meta = HardwareKeyboard.instance.isMetaPressed;
+    var result = KeyboardControl.handleKeyDown(key, alt, ctrl, meta, shift);
+    return result? KeyEventResult.handled: KeyEventResult.ignored;
+  }
+
+  void requestKeyboard() {
+    if(_hasFocus) {
+      _openConnectionIfNeeded();
+      // _showCaretOnScreen();
+    } else {
+      widget.focusNode.requestFocus();
+    }
+  }
+  void hideKeyboard() {
+    if(!_hasFocus) {
+      return;
+    }
+    widget.focusNode.unfocus();
+    Controller.instance.selectionController.releaseCursor();
+    widget.controller.clearEditingBlock();
+  }
+
+  void openOrCloseConnection() {
+    if(widget.focusNode.hasFocus && widget.focusNode.consumeKeyboardToken()) {
+      _openConnectionIfNeeded();
+    } else if(!widget.focusNode.hasFocus) {
+      _closeConnectionIfNeeded();
+    }
+  }
+
+  void _openConnectionIfNeeded() {
+    if(!_shouldCreateInputConnection) {
+      return;
+    }
+    // _lastEditingValue = widget.controller.getCurrentTextEditingValue();
+
+    if(!_hasConnection) {
+      _textInputConnection = TextInput.attach(
+        this,
+        TextInputConfiguration(
+          inputType: TextInputType.multiline,
+          readOnly: widget.isReadOnly,
+          inputAction: TextInputAction.newline,
+          enableSuggestions: !widget.isReadOnly,
+          keyboardAppearance: Brightness.light,
+        ),
+      );
+      // _textInputConnection!.updateConfig(const TextInputConfiguration(inputAction: TextInputAction.done));
+
+      MyLogger.info('_openConnectionIfNeeded: calling _resetEditingState');
+      // _sentRemoteValues.add(_lastKnownRemoteTextEditingValue);
+      _resetEditingState();
+    } else {
+      if(_lastEditingValue == null) {
+        var newEditingValue = const TextEditingValue(
+          text: '',
+          selection: TextSelection.collapsed(offset: 0),
+          composing: TextRange.empty,
+        );
+        MyLogger.info('_openConnectionIfNeeded: current text editing: $newEditingValue');
+        _lastEditingValue = newEditingValue;
+      }
+    }
+    _textInputConnection!.show();
+  }
+
+  void _closeConnectionIfNeeded() {
+    if(!_hasConnection) {
+      return;
+    }
+    MyLogger.info('_closeConnectionIfNeeded: now close _textInputConnection');
+    _textInputConnection!.close();
+    _textInputConnection = null;
+    _lastEditingValue = null;
+  }
+
+  void refreshTextEditingValue() {
+    if(!_hasConnection) {
+      return;
+    }
+    _resetEditingState();
+    MyLogger.info('refreshTextEditingValue: Refreshing editingValue to $_lastEditingValue');
+  }
+
+  Widget _buildBlockList() {
+    var builder = ListView.builder(
+      controller: controller,
+      itemCount: widget.document.paragraphs.length,
+      itemBuilder: (context, index) {
+        return _constructBlock(widget.document.paragraphs[index]);
+      },
+    );
+    return builder;
+  }
+
+  Widget _constructBlock(ParagraphDesc para, {bool readOnly = false}) {
+    Widget blockItem = _buildBlockFromDesc(para, readOnly);
+    if(Controller.instance.isDebugMode) {
+      blockItem = Container(
+        child: blockItem,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.blueGrey, width: 1),
+        ),
+      );
+    }
+    Widget containerWithPadding = Container(
+      padding: const EdgeInsets.fromLTRB(0.0, 5.0, 0.0, 5.0),
+      child: blockItem,
+    );
+    return containerWithPadding;
+  }
+
+  Widget _buildBlockFromDesc(ParagraphDesc paragraph, bool readOnly) {
+    var blockView = MindEditBlock(
+      texts: paragraph,
+      controller: widget.controller,
+      key: ValueKey(paragraph.getBlockId()),
+      readOnly: readOnly,
+    );
+    return blockView;
+  }
+
+  List<Widget> getReadOnlyBlocks() {
+    var result = <Widget>[];
+    for(var para in widget.document.paragraphs) {
+      var item = _constructBlock(para, readOnly: true);
+      result.add(item);
+    }
+    return result;
+  }
+
+  /// Compose a new TextEditingValue from old TextEditingValue, and re-use updateEditingValue() method
+  void pasteText(String text) {
+    // 1. Get old editing value
+    TextEditingValue oldEditingValue = getLastEditingValue()?? const TextEditingValue(text: '');
+    String oldText = oldEditingValue.text;
+    int oldTextLength = oldText.length;
+
+    // 2. Compose new editing value from oldEditingValue and pasted text
+    var selection = oldEditingValue.selection;
+    String prefixText = '', suffixText = '';
+    if(selection.start > 0) {
+      prefixText = oldText.substring(0, selection.start);
+    }
+    if(selection.end >= 0 && selection.end < oldTextLength) {
+      suffixText = oldText.substring(selection.end);
+    }
+    TextEditingValue newEditingValue = TextEditingValue(
+      text: prefixText + text + suffixText,
+      selection: TextSelection.collapsed(offset: prefixText.length + text.length),
+    );
+
+    // _textInputConnection?.setEditingState(newEditingValue);
+    updateEditingValue(newEditingValue);
+    rudelyCloseIME();
+  }
+
+  @override
+  void connectionClosed() {
+    if(!_hasConnection) {
+      return;
+    }
+    MyLogger.info('connectionClosed');
+    _textInputConnection!.connectionClosedReceived();
+    _textInputConnection = null;
+    // _lastKnownRemoteTextEditingValue = null;
+    // _sentRemoteValues.clear();
+  }
+
+  @override
+  AutofillScope? get currentAutofillScope => null;
+
+  @override
+  TextEditingValue? get currentTextEditingValue {
+    MyLogger.info('TextInputClient.currentTextEditingValue called');
+    return _lastEditingValue;
+  }
+
+  @override
+  void performAction(TextInputAction action) {
+    MyLogger.info('TextInputClient.performAction: action=$action');
+  }
+
+  @override
+  void performPrivateCommand(String action, Map<String, dynamic> data) {
+    MyLogger.info('TextInputClient.performPrivateCommand');
+  }
+
+  @override
+  void showAutocorrectionPromptRect(int start, int end) {
+    MyLogger.info('TextInputClient.showAutocorrectionPromptRect');
+  }
+
+  TextEditingValue? getLastEditingValue() {
+    return _lastEditingValue;
+  }
+
+  @override
+  void updateEditingValue(TextEditingValue value) {
+    // Check following situations first:
+    // 1. In iOS environment, using _initialTextValue to detect deletion in soft keyboard
+    //   1.1. Check deletion
+    //   1.2. Stripe _initialTextValue before later processing
+    // 2. Check if the block text length exceeds maximum limitation
+
+    // Step 1.1
+    if(_initialTextValue.isNotEmpty && value.text.isEmpty) {
+      MyLogger.info('updateEditingValue: detected backspace entered, isCollapsed=${widget.controller.selectionController.isCollapsed()}');
+      _deleteSelectionOrCharacter();
+      return;
+    }
+    // Step 1.2
+    value = _stripeInitialText(value);
+    MyLogger.info('updateEditingValue: updating editing value: new value=$value, old value=$_lastEditingValue');
+
+    // Do nothing if the editing value is same as last time
+    if(_lastEditingValue == value) {
+      MyLogger.warn('updateEditingValue: Totally identical');
+      return;
+    }
+    // Just update value if only composing changed(caused by input method)
+    var sameText = _lastEditingValue!.text == value.text;
+    if(sameText && _lastEditingValue!.selection == value.selection) {
+      MyLogger.info('updateEditingValue: Only composing different');
+      _updateLastEditingValue(value);
+      return;
+    }
+    if(value.text.length > widget.controller.setting.blockMaxCharacterLength) {
+      // CallbackRegistry.unregisterCurrentSnackBar();
+      CallbackRegistry.showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.orangeAccent,
+          content: Text('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 2000),
+        )
+      );
+      // refreshTextEditingValue();
+      return;
+    }
+    final oldEditingValue = _lastEditingValue!;
+    _updateAndSaveText(oldEditingValue, value, sameText);
+  }
+
+  @override
+  void updateFloatingCursor(RawFloatingCursorPoint point) {
+    MyLogger.debug('TextInputClient: updateFloatingCursor');
+  }
+
+  @override
+  void insertTextPlaceholder(Size size) {
+    MyLogger.debug('TextInputClient: insertTextPlaceholder');
+  }
+
+  @override
+  void removeTextPlaceholder() {
+    MyLogger.debug('TextInputClient: removeTextPlaceholder');
+  }
+
+  @override
+  void showToolbar() {
+    MyLogger.debug('TextInputClient: showToolbar');
+  }
+
+  @override
+  void didChangeInputControl(TextInputControl? oldControl, TextInputControl? newControl) {
+    // TODO: implement didChangeInputControl
+    MyLogger.info('TextInputClient didChangeInputControl() called');
+  }
+
+  @override
+  void performSelector(String selectorName) {
+    // TODO: implement performSelector
+    MyLogger.info('TextInputClient performSelector() called');
+  }
+
+  @override
+  void insertContent(KeyboardInsertedContent content) {
+    // TODO: implement insertContent
+    MyLogger.info('TextInputClient insertContent() called');
+  }
+
+  /// Close IME forcibly, used when User move cursor actively.
+  /// Including mouse click, gesture tap, arrow key pressed, enter pressed, etc...
+  void rudelyCloseIME() {
+    _textInputConnection?.close();
+    _lastEditingValue = const TextEditingValue(
+      text: '',
+      selection: TextSelection.collapsed(offset: 0),
+      composing: TextRange.empty,
+    );
+  }
+  void initDocAndControlBlock() {
+    widget.document.clearEditingBlock();
+    widget.document.clearTextSelection();
+  }
+  void refreshDoc({String? activeBlockId, int position = 0}) {
+    setState(() {
+      initDocAndControlBlock();
+      if(activeBlockId != null) { // If activeId is not null, make the cursor appear on the block with activeId
+        widget.controller.selectionController.collapseInBlock(activeBlockId, position, true);
+      }
+    });
+  }
+  void refreshDocWithoutBlockState(String blockId, int position) {
+    setState(() {
+      initDocAndControlBlock();
+      widget.controller.selectionController.updateSelectionWithoutBlockState(blockId, TextSelection(baseOffset: position, extentOffset: position));
+    });
+  }
+
+  void _updateAndSaveText(TextEditingValue oldValue, TextEditingValue newValue, bool sameText) {
+    // MyLogger.info('MindEditFieldState: Save $newValue to $oldValue with parameter $sameText');
+    var controller = widget.controller;
+    var currentBlock = controller.getEditingBlockState()!;
+    var block = currentBlock.widget.texts;
+    final _render = currentBlock.getRender()!;
+    final selectionController = widget.controller.selectionController;
+    var leadingPosition = selectionController.lastExtentBlockPos - oldValue.selection.extentOffset;
+    // If text is same, and the selection is collapsed, only need to modify cursor and selection
+    if(sameText && selectionController.isCollapsed()) {
+      MyLogger.info('_updateAndSaveText: same Text, only modify cursor and selection');
+      selectionController.updateSelectionByIMESelection(block.getBlockId(), leadingPosition, newValue.selection);
+      _updateLastEditingValue(newValue);
+      _render.markNeedsPaint();
+      return;
+    }
+
+    // How to update texts given oldValue and newValue:
+    // 1. Find the first different character from left hand side, remember left same count as leftCommonCount
+    // 2. Find the first different character from right hand side, remember right same count as rightCount
+    // 3. Characters from leftCommonCount to (length-rightCount) in the oldValue are to be deleted(as deleteFrom and deleteTo)
+    // 4. Characters from leftCommonCount to (length-rightCount) in the newValue are to be inserted(as insertStr)
+    //
+    // Shown as the following diagram
+    //     leftCommonCount=5    rightCount=2
+    //                 |         |
+    //                 v         v
+    // old string: Hello_xyz_bit_mn
+    // new string: Hello123456789mn
+    //                 ^         ^
+    //                 |         |
+    //    leftCommonCount=5    rightCount=2
+    var oldText = oldValue.text;
+    var newText = newValue.text;
+    // Find the same part in oldValue and newValue
+    var leftCommonCount = helper.findLeftDifferent(oldText, newText, newValue.selection.extentOffset - 1);
+    // Find the same part in newValue. But never exceed newValue.selection.extentOffset, because this position is newly edited
+    var rightCount = helper.findRightDifferent(oldText, newText, newValue.selection.extentOffset);
+    MyLogger.verbose('_updateAndSaveText: oldText=($oldText), newText=($newText)');
+    MyLogger.verbose('_updateAndSaveText: leftCommonCount=$leftCommonCount, rightCount=$rightCount');
+    // Find the positions deleteFrom and deleteTo, and find the insertStr
+    var changeFrom = leftCommonCount;
+    var changeTo = oldText.length - rightCount;
+    MyLogger.info('_updateAndSaveText: changeFrom=$changeFrom, changeTo=$changeTo');
+    var insertFrom = leftCommonCount;
+    var insertTo = newText.length - rightCount;
+    var insertStr = (insertTo > insertFrom)? newText.substring(insertFrom, insertTo): '';
+    MyLogger.info('_updateAndSaveText: insertFrom=$insertFrom, insertTo=$insertTo, insertStr=$insertStr');
+
+    // Split insertStr to handle every line separately
+    insertStr = insertStr.replaceAll('\r', '');
+    var insertStrWithoutNewline = insertStr.split('\n');
+    if(insertStrWithoutNewline.isEmpty) return; // Not possible
+
+    // If the string is inserted exactly between two TextSpan, the affinity decides the string is in left TextSpan or in the right one:
+    // 1. affinity is upstream, in the left TextSpan
+    // 2. affinity is downstream, in the right TextSpan
+    final affinity = newValue.selection.affinity;
+
+    // Determine if the selection is in the same block, and the line count of new text. Save these flags, will be used in the following code
+    final inSelection = !selectionController.isCollapsed();
+    final selectionInSingleBlock = selectionController.isInSingleBlock();
+    final lineCount = insertStrWithoutNewline.length;
+
+    // 1. If in selection, delete the selected content
+    // 2. Insert new text line by line
+    //   2.1 Insert first line at the current position of editing block, update cursor position
+    //   2.2 If there are at least 2 lines, spawn a new line, and insert last line after current cursor position
+    //   2.3 If there are more than 2 lines, insert other lines at the end of first line
+    // 3. If the structure of document has been changed, refresh it.
+
+    // Step 1
+    MyLogger.info('_updateAndSaveText: inSelection=$inSelection, old selection=${oldValue.selection}');
+    // If oldValue's selection is not collapsed,
+    // the deleted selection should be handled by replaceText method in the following code
+    if(inSelection && oldValue.selection.isCollapsed) {
+      MyLogger.info('_updateAndSaveText: delete selection');
+      selectionController.deleteSelectedContent(refreshView: false);
+      leadingPosition = selectionController.lastExtentBlockPos;
+    }
+
+    // Step 2.1
+    final firstLineBlockState = widget.controller.getEditingBlockState()!;
+    final firstLine = insertStrWithoutNewline[0];
+    MyLogger.info('_updateAndSaveText: leadingPosition=$leadingPosition');
+    firstLineBlockState.replaceText(leadingPosition + changeFrom, leadingPosition + changeTo, firstLine, affinity);
+    int firstLineLength = leadingPosition + changeFrom + firstLine.length;
+    int newExtentPosition = leadingPosition + newValue.selection.extentOffset;
+    String lastLineBlockId = firstLineBlockState.getBlockId(); // Assume the first line is also the last line
+    if(lineCount == 1) {
+      MyLogger.info('_updateAndSaveText: collapse in block: ${firstLineBlockState.getBlockId()}, pos=$newExtentPosition');
+      selectionController.collapseInBlock(firstLineBlockState.getBlockId(), newExtentPosition, false);
+    }
+    // Step 2.2
+    if(lineCount >= 2) {
+      final lastLine = insertStrWithoutNewline[lineCount - 1];
+      firstLineBlockState.replaceText(firstLineLength, firstLineLength, lastLine, affinity);
+      lastLineBlockId = firstLineBlockState.spawnNewLineAtOffset(firstLineLength);
+      newExtentPosition = lastLine.length;
+      // Step 2.3
+      firstLineBlockState.insertBlocksWithTexts(insertStrWithoutNewline.sublist(1, lineCount - 1));
+    }
+
+    if(lineCount <= 1) {
+      _updateLastEditingValue(newValue);
+    } else {
+      _resetEditingState();
+    }
+    // Step 3
+    if(lineCount >= 2 || !selectionInSingleBlock) {
+      refreshDocWithoutBlockState(lastLineBlockId, newExtentPosition);
+    }
+
+    selectionController.resetCursor();
+    _render.updateParagraph();
+    _render.markNeedsLayout();
+  }
+
+  void _resetEditingState() {
+    var newEditingValue = _createTextEditingValue(_initialTextValue);
+    _textInputConnection!.setEditingState(newEditingValue);
+    _lastEditingValue = _createTextEditingValue('');
+    MyLogger.info('_resetEditingState: newEditingValue=$newEditingValue');
+  }
+  TextEditingValue _createTextEditingValue(String text) {
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+  void _updateLastEditingValue(TextEditingValue newValue) {
+    _lastEditingValue = newValue;
+  }
+  void _updateContext(BuildContext context) {
+    widget.controller.selectionController.updateContext(context);
+    widget.controller.pluginManager.updateContext(context);
+  }
+  void _deleteSelectionOrCharacter() {
+    if(!widget.controller.selectionController.isCollapsed()) {
+      widget.controller.selectionController.deleteSelectedContent();
+    } else {
+      var editingState = widget.controller.getEditingBlockState();
+      editingState?.deletePreviousCharacter();
+    }
+    _resetEditingState();
+  }
+  TextEditingValue _stripeInitialText(TextEditingValue value) {
+    if(_initialTextValue.isNotEmpty && value.text.startsWith(_initialTextValue)) {
+      MyLogger.info('_stripeInitialText: initialTextValue detected, original value=$value');
+      var newText = value.text.substring(1); // stripe _initialTextValue
+
+      var baseOffset = value.selection.baseOffset - 1 > 0? value.selection.baseOffset - 1: 0;
+      var extentOffset = value.selection.extentOffset - 1 > 0? value.selection.extentOffset - 1: 0;
+      var newSelection = TextSelection(baseOffset: baseOffset, extentOffset: extentOffset);
+
+      var newComposing = TextRange.empty;
+      if(value.composing.isValid) {
+        var start = value.composing.start - 1 > 0? value.composing.start - 1: 0;
+        var end = value.composing.end - 1 > 0? value.composing.end - 1: 0;
+        newComposing = TextRange(start: start, end: end);
+      }
+      value = TextEditingValue(text: newText, selection: newSelection, composing: newComposing);
+    }
+    return value;
+  }
+}
