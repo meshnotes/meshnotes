@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/rendering.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
@@ -37,9 +38,29 @@ class TextSpansStyle {
   bool isAllUnderline = false;
 }
 
+class ExtraInfo {
+  String content;
+  int updatedAt;
+
+  ExtraInfo({
+    required this.content,
+    required this.updatedAt,
+  });
+
+  ExtraInfo.fromJson(Map<String, dynamic> map): content = map['content'], updatedAt = map['timestamp'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'content': content,
+      'timestamp': updatedAt,
+    };
+  }
+}
+
 class ParagraphDesc {
   late String _id;
   late List<TextDesc> _texts;
+  Map<String, ExtraInfo> _extra;
   String hash = '';
   _BlockType _type = _BlockType.text;
   _BlockListing _listing = _BlockListing.none;
@@ -54,15 +75,17 @@ class ParagraphDesc {
   bool _showExtentLeader = false;
   MindEditBlockState? _state;
   int _lastUpdate = 0;
+  Timer? _idleTimer;
 
   ParagraphDesc({
     List<TextDesc>? texts,
+    String extra = '',
     String? id,
     String? type,
     String? listing,
     int? level,
     int? time,
-  }) {
+  }): _extra = _parseExtra(extra) {
     if(texts == null || texts.isEmpty) {
       MyLogger.debug('Init by unexpected empty texts($texts), fix it to default TextDesc list');
       texts = [TextDesc()];
@@ -85,21 +108,27 @@ class ParagraphDesc {
     }
   }
   ParagraphDesc.fromStringList(
-      String _id,
-      String type,
-      String raw,
-      String listing,
-      int level,
-      ): _id = _id, _type = _parseBlockType(type), _listing = _parseBlockListing(listing), _level = level {
+    String _id,
+    String type,
+    String raw,
+    String listing,
+    int level,
+  ): _id = _id, _type = _parseBlockType(type), _listing = _parseBlockListing(listing), _level = level, _extra = _parseExtra('') {
     _parseTexts(raw);
   }
-  ParagraphDesc.fromTitle(String text): _id = Constants.keyTitleId, _type = _BlockType.title, _listing = _BlockListing.none, _level = 0 {
+  ParagraphDesc.fromTitle(String text):
+    _id = Constants.keyTitleId,
+    _type = _BlockType.title,
+    _listing = _BlockListing.none,
+    _level = 0,
+    _extra = _parseExtra('') {
     _parseTexts(text);
   }
   factory ParagraphDesc.buildFromJson({
     required String id,
     required String jsonStr,
     required int time,
+    String extra = '',
   }) {
     BlockContent block = BlockContent.fromJson(jsonDecode(jsonStr));
     return ParagraphDesc(
@@ -108,6 +137,7 @@ class ParagraphDesc {
       listing: block.listing,
       level: block.level,
       texts: block.text,
+      extra: extra,
       time: time,
     );
   }
@@ -150,6 +180,32 @@ class ParagraphDesc {
   void updateTexts(List<TextDesc> _t) {
     _updateTexts(_t);
     _storeBlock();
+    _tryToSendEvent();
+  }
+
+  void updateExtra(String key, ExtraInfo info) {
+    _extra[key] = info;
+    _storeExtra();
+  }
+  void clearExtra(String key) {
+    if(_extra.containsKey(key)) {
+      _extra.remove(key);
+      _storeExtra();
+    }
+  }
+
+  String getExtra() {
+    String result = '';
+    if(_extra.isNotEmpty) {
+      for(var e in _extra.entries) {
+        final value = e.value;
+        if(result.isNotEmpty) {
+          result += '\n';
+        }
+        result += value.content;
+      }
+    }
+    return result;
   }
 
   String getSelectedPlainText() {
@@ -240,6 +296,10 @@ class ParagraphDesc {
 
   bool isTitle() {
     return _type == _BlockType.title;
+  }
+
+  bool hasExtra() {
+    return _extra.isNotEmpty;
   }
 
   void setPrevious(ParagraphDesc? p) {
@@ -419,6 +479,12 @@ class ParagraphDesc {
     // dbHelper.updateDoc(parent.doc.id, Util.getTimeStamp());
     parent.setModified();
   }
+  // Save extra to database
+  void _storeExtra() {
+    var dbHelper = Controller.instance.dbHelper;
+    if(isTitle()) return;
+    dbHelper.updateDocBlockExtra(parent.id, getBlockId(), jsonEncode(_extra));
+  }
 
   BlockContent _convertToBlockContent() {
     var block = BlockContent(
@@ -456,6 +522,32 @@ class ParagraphDesc {
       var m = span as Map<String, dynamic>;
       var textDesc = TextDesc.fromJson(m);
       result.add(textDesc);
+    }
+    return result;
+  }
+
+  static Map<String, ExtraInfo> _parseExtra(String raw) {
+    Map<String, ExtraInfo> result = {};
+    if(raw.isNotEmpty) {
+      Map<String, dynamic>? map;
+      try {
+        final _m = jsonDecode(raw);
+        if (_m is! Map<String, dynamic>) return result;
+        map = _m;
+      } catch(e) {
+        MyLogger.warn('_parseExtra: $e');
+        return result;
+      }
+      for (var e in map.entries) {
+        String key = e.key;
+        dynamic value = e.value;
+        try {
+          ExtraInfo info = ExtraInfo.fromJson(value);
+          result[key] = info;
+        } catch(e) {
+          MyLogger.warn('_parseExtra traversing map: $e');
+        }
+      }
     }
     return result;
   }
@@ -610,5 +702,13 @@ class ParagraphDesc {
         idx++;
       }
     }
+  }
+  void _tryToSendEvent() {
+    if(isTitle()) return;
+    _idleTimer?.cancel();
+    _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfInputIdle), () {
+      Controller.instance.pluginManager.produceBlockContentChangedEvent(getBlockId(), getPlainText());
+      _idleTimer = null;
+    });
   }
 }

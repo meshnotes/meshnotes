@@ -1,5 +1,6 @@
 import 'package:dart_openai/dart_openai.dart';
 import 'package:mesh_note/plugin/ai/abstract_agent.dart';
+import 'package:my_log/my_log.dart';
 
 class KimiExecutor implements AiExecutor {
   String apiKey;
@@ -14,31 +15,30 @@ class KimiExecutor implements AiExecutor {
   }
 
   @override
-  Future<String> execute(String prompt) async {
+  Future<String> execute({required String userPrompt, String? systemPrompt}) async {
     OpenAI.baseUrl = 'https://api.moonshot.cn';
     OpenAI.apiKey = apiKey;
     OpenAI.showLogs = true;
+    var messages = <OpenAIChatCompletionChoiceMessageModel>[
+      const OpenAIChatCompletionChoiceMessageModel(
+        role: OpenAIChatMessageRole.system,
+        content: 'Answer question directly, no more than 300 words, better in 50 words, and in the language of original text',//'请直接回答问题，尽量控制字数在100以内，不要超过300',
+      ),
+      OpenAIChatCompletionChoiceMessageModel(
+        role: OpenAIChatMessageRole.user,
+        content: userPrompt,
+      ),
+    ];
+    if(systemPrompt != null) {
+      messages.insert(0, OpenAIChatCompletionChoiceMessageModel(
+        role: OpenAIChatMessageRole.system,
+        content: systemPrompt,
+      ));
+    }
+    MyLogger.info('efantest: messages=$messages');
     OpenAIChatCompletionModel completion = await OpenAI.instance.chat.create(
       model: 'moonshot-v1-8k',
-      messages: [
-        const OpenAIChatCompletionChoiceMessageModel(
-          role: OpenAIChatMessageRole.system,
-          content: '请直接回答问题，尽量控制字数在100以内，不要超过300',
-        ),
-        OpenAIChatCompletionChoiceMessageModel(
-          role: OpenAIChatMessageRole.user,
-          content: prompt,
-        ),
-        // OpenAIChatCompletionChoiceMessageModel.fromMap({
-        //   "role": "system",
-        //   "content": "你是 Kimi，由 Moonshot AI 提供的人工智能助手，你更擅长中文和英文的对话。你会为用户提供安全，有帮助，准确的回答。同时，你会拒绝一切涉及恐怖主义，种族歧视，黄色暴力等问题的回答。Moonshot AI 为专有名词，不可翻译成其他语言。"
-        // })
-        //
-        // {
-        //   "role": "user",
-        //   "content": "你好，我叫李雷，1+1等于多少？"
-        // }
-      ],
+      messages: messages,
       temperature: 0.3,
     );
     return completion.choices.first.message.content;

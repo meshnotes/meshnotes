@@ -300,7 +300,7 @@ class Document {
 
   void setIdle() {
     _idleTimer?.cancel();
-    _idleTimer = Timer(const Duration(seconds: Constants.timeoutSyncIdle), () {
+    _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfSyncIdle), () {
       Controller.instance.sendVersionTree();
       _idleTimer = null;
     });
@@ -322,7 +322,8 @@ class Document {
         MyLogger.warn('_loadBlocks: could not find block(id=$blockId) in block map of document(id=$docId)');
         continue;
       }
-      var p = ParagraphDesc.buildFromJson(id: blockData.blockId, jsonStr: blockData.blockData, time: blockData.updatedAt);
+      MyLogger.debug('_loadBlocks: block=${blockData.blockId}}, extra=${blockData.blockExtra}');
+      var p = ParagraphDesc.buildFromJson(id: blockData.blockId, jsonStr: blockData.blockData, time: blockData.updatedAt, extra: blockData.blockExtra);
       result.add(p);
     }
     return result;

@@ -332,7 +332,7 @@ class DocumentManager {
     }
     var data = _db.getRawBlockById(docId, blockId);
     if(data != null) {
-      var para = ParagraphDesc.buildFromJson(id: data.blockId, jsonStr: data.blockData, time: data.updatedAt);
+      var para = ParagraphDesc.buildFromJson(id: data.blockId, jsonStr: data.blockData, time: data.updatedAt, extra: data.blockExtra);
       seed.cache[blockId] = para;
       return para;
     }

@@ -11,6 +11,8 @@ class FakeDbHelper implements DbHelper {
   @override
   void storeDocBlock(String docId, String blockId, String data, int timestamp) {}
   @override
+  void updateDocBlockExtra(String docId, String blockId, String extra) {}
+  @override
   Future<void> dropDocBlock(String docId, String id) async {}
   @override
   DocContentData? getDoc(String docId) { return null; }

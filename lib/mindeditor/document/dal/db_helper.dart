@@ -20,6 +20,7 @@ abstract class DbHelper {
   void storeDocHash(String docId, String hash, int timestamp);
   void storeDocContent(String docId, String docContent, int timestamp);
   void storeDocBlock(String docId, String blockId, String data, int timestamp);
+  void updateDocBlockExtra(String docId, String blockId, String extra);
   void dropDocBlock(String docId, String blockId);
   DocContentData? getDoc(String docId);
   Map<String, BlockData> getBlockMapOfDoc(String docId);
@@ -173,6 +174,12 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
+  void updateDocBlockExtra(String docId, String blockId, String extra) {
+    const sql = 'UPDATE blocks SET extra=? WHERE doc_id=? AND block_id=?';
+    _database.execute(sql, [extra, docId, blockId]);
+  }
+
+  @override
   void dropDocBlock(String docId, String blockId) {
     const sql = 'DELETE FROM blocks WHERE doc_id=? AND block_id=?';
     _database.execute(sql, [docId, blockId]);
@@ -182,7 +189,7 @@ class RealDbHelper implements DbHelper {
   DocContentData? getDoc(String docId) {
     const sql = 'SELECT doc_content, updated_at FROM doc_contents WHERE doc_id=?';
     var resultSet = _database.select(sql, [docId]);
-    MyLogger.debug('efantest: getDoc result=$resultSet');
+    MyLogger.debug('getDoc: result=$resultSet');
 
     if(resultSet.isEmpty) return null;
     final row = resultSet.first;
@@ -191,20 +198,22 @@ class RealDbHelper implements DbHelper {
 
   @override
   Map<String, BlockData> getBlockMapOfDoc(String docId) {
-    const sql = 'SELECT block_id, data, updated_at FROM blocks WHERE doc_id=?';
+    const sql = 'SELECT block_id, data, updated_at, extra FROM blocks WHERE doc_id=?';
     final resultSet = _database.select(sql, [docId]);
-    MyLogger.debug('efantest: getBlockMapOfDoc result=$resultSet');
+    MyLogger.debug('getBlockMapOfDoc: result=$resultSet');
 
     var result = <String, BlockData>{};
     for(final row in resultSet) {
-      MyLogger.debug('efantest: row=$row');
+      MyLogger.debug('getBlockMapOfDoc: row=$row');
       String blockId = row['block_id'];
       String data = row['data'];
       int updatedAt = row['updated_at'];
+      String? extra = row['extra'];
       result[blockId] = BlockData(
         blockId: blockId,
         blockData: data,
         updatedAt: updatedAt,
+        blockExtra: extra?? '',
       );
     }
     return result;
@@ -259,7 +268,7 @@ class RealDbHelper implements DbHelper {
   Map<String, String> getAllTitles() {
     const sql = 'SELECT doc_id, data FROM blocks WHERE block_id=?';
     final resultSet = _database.select(sql, [Constants.keyTitleId]);
-    MyLogger.debug('efantest: getAllTitles result=$resultSet');
+    MyLogger.debug('getAllTitles: result=$resultSet');
     var result = <String, String>{};
     for(final row in resultSet) {
       String docId = row['doc_id'];
@@ -272,10 +281,10 @@ class RealDbHelper implements DbHelper {
   List<DocData> getAllDocuments() {
     const sql = 'SELECT doc_id, doc_hash, updated_at FROM doc_list';
     final resultSet = _database.select(sql, []);
-    MyLogger.debug('efantest: getAllDocumentList result=$resultSet');
+    MyLogger.debug('getAllDocuments: result=$resultSet');
     var result = <DocData>[];
     for(final row in resultSet) {
-      MyLogger.verbose('efantest: row=$row');
+      MyLogger.verbose('getAllDocuments: row=$row');
       String docId = row['doc_id'];
       String docHash = row['doc_hash'];
       int updatedAt = row['updated_at'];
@@ -343,7 +352,7 @@ class RealDbHelper implements DbHelper {
   List<(String, String)> getAllBlocks() {
     const sql = 'SELECT doc_id, block_id FROM blocks WHERE data!=""';
     final resultSet = _database.select(sql);
-    MyLogger.debug('efantest: getAllBlocks result=$resultSet');
+    MyLogger.debug('getAllBlocks: result=$resultSet');
     if(resultSet.isEmpty) {
       MyLogger.warn('Blocks not found!');
       return [];
@@ -358,7 +367,7 @@ class RealDbHelper implements DbHelper {
   }
   @override
   BlockData? getRawBlockById(String docId, String blockId) {
-    const sql = 'SELECT data FROM blocks, updated_at WHERE doc_id=? AND block_id=?';
+    const sql = 'SELECT data FROM blocks, updated_at, extra WHERE doc_id=? AND block_id=?';
     final resultSet = _database.select(sql, [docId, blockId]);
     MyLogger.debug('getRawBlockById result=$resultSet');
     if(resultSet.length != 1) {
@@ -368,10 +377,12 @@ class RealDbHelper implements DbHelper {
     final row = resultSet.first;
     String data = row['data'];
     int updatedAt = row['updated_at'];
+    String? extra = row['extra'];
     return BlockData(
       blockId: blockId,
       blockData: data,
       updatedAt: updatedAt,
+      blockExtra: extra?? '',
     );
   }
 

@@ -9,6 +9,8 @@ abstract class PluginProxy {
   String? getEditingBlockId();
   void sendTextToClipboard(String text);
   String? appendTextToNextBlock(String blockId, String text);
+  void addExtra(String blockId, String content);
+  void clearExtra(String blockId);
 }
 
 abstract class PluginInstance {
@@ -20,11 +22,13 @@ class PluginRegisterInformation {
   String pluginName;
   ToolbarInformation toolbarInformation;
   List<PluginSetting> settingsInformation;
+  void Function(BlockChangedEventData)? onBlockChanged;
 
   PluginRegisterInformation({
     required this.pluginName,
     required this.toolbarInformation,
     required this.settingsInformation,
+    this.onBlockChanged,
   });
 }
 
@@ -51,5 +55,14 @@ class PluginSetting {
     required this.settingName,
     required this.settingComment,
     this.settingDefaultValue = '',
+  });
+}
+
+class BlockChangedEventData {
+  String blockId;
+  String content;
+  BlockChangedEventData({
+    required this.blockId,
+    required this.content,
   });
 }

@@ -59,7 +59,8 @@ class Environment {
         File(Platform.resolvedExecutable).parent.path,
       ];
     }
-    return [getApplicationDocumentsDirectory().toString()];
+    final dir = await getApplicationDocumentsDirectory();
+    return [dir.path];
   }
   Future<String> getExistFileFromLibraryPathsByEnvironment(String fileName) async {
     final lookupPaths = await getLibraryPathsByEnvironment();

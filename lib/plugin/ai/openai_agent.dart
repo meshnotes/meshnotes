@@ -3,7 +3,6 @@ import 'package:mesh_note/plugin/ai/abstract_agent.dart';
 
 class OpenAiExecutor implements AiExecutor {
   String apiKey;
-  // OpenAICompletionModel? _openAI;
 
   OpenAiExecutor({
     required this.apiKey,
@@ -12,8 +11,7 @@ class OpenAiExecutor implements AiExecutor {
   }
 
   @override
-  Future<String> execute(String prompt) async {
-    // OpenAI.baseUrl = 'https://api.moonshot.cn';
+  Future<String> execute({required String userPrompt, String? systemPrompt}) async {
     OpenAI.apiKey = apiKey;
     OpenAI.showLogs = true;
     OpenAIChatCompletionModel completion = await OpenAI.instance.chat.create(
@@ -21,21 +19,12 @@ class OpenAiExecutor implements AiExecutor {
       messages: [
         const OpenAIChatCompletionChoiceMessageModel(
           role: OpenAIChatMessageRole.system,
-          content: '请直接回答问题，尽量控制字数在100以内，不要超过300',
+          content: 'Answer the question directly, in the original language. make the answer within 300 words, better no more than 100 words',
         ),
         OpenAIChatCompletionChoiceMessageModel(
           role: OpenAIChatMessageRole.user,
-          content: prompt,
+          content: userPrompt,
         ),
-        // OpenAIChatCompletionChoiceMessageModel.fromMap({
-        //   "role": "system",
-        //   "content": "你是 Kimi，由 Moonshot AI 提供的人工智能助手，你更擅长中文和英文的对话。你会为用户提供安全，有帮助，准确的回答。同时，你会拒绝一切涉及恐怖主义，种族歧视，黄色暴力等问题的回答。Moonshot AI 为专有名词，不可翻译成其他语言。"
-        // })
-        //
-        // {
-        //   "role": "user",
-        //   "content": "你好，我叫李雷，1+1等于多少？"
-        // }
       ],
       temperature: 0.3,
     );

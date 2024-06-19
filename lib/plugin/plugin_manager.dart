@@ -49,6 +49,9 @@ class PluginManager {
     for(var setting in pluginInfo.settingsInformation) {
       _addToSupportedSetting(pluginInfo.pluginName, setting);
     }
+    if(pluginInfo.onBlockChanged != null) {
+      registerBlockContentChangeEventListener(pluginInfo.onBlockChanged!);
+    }
   }
   void _addToSupportedSetting(String pluginName, PluginSetting setting) {
     // Add prefix to the key, check duplication, and add the setting item
@@ -187,6 +190,28 @@ class PluginManager {
   List<SettingData> getPluginSupportedSettings() {
     return _pluginSupportedSettings;
   }
+
+  void addExtra(PluginProxyImpl proxy, String blockId, String content) {
+    var pluginInfo = _pluginInstances[proxy];
+    if(pluginInfo == null) return;
+    var blockState = Controller.instance.getBlockState(blockId);
+    //TODO should check if document is still opening here
+    if(blockState == null) return;
+    final pluginName = pluginInfo.pluginName;
+    final key = 'plugin/$pluginName';
+    blockState.addExtra(key, content);
+  }
+  void clearExtra(PluginProxyImpl proxy, String blockId) {
+    var pluginInfo = _pluginInstances[proxy];
+    if(pluginInfo == null) return;
+    var blockState = Controller.instance.getBlockState(blockId);
+    //TODO should check if document is still opening here
+    if(blockState == null) return;
+    final pluginName = pluginInfo.pluginName;
+    final key = 'plugin/$pluginName';
+    blockState.clearExtra(key);
+  }
+
   Widget _buildTitleBar(String title) {
     var titleText = Text(title);
     var button = CupertinoButton(
@@ -207,6 +232,19 @@ class PluginManager {
       ],
     );
     return row;
+  }
+  List<void Function(BlockChangedEventData)> blockContentChangedEventHandlerQueue = [];
+  void registerBlockContentChangeEventListener(void Function(BlockChangedEventData) handler) {
+    var queue = blockContentChangedEventHandlerQueue;
+    if(queue.contains(handler)) return;
+    queue.add(handler);
+  }
+  void produceBlockContentChangedEvent(String blockId, String content) {
+    var queue = blockContentChangedEventHandlerQueue;
+    final data = BlockChangedEventData(blockId: blockId, content: content);
+    for(var callback in queue) {
+      callback.call(data);
+    }
   }
 }
 
@@ -252,5 +290,15 @@ class PluginProxyImpl implements PluginProxy {
   @override
   String? appendTextToNextBlock(String blockId, String text) {
     return _manager.appendTextToNextBlock(blockId, text);
+  }
+
+  @override
+  void addExtra(String blockId, String content) {
+    _manager.addExtra(this, blockId, content);
+  }
+
+  @override
+  void clearExtra(String blockId) {
+    _manager.clearExtra(this, blockId);
   }
 }

@@ -59,7 +59,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       widget.routeIfResize(context);
     }
     Widget createButton = TextButton(
-      child: const Text('创建新文档'),
+      child: const Text('New Document'),
       onPressed: () {
         MyLogger.info('new document');
         Controller.instance.newDocument();
@@ -74,7 +74,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     if(docList.isEmpty) {
       content = Expanded(
         child: Container(
-          child: const Text('没有文档'),
+          child: const Text('No Document'),
           alignment: Alignment.center,
         ),
       );
@@ -110,7 +110,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     if(widget.smallView) {
       appBar = AppBar(
         title: const Center(
-          child: Text('文档列表'),
+          child: Text('Document list'),
         ),
         titleSpacing: 0,
         backgroundColor: Colors.white,

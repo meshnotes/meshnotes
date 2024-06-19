@@ -2,7 +2,9 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:mesh_note/mindeditor/view/floating_view.dart';
 import 'package:my_log/my_log.dart';
+import '../../util/util.dart';
 import '../document/paragraph_desc.dart';
 import '../document/text_desc.dart';
 import '../setting/constants.dart';
@@ -32,6 +34,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   bool _mouseEntered = false;
   MindBlockImplRenderObject? _render;
   Widget? _leading;
+  late FloatingViewManager _floatingViewManager;
 
   void setRender(MindBlockImplRenderObject r) {
     _render = r;
@@ -47,6 +50,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   @override
   void initState() {
     super.initState();
+    _floatingViewManager = FloatingViewManager();
     if(!widget.readOnly) {
       MyLogger.debug('MindEditBlockState: initializing MindEditBlockState for block(id=${getBlockId()})');
       widget.controller.setBlockStateToTreeNode(getBlockId(), this);
@@ -67,7 +71,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     }
     var blockImpl = _buildBlockImpl();
     var handler = _buildHandler();
-    var result = _buildAll(handler, blockImpl);
+    var extra = _buildExtra();
+    var result = _buildAll(handler, blockImpl, extra);
     return result;
   }
 
@@ -197,8 +202,33 @@ class MindEditBlockState extends State<MindEditBlock> {
     return null;
   }
 
-  Widget _buildAll(Widget? handler, Widget block) {
-    var items = <Widget>[block];
+  Widget _buildExtra() {
+    Widget? child = Container();
+    if(widget.texts.hasExtra()) {
+      child = Container(
+        child: Icon(Icons.emoji_objects_outlined, size: widget.controller.setting.blockHandlerSize, color: Colors.white,),
+        // color: Colors.green,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.green,
+        ),
+      );
+      child = GestureDetector(
+        onTap: () {
+          _floatingViewManager.showBlockTips(context, widget.texts.getExtra());
+        },
+        child: child,
+      );
+    }
+    return SizedBox(
+      width: widget.controller.setting.blockExtraTipsSize,
+      height: widget.controller.setting.blockHandlerSize,
+      child: child,
+    );
+  }
+
+  Widget _buildAll(Widget? handler, Widget block, Widget extraWidget) {
+    var items = <Widget>[block, extraWidget];
     if(_leading != null) {
       items.insert(0, _leading!);
     }
@@ -729,6 +759,18 @@ class MindEditBlockState extends State<MindEditBlock> {
       widget.controller.document!.insertNewParagraphsAfterId(widget.texts.getBlockId(), paragraphs);
     }
     return result;
+  }
+
+  void addExtra(String key, String content) {
+    var para = widget.texts;
+    final extraInfo = ExtraInfo(content: content, updatedAt: Util.getTimeStamp());
+    para.updateExtra(key, extraInfo);
+    setState(() {});
+  }
+  void clearExtra(String key) {
+    var para = widget.texts;
+    para.clearExtra(key);
+    setState(() {});
   }
 
   String _getCurrentListing() {

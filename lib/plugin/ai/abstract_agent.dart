@@ -1,4 +1,4 @@
 
 abstract class AiExecutor {
-  Future<String> execute(String prompt);
+  Future<String> execute({required String userPrompt, String? systemPrompt});
 }

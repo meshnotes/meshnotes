@@ -71,7 +71,7 @@ class Controller {
 
   Future<bool> initAll(NetworkController _net, {bool test=false}) async {
     // Load settings before starting network
-    final confFile = environment.getExistFileFromLibraryPaths('setting.conf');
+    final confFile = await environment.getExistFileFromLibraryPathsByEnvironment('setting.conf');
     MyLogger.info('initAll: load settings from $confFile');
     setting = Setting(confFile);
     setting.load();

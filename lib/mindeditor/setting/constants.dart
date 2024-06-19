@@ -26,8 +26,8 @@ class Constants {
 
   static const widthThreshold = 600;
 
-  static const int timeoutInputIdle = 1;
-  static const int timeoutSyncIdle = 15;
+  static const int timeoutOfInputIdle = 5;
+  static const int timeoutOfSyncIdle = 15;
 
   static const String welcomeRouteName = '/';
   static const String navigatorRouteName = '/navigator';

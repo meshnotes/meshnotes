@@ -37,10 +37,13 @@ class Setting {
   Setting(String fileName): settingFileName = fileName;
 
   // block handler
-  double blockHandlerSize = 16.0; // 抓手的大小
-  Color blockHandlerColor = Colors.grey; // 抓手的颜色
-  Color blockHandlerDefaultBackgroundColor = Colors.transparent; // 抓手默认状态下的背景颜色
-  Color blockHandlerHoverBackgroundColor = Colors.grey[200]!; // 抓手hover状态下的背景颜色
+  double blockHandlerSize = 16.0; // Size of block handler
+  Color blockHandlerColor = Colors.grey; // Color of block handler
+  Color blockHandlerDefaultBackgroundColor = Colors.transparent; // Background color of block handler in normal state
+  Color blockHandlerHoverBackgroundColor = Colors.grey[200]!; // Background color of block handler in hover state
+
+  // block extra tips icon
+  double blockExtraTipsSize = 18.0; // Size of extra tips icon
 
   // block
   double blockNormalFontSize = 16.0; // 普通文本的字体大小

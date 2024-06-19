@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -34,6 +36,7 @@ class PluginAI implements PluginInstance {
       pluginName: _pluginName,
       toolbarInformation: toolbarInfo,
       settingsInformation: settingInfo,
+      onBlockChanged: _blockChangedHandler,
     );
     proxy.registerPlugin(registerInfo);
   }
@@ -107,6 +110,33 @@ class PluginAI implements PluginInstance {
     OpenAiExecutor openAi = OpenAiExecutor(apiKey: _apiKey);
     return openAi;
   }
+  List<String> noneExpression = ['None', 'None.', 'none', 'none.'];
+  void _blockChangedHandler(BlockChangedEventData data) {
+    MyLogger.info('AI plugin receive block changed: id=${data.blockId}, content=${data.content}');
+    var executor = _buildAiExecutor();
+    const prompt = 'Here is a piece of note, please check if it is meaningful, or inspiring, '
+        'or corresponds to some allusions, famous quotes, if so, write a brief comment(by the original language), '
+        'provide expansion suggestions, use JSON format {"comment": comment, "suggestion": suggestion}. '
+        'if not, such as that doesn\'t make sense, or nothing worth highlight, just reply with raw text None. '
+        'Please reply directly, without any other content, best to keep it within 300 words';
+    const systemPrompt = 'You are a learned sage, adept at offering advice, unearthing the highlights or errors in others\' language, and pointing them out in an acceptable manner';
+    executor?.execute(userPrompt: '$prompt: ${data.content}', systemPrompt: systemPrompt).then((value) {
+      MyLogger.info('Here is reply: $value');
+      final trimValue = value.trim();
+      if(noneExpression.contains(trimValue)) {
+        _proxy.clearExtra(data.blockId);
+        return;
+      }
+      final _m = jsonDecode(value);
+      if(_m is! Map<String, dynamic>) return;
+      Map<String, dynamic> map = _m;
+      final comment = map['comment'];
+      final suggestion = map['suggestion'];
+      if(comment == null || comment.toString().isEmpty) return;
+      String aiReview = suggestion == null? comment: '$comment\n\n$suggestion';
+      _proxy.addExtra(data.blockId, aiReview);
+    });
+  }
 }
 
 class _AIDialog extends StatefulWidget {
@@ -128,10 +158,23 @@ class _AIDialogState extends State<_AIDialog> {
     // _AIContent(text: '', prompt: '', result: 'content3'),
   ];
   final List<_AIAction> _supportedActions = [
-    _AIAction(displayedText: 'Summary', promptTemplate: '对下面内容进行简要总结：'),
-    _AIAction(displayedText: 'Continue writing', promptTemplate: '接着下面内容继续写下去：'),
-    _AIAction(displayedText: 'Rewrite more', promptTemplate: '改写下面内容，使其更丰富：'),
-    _AIAction(displayedText: 'Rewrite simpler', promptTemplate: '改写下面内容，使其更简洁'),
+    _AIAction(
+      displayedText: 'Summary',
+      promptTemplate: 'Summary the following content: ',
+      //systemPrompt: 'Answer in the original language',
+    ),
+    _AIAction(
+      displayedText: 'Continue writing',
+      promptTemplate: 'Here is a text, continue writing by the original language: ',
+    ),
+    _AIAction(
+      displayedText: 'Rewrite more',
+      promptTemplate: 'Rewrite the following text, make it better and more verbose, by the original language: ',
+    ),
+    _AIAction(
+      displayedText: 'Rewrite simpler',
+      promptTemplate: 'Rewrite the following text, make it more concise and simpler, by the original language: ',
+    ),
   ];
   String originalContent = '';
   ScrollController scrollController = ScrollController();
@@ -292,7 +335,7 @@ class _AIDialogState extends State<_AIDialog> {
       );
       contents.add(item);
       _update(item.text);
-      widget.executor.execute(prompt).then((value) {
+      widget.executor.execute(userPrompt: prompt, systemPrompt: action.getSystemPrompt()).then((value) {
         item.result = value;
         _update(value);
       });
@@ -396,13 +439,17 @@ class _AIChatCard extends StatelessWidget {
 class _AIAction {
   String displayedText;
   String promptTemplate;
+  String? systemPrompt;
 
   _AIAction({
     required this.displayedText,
     required this.promptTemplate,
+    this.systemPrompt,
   });
 
   String getPrompt(String text) {
     return promptTemplate + text;
   }
+
+  String? getSystemPrompt() => systemPrompt;
 }
