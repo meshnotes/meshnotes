@@ -35,6 +35,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   MindBlockImplRenderObject? _render;
   Widget? _leading;
   late FloatingViewManager _floatingViewManager;
+  final LayerLink _layerLink = LayerLink();
 
   void setRender(MindBlockImplRenderObject r) {
     _render = r;
@@ -215,8 +216,12 @@ class MindEditBlockState extends State<MindEditBlock> {
       );
       child = GestureDetector(
         onTap: () {
-          _floatingViewManager.showBlockTips(context, widget.texts.getExtra());
+          _floatingViewManager.showBlockTips(context, widget.texts.getExtra(), _layerLink);
         },
+        child: child,
+      );
+      child = CompositedTransformTarget(
+        link: _layerLink,
         child: child,
       );
     }
