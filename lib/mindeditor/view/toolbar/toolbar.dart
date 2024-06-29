@@ -125,13 +125,20 @@ class MindToolBar extends StatelessWidget {
   }
 
   static AppearanceSetting _buildDefaultAppearance(BuildContext context) {
-    var defaultAppearance = AppearanceSetting(
+    if(Controller.instance.environment.isMobile()) {
+      return AppearanceSetting(
+        iconSize: 28,
+        size: 32,
+        fillColor: Theme.of(context).canvasColor,
+        hoverColor: Theme.of(context).colorScheme.background,
+      );
+    }
+    return AppearanceSetting(
       iconSize: 18,
       size: 36,
       fillColor: Theme.of(context).canvasColor,
       hoverColor: Theme.of(context).colorScheme.background,
     );
-    return defaultAppearance;
   }
 
   @override

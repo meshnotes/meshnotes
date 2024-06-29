@@ -142,6 +142,9 @@ class ParagraphDesc {
     );
   }
 
+  bool hasContent() {
+    return _plainText!.trim().isNotEmpty;
+  }
   String getPlainText() {
     return _plainText!;
   }

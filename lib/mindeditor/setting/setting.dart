@@ -108,7 +108,7 @@ class Setting {
   static Map<String, String> _getSettingsFromFile(File file) {
     Map<String, String> result = {};
     var lines = file.readAsLinesSync();
-    MyLogger.info('efantest: lines=$lines');
+    MyLogger.debug('_getSettingsFromFile: lines=$lines');
     for(var line in lines) {
       var (key, value) = _parseLine(line);
       if(key == null || value == null) continue;
@@ -150,7 +150,7 @@ class Setting {
         result.add(value.clone());
       }
     }
-    MyLogger.info('efantest: result=$result');
+    MyLogger.debug('getSettings: result=$result');
     return result;
   }
   String? getSetting(String key) {

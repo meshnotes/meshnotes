@@ -97,6 +97,15 @@ class Document {
     return <String>[getTitle().getPlainText()];
   }
 
+  bool hasContent() {
+    for(var para in paragraphs) {
+      if(para.isTitle()) continue;
+      if(para.hasContent()) {
+        return true;
+      }
+    }
+    return false;
+  }
   ParagraphDesc? getParagraph(String _id) {
     return _mapOfParagraphs[_id];
   }
