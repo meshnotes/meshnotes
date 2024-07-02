@@ -2,11 +2,13 @@ class BlockData {
   final String blockId;
   final String blockData;
   final int updatedAt;
+  final String blockExtra;
 
   BlockData({
     required this.blockId,
     required this.blockData,
     required this.updatedAt,
+    required this.blockExtra,
   });
 }
 

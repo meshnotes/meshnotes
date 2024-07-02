@@ -4,8 +4,13 @@ import 'package:flutter/material.dart';
 abstract class PluginProxy {
   void registerPlugin(PluginRegisterInformation registerInformation);
   void showDialog(String title, Widget child);
-  String getSelectedContent();
+  String getSelectedOrFocusedContent();
   String? getSettingValue(String key);
+  String? getEditingBlockId();
+  void sendTextToClipboard(String text);
+  String? appendTextToNextBlock(String blockId, String text);
+  void addExtra(String blockId, String content);
+  void clearExtra(String blockId);
 }
 
 abstract class PluginInstance {
@@ -14,10 +19,16 @@ abstract class PluginInstance {
 }
 
 class PluginRegisterInformation {
+  String pluginName;
   ToolbarInformation toolbarInformation;
+  List<PluginSetting> settingsInformation;
+  void Function(BlockChangedEventData)? onBlockChanged;
 
   PluginRegisterInformation({
+    required this.pluginName,
     required this.toolbarInformation,
+    required this.settingsInformation,
+    this.onBlockChanged,
   });
 }
 
@@ -30,5 +41,28 @@ class ToolbarInformation {
     required this.buttonIcon,
     required this.action,
     required this.tip,
+  });
+}
+
+class PluginSetting {
+  String settingKey;
+  String settingName;
+  String settingComment;
+  String settingDefaultValue;
+
+  PluginSetting({
+    required this.settingKey,
+    required this.settingName,
+    required this.settingComment,
+    this.settingDefaultValue = '',
+  });
+}
+
+class BlockChangedEventData {
+  String blockId;
+  String content;
+  BlockChangedEventData({
+    required this.blockId,
+    required this.content,
   });
 }

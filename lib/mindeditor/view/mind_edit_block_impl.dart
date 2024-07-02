@@ -192,19 +192,26 @@ class MindBlockImplRenderObject extends RenderBox {
     return defaultTextColor;
   }
 
+  void updateCurrentBox() {
+    currentBox = _getCurrentRenderGlobalRect();
+  }
+  void clearCurrentBox() {
+    currentBox = null;
+  }
+
   @override
   void performLayout() {
     paragraph.layout(constraints, parentUsesSize: true);
     placeHolder.layout(constraints, parentUsesSize: true);
     var _para = texts.getPlainText().isEmpty? placeHolder: paragraph;
     size = Size(constraints.maxWidth, _para.computeMinIntrinsicHeight(constraints.maxWidth));
+    MyLogger.debug('performLayout: blockId=${texts.getBlockId()}, idx=${texts.getBlockIndex()}');
   }
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    final _firstPoint = localToGlobal(Offset.zero);
-    final _lastPoint = localToGlobal(Offset(size.width, size.height));
-    currentBox = Rect.fromPoints(_firstPoint, _lastPoint);
+    updateCurrentBox();
+    MyLogger.debug('paint: blockId=${texts.getBlockId()}, currentBox=$currentBox, idx=${texts.getBlockIndex()}');
     final canvas = context.canvas;
     final hasCursor = texts.hasCursor();
     var textSelection = texts.getTextSelection();
@@ -213,8 +220,9 @@ class MindBlockImplRenderObject extends RenderBox {
       final _lineHeight = paragraph.getPreferredHeight();
       MyLogger.verbose('MindEditBlockImplRenderObject: lineHeight=$_lineHeight');
       var currentTextPos = TextPosition(offset: textSelection.extentOffset);
-      // MyLogger.info('MindEditBlockImplRenderObject: currentTextPos=$currentTextPos, extent=${textSelection.extentOffset}, leading=${Controller.instance.selectionController.leadingPositionBeforeInput}');
+      // MyLogger.info('MindEditBlockImplRenderObject: currentTextPos=$currentTextPos, extent=${textSelection.extentOffset}');
       currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
+      MyLogger.debug('paint: index=${texts.getBlockIndex()}, currentCursorRect=$currentCursorRect');
       var baseTextPos = TextPosition(offset: textSelection.baseOffset);
       baseOffsetRect = _calculateCursorRectByPosition(baseTextPos, height: _lineHeight);
       if(!textSelection.isCollapsed) {
@@ -280,6 +288,12 @@ class MindBlockImplRenderObject extends RenderBox {
         controller.selectionController.updateExtentHandlePoint(globalPoint);
       });
     }
+  }
+
+  Rect _getCurrentRenderGlobalRect() {
+    final _firstPoint = localToGlobal(Offset.zero);
+    final _lastPoint = localToGlobal(Offset(size.width, size.height));
+    return Rect.fromPoints(_firstPoint, _lastPoint);
   }
 
   @override

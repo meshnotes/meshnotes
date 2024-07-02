@@ -64,7 +64,7 @@ class SelectionController {
     int index = _getIndexOfBlock(blockId);
     int pos = _getPosFromRender(render, offset);
     _updateSelection(index, pos, index, pos, paragraphs);
-    blockState.setEditingBlockAndResetCursor();
+    blockState.setEditingBlockAndResetCursor(forceShowKeyboard: true);
   }
 
   void updateSelectionInBlock(String blockId, TextSelection newSelection, bool requestKeyboard) {
@@ -255,6 +255,10 @@ class SelectionController {
   void updateExtentHandlePoint(Offset offset) {
     _selectionHandleLayer.updateExtentHandleOffset(offset);
   }
+  void updateHandlesPointByDelta(Offset delta) {
+    _selectionHandleLayer.updateBaseHandleOffsetByDelta(delta);
+    _selectionHandleLayer.updateExtentHandleOffsetByDelta(delta);
+  }
   void setShouldShowSelectionHandle(bool _b) {
     _shouldShowSelectionHandle = _b;
   }
@@ -321,7 +325,9 @@ class SelectionController {
     if(readOnly == null || readOnly) return;
 
     final render = blockState?.getRender();
-    render?.markNeedsPaint();
+    if(render != null && render.attached) {
+      render.markNeedsPaint();
+    }
   }
   void _releaseCursor() {
     if(lastExtentBlockIndex < 0) return;
@@ -425,13 +431,25 @@ class SelectionController {
   ///   * block 1 or block 2 could be null when the position is at the edge
   MindEditBlockState? _findBlockState(List<ParagraphDesc> paragraphs, Offset globalPosition, SelectionExtentType type) {
     ParagraphDesc? lastPara;
-    for(var para in paragraphs) {
+    var pairs = CallbackRegistry.getActiveBlockIndexRange();
+    if(pairs == null) return null;
+
+    var (start, end) = pairs;
+    if(start == -1 || end == -1) return null;
+
+    for(int idx = start; idx <= end; idx++) {
+      final para = paragraphs[idx];
       final state = para.getEditState();
       if(state == null) continue;
 
       final render = state.getRender();
       if(render == null) continue;
 
+      if(!render.attached) continue;
+
+      // final topLeft = render.semanticBounds.topLeft;
+      // final bottomRight = render.semanticBounds.bottomRight;
+      // final box = Rect.fromPoints(render.localToGlobal(topLeft), render.localToGlobal(bottomRight));
       final box = render.currentBox;
       if(box == null) continue;
 

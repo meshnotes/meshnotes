@@ -28,7 +28,7 @@ class CopyButton extends StatelessWidget {
         return (selection != null && !selection.isCollapsed);
       },
       onPressed: () async {
-        await EditorController.copyToClipboard();
+        await EditorController.copySelectedContentToClipboard();
         CallbackRegistry.requestFocus();
       },
     );

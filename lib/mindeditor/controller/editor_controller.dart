@@ -16,9 +16,13 @@ class EditorController {
     final selectionController = Controller.instance.selectionController;
     selectionController.deleteSelectedContent();
   }
-  static Future<void> copyToClipboard() async {
+  static Future<void> copySelectedContentToClipboard() async {
     var content = getSelectedContent();
-    await ClipboardUtil.writeToClipboard(content);
+    copyTextToClipboard(content);
+  }
+
+  static Future<void> copyTextToClipboard(String text) async {
+    await ClipboardUtil.writeToClipboard(text);
     checkIfReadyToPaste();
   }
 

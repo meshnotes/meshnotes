@@ -107,7 +107,7 @@ class Document {
     insertNewParagraphAfterId(id, para);
     return para;
   }
-  ParagraphDesc insertNewParagraphAfterId(String _id, ParagraphDesc newItem) {
+  void insertNewParagraphAfterId(String _id, ParagraphDesc newItem) {
     int idx;
     for(idx = 0; idx < paragraphs.length; idx++) {
       if(paragraphs[idx].getBlockId() == _id) {
@@ -127,10 +127,10 @@ class Document {
     _mapOfParagraphs[newItem.getBlockId()] = newItem;
     _flushDocStructure();
     _lastUpdate = Util.getTimeStamp();
-    return newItem;
+    return;
   }
   //TODO merge with the previous function
-  ParagraphDesc insertNewParagraphsAfterId(String _id, List<ParagraphDesc> newItems) {
+  void insertNewParagraphsAfterId(String _id, List<ParagraphDesc> newItems) {
     int idx;
     for(idx = 0; idx < paragraphs.length; idx++) {
       if(paragraphs[idx].getBlockId() == _id) {
@@ -154,7 +154,6 @@ class Document {
     }
     _flushDocStructure();
     _lastUpdate = Util.getTimeStamp();
-    return newItems[0];
   }
 
   void removeParagraph(String _id) {
@@ -301,7 +300,7 @@ class Document {
 
   void setIdle() {
     _idleTimer?.cancel();
-    _idleTimer = Timer(const Duration(seconds: Constants.timeoutSyncIdle), () {
+    _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfSyncIdle), () {
       Controller.instance.sendVersionTree();
       _idleTimer = null;
     });
@@ -323,7 +322,8 @@ class Document {
         MyLogger.warn('_loadBlocks: could not find block(id=$blockId) in block map of document(id=$docId)');
         continue;
       }
-      var p = ParagraphDesc.buildFromJson(id: blockData.blockId, jsonStr: blockData.blockData, time: blockData.updatedAt);
+      MyLogger.debug('_loadBlocks: block=${blockData.blockId}}, extra=${blockData.blockExtra}');
+      var p = ParagraphDesc.buildFromJson(id: blockData.blockId, jsonStr: blockData.blockData, time: blockData.updatedAt, extra: blockData.blockExtra);
       result.add(p);
     }
     return result;

@@ -13,6 +13,7 @@ class SelectionHandleLayer {
   Offset? _baseHandleOffset;
   Offset? _extentHandleOffset;
   static const _handleSize = 16.0;
+  static const _handleDragSize = 32.0;
   bool _isDragging = false;
 
   bool isDragging() => _isDragging;
@@ -31,13 +32,19 @@ class SelectionHandleLayer {
   }
   void updateBaseHandleOffset(Offset? offset) {
     if(offset == null) return;
-    _baseHandleOffset = offset + const Offset(-_handleSize / 2, 0);
+    _baseHandleOffset = offset + const Offset(-_handleDragSize / 2, 0);
     _positionedOfBase?.updatePosition(_baseHandleOffset!);
   }
   void updateExtentHandleOffset(Offset? offset) {
     if(offset == null) return;
-    _extentHandleOffset = offset + const Offset(-_handleSize / 2, 0);
+    _extentHandleOffset = offset + const Offset(-_handleDragSize / 2, 0);
     _positionedOfExtent?.updatePosition(_extentHandleOffset!);
+  }
+  void updateBaseHandleOffsetByDelta(Offset delta) {
+    _positionedOfBase?.updatePositionByDelta(delta);
+  }
+  void updateExtentHandleOffsetByDelta(Offset delta) {
+    _positionedOfExtent?.updatePositionByDelta(delta);
   }
   void updatePositionedOfBase(_PositionedHandleState state) {
     _positionedOfBase = state;
@@ -81,8 +88,8 @@ class SelectionHandleLayer {
     return _buildHandle(SelectionExtentType.extent);
   }
   OverlayEntry _buildHandle(SelectionExtentType type) {
-    var container = Container(
-      alignment: Alignment.topLeft,
+    var paintContainer = Container(
+      alignment: Alignment.topCenter,
       child: SizedBox(
         width: _handleSize,
         height: _handleSize,
@@ -91,7 +98,14 @@ class SelectionHandleLayer {
         ),
       ),
     );
+    var dragContainer = Container(
+      width: _handleDragSize,
+      height: _handleDragSize,
+      alignment: Alignment.topCenter,
+      child: paintContainer,
+    );
     var gesture = GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onPanStart: (DragStartDetails details) {
         MyLogger.info('selection handle: drag start');
         _isDragging = true;
@@ -111,7 +125,7 @@ class SelectionHandleLayer {
         MyLogger.info('selection handle: drag cancel');
         _isDragging = false;
       },
-      child: container,
+      child: dragContainer,
     );
     Offset offset;
     switch(type) {
@@ -201,8 +215,16 @@ class _PositionedHandleState extends State<PositionedHandle> {
   }
 
   void updatePosition(Offset offset) {
+    if(offset == position) return;
     setState(() {
       position = offset;
+    });
+  }
+
+  void updatePositionByDelta(Offset delta) {
+    if(delta == Offset.zero) return;
+    setState(() {
+      position -= delta;
     });
   }
 }

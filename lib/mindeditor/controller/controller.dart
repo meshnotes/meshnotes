@@ -32,7 +32,7 @@ class Controller {
   final FocusNode globalFocusNode = FocusNode();
   final Environment environment = Environment();
   final Device device = Device();
-  final Setting setting = Setting.defaultSetting;
+  late final Setting setting;// = Setting.defaultSetting;
   // Mouse and gesture handler
   late final GestureHandler gestureHandler;
   late final NetworkController network;
@@ -70,14 +70,15 @@ class Controller {
   }
 
   Future<bool> initAll(NetworkController _net, {bool test=false}) async {
-    MyLogger.debug('initAll: init db');
+    // Load settings before starting network
+    final confFile = await environment.getExistFileFromLibraryPathsByEnvironment('setting.conf');
+    MyLogger.info('initAll: load settings from $confFile');
+    setting = Setting(confFile);
+    setting.load();
 
+    MyLogger.debug('initAll: init db');
     await dbHelper.init();
     _docManager = DocumentManager(db: dbHelper);
-
-    // Load settings before starting network
-    MyLogger.debug('initAll: load settings');
-    setting.loadFromDb(dbHelper);
 
     // Load user information from setting
     userPrivateInfo = _loadUserInfo(setting);
@@ -98,6 +99,9 @@ class Controller {
 
     _pluginManager = PluginManager();
     _pluginManager.initPluginManager();
+
+    setting.addAdditionalSettings(_pluginManager.getPluginSupportedSettings());
+    setting.load();
 
     MyLogger.debug('initAll: finish initialization');
     return true;
@@ -260,13 +264,13 @@ class Controller {
       //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
       return;
     }
-    MyLogger.info('efantest: receive version tree: $dag');
+    MyLogger.info('receiveVersionTree: receive version tree: $dag');
     docManager.assembleVersionTree(dag);
   }
   void receiveRequireVersions(List<String> requiredVersions) {
-    MyLogger.info('efantest: receive require versions message: $requiredVersions');
+    MyLogger.info('receiveRequireVersions: receive require versions message: $requiredVersions');
     var versions = docManager.assembleRequireVersions(requiredVersions);
-    MyLogger.info('efantest: preparing to send versions: $versions');
+    MyLogger.info('receiveRequireVersions: preparing to send versions: $versions');
     network.sendVersions(versions);
   }
   void receiveResources(List<UnsignedResource> resources) {
@@ -282,7 +286,9 @@ class Controller {
         nonChainResources.add(res);
       }
     }
-    docManager.assembleResources(nonChainResources);
+    if(nonChainResources.isNotEmpty) {
+      docManager.assembleResources(nonChainResources);
+    }
 
     for(var chain in versionChains) {
       receiveVersionTree(chain.versionDag);
