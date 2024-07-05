@@ -29,6 +29,11 @@ class VersionNode {
     }
     return result;
   }
+
+  @override
+  String toString() {
+    return 'Version node for $versionHash';
+  }
 }
 
 class VersionChain {

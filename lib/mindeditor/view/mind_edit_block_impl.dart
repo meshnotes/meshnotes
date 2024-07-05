@@ -65,7 +65,7 @@ class MindBlockImplRenderObject extends RenderBox {
     this.readOnly = false,
   }) {
     paragraph = _buildParagraph(texts, fontSize);
-    placeHolder = _buildPlaceHolder(texts.isTitle()? '输入标题': '输入文字', fontSize);
+    placeHolder = _buildPlaceHolder(texts.isTitle()? 'Write note title here': 'Write note text here', fontSize);
     block.setRender(this);
   }
 
@@ -231,11 +231,13 @@ class MindBlockImplRenderObject extends RenderBox {
 
       if(!readOnly && hasCursor) {
         _drawCursor(canvas, offset, _lineHeight);
-        _drawComposing(canvas, offset, _lineHeight); // 如果处于输入法状态中，在输入中的文字下方画线
+        _drawComposing(canvas, offset, _lineHeight); // Draw underline when input method is composing
       }
     }
-    // 如果没有文字，则当鼠标悬停时、或光标定位在此block时，要显示place holder。如果是标题，则不管鼠标和光标都显示place holder
-    if(!readOnly && texts.getPlainText().isEmpty && (block.isMouseEntered() || hasCursor || texts.isTitle())) {
+    // When text is empty, and mouse hover, or cursor locating in this block, show the place holder
+    // If this is title block, show place holder when title is empty
+    // If the current note has no content, show place holder
+    if(!readOnly && texts.getPlainText().isEmpty && (block.isMouseEntered() || hasCursor || texts.isTitle() || !(controller.document?.hasContent()?? false))) {
       placeHolder.paint(context, offset);
     } else {
       paragraph.paint(context, offset);
@@ -346,7 +348,7 @@ class MindBlockImplRenderObject extends RenderBox {
   }
   Offset _calcOffsetOfTextPosition(TextPosition pos) {
     var offset = _convertOffsetFromPosition(pos);
-    return Offset(offset.dx, offset.dy + fontSize / 2); // 稍微偏下一点，不然会定位到上一行的位置
+    return Offset(offset.dx, offset.dy + fontSize / 2); // A little lower than offset.dx, or it may be located at the upper line
   }
   Offset _convertOffsetFromPosition(TextPosition pos) {
     var canvasRect = Rect.fromLTWH(0, 0, size.width, size.height);

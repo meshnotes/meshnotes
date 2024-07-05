@@ -35,7 +35,7 @@ class KimiExecutor implements AiExecutor {
         content: systemPrompt,
       ));
     }
-    MyLogger.info('efantest: messages=$messages');
+    MyLogger.debug('kimi execute: messages=$messages');
     OpenAIChatCompletionModel completion = await OpenAI.instance.chat.create(
       model: 'moonshot-v1-8k',
       messages: messages,

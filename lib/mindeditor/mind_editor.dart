@@ -81,8 +81,12 @@ class MindEditorState extends State<MindEditor> {
       controller: controller,
       context: context,
     );
+    var padding = const EdgeInsets.all(1.0);
+    if(Controller.instance.environment.isMobile()) {
+      padding = const EdgeInsets.fromLTRB(1.0, 1.0, 1.0, 12.0); // Leave a little space for mobile phone's controller bar
+    }
     var container = Container(
-      padding: const EdgeInsets.all(1),
+      padding: padding,
       width: double.infinity,
       child: toolbarView,
     );
