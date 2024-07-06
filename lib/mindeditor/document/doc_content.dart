@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:keygen/keygen.dart';
 import 'text_desc.dart';
 
+// Data structure to describe a single version
 class VersionContent {
   List<VersionContentItem> table;
   int timestamp;
@@ -49,6 +50,7 @@ class VersionContent {
   }
 }
 
+// Data structure to describe a single document's id and hash relationship
 class VersionContentItem {
   String docId;
   String docHash;
@@ -73,6 +75,7 @@ class VersionContentItem {
         updatedAt = map['updated_at'];
 }
 
+// Data structure to describe a document's content
 class DocContent {
   List<DocContentItem> contents;
 
@@ -105,6 +108,7 @@ class DocContent {
   }
 }
 
+// Data structure to describe a single block's id and hash relationship
 class DocContentItem {
   String blockId;
   String blockHash;
@@ -141,6 +145,7 @@ class DocContentItem {
   }
 }
 
+// Data structure to describe a single block's content
 class BlockContent {
   String type;
   String listing;

@@ -1,25 +1,93 @@
 import 'package:flutter/material.dart';
-import 'package:my_log/my_log.dart';
 
 class FloatingViewManager {
-  OverlayEntry? tipsEntry;
+  late Widget _selectionLayer;
+  late Widget _pluginTipsLayer;
+  final _selectionKey = GlobalKey<_FloatingStackViewState>();
+  final _pluginTipsKey = GlobalKey<_FloatingStackViewState>();
 
-  void showBlockTips(BuildContext context, String content, LayerLink layerLink) {
-    OverlayEntry tipsWidget = OverlayEntry(builder: (context) {
-      return _TipsDialog(
-        content: content,
-        layerLink: layerLink,
-        closeCallback: _closeBlockTips,
-      );
-    });
-    tipsEntry = tipsWidget;
-    Overlay.of(context).insert(tipsWidget);
+  FloatingViewManager() {
+    _selectionLayer = _buildSelectionLayer();
+    _pluginTipsLayer = _buildPluginTipsLayer();
   }
 
-  void _closeBlockTips() {
-    MyLogger.info('efantest: close block tips');
-    tipsEntry?.remove();
-    tipsEntry = null;
+  void showBlockTips(BuildContext context, String content, LayerLink layerLink) {
+    var tipsWidget = _TipsDialog(
+      content: content,
+      layerLink: layerLink,
+      closeCallback: () {
+        _pluginTipsKey.currentState?.clearLayer();
+      },
+    );
+    _pluginTipsKey.currentState?.addLayer(tipsWidget);
+  }
+
+  List<Widget> getWidgets() {
+    return [
+      _selectionLayer,
+      _pluginTipsLayer,
+    ];
+  }
+
+  void addSelectionHandles(Widget handle1, Widget handle2) {
+    _selectionKey.currentState?.addLayer(handle1);
+    _selectionKey.currentState?.addLayer(handle2);
+  }
+  void removeSelectionHandles(Widget handle1, Widget handle2) {
+    _selectionKey.currentState?.removeLayer(handle1);
+    _selectionKey.currentState?.removeLayer(handle2);
+  }
+
+  Offset? convertGlobalOffsetToSelectionLayer(Offset global) {
+    final render = _selectionKey.currentContext?.findRenderObject() as RenderBox?;
+    return render?.globalToLocal(global);
+  }
+
+  Widget _buildSelectionLayer() {
+    return _FloatingStackView(
+      key: _selectionKey,
+    );
+  }
+  Widget _buildPluginTipsLayer() {
+    return _FloatingStackView(
+      key: _pluginTipsKey,
+    );
+  }
+}
+
+class _FloatingStackView extends StatefulWidget {
+  const _FloatingStackView({
+    super.key,
+  });
+
+  @override
+  State<StatefulWidget> createState() => _FloatingStackViewState();
+}
+class _FloatingStackViewState extends State<_FloatingStackView> {
+  List<Widget> views = [];
+
+  @override
+  Widget build(BuildContext context) {
+    final stack = Stack(
+      children: views,
+    );
+    return stack;
+  }
+
+  void addLayer(Widget _w) {
+    setState(() {
+      views.add(_w);
+    });
+  }
+  void clearLayer() {
+    setState(() {
+      views.clear();
+    });
+  }
+  void removeLayer(Widget _w) {
+    setState(() {
+      views.remove(_w);
+    });
   }
 }
 

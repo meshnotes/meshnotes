@@ -106,7 +106,7 @@ class MindEditorState extends State<MindEditor> {
       ],
     );
     var withPadding = Container(
-      padding: EdgeInsets.all(paddingSize),
+      padding: const EdgeInsets.fromLTRB(10.0, 0.0, 0.0, 0.0),
       child: columnWrapper,
     );
     var expanded = Expanded(
@@ -122,7 +122,7 @@ class MindEditorState extends State<MindEditor> {
     });
   }
 
-  double get paddingSize => Controller.instance.environment.isDesktop()? 20.0: 10.0;
+  double get paddingSize => Controller.instance.environment.isDesktop()? 0.0: 10.0;
 
   void _takeScreenShot() async {
     MyLogger.info('Taking screen shot');
