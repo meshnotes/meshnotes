@@ -442,14 +442,15 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     }
     if(value.text.length > widget.controller.setting.blockMaxCharacterLength) {
       // CallbackRegistry.unregisterCurrentSnackBar();
-      CallbackRegistry.showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.orangeAccent,
-          content: Text('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(milliseconds: 2000),
-        )
-      );
+      // CallbackRegistry.showSnackBar(
+      //   SnackBar(
+      //     backgroundColor: Colors.orangeAccent,
+      //     content: Text('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters'),
+      //     behavior: SnackBarBehavior.floating,
+      //     duration: const Duration(milliseconds: 2000),
+      //   )
+      // );
+      CallbackRegistry.getFloatingViewManager()?.showEditorToast('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters');
       // refreshTextEditingValue();
       return;
     }
