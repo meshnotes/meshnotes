@@ -133,12 +133,12 @@ class PluginManager {
       closeDialog();
     }
     CallbackRegistry.hideKeyboard();
-    final smallView = Controller.instance.environment.isSmallView(_context!);
+    final isSmallView = Controller.instance.environment.isSmallView(_context!);
     _overlayEntry = OverlayEntry(
       builder: (context) {
         double width = 300;
         double height = 300;
-        if(smallView) {
+        if(isSmallView) {
           width = double.infinity;
           height = double.infinity;
         }
