@@ -6,6 +6,7 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/controller/key_control.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
+import 'package:mesh_note/mindeditor/view/floating_view.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:my_log/my_log.dart';
 
@@ -43,6 +44,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   int _activeBlockFirstIndex = -1;
   int _activeBlockLastIndex = -1;
   double _currentScrollPixel = 0.0;
+  late FloatingViewManager _floatingViewManager;
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -52,6 +54,8 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   void initState() {
     MyLogger.debug('MindEditFieldState: init state');
     super.initState();
+    _floatingViewManager = FloatingViewManager();
+    CallbackRegistry.registerFloatingViewManager(_floatingViewManager);
     if(widget.controller.environment.isIos()) {
       _initialTextValue = _iosInitialTextValue;
     }
@@ -76,6 +80,20 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(_hasFocus) {
       _focusAttachment!.reparent();
     }
+    Widget lowestLayer = _buildLowestLayer();
+    var stack = Stack(
+      children: [
+        lowestLayer,
+        ..._floatingViewManager.getWidgets(),
+      ],
+    );
+    var expanded = Expanded(
+      child: stack,
+    );
+    return expanded;
+  }
+
+  GestureDetector _buildLowestLayer() {
     Widget listView = _buildBlockList();
     if(Controller.instance.isDebugMode) {
       listView = Container(
@@ -116,10 +134,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         MyLogger.info('MindEditFieldState: on pan end');
       },
     );
-    var expanded = Expanded(
-      child: gesture,
-    );
-    return expanded;
+    return gesture;
   }
 
   @override
@@ -427,14 +442,15 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     }
     if(value.text.length > widget.controller.setting.blockMaxCharacterLength) {
       // CallbackRegistry.unregisterCurrentSnackBar();
-      CallbackRegistry.showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.orangeAccent,
-          content: Text('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(milliseconds: 2000),
-        )
-      );
+      // CallbackRegistry.showSnackBar(
+      //   SnackBar(
+      //     backgroundColor: Colors.orangeAccent,
+      //     content: Text('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters'),
+      //     behavior: SnackBarBehavior.floating,
+      //     duration: const Duration(milliseconds: 2000),
+      //   )
+      // );
+      CallbackRegistry.getFloatingViewManager()?.showEditorToast('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters');
       // refreshTextEditingValue();
       return;
     }

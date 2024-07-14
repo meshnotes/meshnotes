@@ -2,7 +2,6 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:mesh_note/mindeditor/view/floating_view.dart';
 import 'package:my_log/my_log.dart';
 import '../../util/util.dart';
 import '../document/paragraph_desc.dart';
@@ -34,7 +33,6 @@ class MindEditBlockState extends State<MindEditBlock> {
   bool _mouseEntered = false;
   MindBlockImplRenderObject? _render;
   Widget? _leading;
-  late FloatingViewManager _floatingViewManager;
   final LayerLink _layerLink = LayerLink();
 
   void setRender(MindBlockImplRenderObject r) {
@@ -51,7 +49,6 @@ class MindEditBlockState extends State<MindEditBlock> {
   @override
   void initState() {
     super.initState();
-    _floatingViewManager = FloatingViewManager();
     if(!widget.readOnly) {
       MyLogger.debug('MindEditBlockState: initializing MindEditBlockState for block(id=${getBlockId()})');
       widget.controller.setBlockStateToTreeNode(getBlockId(), this);
@@ -216,7 +213,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       );
       child = GestureDetector(
         onTap: () {
-          _floatingViewManager.showBlockTips(context, widget.texts.getExtra(), _layerLink);
+          CallbackRegistry.getFloatingViewManager()?.showBlockTips(context, widget.texts.getExtra(), _layerLink);
         },
         child: child,
       );

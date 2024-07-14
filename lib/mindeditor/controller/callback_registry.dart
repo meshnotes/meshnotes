@@ -3,14 +3,15 @@ import 'package:mesh_note/net/status.dart';
 import 'package:mesh_note/page/title_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:super_clipboard/super_clipboard.dart';
-
 import '../document/paragraph_desc.dart';
 import '../mind_editor.dart';
+import '../view/floating_view.dart';
 import '../view/mind_edit_field.dart';
 
 class CallbackRegistry {
   static DocumentTitleBarState? _titleBarState;
   static MindEditorState? _editorState;
+  static FloatingViewManager? _floatingViewManager;
   static MindEditFieldState? _editFieldState;
   static GlobalKey<State<ScaffoldMessenger>>? _messengerKey;
   static final Map<String, Function(TextSpansStyle?)> _selectionStyleWatcher = {};
@@ -40,6 +41,9 @@ class CallbackRegistry {
   static void openDocument(Document doc) {
     _editorState?.open(doc);
   }
+
+  static registerFloatingViewManager(FloatingViewManager _f) => _floatingViewManager = _f;
+  static FloatingViewManager? getFloatingViewManager() => _floatingViewManager;
 
   static void registerEditFieldState(MindEditFieldState _s) {
     _editFieldState = _s;

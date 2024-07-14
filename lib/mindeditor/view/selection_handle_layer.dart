@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/mindeditor/view/floating_view.dart';
 import 'package:my_log/my_log.dart';
 
 import '../controller/controller.dart';
 import '../controller/selection_controller.dart';
 
 class SelectionHandleLayer {
-  OverlayEntry? _handleOfStart;
-  OverlayEntry? _handleOfEnd;
-  _PositionedHandleState? _positionedOfBase;
-  _PositionedHandleState? _positionedOfExtent;
+  Widget? _handleOfStart;
+  Widget? _handleOfEnd;
+  _PositionedHandleState? _handleStateOfBase;
+  _PositionedHandleState? _handleStateOfExtent;
   BuildContext? _context;
   Offset? _baseHandleOffset;
   Offset? _extentHandleOffset;
@@ -33,24 +35,28 @@ class SelectionHandleLayer {
   void updateBaseHandleOffset(Offset? offset) {
     if(offset == null) return;
     _baseHandleOffset = offset + const Offset(-_handleDragSize / 2, 0);
-    _positionedOfBase?.updatePosition(_baseHandleOffset!);
+    _handleStateOfBase?.updatePosition(_baseHandleOffset!);
   }
   void updateExtentHandleOffset(Offset? offset) {
     if(offset == null) return;
     _extentHandleOffset = offset + const Offset(-_handleDragSize / 2, 0);
-    _positionedOfExtent?.updatePosition(_extentHandleOffset!);
+    _handleStateOfExtent?.updatePosition(_extentHandleOffset!);
   }
   void updateBaseHandleOffsetByDelta(Offset delta) {
-    _positionedOfBase?.updatePositionByDelta(delta);
+    _handleStateOfBase?.updatePositionByDelta(delta);
   }
   void updateExtentHandleOffsetByDelta(Offset delta) {
-    _positionedOfExtent?.updatePositionByDelta(delta);
+    _handleStateOfExtent?.updatePositionByDelta(delta);
   }
-  void updatePositionedOfBase(_PositionedHandleState state) {
-    _positionedOfBase = state;
+  void updateHandleStateOfBase(_PositionedHandleState state) {
+    _handleStateOfBase = state;
   }
-  void updatePositionedOfExtent(_PositionedHandleState state) {
-    _positionedOfExtent = state;
+  void updateHandleStateOfExtent(_PositionedHandleState state) {
+    _handleStateOfExtent = state;
+  }
+  Offset? convertGlobalOffsetToSelectionLayer(Offset global) {
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
+    return floatingViewManager?.convertGlobalOffsetToSelectionLayer(global);
   }
 
   void hide() {
@@ -63,31 +69,33 @@ class SelectionHandleLayer {
     if(_baseHandleOffset == null || _extentHandleOffset == null) {
       return;
     }
-    _handleOfStart = _buildStartHandle();
-    _handleOfEnd = _buildEndHandle();
-    Overlay.of(_context!).insert(_handleOfStart!);
-    Overlay.of(_context!).insert(_handleOfEnd!);
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
+    if(floatingViewManager != null) {
+      _handleOfStart = _buildStartHandle();
+      _handleOfEnd = _buildEndHandle();
+      floatingViewManager.addSelectionHandles(_handleOfStart!, _handleOfEnd!);
+    }
   }
 
   void hideTextSelectionHandles() {
-    _handleOfStart?.remove();
-    _handleOfStart?.dispose();
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
+    if(_handleOfStart != null && _handleOfEnd != null) {
+      floatingViewManager?.removeSelectionHandles(_handleOfStart!, _handleOfEnd!);
+    }
     _handleOfStart = null;
-    _positionedOfBase = null;
-    _handleOfEnd?.remove();
-    _handleOfEnd?.dispose();
+    _handleStateOfBase = null;
     _handleOfEnd = null;
-    _positionedOfExtent = null;
+    _handleStateOfExtent = null;
     _isDragging = false;
   }
 
-  OverlayEntry _buildStartHandle() {
+  Widget _buildStartHandle() {
     return _buildHandle(SelectionExtentType.base);
   }
-  OverlayEntry _buildEndHandle() {
+  Widget _buildEndHandle() {
     return _buildHandle(SelectionExtentType.extent);
   }
-  OverlayEntry _buildHandle(SelectionExtentType type) {
+  Widget _buildHandle(SelectionExtentType type) {
     var paintContainer = Container(
       alignment: Alignment.topCenter,
       child: SizedBox(
@@ -136,16 +144,11 @@ class SelectionHandleLayer {
         offset = _extentHandleOffset!;
         break;
     }
-    return OverlayEntry(
-      builder: (BuildContext context) {
-        var result = PositionedHandle(
-          initPosition: offset,
-          child: gesture,
-          type: type,
-          parentLayer: this,
-        );
-        return result;
-      },
+    return PositionedHandle(
+      initPosition: offset,
+      child: gesture,
+      type: type,
+      parentLayer: this,
     );
   }
 }
@@ -193,13 +196,13 @@ class _PositionedHandleState extends State<PositionedHandle> {
 
   @override
   void initState() {
-    position = widget.initPosition;
+    position = widget.parentLayer.convertGlobalOffsetToSelectionLayer(widget.initPosition)?? widget.initPosition;
     switch(widget.type) {
       case SelectionExtentType.base:
-        widget.parentLayer.updatePositionedOfBase(this);
+        widget.parentLayer.updateHandleStateOfBase(this);
         break;
       case SelectionExtentType.extent:
-        widget.parentLayer.updatePositionedOfExtent(this);
+        widget.parentLayer.updateHandleStateOfExtent(this);
         break;
     }
     super.initState();
@@ -215,6 +218,7 @@ class _PositionedHandleState extends State<PositionedHandle> {
   }
 
   void updatePosition(Offset offset) {
+    offset = widget.parentLayer.convertGlobalOffsetToSelectionLayer(offset)?? offset;
     if(offset == position) return;
     setState(() {
       position = offset;
