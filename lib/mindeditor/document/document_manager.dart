@@ -6,7 +6,7 @@ import 'package:mesh_note/mindeditor/document/collaborate/conflict_manager.dart'
 import 'package:mesh_note/mindeditor/document/collaborate/merge_manager.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
-import 'package:mesh_note/mindeditor/document/dal/doc_data.dart';
+import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
@@ -25,21 +25,27 @@ class DocumentManager {
   VersionManager vm = VersionManager();
   DiffManager dm = DiffManager();
   String? currentDocId;
-  List<DocData> _docTitles = [];
+  List<DocDataModel> _docTitles = [];
   String _currentVersion = '';
   int _currentVersionTimestamp = 0;
   bool _syncing = false;
 
   DocumentManager({
     required DbHelper db,
-  }): _db = db;
+  }): _db = db {
+    Controller.instance.evenTasksManager.addAfterInitTask(() {
+      Future(() {
+        checkConsistency();
+      });
+    });
+  }
 
   Document? getCurrentDoc() {
     if(currentDocId == null) return null;
     return _documents[currentDocId];
   }
 
-  List<DocData> getAllDocuments() {
+  List<DocDataModel> getAllDocuments() {
     if(_docTitles.isNotEmpty) {
       return _docTitles;
     }
@@ -86,11 +92,11 @@ class DocumentManager {
     _db.storeDocBlock(docId, blockId, jsonEncode(block), now);
     var docContent = _genDocContentWithTitle(docId, blockId, block);
     _db.storeDocContent(docId, jsonEncode(docContent), now);
-    _docTitles.add(DocData(docId: docId, title: title, hash: '', timestamp: now));
+    _docTitles.add(DocDataModel(docId: docId, title: title, hash: '', timestamp: now));
     return docId;
   }
 
-  (List<VersionData>, int) genAndSaveNewVersionTree() {
+  (List<VersionDataModel>, int) genAndSaveNewVersionTree() {
     if(!hasModified()) return ([], 0);
     final now = Util.getTimeStamp();
     var version = _genVersionAndClearModified(now);
@@ -115,9 +121,9 @@ class DocumentManager {
       String versionHash = node.versionHash;
       String parents = _buildParents(node.parents);
       int timestamp = node.createdAt;
-      var oldVersion = _db.getVersionData(versionHash);
-      if(oldVersion == null) {
-        _db.storeVersion(versionHash, parents, timestamp);
+      var localVersion = _db.getVersionData(versionHash);
+      if(localVersion == null) { // If the version is not exists, create one and set it as from_peer/unavailable
+        _db.storeVersion(versionHash, parents, timestamp, Constants.createdFromPeer, Constants.statusUnavailable);
       }
     }
   }
@@ -161,7 +167,9 @@ class DocumentManager {
       String key = res.key;
       int timestamp = res.timestamp;
       String content = res.data;
-      _db.storeObject(key, content, timestamp);
+      if(_db.getObject(key) == null) {
+        _db.storeObject(key, content, timestamp, Constants.createdFromPeer, Constants.statusAvailable);
+      }
     }
     var _versionMap = _genVersionMapFromDb();
     _tryToMergeVersionTree(_versionMap);
@@ -173,6 +181,11 @@ class DocumentManager {
   }
   void clearSyncing() {
     _syncing = false;
+  }
+
+  void checkConsistency() {
+    _checkVersionIntegrity();
+    _checkObjectsIntegrity();
   }
 
   /// Try to merge entire version tree, called after receiving new version_tree or receiving missing versions.
@@ -234,8 +247,8 @@ class DocumentManager {
       return;
     }
 
-    for(var item in contentVersion.table) {
-      _updateDoc(item, {});
+    for(var doc in contentVersion.table) {
+      _updateDoc(doc, {});
     }
 
     bool fastForward = newVersionHash == _currentVersion || newVersionHash == targetVersion;
@@ -245,20 +258,20 @@ class DocumentManager {
   }
   void _updateDoc(VersionContentItem node, Map<String, String> objects) {
     var docId = node.docId;
-    DocData? found;
-    for(var i in _docTitles) {
-      if(i.docId == docId) {
-        found = i;
+    DocDataModel? found;
+    for(var item in _docTitles) {
+      if(item.docId == docId) {
+        found = item;
         break;
       }
     }
-    // If not found, insert it
-    // If found and identical, ignore it
-    // If found and not identical, update it, and restore doc content
+    /// 1. If found and identical, ignore it
+    /// 2. If not found, insert it
+    /// 3. If found and not identical, update it, and restore doc content
     if(found != null && found.hash == node.docHash && found.timestamp == node.updatedAt) return;
 
     if(found == null) {
-      found = DocData(docId: docId, title: '', hash: node.docHash, timestamp: node.updatedAt);
+      found = DocDataModel(docId: docId, title: '', hash: node.docHash, timestamp: node.updatedAt);
       _docTitles.add(found);
     } else {
       found..hash = node.docHash
@@ -272,7 +285,6 @@ class DocumentManager {
     var docObject = _db.getObject(found.hash);
     var docContentStr = docObject!.data;
     MyLogger.info('_updateDoc: docContent=$docContentStr');
-    _db.storeObject(found.hash, docContentStr, found.timestamp);
     var docContent = DocContent.fromJson(jsonDecode(docContentStr));
 
     // Store blocks into objects
@@ -356,8 +368,8 @@ class DocumentManager {
     } else {
       final jsonStr = jsonEncode(version);
       // Save version object, version tree, current_version flag, and current_version_timestamp flag
-      _db.storeObject(hash, jsonStr, now);
-      _db.storeVersion(hash, parents, now);
+      _db.storeObject(hash, jsonStr, now, Constants.createdFromLocal, Constants.statusAvailable);
+      _db.storeVersion(hash, parents, now, Constants.createdFromLocal, Constants.statusAvailable);
       _db.setFlag(Constants.flagNameCurrentVersion, hash);
       _db.setFlag(Constants.flagNameCurrentVersionTimestamp, now.toString());
 
@@ -383,7 +395,7 @@ class DocumentManager {
     return _hasModified;
   }
 
-  DocData? _getDocTreeNode(String docId) {
+  DocDataModel? _getDocTreeNode(String docId) {
     for(var node in _docTitles) {
       if(node.docId == docId) {
         return node;
@@ -433,7 +445,7 @@ class DocumentManager {
     }
   }
 
-  static List<VersionContentItem> _genDocTreeNodeList(List<DocData> list) {
+  static List<VersionContentItem> _genDocTreeNodeList(List<DocDataModel> list) {
     List<VersionContentItem> result = [];
     for(var item in list) {
       var node = VersionContentItem(docId: item.docId, docHash: item.hash, updatedAt: item.timestamp);
@@ -662,7 +674,7 @@ class DocumentManager {
     return data == null? null: VersionContent.fromJson(jsonDecode(data.data));
   }
 
-  List<VersionData> _getVersionMap() {
+  List<VersionDataModel> _getVersionMap() {
     var versions = _db.getAllVersions();
     return versions;
   }
@@ -713,7 +725,9 @@ class DocumentManager {
       var newDoc = cm.mergeDocument(totalOperations);
       var now = Util.getTimeStamp();
       var newDocHash = newDoc.getHash();
-      _db.storeObject(newDocHash, jsonEncode(newDoc), now);
+      if(_db.getObject(newDocHash) == null) { // Create a local merged document
+        _db.storeObject(newDocHash, jsonEncode(newDoc), now, Constants.createdFromLocal, Constants.statusAvailable);
+      }
       var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: newDocHash, timestamp: now);
       MyLogger.info('Solve conflict of document($docHash1) and document($docHash2) based on document($baseHash), generate new document($newDocHash)');
       resolvedOperations.add(op);
@@ -727,7 +741,7 @@ class DocumentManager {
     return DocContent.fromJson(jsonDecode(obj.data));
   }
 
-  List<DocData> _getAllDocumentAndTitles() {
+  List<DocDataModel> _getAllDocumentAndTitles() {
     var data = _db.getAllDocuments();
     var titleMap = _db.getAllTitles();
     for(var doc in data) {
@@ -736,6 +750,27 @@ class DocumentManager {
       doc.title = block.text[0].text;
     }
     return data;
+  }
+
+  /// Check all versions has object of corresponding version hash
+  void _checkVersionIntegrity() {
+    var versions = _db.getAllVersions();
+    int countOfProblem = 0;
+    for(final version in versions) {
+      final hash = version.versionHash;
+      final object = _db.getObject(hash);
+      if(object == null) {
+        if(version.status != Constants.statusUnavailable) {
+          _db.updateVersionStatus(hash, Constants.statusUnavailable);
+        }
+        countOfProblem++;
+        MyLogger.warn('Find data inconsistency of version $hash');
+      }
+    }
+    MyLogger.info('Find $countOfProblem inconsistency issue(s)');
+  }
+  void _checkObjectsIntegrity() {
+    // Not implemented yet
   }
 
   static BlockContent _genDefaultTitleBlock(String title) {

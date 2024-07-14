@@ -1,10 +1,10 @@
-class BlockData {
+class BlockDataModel {
   final String blockId;
   final String blockData;
   final int updatedAt;
   final String blockExtra;
 
-  BlockData({
+  BlockDataModel({
     required this.blockId,
     required this.blockData,
     required this.updatedAt,
@@ -12,13 +12,13 @@ class BlockData {
   });
 }
 
-class DocData {
+class DocDataModel {
   String docId;
   String title;
   String hash;
   int timestamp;
 
-  DocData({
+  DocDataModel({
     required this.docId,
     required this.title,
     required this.hash,
@@ -26,38 +26,46 @@ class DocData {
   });
 }
 
-class DocContentData {
+class DocContentDataModel {
   String docId;
   String docContent;
   int timestamp;
 
-  DocContentData({
+  DocContentDataModel({
     required this.docId,
     required this.docContent,
     required this.timestamp,
   });
 }
 
-class VersionData {
+class VersionDataModel {
   String versionHash;
   String parents;
   int createdAt;
+  int createdFrom;
+  int status;
 
-  VersionData({
+  VersionDataModel({
     required this.versionHash,
     required this.parents,
     required this.createdAt,
+    required this.createdFrom,
+    required this.status,
   });
 }
 
-class ObjectData {
+class ObjectDataModel {
   String key;
   String data;
   int timestamp;
+  int createdFrom;
+  int status;
 
-  ObjectData({
+  ObjectDataModel({
     required this.key,
     required this.data,
     required this.timestamp,
+    required this.createdFrom,
+    required this.status,
   });
 }

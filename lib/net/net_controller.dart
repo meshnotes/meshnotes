@@ -5,7 +5,7 @@ import 'dart:async';
 import 'dart:isolate';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/document/dal/doc_data.dart';
+import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
 import 'package:my_log/my_log.dart';
 import '../mindeditor/controller/callback_registry.dart';
 import '../mindeditor/setting/constants.dart';
@@ -45,7 +45,7 @@ class NetworkController {
   }
 
   /// Pack versionData in VersionChain, encrypt it, and sign it
-  void sendNewVersionTree(List<VersionData> versionData, int timestamp) {
+  void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp) {
     if(!isStarted()) return;
     var dag = _buildDag(versionData);
     VersionChain versionChain = VersionChain(
@@ -158,7 +158,7 @@ class NetworkController {
     ));
   }
 
-  List<VersionNode> _buildDag(List<VersionData> data) {
+  List<VersionNode> _buildDag(List<VersionDataModel> data) {
     List<VersionNode> result = [];
     for(var item in data) {
       String versionHash = item.versionHash;

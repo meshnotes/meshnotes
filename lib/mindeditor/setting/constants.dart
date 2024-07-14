@@ -37,6 +37,10 @@ class Constants {
   // Flags in db
   static const String flagNameCurrentVersion = 'current_version';
   static const String flagNameCurrentVersionTimestamp = 'current_version_timestamp';
+  static const int createdFromLocal = 0;
+  static const int createdFromPeer = 1;
+  static const int statusAvailable = 0;
+  static const int statusUnavailable = -1;
 
   // InspiredCard related
   static const int cardMaximumWidth = 800;

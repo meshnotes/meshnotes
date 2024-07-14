@@ -9,7 +9,7 @@ import 'large_screen_setting_page.dart';
 import 'small_screen_setting_page.dart';
 import 'inspired_page.dart';
 import 'resizable_view.dart';
-import '../mindeditor/document/dal/doc_data.dart';
+import '../mindeditor/document/dal/doc_data_model.dart';
 import '../mindeditor/setting/constants.dart';
 
 class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
@@ -32,7 +32,7 @@ class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
 
 class DocumentNavigatorState extends State<DocumentNavigator> {
   static const String watcherKey = 'doc_navigator';
-  List<DocData> docList = [];
+  List<DocDataModel> docList = [];
   int? selected;
   _NetworkStatus _networkStatus = _NetworkStatus.lost;
 

@@ -6,7 +6,7 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:sqlite3/open.dart';
 import 'package:my_log/my_log.dart';
 import '../../../util/idgen.dart';
-import 'doc_data.dart';
+import 'doc_data_model.dart';
 
 class DbUpgradeInfo {
   int targetVersion;
@@ -22,27 +22,28 @@ abstract class DbHelper {
   void storeDocBlock(String docId, String blockId, String data, int timestamp);
   void updateDocBlockExtra(String docId, String blockId, String extra);
   void dropDocBlock(String docId, String blockId);
-  DocContentData? getDoc(String docId);
-  Map<String, BlockData> getBlockMapOfDoc(String docId);
+  DocContentDataModel? getDoc(String docId);
+  Map<String, BlockDataModel> getBlockMapOfDoc(String docId);
   Future<void> updateParagraphType(String docId, String id, String type);
   Future<void> updateParagraphListing(String docId, String id, String listing);
   Future<void> updateParagraphLevel(String docId, String id, int level);
   Future<void> updateDoc(String docId, int timestamp);
-  VersionData? getVersionData(String versionHash);
-  List<VersionData> getAllVersions();
+  VersionDataModel? getVersionData(String versionHash);
+  List<VersionDataModel> getAllVersions();
   List<String> getAllValidVersionHashes();
   Map<String, String> getAllTitles();
-  List<DocData> getAllDocuments();
-  ObjectData? getObject(String hash);
-  void storeObject(String hash, String data, int updatedAt);
-  void storeVersion(String hash, String parents, int timestamp);
+  List<DocDataModel> getAllDocuments();
+  ObjectDataModel? getObject(String hash);
+  void storeObject(String hash, String data, int updatedAt, int createdFrom, int status);
+  void storeVersion(String hash, String parents, int timestamp, int createdFrom, int status);
+  void updateVersionStatus(String hash, int status);
   String getFlag(String name);
   void setFlag(String name, String value);
   String newDocument(int timestamp);
   void insertOrUpdateDoc(String docId, String docHash, int timestamp);
   //Card
   List<(String, String)> getAllBlocks();
-  BlockData? getRawBlockById(String docId, String blockId);
+  BlockDataModel? getRawBlockById(String docId, String blockId);
   //Setting
   Map<String, String> getSettings();
   bool saveSettings(Map<String, String> settings);
@@ -186,30 +187,30 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  DocContentData? getDoc(String docId) {
+  DocContentDataModel? getDoc(String docId) {
     const sql = 'SELECT doc_content, updated_at FROM doc_contents WHERE doc_id=?';
     var resultSet = _database.select(sql, [docId]);
     MyLogger.debug('getDoc: result=$resultSet');
 
     if(resultSet.isEmpty) return null;
     final row = resultSet.first;
-    return DocContentData(docId: docId, docContent: row['doc_content'], timestamp: row['updated_at']);
+    return DocContentDataModel(docId: docId, docContent: row['doc_content'], timestamp: row['updated_at']);
   }
 
   @override
-  Map<String, BlockData> getBlockMapOfDoc(String docId) {
-    const sql = 'SELECT block_id, data, updated_at, extra FROM blocks WHERE doc_id=?';
+  Map<String, BlockDataModel> getBlockMapOfDoc(String docId) {
+    const sql = 'SELECT block_id, data, updated_at, extra, created_from, status FROM blocks WHERE doc_id=?';
     final resultSet = _database.select(sql, [docId]);
     MyLogger.debug('getBlockMapOfDoc: result=$resultSet');
 
-    var result = <String, BlockData>{};
+    var result = <String, BlockDataModel>{};
     for(final row in resultSet) {
       MyLogger.debug('getBlockMapOfDoc: row=$row');
       String blockId = row['block_id'];
       String data = row['data'];
       int updatedAt = row['updated_at'];
       String? extra = row['extra'];
-      result[blockId] = BlockData(
+      result[blockId] = BlockDataModel(
         blockId: blockId,
         blockData: data,
         updatedAt: updatedAt,
@@ -226,8 +227,8 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  VersionData? getVersionData(String versionHash) {
-    const sql = 'SELECT parents, created_at FROM versions WHERE tree_hash=?';
+  VersionDataModel? getVersionData(String versionHash) {
+    const sql = 'SELECT parents, created_at, created_from, status FROM versions WHERE tree_hash=?';
     final resultSet = _database.select(sql, [versionHash]);
     if(resultSet.isEmpty) {
       return null;
@@ -235,20 +236,36 @@ class RealDbHelper implements DbHelper {
     final row = resultSet.first;
     String parents = row['parents'];
     int createdAt = row['created_at'];
-    return VersionData(versionHash: versionHash, parents: parents, createdAt: createdAt);
+    int? createdFrom = row['created_from'];
+    int? dataStatus = row['status'];
+    return VersionDataModel(
+      versionHash: versionHash,
+      parents: parents,
+      createdAt: createdAt,
+      createdFrom: createdFrom?? Constants.createdFromPeer,
+      status: dataStatus?? Constants.statusUnavailable,
+    );
   }
 
   @override
-  List<VersionData> getAllVersions() {
-    const sql = 'SELECT tree_hash, parents, created_at FROM versions';
+  List<VersionDataModel> getAllVersions() {
+    const sql = 'SELECT tree_hash, parents, created_at, created_from, status FROM versions';
     final resultSet = _database.select(sql);
-    List<VersionData> result = [];
+    List<VersionDataModel> result = [];
     for(final row in resultSet) {
       MyLogger.verbose('getAllVersions: row=$row');
       String versionHash = row['tree_hash'];
       String parents = row['parents'];
       int timestamp = row['created_at'];
-      result.add(VersionData(versionHash: versionHash, parents: parents, createdAt: timestamp));
+      int? createdFrom = row['created_from'];
+      int? dataStatus = row['data_status'];
+      result.add(VersionDataModel(
+        versionHash: versionHash,
+        parents: parents,
+        createdAt: timestamp,
+        createdFrom: createdFrom?? Constants.createdFromPeer,
+        status: dataStatus?? Constants.statusUnavailable,
+      ));
     }
     return result;
   }
@@ -278,43 +295,65 @@ class RealDbHelper implements DbHelper {
     return result;
   }
   @override
-  List<DocData> getAllDocuments() {
+  List<DocDataModel> getAllDocuments() {
     const sql = 'SELECT doc_id, doc_hash, updated_at FROM doc_list';
     final resultSet = _database.select(sql, []);
     MyLogger.debug('getAllDocuments: result=$resultSet');
-    var result = <DocData>[];
+    var result = <DocDataModel>[];
     for(final row in resultSet) {
       MyLogger.verbose('getAllDocuments: row=$row');
       String docId = row['doc_id'];
       String docHash = row['doc_hash'];
       int updatedAt = row['updated_at'];
-      result.add(DocData(docId: docId, title: '', hash: docHash, timestamp: updatedAt));
+      result.add(DocDataModel(docId: docId, title: '', hash: docHash, timestamp: updatedAt));
     }
     return result;
   }
 
   @override
-  ObjectData? getObject(String hash) {
+  ObjectDataModel? getObject(String hash) {
     const sql = 'SELECT obj_hash, data, updated_at FROM objects WHERE obj_hash=?';
     final resultSet = _database.select(sql, [hash]);
     if(resultSet.isEmpty) {
       return null;
     }
     final row = resultSet.first;
-    return ObjectData(key: row['obj_hash'], data: row['data'], timestamp: row['updated_at']);
+    var key = row['obj_hash'];
+    var data = row['data'];
+    var timestamp = row['updated_at'];
+    var createdFrom = row['created_from'];
+    var dataStatus = row['status'];
+    return ObjectDataModel(
+      key: key,
+      data: data,
+      timestamp: timestamp,
+      createdFrom: createdFrom?? Constants.createdFromPeer,
+      status: dataStatus?? Constants.statusUnavailable,
+    );
   }
   @override
-  void storeObject(String hash, String data, int updatedAt) {
+  void storeObject(String hash, String data, int updatedAt, int createdFrom, int status) {
     //TODO Log an error while conflict
-    const sql = 'INSERT INTO objects(obj_hash, data, updated_at) VALUES(?, ?, ?) ON CONFLICT(obj_hash) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at';
-    _database.execute(sql, [hash, data, updatedAt]);
+    const sql = 'INSERT INTO objects(obj_hash, data, updated_at, created_from, status) VALUES(?, ?, ?, ?, ?) '
+        'ON CONFLICT(obj_hash) DO UPDATE SET '
+        '  data=excluded.data,'
+        '  updated_at=excluded.updated_at,'
+        '  created_from=excluded.created_from,'
+        '  status=excluded.status';
+    _database.execute(sql, [hash, data, updatedAt, createdFrom, status]);
   }
 
   @override
-  void storeVersion(String hash, String parents, int timestamp) {
+  void storeVersion(String hash, String parents, int timestamp, int createdFrom, int status) {
     //TODO Log an error while conflict
-    const sql = 'INSERT INTO versions(tree_hash, parents, created_at) VALUES(?, ?, ?)';
-    _database.execute(sql, [hash, parents, timestamp]);
+    const sql = 'INSERT INTO versions(tree_hash, parents, created_at, created_from, status) VALUES(?, ?, ?, ?, ?)';
+    _database.execute(sql, [hash, parents, timestamp, createdFrom, status]);
+  }
+
+  @override
+  void updateVersionStatus(String hash, int status) {
+    const sql = 'UPDATE version SET status=? WHERE tree_hash=?';
+    _database.execute(sql, [status, hash]);
   }
 
   @override
@@ -366,8 +405,8 @@ class RealDbHelper implements DbHelper {
     return result;
   }
   @override
-  BlockData? getRawBlockById(String docId, String blockId) {
-    const sql = 'SELECT data FROM blocks, updated_at, extra WHERE doc_id=? AND block_id=?';
+  BlockDataModel? getRawBlockById(String docId, String blockId) {
+    const sql = 'SELECT data FROM blocks, updated_at, extra, created_from, status WHERE doc_id=? AND block_id=?';
     final resultSet = _database.select(sql, [docId, blockId]);
     MyLogger.debug('getRawBlockById result=$resultSet');
     if(resultSet.length != 1) {
@@ -378,7 +417,7 @@ class RealDbHelper implements DbHelper {
     String data = row['data'];
     int updatedAt = row['updated_at'];
     String? extra = row['extra'];
-    return BlockData(
+    return BlockDataModel(
       blockId: blockId,
       blockData: data,
       updatedAt: updatedAt,

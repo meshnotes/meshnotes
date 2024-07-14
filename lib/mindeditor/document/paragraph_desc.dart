@@ -266,7 +266,7 @@ class ParagraphDesc {
     var hash = block.getHash();
     var oldObject = Controller.instance.dbHelper.getObject(hash);
     if(oldObject == null) {
-      Controller.instance.dbHelper.storeObject(hash, jsonEncode(block), timestamp);
+      Controller.instance.dbHelper.storeObject(hash, jsonEncode(block), timestamp, Constants.createdFromLocal, Constants.statusAvailable);
     }
   }
 

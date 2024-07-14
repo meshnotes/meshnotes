@@ -11,10 +11,10 @@ Future<void> appInit({bool test=false}) async {
   } else {
     MyLogger.init(name: 'main', debug: false);
   }
-  Controller.init(test: test);
+  Controller.initDb(test: test);
   var networkController = await initNet();
   await Controller.instance.initAll(networkController, test: test);
-  // 美化标题栏颜色
+  // Make title bar looks better
   if(Controller.instance.environment.isAndroid()) {
     var style = const SystemUiOverlayStyle(statusBarColor: Colors.transparent);
     SystemChrome.setSystemUIOverlayStyle(style);

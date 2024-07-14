@@ -7,7 +7,7 @@ import '../../util/util.dart';
 import '../controller/controller.dart';
 import '../setting/constants.dart';
 import 'dal/db_helper.dart';
-import 'dal/doc_data.dart';
+import 'dal/doc_data_model.dart';
 import 'paragraph_desc.dart';
 import 'document_manager.dart';
 
@@ -38,7 +38,7 @@ class Document {
     }
   }
 
-  factory Document.loadByNode(DocData docNode, DocumentManager parent) {
+  factory Document.loadByNode(DocDataModel docNode, DocumentManager parent) {
     List<ParagraphDesc> paragraphs = [];
     // Load content
     var blocks = _loadBlocks(docNode.docId);
@@ -268,7 +268,7 @@ class Document {
     }
     var docContent = _generateDocContent();
     String docHash = docContent.getHash();
-    _db.storeObject(docHash, jsonEncode(docContent), now);
+    _db.storeObject(docHash, jsonEncode(docContent), now, Constants.createdFromLocal, Constants.statusAvailable);
     return docHash;
   }
 

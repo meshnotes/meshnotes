@@ -13,6 +13,7 @@ import 'package:mesh_note/mindeditor/controller/selection_controller.dart';
 import 'package:mesh_note/net/net_controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
+import 'package:mesh_note/tasks/event_tasks.dart';
 import 'package:my_log/my_log.dart';
 import '../../net/version_chain_api.dart';
 import '../../plugin/plugin_manager.dart';
@@ -41,6 +42,7 @@ class Controller {
   String simpleDeviceId = '';
   UserPrivateInfo? userPrivateInfo;
   late final PluginManager _pluginManager;
+  final EvenTasksManager evenTasksManager = EvenTasksManager();
   double? _toolbarHeight;
 
   // Getters
@@ -58,7 +60,7 @@ class Controller {
   static final Controller _theOne = Controller();
   static Controller get instance => _theOne;
 
-  static void init({bool test=false}) {
+  static void initDb({bool test=false}) {
     if(test) {
       _theOne.isUnitTest = true;
       _theOne.dbHelper = FakeDbHelper();
@@ -103,7 +105,8 @@ class Controller {
     setting.addAdditionalSettings(_pluginManager.getPluginSupportedSettings());
     setting.load();
 
-    MyLogger.debug('initAll: finish initialization');
+    MyLogger.info('initAll: finish initialization');
+    evenTasksManager.triggerAfterInit();
     return true;
   }
 

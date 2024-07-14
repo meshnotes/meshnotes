@@ -31,7 +31,7 @@ class SOTPNetworkLayer {
   bool useMulticast;
   String _deviceId;
   int _lastSentMulticast = 0;
-  static const _maxMulticastInterval = 60 * 1000; // 1 minute in milliseconds
+  static const _maxMulticastInterval = 20 * 1000; // 1 minute in milliseconds
 
   // Callback functions
   Function()? startedCallback; // Trigger after network layer started

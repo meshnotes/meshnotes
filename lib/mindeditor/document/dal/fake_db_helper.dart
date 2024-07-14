@@ -1,5 +1,5 @@
 import 'db_helper.dart';
-import 'doc_data.dart';
+import 'doc_data_model.dart';
 
 class FakeDbHelper implements DbHelper {
   @override
@@ -15,9 +15,9 @@ class FakeDbHelper implements DbHelper {
   @override
   Future<void> dropDocBlock(String docId, String id) async {}
   @override
-  DocContentData? getDoc(String docId) { return null; }
+  DocContentDataModel? getDoc(String docId) { return null; }
   @override
-  Map<String, BlockData> getBlockMapOfDoc(String docId) { return {}; }
+  Map<String, BlockDataModel> getBlockMapOfDoc(String docId) { return {}; }
   @override
   Future<void> updateParagraphType(String docId, String id, String type) async {}
   @override
@@ -27,21 +27,23 @@ class FakeDbHelper implements DbHelper {
   @override
   Future<void> updateDoc(String docId, int timestamp) async {}
   @override
-  VersionData? getVersionData(String versionHash) { return null; }
+  VersionDataModel? getVersionData(String versionHash) { return null; }
   @override
-  List<VersionData> getAllVersions() { return <VersionData>[]; }
+  List<VersionDataModel> getAllVersions() { return <VersionDataModel>[]; }
   @override
   List<String> getAllValidVersionHashes() { return []; }
   @override
   Map<String, String> getAllTitles() { return <String, String>{}; }
   @override
-  List<DocData> getAllDocuments() { return <DocData>[]; }
+  List<DocDataModel> getAllDocuments() { return <DocDataModel>[]; }
   @override
-  ObjectData? getObject(String hash) { return null; }
+  ObjectDataModel? getObject(String hash) { return null; }
   @override
-  void storeObject(String hash, String data, int updatedAt) {}
+  void storeObject(String hash, String data, int updatedAt, int createdFrom, int status) {}
   @override
-  void storeVersion(String hash, String parents, int timestamp) {}
+  void storeVersion(String hash, String parents, int timestamp, int createdFrom, int status) {}
+  @override
+  void updateVersionStatus(String hash, int status) {}
   @override
   String getFlag(String name) { return ''; }
   @override
@@ -53,7 +55,7 @@ class FakeDbHelper implements DbHelper {
   @override
   List<(String, String)> getAllBlocks() { return []; }
   @override
-  BlockData? getRawBlockById(String docId, String blockId) { return null; }
+  BlockDataModel? getRawBlockById(String docId, String blockId) { return null; }
   @override
   Map<String, String> getSettings() { return {}; }
   @override
