@@ -96,6 +96,17 @@ class NetworkController {
   NetworkStatus getNetworkStatus() {
     return _networkStatus;
   }
+  bool isAlong() {
+    if(_networkStatus != NetworkStatus.running) {
+      return true;
+    }
+    for(final node in _nodes.values) {
+      if(node.status == NodeStatus.inContact) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   List<NodeInfo> getNetworkDetails() {
     return _nodes.values.toList();
