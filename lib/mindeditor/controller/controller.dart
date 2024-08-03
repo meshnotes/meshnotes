@@ -15,6 +15,7 @@ import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/tasks/event_tasks.dart';
 import 'package:my_log/my_log.dart';
+import '../../net/status.dart';
 import '../../net/version_chain_api.dart';
 import '../../plugin/plugin_manager.dart';
 import '../../util/idgen.dart';
@@ -246,6 +247,9 @@ class Controller {
   }
 
   bool sendVersionTree() {
+    // If there is no network peer, don't generate new version and send
+    //TODO here the running status should be changed
+    if(network.getNetworkStatus() != NetworkStatus.running) return false;
     // If there is any modification, generate a new version tree, and try to sync this version
     if(!docManager.hasModified() || docManager.isSyncing()) return false;
     var (versionData, timestamp) = docManager.genAndSaveNewVersionTree();

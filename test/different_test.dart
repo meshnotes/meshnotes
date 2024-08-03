@@ -1,6 +1,6 @@
 import 'package:mesh_note/init.dart';
 import 'package:mesh_note/mindeditor/view/view_helper.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 void main() {
   appInit(test: true);

@@ -11,6 +11,7 @@ import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
+import 'sync_status.dart';
 import 'package:mesh_note/mindeditor/document/text_desc.dart';
 import 'package:my_log/my_log.dart';
 import '../../net/version_chain_api.dart';
@@ -19,6 +20,7 @@ import '../setting/constants.dart';
 import 'collaborate/diff_manager.dart';
 
 class DocumentManager {
+  SyncStatus _syncStatus = SyncStatus.idle;
   bool _hasModified = false;
   final DbHelper _db;
   final Map<String, Document> _documents = {};
@@ -101,7 +103,7 @@ class DocumentManager {
     final now = Util.getTimeStamp();
     var version = _genVersionAndClearModified(now);
     _saveVersion(version, _currentVersion, now);
-    return (_getVersionMap(), now);
+    return (_getValidVersionMap(), now);
   }
 
   /// Generate new version tree by merging local and remote version tree.
@@ -109,7 +111,7 @@ class DocumentManager {
   /// If no missing version, merge versions.
   /// Once assembling, set syncing status to stop other nodes sending version_tree concurrently.
   void assembleVersionTree(List<VersionNode> versionDag) {
-    setSyncing();
+    _setSyncing();
     _storeVersions(versionDag);
     // Map<String, DagNode> remoteDagMap = _buildRemoteVersionTreeMap(versionDag);
     Map<String, DagNode> localDagMap = _genVersionMapFromDb();
@@ -175,11 +177,16 @@ class DocumentManager {
     _tryToMergeVersionTree(_versionMap);
   }
 
-  bool isSyncing() => _syncing;
-  void setSyncing() {
+  bool isSyncing() => _syncing || _syncStatus != SyncStatus.idle;
+  void _setSyncing() {
+    _syncStatus = SyncStatus.waiting;
     _syncing = true;
   }
-  void clearSyncing() {
+  void _setMerging() {
+    _syncStatus = SyncStatus.merging;
+  }
+  void _clearSyncing() {
+    _syncStatus = SyncStatus.idle;
     _syncing = false;
   }
 
@@ -208,6 +215,7 @@ class DocumentManager {
   ///   2.3 Update current version to that newly merged version
   /// 5. Refresh view
   void _mergeVersions(Map<String, DagNode> map) {
+    _setMerging();
     var leafNodes = _findLeafNodesInDag(map);
     MyLogger.info('_mergeVersions: find leaf nodes: $leafNodes');
     leafNodes.remove(_currentVersion);
@@ -217,7 +225,7 @@ class DocumentManager {
       _mergeCurrentAndSave(leafHash, commonVersionHash);
     }
     Controller.instance.refreshDocNavigator();
-    clearSyncing();
+    _clearSyncing();
   }
   /// Find all nodes that is not parent of any other node
   Set<String> _findLeafNodesInDag(Map<String, DagNode> map) {
@@ -567,7 +575,7 @@ class DocumentManager {
     }
     return result;
   }
-  List<String> _splitParents(String parents) {
+  static List<String> _splitParents(String parents) {
     List<String> _sp = parents.split(',');
     return _sp;
   }
@@ -674,9 +682,41 @@ class DocumentManager {
     return data == null? null: VersionContent.fromJson(jsonDecode(data.data));
   }
 
-  List<VersionDataModel> _getVersionMap() {
+  List<VersionDataModel> _getValidVersionMap() {
     var versions = _db.getAllVersions();
+    versions = filterUnreachableVersions(versions, _currentVersion);
     return versions;
+  }
+  static List<VersionDataModel> filterUnreachableVersions(List<VersionDataModel> versions, String newestVersion) {
+    /// 1. Visit every parent versions from newestVersion
+    /// 2. Mark every visited version
+    /// 3. Add every visited version to result, ignore all unreachable(unvisited) versions
+    Map<String, bool> visited = {};
+    Map<String, VersionDataModel> map = {};
+    Set<String> waitingQueue = {};
+    for(final ver in versions) {
+      visited[ver.versionHash] = false;
+      map[ver.versionHash] = ver;
+    }
+    waitingQueue.add(newestVersion);
+    while(waitingQueue.isNotEmpty) {
+      final currentHash = waitingQueue.first;
+      waitingQueue.remove(currentHash);
+
+      final current = map[currentHash];
+      if(current == null) continue;
+
+      visited[currentHash] = true;
+      var parents = _splitParents(current.parents);
+      waitingQueue.addAll(parents);
+    }
+    List<VersionDataModel> result = [];
+    for(final ver in versions) {
+      if(visited[ver.versionHash] == true) {
+        result.add(ver);
+      }
+    }
+    return result;
   }
 
   // This function have to be placed at the bottom of a source file.
