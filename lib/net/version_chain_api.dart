@@ -137,3 +137,26 @@ class RelatedObject {
     return '$objHash/$createdAt';
   }
 }
+
+class BroadcastMessages {
+  Map<String, String> messages;
+
+  BroadcastMessages({
+    required this.messages,
+  });
+
+  BroadcastMessages.fromJson(Map<String, dynamic> map): messages = _buildMessages(map['messages']);
+  Map<String, dynamic> toJson() {
+    return {
+      'messages': messages,
+    };
+  }
+
+  static Map<String, String> _buildMessages(Map<String, dynamic> map) {
+    final result = <String, String>{};
+    for(var e in map.entries) {
+      result[e.key] = e.value;
+    }
+    return result;
+  }
+}

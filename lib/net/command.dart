@@ -7,12 +7,14 @@ enum Command {
   startVillage,
   networkStatus,
   nodeStatus,
+  sendBroadcast,
   sendVersionTree, // Send version tree
   // receiveVersionTree, // Receive version tree
   sendRequireVersions,
   // receiveRequiredVersions,
   sendVersions,
   // receiveVersions,
+  receiveBroadcast,
   receiveProvide,
   receiveQuery,
 }

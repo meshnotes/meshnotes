@@ -28,6 +28,7 @@ class Constants {
 
   static const int timeoutOfInputIdle = 5;
   static const int timeoutOfSyncIdle = 15;
+  static const int timeoutOfPeriodSync = 30;
 
   static const String welcomeRouteName = '/';
   static const String navigatorRouteName = '/navigator';

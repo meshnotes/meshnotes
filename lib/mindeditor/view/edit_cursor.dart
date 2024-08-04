@@ -15,20 +15,18 @@ class EditCursor {
 
   void _init() {
     show = true;
-    _cursorTimer = Timer.periodic(duration, _onDisappear);
+    _cursorTimer = Timer(duration, _onDisappear);
   }
 
-  void _onDisappear(Timer timer) {
-    timer.cancel();
+  void _onDisappear() {
     show = false;
     refreshFunc();
-    _cursorTimer = Timer.periodic(duration, _onShow);
+    _cursorTimer = Timer(duration, _onShow);
   }
-  void _onShow(Timer timer) {
-    timer.cancel();
+  void _onShow() {
     show = true;
     refreshFunc();
-    _cursorTimer = Timer.periodic(duration, _onDisappear);
+    _cursorTimer = Timer(duration, _onDisappear);
   }
 
   void stopCursor() {

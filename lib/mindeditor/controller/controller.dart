@@ -245,6 +245,19 @@ class Controller {
     CallbackRegistry.triggerEditingBlockFormatEvent(type, listing, level);
   }
 
+  /// Send current newest version if:
+  /// 1. There is network peer(s)
+  /// 2. Currently not modified or syncing
+  /// 3. the newest version is valid(not '')
+  void sendVersionBroadcast() {
+    if(network.isAlong()) return;
+    if(docManager.hasModified() || docManager.isSyncing()) return;
+    var newestVersion = docManager.getNewestVersion();
+    if(newestVersion.isEmpty) return;
+
+    MyLogger.info('sendVersionBroadcast: $newestVersion');
+    network.sendVersionBroadcast(newestVersion);
+  }
   bool sendVersionTree() {
     // If there is no network peer, don't generate new version and send
     if(network.isAlong()) return false;
@@ -254,7 +267,7 @@ class Controller {
     if(versionData.isEmpty) {
       return false;
     }
-    MyLogger.info('syncVersionTree: $versionData');
+    MyLogger.info('sendVersionTree: $versionData');
     network.sendNewVersionTree(versionData, timestamp);
     return true;
   }
@@ -263,6 +276,9 @@ class Controller {
     network.sendRequireVersions(missingVersions);
   }
 
+  void receiveVersionBroadcast(String latestVersion) {
+    //TODO add handler here
+  }
   void receiveVersionTree(List<VersionNode> dag) {
     if(docManager.isSyncing()) {
       MyLogger.info('receiveVersionTree: too busy to handle version tree: $dag');

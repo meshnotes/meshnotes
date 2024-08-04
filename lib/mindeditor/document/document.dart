@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:my_log/my_log.dart';
@@ -19,7 +18,6 @@ class Document {
   int _lastUpdate;
   String? _editingBlockId;
   DocumentManager parent;
-  Timer? _idleTimer;
   static final DbHelper _db = Controller.instance.dbHelper;
 
   Document({
@@ -300,19 +298,9 @@ class Document {
   }
 
   void closeDocument() {
-    _idleTimer?.cancel();
-    _idleTimer = null;
     for(var p in paragraphs) {
       p.close();
     }
-  }
-
-  void setIdle() {
-    _idleTimer?.cancel();
-    _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfSyncIdle), () {
-      Controller.instance.sendVersionTree();
-      _idleTimer = null;
-    });
   }
 
   static List<ParagraphDesc> _loadBlocks(String docId) {

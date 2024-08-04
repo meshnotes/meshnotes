@@ -2,12 +2,20 @@ import 'dart:convert';
 
 typedef OnHandleStringFunction = Function(String data);
 
-const String ProvideAppType = 'provide';
-const String QueryAppType = 'query';
+enum AppMessageType {
+  provideAppType('provide'), // Provider other nodes the version tree
+  queryAppType('query'), // Query other nodes for version
+  // searchAppType('search'), // Ask for the location of resource
+  publishAppType('publish'); // Publish newest resource to other nodes
+
+  final String value;
+  const AppMessageType(this.value);
+}
 
 class VillageMessageHandler {
   OnHandleStringFunction? handleProvide;
   OnHandleStringFunction? handleQuery;
+  OnHandleStringFunction? handlePublish;
 }
 
 class SignedMessage {
@@ -135,25 +143,6 @@ class SignedResources {
       result.add(signedResource);
     }
     return result;
-  }
-}
-
-class ProvideMessage {
-  String userPubKey;
-  List<String> resources;
-
-  ProvideMessage({
-    required this.userPubKey,
-    required this.resources,
-  });
-
-  ProvideMessage.fromJson(Map<String, dynamic> map): userPubKey = map['user'], resources = map['resources'];
-
-  Map<String, dynamic> toJson() {
-    return {
-      'user': userPubKey,
-      'resources': resources,
-    };
   }
 }
 

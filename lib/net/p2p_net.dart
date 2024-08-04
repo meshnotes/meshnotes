@@ -28,13 +28,12 @@ Future<Village> startVillage(String localPort, String serverList, String deviceI
     onNodeChanged: connectedCallback,
   );
   final village = Village(
-    userId: 'efan',
     localPort: _localPort,
     sponsors: sponsors,
     overlay: _overlay,
     messageHandler: messageHandler,
     db: db,
-    upperAppName: 'mesh_note',
+    upperAppName: 'mesh_notes',
   );
   await village.start();
   return village;

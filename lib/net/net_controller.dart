@@ -44,6 +44,19 @@ class NetworkController {
     });
   }
 
+  void sendVersionBroadcast(String latestVersion) {
+    var msg = BroadcastMessages(
+      messages: {
+        'latest_version': latestVersion,
+      }
+    );
+    _sendPort?.send(
+      Message(
+        cmd: Command.sendBroadcast,
+        parameter: msg,
+      ),
+    );
+  }
   /// Pack versionData in VersionChain, encrypt it, and sign it
   void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp) {
     if(!isStarted()) return;
@@ -118,6 +131,7 @@ class NetworkController {
     switch(msg.cmd) {
       case Command.terminate:
       case Command.startVillage:
+      case Command.sendBroadcast:
       case Command.sendVersionTree:
       case Command.sendRequireVersions:
       case Command.sendVersions:
@@ -144,6 +158,13 @@ class NetworkController {
             final id = item.peer;
             _nodes[id] = item;
           }
+        }
+        break;
+      case Command.receiveBroadcast:
+        final param = msg.parameter as BroadcastMessages;
+        final latestVersion = param.messages['latest_version'];
+        if(latestVersion != null) {
+          Controller.instance.receiveVersionBroadcast(latestVersion);
         }
         break;
       case Command.receiveProvide:

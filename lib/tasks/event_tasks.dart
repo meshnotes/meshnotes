@@ -1,5 +1,6 @@
 class EvenTasksManager {
   final List<Function()> _afterInitTasks = [];
+  final List<Function()> _idleTasks = [];
 
   void addAfterInitTask(Function() task) {
     if(!_afterInitTasks.contains(task)) {
@@ -8,6 +9,12 @@ class EvenTasksManager {
   }
   triggerAfterInit() {
     for(final task in _afterInitTasks) {
+      task.call();
+    }
+  }
+
+  void triggerIdle() {
+    for(final task in _idleTasks) {
       task.call();
     }
   }

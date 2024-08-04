@@ -96,7 +96,7 @@ class VillageOverlay implements ApplicationController {
   void sendData(String appKey, ApplicationController app, VillagerNode node, String type, String data) {
     ApplicationController? _checkedApp = _keyToApp[appKey];
     if(_checkedApp != app) {
-      MyLogger.warn('Application($_checkedApp) not compliance with key($appKey)');
+      MyLogger.warn('${logPrefix} sendData: Application($_checkedApp) not compliance with key($appKey)');
       return;
     }
 
@@ -108,11 +108,12 @@ class VillageOverlay implements ApplicationController {
     MyLogger.verbose('${logPrefix} Send message $jsonStr');
     peer.sendData(utf8.encode(jsonStr));
   }
-  void sendToAllNodesOfUser(String appKey, ApplicationController app, String userId, String type, String data) {
-    final nodes = _findAllNodesOfUser(userId);
-    MyLogger.info('efantest: find nodes: $nodes');
+  void sendToAllNodesOfUser(String appKey, ApplicationController app, String type, String data) {
+    //TODO should change to only find the nodes with same user id(public key)
+    final nodes = _findAllNodes();
+    MyLogger.info('${logPrefix} sendToAllNodesOfUser: find nodes: $nodes');
     for(var node in nodes) {
-      MyLogger.info('efantest: send to node: $node, type: $type, data: $data');
+      MyLogger.info('${logPrefix} sendToAllNodesOfUser: send to node: $node, type: $type, data: $data');
       sendData(appKey, app, node, type, data);
     }
   }
@@ -317,7 +318,7 @@ class VillageOverlay implements ApplicationController {
     onNodeChanged(node);
   }
 
-  List<VillagerNode> _findAllNodesOfUser(String userId) {
+  List<VillagerNode> _findAllNodes() {
     var result = <VillagerNode>[];
     for(var node in _villagers) {
       if(node.getStatus() == VillagerStatus.keepInTouch) {

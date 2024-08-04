@@ -791,7 +791,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
 
   void _triggerBlockModified() {
-    Controller.instance.document?.setIdle();
+    Controller.instance.docManager.setIdle();
   }
 }
 

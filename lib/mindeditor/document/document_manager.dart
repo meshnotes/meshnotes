@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
@@ -31,6 +32,7 @@ class DocumentManager {
   String _currentVersion = '';
   int _currentVersionTimestamp = 0;
   bool _syncing = false;
+  Timer? _idleTimer;
 
   DocumentManager({
     required DbHelper db,
@@ -39,6 +41,12 @@ class DocumentManager {
       Future(() {
         checkConsistency();
       });
+    });
+    // Periodically send newest version to peers
+    Timer.periodic(const Duration(seconds: Constants.timeoutOfPeriodSync), (timer) {
+      final now = Util.getTimeStamp();
+      if(now - _currentVersionTimestamp < 15000) return; // Ignore if the newest version is generated within 15s
+      Controller.instance.sendVersionBroadcast();
     });
   }
 
@@ -98,12 +106,16 @@ class DocumentManager {
     return docId;
   }
 
+  String getNewestVersion() {
+    return _currentVersion;
+  }
+
   (List<VersionDataModel>, int) genAndSaveNewVersionTree() {
     if(!hasModified()) return ([], 0);
     final now = Util.getTimeStamp();
     var version = _genVersionAndClearModified(now);
     _saveVersion(version, _currentVersion, now);
-    return (_getValidVersionMap(), now);
+    return (_getValidVersionMap(_currentVersion), now);
   }
 
   /// Generate new version tree by merging local and remote version tree.
@@ -362,8 +374,11 @@ class DocumentManager {
   (String, int) _getCurrentVersionAndTimestamp() {
     var ver = _db.getFlag(Constants.flagNameCurrentVersion);
     var t = _db.getFlag(Constants.flagNameCurrentVersionTimestamp);
-    int? timestamp = int.tryParse(t, radix: 10);
-    return (ver, timestamp?? 0);
+    int? timestamp;
+    if(t != null) {
+      timestamp = int.tryParse(t, radix: 10);
+    }
+    return (ver?? '', timestamp?? 0);
   }
 
   void _saveVersion(VersionContent version, String parents, int now, {bool fastForward = false}) {
@@ -401,6 +416,15 @@ class DocumentManager {
 
   bool hasModified() {
     return _hasModified;
+  }
+
+  void setIdle() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfSyncIdle), () {
+      Controller.instance.evenTasksManager.triggerIdle();
+      Controller.instance.sendVersionTree();
+      _idleTimer = null;
+    });
   }
 
   DocDataModel? _getDocTreeNode(String docId) {
@@ -682,9 +706,9 @@ class DocumentManager {
     return data == null? null: VersionContent.fromJson(jsonDecode(data.data));
   }
 
-  List<VersionDataModel> _getValidVersionMap() {
+  List<VersionDataModel> _getValidVersionMap(String newestVersion) {
     var versions = _db.getAllVersions();
-    versions = filterUnreachableVersions(versions, _currentVersion);
+    versions = filterUnreachableVersions(versions, newestVersion);
     return versions;
   }
   static List<VersionDataModel> filterUnreachableVersions(List<VersionDataModel> versions, String newestVersion) {

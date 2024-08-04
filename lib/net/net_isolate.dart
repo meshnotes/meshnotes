@@ -93,6 +93,7 @@ class VersionChainVillager {
         // ..handleSendVersions = _handleSendVersions
           ..handleProvide = _handleProvide
           ..handleQuery = _handleQuery
+          ..handlePublish = _handlePublish
         ;
         _village = await startVillage(
           parameter.localPort,
@@ -107,9 +108,14 @@ class VersionChainVillager {
       case Command.terminateOk:
       case Command.networkStatus:
       case Command.nodeStatus:
+      case Command.receiveBroadcast:
       case Command.receiveProvide:
       case Command.receiveQuery:
       // Do nothing, these commands are handled in net_controller
+        break;
+      case Command.sendBroadcast:
+        final brdMsg = msg.parameter as BroadcastMessages;
+        _onSendBroadcast(brdMsg);
         break;
       case Command.sendVersionTree:
         final param = msg.parameter as SendVersionTreeParameter;
@@ -186,7 +192,7 @@ class VersionChainVillager {
         key: resource.key,
         subKey: resource.subKey,
         timestamp: resource.timestamp,
-        data: resource.data,
+        data: resource.data, // currently encrypted data
       );
       if(!_verify!.ver(rawResource.getFeature(), resource.signature)) {
         continue;
@@ -226,6 +232,34 @@ class VersionChainVillager {
     ));
   }
 
+  void _handlePublish(String data) {
+    /// 1. Check public key is the same
+    /// 2. Verify message
+    /// 3. Send to port to notify upper layer
+    SignedMessage signedMessage = SignedMessage.fromJson(jsonDecode(data));
+    final publicKey = signedMessage.userPublicId;
+    if(publicKey != _signing!.getCompressedPublicKey()) {
+      MyLogger.info('Receive verify message from other user: $publicKey');
+      return;
+    }
+    if(!_verify!.ver(signedMessage.data, signedMessage.signature)) {
+      MyLogger.info('Verify publish message failed');
+      return;
+    }
+    var brdMsg = BroadcastMessages.fromJson(jsonDecode(signedMessage.data));
+    _sendPort.send(Message(
+      cmd: Command.receiveBroadcast,
+      parameter: brdMsg,
+    ));
+  }
+
+  void _onSendBroadcast(BroadcastMessages msg) {
+    String json = jsonEncode(msg);
+    String signature = _signing!.sign(json);
+    SignedMessage signedMessage = SignedMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
+    String signedMessageJson = jsonEncode(signedMessage);
+    _village?.sendPublish(signedMessageJson);
+  }
   void _onSendVersionTree(VersionChain versionChain, int timestamp) {
     String chainJson = jsonEncode(versionChain);
     String encryptedChainJson = _encrypt!.encrypt(timestamp, chainJson);

@@ -45,7 +45,7 @@ class FakeDbHelper implements DbHelper {
   @override
   void updateVersionStatus(String hash, int status) {}
   @override
-  String getFlag(String name) { return ''; }
+  String? getFlag(String name) { return null; }
   @override
   void setFlag(String name, String value) {}
   @override

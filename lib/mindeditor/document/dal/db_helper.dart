@@ -37,7 +37,7 @@ abstract class DbHelper {
   void storeObject(String hash, String data, int updatedAt, int createdFrom, int status);
   void storeVersion(String hash, String parents, int timestamp, int createdFrom, int status);
   void updateVersionStatus(String hash, int status);
-  String getFlag(String name);
+  String? getFlag(String name);
   void setFlag(String name, String value);
   String newDocument(int timestamp);
   void insertOrUpdateDoc(String docId, String docHash, int timestamp);
@@ -357,11 +357,11 @@ class RealDbHelper implements DbHelper {
   }
 
   @override
-  String getFlag(String name) {
+  String? getFlag(String name) {
     const sql = 'SELECT value FROM flags WHERE name=?';
     final resultSet = _database.select(sql, [name]);
     if(resultSet.isEmpty) {
-      return '';
+      return null;
     }
     return resultSet.first['value'];
   }
