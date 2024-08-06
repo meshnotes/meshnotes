@@ -252,32 +252,52 @@ class Controller {
   void sendVersionBroadcast() {
     if(network.isAlong()) return;
     if(docManager.hasModified() || docManager.isSyncing()) return;
-    var newestVersion = docManager.getNewestVersion();
-    if(newestVersion.isEmpty) return;
+    var latestVersion = docManager.getLatestVersion();
+    if(latestVersion.isEmpty) return;
 
-    MyLogger.info('sendVersionBroadcast: $newestVersion');
-    network.sendVersionBroadcast(newestVersion);
+    MyLogger.info('sendVersionBroadcast: latest version=$latestVersion');
+    network.sendVersionBroadcast(latestVersion);
   }
-  bool sendVersionTree() {
+  bool tryToSaveAndSendVersionTree() {
     // If there is no network peer, don't generate new version and send
     if(network.isAlong()) return false;
     // If there is any modification, generate a new version tree, and try to sync this version
     if(!docManager.hasModified() || docManager.isSyncing()) return false;
-    var (versionData, timestamp) = docManager.genAndSaveNewVersionTree();
-    if(versionData.isEmpty) {
+    docManager.genNewVersionTree();
+    return _sendCurrentVersionTree();
+  }
+  bool _sendCurrentVersionTree() {
+    var (versionData, timestamp) = docManager.genCurrentVersionTree();
+    if(versionData.isEmpty || timestamp == 0) {
       return false;
     }
     MyLogger.info('sendVersionTree: $versionData');
     network.sendNewVersionTree(versionData, timestamp);
     return true;
   }
-
   void sendRequireVersions(List<String> missingVersions) {
     network.sendRequireVersions(missingVersions);
   }
+  void sendRequireVersionTree(String latestVersion) {
+    //TODO Currently ignore latestVersion, but later should support specified version
+    network.sendRequireVersionTree(Constants.resourceKeyVersionTree);
+  }
 
   void receiveVersionBroadcast(String latestVersion) {
-    //TODO add handler here
+    /// 1. Check if already have latestVersion
+    /// 2. If not, send require version tree
+    /// 3. If there is the version, but no object, send require version
+    MyLogger.info('receive version broadcast');
+    final version = dbHelper.getVersionData(latestVersion);
+    if(version == null) {
+      // Send require version tree
+      sendRequireVersionTree(latestVersion);
+      return;
+    }
+    final object = dbHelper.getObject(latestVersion);
+    if(object == null) {
+      sendRequireVersions([latestVersion]);
+    }
   }
   void receiveVersionTree(List<VersionNode> dag) {
     if(docManager.isSyncing()) {
@@ -290,6 +310,14 @@ class Controller {
   }
   void receiveRequireVersions(List<String> requiredVersions) {
     MyLogger.info('receiveRequireVersions: receive require versions message: $requiredVersions');
+    for(final item in requiredVersions) {
+      //TODO Currently only send version tree if there is any resource with the key 'version_tree'.
+      //TODO Maybe should make ordinary resources and version_tree coexist
+      if(item == Constants.resourceKeyVersionTree) {
+        _sendCurrentVersionTree();
+        return;
+      }
+    }
     var versions = docManager.assembleRequireVersions(requiredVersions);
     MyLogger.info('receiveRequireVersions: preparing to send versions: $versions');
     network.sendVersions(versions);

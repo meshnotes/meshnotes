@@ -19,7 +19,7 @@ class Village implements ApplicationController {
   String upperAppName;
   VillageMessageHandler messageHandler;
   VillageDbHelper _db;
-  late Map<String, AppMessageType> _mapOfAppMessageType;
+  Map<String, AppMessageType> _mapOfAppMessageType = {};
 
   // Villager properties
   // String _userId; // It seems this is not necessary
@@ -37,7 +37,7 @@ class Village implements ApplicationController {
     MyLogger.info('${logPrefix} register app=$_appName');
     _overlay.registerApplication(_appName, this, setDefault: true);
     _overlay.registerApplication(upperAppName, this);
-    AppMessageType.values.map((e) => _mapOfAppMessageType[e.value] = e);
+    AppMessageType.values.forEach((e) { _mapOfAppMessageType[e.value] = e; });
   }
 
   Future<void> start() async {

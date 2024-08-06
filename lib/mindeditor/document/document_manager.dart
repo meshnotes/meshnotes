@@ -76,7 +76,7 @@ class DocumentManager {
     }
     // If modified, sync it before opening new document
     if(hasModified()) {
-      Controller.instance.sendVersionTree();
+      Controller.instance.tryToSaveAndSendVersionTree();
     }
 
     // If the document was not open, load it from db
@@ -106,16 +106,19 @@ class DocumentManager {
     return docId;
   }
 
-  String getNewestVersion() {
+  String getLatestVersion() {
     return _currentVersion;
   }
 
-  (List<VersionDataModel>, int) genAndSaveNewVersionTree() {
-    if(!hasModified()) return ([], 0);
+  void genNewVersionTree() {
+    if(!hasModified()) return;
     final now = Util.getTimeStamp();
     var version = _genVersionAndClearModified(now);
-    _saveVersion(version, _currentVersion, now);
-    return (_getValidVersionMap(_currentVersion), now);
+    _updateCurrentVersion(version, _currentVersion, now);
+  }
+  (List<VersionDataModel>, int) genCurrentVersionTree() {
+    if(_currentVersion.isEmpty || _currentVersionTimestamp == 0) return ([], 0); // Not ready
+    return (_getValidVersionMap(_currentVersion), _currentVersionTimestamp);
   }
 
   /// Generate new version tree by merging local and remote version tree.
@@ -274,7 +277,7 @@ class DocumentManager {
     bool fastForward = newVersionHash == _currentVersion || newVersionHash == targetVersion;
     var now = fastForward? contentVersion.timestamp: Util.getTimeStamp();
     var parents = fastForward? '': '$_currentVersion,$targetVersion'; // Ignore parents if fast_forward
-    _saveVersion(contentVersion, parents, now, fastForward: fastForward);
+    _updateCurrentVersion(contentVersion, parents, now, fastForward: fastForward);
   }
   void _updateDoc(VersionContentItem node, Map<String, String> objects) {
     var docId = node.docId;
@@ -381,7 +384,7 @@ class DocumentManager {
     return (ver?? '', timestamp?? 0);
   }
 
-  void _saveVersion(VersionContent version, String parents, int now, {bool fastForward = false}) {
+  void _updateCurrentVersion(VersionContent version, String parents, int now, {bool fastForward = false}) {
     final hash = version.getHash();
     if(fastForward) {
       MyLogger.info('Fast forward to version($hash)');
@@ -422,7 +425,7 @@ class DocumentManager {
     _idleTimer?.cancel();
     _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfSyncIdle), () {
       Controller.instance.evenTasksManager.triggerIdle();
-      Controller.instance.sendVersionTree();
+      Controller.instance.tryToSaveAndSendVersionTree();
       _idleTimer = null;
     });
   }

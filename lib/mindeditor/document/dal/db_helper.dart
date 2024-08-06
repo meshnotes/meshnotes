@@ -199,7 +199,7 @@ class RealDbHelper implements DbHelper {
 
   @override
   Map<String, BlockDataModel> getBlockMapOfDoc(String docId) {
-    const sql = 'SELECT block_id, data, updated_at, extra, created_from, status FROM blocks WHERE doc_id=?';
+    const sql = 'SELECT block_id, data, updated_at, extra FROM blocks WHERE doc_id=?';
     final resultSet = _database.select(sql, [docId]);
     MyLogger.debug('getBlockMapOfDoc: result=$resultSet');
 

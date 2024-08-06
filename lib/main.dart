@@ -135,7 +135,7 @@ class _AppLifecyclePageState extends State<MeshApp> {
   Future<bool> _beforeClose() async {
     final controller = Controller.instance;
     if(controller.network.isStarted()) {
-      if(controller.sendVersionTree()) {
+      if(controller.tryToSaveAndSendVersionTree()) {
         await Future.delayed(const Duration(seconds: 1));
       }
       final completer = controller.network.gracefulTerminate();

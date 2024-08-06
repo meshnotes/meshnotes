@@ -87,6 +87,11 @@ class NetworkController {
     );
   }
 
+  void sendRequireVersionTree(String latestVersion) {
+    // Reuse require versions message
+    sendRequireVersions([latestVersion]);
+  }
+
   void sendVersions(List<SendVersions> versions) {
     if(!isStarted()) return;
     _sendPort?.send(
