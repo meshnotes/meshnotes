@@ -16,7 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mesh_note/util/util.dart';
 
 void main() {
-  appInit(test: true);
+  setUpAll(() => appInit(test: true));
   testDelete1();
   testStyleSetting1();
 }
