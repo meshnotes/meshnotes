@@ -15,10 +15,10 @@ import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/tasks/event_tasks.dart';
 import 'package:my_log/my_log.dart';
+import '../../net/init.dart';
 import '../../net/version_chain_api.dart';
 import '../../plugin/plugin_manager.dart';
 import '../../util/idgen.dart';
-import '../document/dal/fake_db_helper.dart';
 import '../document/paragraph_desc.dart';
 import '../setting/constants.dart';
 import '../setting/setting.dart';
@@ -60,18 +60,10 @@ class Controller {
   static final Controller _theOne = Controller();
   static Controller get instance => _theOne;
 
-  static void initDb({bool test=false}) {
-    if(test) {
-      _theOne.isUnitTest = true;
-      _theOne.dbHelper = FakeDbHelper();
-    } else {
-      _theOne.dbHelper = RealDbHelper();
-    }
-    _theOne.gestureHandler = GestureHandler(controller: _theOne);
-    _theOne.device.init();
-  }
-
-  Future<bool> initAll(NetworkController _net, {bool test=false}) async {
+  Future<bool> initAll() async {
+    dbHelper = DbHelper();
+    gestureHandler = GestureHandler(controller: _theOne);
+    device.init();
     // Load settings before starting network
     final confFile = await environment.getExistFileFromLibraryPathsByEnvironment('setting.conf');
     MyLogger.info('initAll: load settings from $confFile');
@@ -87,12 +79,10 @@ class Controller {
     MyLogger.info('initAll: load user(${userPrivateInfo?.userName}) from setting');
 
     // Will failed in flutter test mode, so disabled it
-    if(!test) {
-      await _genDeviceId();
-      MyLogger.info('initAll: device_id=$deviceId, simple_device_id=$simpleDeviceId');
-    }
+    await _genDeviceId();
+    MyLogger.info('initAll: device_id=$deviceId, simple_device_id=$simpleDeviceId');
 
-    network = _net;
+    network = await initNet();
     if(!tryStartingNetwork()) {
       MyLogger.info('initAll: try starting network failed');
     }

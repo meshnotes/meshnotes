@@ -493,7 +493,7 @@ class DocumentManager {
     var docNode = _getDocTreeNode(docId);
     if(docNode == null) return null;
 
-    return Document.loadByNode(docNode, this);
+    return Document.loadByNode(_db, docNode, this);
   }
 
   List<Document> _findModifiedDocuments() {

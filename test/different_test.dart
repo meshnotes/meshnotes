@@ -1,9 +1,7 @@
-import 'package:mesh_note/init.dart';
 import 'package:mesh_note/mindeditor/view/view_helper.dart';
 import 'package:test/test.dart';
 
 void main() {
-  setUpAll(() => appInit(test: true));
   testDifferent1();
   testDifferent2();
   testDifferent3();

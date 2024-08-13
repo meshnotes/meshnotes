@@ -9,6 +9,7 @@ import '../../util/util.dart';
 import '../controller/controller.dart';
 import '../setting/constants.dart';
 import '../../util/idgen.dart';
+import 'dal/db_helper.dart';
 import 'document.dart';
 
 enum _BlockType {
@@ -142,6 +143,7 @@ class ParagraphDesc {
     );
   }
 
+  DbHelper? get _db => _parent?.getDb(); // May be null if in test environment
   bool hasContent() {
     return _plainText!.trim().isNotEmpty;
   }
@@ -171,7 +173,7 @@ class ParagraphDesc {
     return _level;
   }
 
-  void setDocDesc(Document p) {
+  void setDocument(Document p) {
     _parent = p;
   }
 
@@ -262,16 +264,18 @@ class ParagraphDesc {
   }
 
   void storeObject(int timestamp) {
+    if(_db == null) return;
+
     var block = getBlockContent();
     var hash = block.getHash();
-    var oldObject = Controller.instance.dbHelper.getObject(hash);
+    var oldObject = _db!.getObject(hash);
     if(oldObject == null) {
-      Controller.instance.dbHelper.storeObject(hash, jsonEncode(block), timestamp, Constants.createdFromLocal, Constants.statusAvailable);
+      _db!.storeObject(hash, jsonEncode(block), timestamp, Constants.createdFromLocal, Constants.statusAvailable);
     }
   }
 
   void drop() {
-    Controller.instance.dbHelper.dropDocBlock(parent.id, getBlockId());
+    _db?.dropDocBlock(parent.id, getBlockId());
   }
 
   BlockContent getBlockContent() {
@@ -470,7 +474,6 @@ class ParagraphDesc {
 
   // Save text to database immediately
   void _storeBlock() {
-    var dbHelper = Controller.instance.dbHelper;
     if(isTitle()) {
       MyLogger.verbose('Save to title');
       parent.updateTitle(getPlainText());
@@ -478,15 +481,14 @@ class ParagraphDesc {
     MyLogger.verbose('Save to blocks: id=${getBlockId()}');
     var block = _convertToBlockContent();
     _lastUpdate = Util.getTimeStamp();
-    dbHelper.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
+    _db?.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
     // dbHelper.updateDoc(parent.doc.id, Util.getTimeStamp());
     parent.setModified();
   }
   // Save extra to database
   void _storeExtra() {
-    var dbHelper = Controller.instance.dbHelper;
     if(isTitle()) return;
-    dbHelper.updateDocBlockExtra(parent.id, getBlockId(), jsonEncode(_extra));
+    _db?.updateDocBlockExtra(parent.id, getBlockId(), jsonEncode(_extra));
   }
 
   BlockContent _convertToBlockContent() {

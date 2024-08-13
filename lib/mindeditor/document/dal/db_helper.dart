@@ -14,42 +14,8 @@ class DbUpgradeInfo {
   
   DbUpgradeInfo(int ver, Function(Database) func): targetVersion = ver, upgradeFunc = func;
 }
-abstract class DbHelper {
-  Future<void> init();
-  //Doc
-  void storeDocHash(String docId, String hash, int timestamp);
-  void storeDocContent(String docId, String docContent, int timestamp);
-  void storeDocBlock(String docId, String blockId, String data, int timestamp);
-  void updateDocBlockExtra(String docId, String blockId, String extra);
-  void dropDocBlock(String docId, String blockId);
-  DocContentDataModel? getDoc(String docId);
-  Map<String, BlockDataModel> getBlockMapOfDoc(String docId);
-  Future<void> updateParagraphType(String docId, String id, String type);
-  Future<void> updateParagraphListing(String docId, String id, String listing);
-  Future<void> updateParagraphLevel(String docId, String id, int level);
-  Future<void> updateDoc(String docId, int timestamp);
-  VersionDataModel? getVersionData(String versionHash);
-  List<VersionDataModel> getAllVersions();
-  List<String> getAllValidVersionHashes();
-  Map<String, String> getAllTitles();
-  List<DocDataModel> getAllDocuments();
-  ObjectDataModel? getObject(String hash);
-  void storeObject(String hash, String data, int updatedAt, int createdFrom, int status);
-  void storeVersion(String hash, String parents, int timestamp, int createdFrom, int status);
-  void updateVersionStatus(String hash, int status);
-  String? getFlag(String name);
-  void setFlag(String name, String value);
-  String newDocument(int timestamp);
-  void insertOrUpdateDoc(String docId, String docHash, int timestamp);
-  //Card
-  List<(String, String)> getAllBlocks();
-  BlockDataModel? getRawBlockById(String docId, String blockId);
-  //Setting
-  Map<String, String> getSettings();
-  bool saveSettings(Map<String, String> settings);
-}
 
-class RealDbHelper implements DbHelper {
+class DbHelper {
   late Database _database;
   DbScript dbScript = DbVersion1();
   static const dbFileName = 'mesh_notes.db';
@@ -80,7 +46,6 @@ class RealDbHelper implements DbHelper {
     throw lastError;
   }
 
-  @override
   Future<void> init() async {
     open.overrideFor(OperatingSystem.linux, _openOnLinux);
     open.overrideFor(OperatingSystem.windows, _openOnWindows);
@@ -136,57 +101,48 @@ class RealDbHelper implements DbHelper {
     }
   }
 
-  @override
   Future<void> updateParagraphType(String docId, String id, String type) async {
     const sqlParagraph = 'UPDATE blocks SET type=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [type, docId, id]);
   }
 
-  @override
   Future<void> updateParagraphListing(String docId, String id, String listing) async {
     const sqlParagraph = 'UPDATE blocks SET listing=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [listing, docId, id]);
   }
 
-  @override
   Future<void> updateParagraphLevel(String docId, String id, int level) async {
     const sqlParagraph = 'UPDATE blocks SET level=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [level, docId, id]);
   }
 
-  @override
   void storeDocHash(String docId, String hash, int timestamp) {
     const sql = 'UPDATE doc_list SET doc_hash=?, updated_at=? WHERE doc_id=?';
     _database.execute(sql, [hash, timestamp, docId]);
   }
 
-  @override
   void storeDocContent(String docId, String docContent, int timestamp) {
     const sql = 'INSERT INTO doc_contents(doc_id, doc_content, updated_at) VALUES(?, ?, ?) '
         'ON CONFLICT(doc_id) DO UPDATE SET doc_content=excluded.doc_content, updated_at=excluded.updated_at';
     _database.execute(sql, [docId, docContent, timestamp]);
   }
 
-  @override
   void storeDocBlock(String docId, String blockId, String data, int timestamp) {
     const sql = 'INSERT INTO blocks(doc_id, block_id, data, updated_at) VALUES(?, ?, ?, ?) '
         'ON CONFLICT(doc_id, block_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at';
     _database.execute(sql, [docId, blockId, data, timestamp]);
   }
 
-  @override
   void updateDocBlockExtra(String docId, String blockId, String extra) {
     const sql = 'UPDATE blocks SET extra=? WHERE doc_id=? AND block_id=?';
     _database.execute(sql, [extra, docId, blockId]);
   }
 
-  @override
   void dropDocBlock(String docId, String blockId) {
     const sql = 'DELETE FROM blocks WHERE doc_id=? AND block_id=?';
     _database.execute(sql, [docId, blockId]);
   }
 
-  @override
   DocContentDataModel? getDoc(String docId) {
     const sql = 'SELECT doc_content, updated_at FROM doc_contents WHERE doc_id=?';
     var resultSet = _database.select(sql, [docId]);
@@ -197,7 +153,6 @@ class RealDbHelper implements DbHelper {
     return DocContentDataModel(docId: docId, docContent: row['doc_content'], timestamp: row['updated_at']);
   }
 
-  @override
   Map<String, BlockDataModel> getBlockMapOfDoc(String docId) {
     const sql = 'SELECT block_id, data, updated_at, extra FROM blocks WHERE doc_id=?';
     final resultSet = _database.select(sql, [docId]);
@@ -220,13 +175,11 @@ class RealDbHelper implements DbHelper {
     return result;
   }
 
-  @override
   Future<void> updateDoc(String docId, int timestamp) async {
     const sqlUpdateDoc = 'UPDATE docs SET updated_at=? WHERE id=?';
     _database.execute(sqlUpdateDoc, [timestamp, docId]);
   }
 
-  @override
   VersionDataModel? getVersionData(String versionHash) {
     const sql = 'SELECT parents, created_at, created_from, status FROM versions WHERE tree_hash=?';
     final resultSet = _database.select(sql, [versionHash]);
@@ -247,7 +200,6 @@ class RealDbHelper implements DbHelper {
     );
   }
 
-  @override
   List<VersionDataModel> getAllVersions() {
     const sql = 'SELECT tree_hash, parents, created_at, created_from, status FROM versions';
     final resultSet = _database.select(sql);
@@ -269,7 +221,6 @@ class RealDbHelper implements DbHelper {
     }
     return result;
   }
-  @override
   List<String> getAllValidVersionHashes() {
     const sql = 'SELECT tree_hash FROM versions';
     final resultSet = _database.select(sql);
@@ -281,7 +232,6 @@ class RealDbHelper implements DbHelper {
     return result;
   }
 
-  @override
   Map<String, String> getAllTitles() {
     const sql = 'SELECT doc_id, data FROM blocks WHERE block_id=?';
     final resultSet = _database.select(sql, [Constants.keyTitleId]);
@@ -294,7 +244,6 @@ class RealDbHelper implements DbHelper {
     }
     return result;
   }
-  @override
   List<DocDataModel> getAllDocuments() {
     const sql = 'SELECT doc_id, doc_hash, updated_at FROM doc_list';
     final resultSet = _database.select(sql, []);
@@ -310,7 +259,6 @@ class RealDbHelper implements DbHelper {
     return result;
   }
 
-  @override
   ObjectDataModel? getObject(String hash) {
     const sql = 'SELECT obj_hash, data, updated_at FROM objects WHERE obj_hash=?';
     final resultSet = _database.select(sql, [hash]);
@@ -331,7 +279,6 @@ class RealDbHelper implements DbHelper {
       status: dataStatus?? Constants.statusUnavailable,
     );
   }
-  @override
   void storeObject(String hash, String data, int updatedAt, int createdFrom, int status) {
     //TODO Log an error while conflict
     const sql = 'INSERT INTO objects(obj_hash, data, updated_at, created_from, status) VALUES(?, ?, ?, ?, ?) '
@@ -343,20 +290,17 @@ class RealDbHelper implements DbHelper {
     _database.execute(sql, [hash, data, updatedAt, createdFrom, status]);
   }
 
-  @override
   void storeVersion(String hash, String parents, int timestamp, int createdFrom, int status) {
     //TODO Log an error while conflict
     const sql = 'INSERT INTO versions(tree_hash, parents, created_at, created_from, status) VALUES(?, ?, ?, ?, ?)';
     _database.execute(sql, [hash, parents, timestamp, createdFrom, status]);
   }
 
-  @override
   void updateVersionStatus(String hash, int status) {
     const sql = 'UPDATE version SET status=? WHERE tree_hash=?';
     _database.execute(sql, [status, hash]);
   }
 
-  @override
   String? getFlag(String name) {
     const sql = 'SELECT value FROM flags WHERE name=?';
     final resultSet = _database.select(sql, [name]);
@@ -365,13 +309,11 @@ class RealDbHelper implements DbHelper {
     }
     return resultSet.first['value'];
   }
-  @override
   void setFlag(String name, String value) {
     const sql = 'INSERT INTO flags(name, value) VALUES(?, ?) ON CONFLICT(name) DO UPDATE SET value=excluded.value';
     _database.execute(sql, [name, value]);
   }
 
-  @override
   String newDocument(int timestamp) {
     var docId = IdGen.getUid();
     const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?)';
@@ -380,14 +322,12 @@ class RealDbHelper implements DbHelper {
     return docId;
   }
 
-  @override
   void insertOrUpdateDoc(String docId, String docHash, int timestamp) {
     const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?) '
         'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at';
     _database.execute(sql, [docId, docHash, timestamp]);
   }
 
-  @override
   List<(String, String)> getAllBlocks() {
     const sql = 'SELECT doc_id, block_id FROM blocks WHERE data!=""';
     final resultSet = _database.select(sql);
@@ -404,7 +344,6 @@ class RealDbHelper implements DbHelper {
     }
     return result;
   }
-  @override
   BlockDataModel? getRawBlockById(String docId, String blockId) {
     const sql = 'SELECT data FROM blocks, updated_at, extra, created_from, status WHERE doc_id=? AND block_id=?';
     final resultSet = _database.select(sql, [docId, blockId]);
@@ -425,7 +364,6 @@ class RealDbHelper implements DbHelper {
     );
   }
 
-  @override
   Map<String, String> getSettings() {
     const sql = 'SELECT name, value FROM settings';
     final resultSet = _database.select(sql);
@@ -439,7 +377,6 @@ class RealDbHelper implements DbHelper {
     }
     return result;
   }
-  @override
   bool saveSettings(Map<String, String> settings) {
     String sql = 'INSERT INTO settings(name, value) VALUES';
     var values = <Object>[];

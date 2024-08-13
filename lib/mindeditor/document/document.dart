@@ -17,18 +17,19 @@ class Document {
   bool _hasModified = false;
   int _lastUpdate;
   String? _editingBlockId;
-  DocumentManager parent;
-  static final DbHelper _db = Controller.instance.dbHelper;
+  DocumentManager? parent;
+  final DbHelper? _db;
 
   Document({
     required this.id,
-    required this.parent,
+    this.parent,
     required List<ParagraphDesc> paras,
     required int time,
-  }): paragraphs = paras, _lastUpdate = time {
+    DbHelper? db,
+  }): paragraphs = paras, _lastUpdate = time, _db = db {
     ParagraphDesc? previous;
     for(var p in paragraphs) {
-      p.setDocDesc(this);
+      p.setDocument(this);
       p.setPrevious(previous);
       previous?.setNext(p);
       previous = p;
@@ -36,10 +37,10 @@ class Document {
     }
   }
 
-  factory Document.loadByNode(DocDataModel docNode, DocumentManager parent) {
+  factory Document.loadByNode(DbHelper db, DocDataModel docNode, DocumentManager parent) {
     List<ParagraphDesc> paragraphs = [];
     // Load content
-    var blocks = _loadBlocks(docNode.docId);
+    var blocks = _loadBlocks(db, docNode.docId);
     paragraphs.addAll(blocks);
 
     Document doc = Document(
@@ -47,6 +48,7 @@ class Document {
       paras: paragraphs,
       parent: parent,
       time: docNode.timestamp,
+      db: db,
     );
     // If the document has no content(or only has a title), add an title line
     if(blocks.isEmpty) {
@@ -73,7 +75,7 @@ class Document {
     for(var entry in _mapOfParagraphs.entries) {
       var blockId = entry.key;
       var block = entry.value;
-      block.setDocDesc(this);
+      block.setDocument(this);
       var oldBlock = _oldMap[blockId];
       var oldEditState = oldBlock?.getEditState();
       if(oldEditState != null) {
@@ -88,6 +90,7 @@ class Document {
     }
   }
 
+  DbHelper? getDb() => _db;
   ParagraphDesc getTitle() {
     return paragraphs[0];
   }
@@ -121,7 +124,7 @@ class Document {
         break;
       }
     }
-    newItem.setDocDesc(this);
+    newItem.setDocument(this);
     paragraphs[idx].setNext(newItem);
     paragraphs[idx].flushDb();
     newItem.setPrevious(paragraphs[idx]);
@@ -146,7 +149,7 @@ class Document {
     }
     //TODO could be optimized here, reduce IO
     for(var item in newItems) {
-      item.setDocDesc(this);
+      item.setDocument(this);
       paragraphs[idx].setNext(item);
       paragraphs[idx].flushDb();
       item.setPrevious(paragraphs[idx]);
@@ -182,7 +185,7 @@ class Document {
   void updateTitle(String title) {
     var now = Util.getTimeStamp();
     // _db.storeDocTitle(id, title, now);
-    parent.updateDocTitle(id, title, now);
+    parent?.updateDocTitle(id, title, now);
 
     _lastUpdate = now;
     setModified();
@@ -266,7 +269,7 @@ class Document {
     }
     var docContent = _generateDocContent();
     String docHash = docContent.getHash();
-    _db.storeObject(docHash, jsonEncode(docContent), now, Constants.createdFromLocal, Constants.statusAvailable);
+    _db?.storeObject(docHash, jsonEncode(docContent), now, Constants.createdFromLocal, Constants.statusAvailable);
     return docHash;
   }
 
@@ -276,7 +279,7 @@ class Document {
     var docContent = _generateDocContent();
     for(var b in docContent.contents) {
       var blockHash = b.blockHash;
-      var object = _db.getObject(blockHash);
+      var object = _db?.getObject(blockHash);
       if(object == null) continue;
       result[blockHash] = object.data;
     }
@@ -285,7 +288,7 @@ class Document {
 
   void setModified() {
     _hasModified = true;
-    parent.setModified();
+    parent?.setModified();
   }
   bool getModified() {
     return _hasModified;
@@ -303,15 +306,15 @@ class Document {
     }
   }
 
-  static List<ParagraphDesc> _loadBlocks(String docId) {
-    var data = _db.getDoc(docId);
+  static List<ParagraphDesc> _loadBlocks(DbHelper db, String docId) {
+    var data = db.getDoc(docId);
     if(data == null) {
       return [];
     }
     DocContent docContent = DocContent.fromJson(jsonDecode(data.docContent));
 
     List<ParagraphDesc> result = [];
-    var blocks = _db.getBlockMapOfDoc(docId);
+    var blocks = db.getBlockMapOfDoc(docId);
     for(var b in docContent.contents) {
       final blockId = b.blockId;
       var blockData = blocks[blockId];
@@ -330,7 +333,7 @@ class Document {
     final now = Util.getTimeStamp();
     var docContent = _generateDocContent();
     final jsonStr = jsonEncode(docContent);
-    _db.storeDocContent(id, jsonStr, now);
+    _db?.storeDocContent(id, jsonStr, now);
   }
 
   DocContent _generateDocContent() {
