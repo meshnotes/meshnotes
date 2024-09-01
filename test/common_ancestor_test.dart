@@ -2,6 +2,8 @@ import 'package:my_log/my_log.dart';
 import 'package:test/test.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';
 
+import 'test_utils.dart';
+
 const String _versionTag1 = 'n1';
 const String _versionTag2 = 'n2';
 const String _commonTag = 'here';
@@ -86,12 +88,7 @@ Map<String, DagNode> _genSimpleLinearDag() {
   var r1 = DagNode(versionHash: 'r1', createdAt: 0, parents: [root]);
   var n1 = DagNode(versionHash: _versionTag1, createdAt: 0, parents: [r1]);
   var n2 = DagNode(versionHash: _versionTag2, createdAt: 0, parents: [n1]);
-  return {
-    'root': root,
-    'r1': r1,
-    _versionTag1: n1,
-    _versionTag2: n2,
-  };
+  return buildDagByNodes([root, r1, n1, n2]);
 }
 
 /// root--r1--common--n1
@@ -102,13 +99,7 @@ Map<String, DagNode> _genForkedDagMapWithOneCommonParent() {
   var common = DagNode(versionHash: _commonTag, createdAt: 0, parents: [r1]);
   var n1 = DagNode(versionHash: _versionTag1, createdAt: 0, parents: [common]);
   var n2 = DagNode(versionHash: _versionTag2, createdAt: 0, parents: [common]);
-  return {
-    'root': root,
-    'r1': r1,
-    _commonTag: common,
-    _versionTag1: n1,
-    _versionTag2: n2,
-  };
+  return buildDagByNodes([root, r1, common, n1, n2]);
 }
 
 ///                 n2
@@ -124,16 +115,7 @@ Map<String, DagNode> _genForkedDagMapWithCommonNodeInOnePath() {
   var crossNode = DagNode(versionHash: 'cross', createdAt: 0, parents: [common, forked2_2]);
   var n1 = DagNode(versionHash: _versionTag1, createdAt: 0, parents: [crossNode]);
   var n2 = DagNode(versionHash: _versionTag2, createdAt: 0, parents: [common]);
-  return {
-    'root': root,
-    'f1': forked1,
-    'f2': forked2,
-    _commonTag: common,
-    'f2_2': forked2_2,
-    'cross': crossNode,
-    _versionTag1: n1,
-    _versionTag2: n2,
-  };
+  return buildDagByNodes([root, forked1, forked2, common, forked2_2, crossNode, n1, n2]);
 }
 
 /// root--f1--p1_1--p1_2--common1----crossed1---n1
@@ -155,19 +137,5 @@ Map<String, DagNode> _genForkedDagMapWithTwoCommonNodes() {
   var n1 = DagNode(versionHash: _versionTag1, createdAt: 0, parents: [crossed1]);
   var r2 = DagNode(versionHash: 'r2', createdAt: 0, parents: [crossed2]);
   var n2 = DagNode(versionHash: _versionTag2, createdAt: 0, parents: [r2]);
-  return {
-    'root': root,
-    'f1': forked1,
-    'f2': forked2,
-    'p1_1': p1_1,
-    'p1_2': p1_2,
-    _commonTag: common1,
-    _commonTag2: common2,
-    'p2_1': p2_1,
-    'crossed1': crossed1,
-    'crossed2': crossed2,
-    _versionTag1: n1,
-    'r2': r2,
-    _versionTag2: n2,
-  };
+  return buildDagByNodes([root, forked1, forked2, p1_1, p1_2, common1, common2, p2_1, crossed1, crossed2, n1, r2, n2]);
 }
