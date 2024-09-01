@@ -196,7 +196,7 @@ class DbHelper {
       parents: parents,
       createdAt: createdAt,
       createdFrom: createdFrom?? Constants.createdFromPeer,
-      status: dataStatus?? Constants.statusUnavailable,
+      status: dataStatus?? Constants.statusWaiting,
     );
   }
 
@@ -216,7 +216,7 @@ class DbHelper {
         parents: parents,
         createdAt: timestamp,
         createdFrom: createdFrom?? Constants.createdFromPeer,
-        status: dataStatus?? Constants.statusUnavailable,
+        status: dataStatus?? Constants.statusWaiting,
       ));
     }
     return result;
@@ -276,7 +276,7 @@ class DbHelper {
       data: data,
       timestamp: timestamp,
       createdFrom: createdFrom?? Constants.createdFromPeer,
-      status: dataStatus?? Constants.statusUnavailable,
+      status: dataStatus?? Constants.statusWaiting,
     );
   }
   void storeObject(String hash, String data, int updatedAt, int createdFrom, int status) {

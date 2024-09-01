@@ -11,8 +11,8 @@ class Constants {
   static const String blockTypeHeadline1 = blockTypeHeadlinePrefix + '1';
   static const String blockTypeHeadline2 = blockTypeHeadlinePrefix + '2';
   static const String blockTypeHeadline3 = blockTypeHeadlinePrefix + '3';
-  static const String blockTypeQuote = 'quote'; // 引用类型，未实现
-  static const String blockTypeCode = 'code'; // 代码块类型，未实现
+  static const String blockTypeQuote = 'quote'; // quote block, unimplemented
+  static const String blockTypeCode = 'code'; // code block, unimplemented
 
   static const String blockListTypeNone = 'none';
   static const String blockListTypeBulleted = 'bulleted_list';
@@ -40,8 +40,10 @@ class Constants {
   static const String flagNameCurrentVersionTimestamp = 'current_version_timestamp';
   static const int createdFromLocal = 0;
   static const int createdFromPeer = 1;
-  static const int statusAvailable = 0;
-  static const int statusUnavailable = -1;
+  static const int statusAvailable = 0; // data is available, created from local or already sync from peer
+  static const int statusWaiting = -1; // meta data is sync from peer in a short time, but waiting detail data
+  static const int statusDeprecated = -2; // data is deprecated from local or peer, all its parents will be deprecated
+  static const int statusMissing = -3; // data sync failed for several times, so it is considered to be missing, will try later
 
   // InspiredCard related
   static const int cardMaximumWidth = 800;
