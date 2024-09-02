@@ -181,7 +181,7 @@ class VersionChainVillager {
       return;
     }
     String feature = SignedResources.getFeature(signedResources.resources);
-    final ok = _verify!.ver(feature, signedResources.signature);
+    final ok = _verifySignature(feature, signedResources.signature);
     if(!ok) {
       MyLogger.info('Verify provide message failed');
       return;
@@ -194,7 +194,8 @@ class VersionChainVillager {
         timestamp: resource.timestamp,
         data: resource.data, // currently encrypted data
       );
-      if(!_verify!.ver(rawResource.getFeature(), resource.signature)) {
+      if(!_verifySignature(rawResource.getFeature(), resource.signature)) {
+        MyLogger.info('Verify resource failed: ${rawResource.key}');
         continue;
       }
       var plainText = _encrypt!.decrypt(rawResource.timestamp, rawResource.data);
@@ -219,7 +220,7 @@ class VersionChainVillager {
       MyLogger.info('Receive verify message from other user: $publicKey');
       return;
     }
-    if(!_verify!.ver(signedMessage.data, signedMessage.signature)) {
+    if(!_verifySignature(signedMessage.data, signedMessage.signature)) {
       MyLogger.info('Verify query message failed');
       return;
     }
@@ -242,7 +243,7 @@ class VersionChainVillager {
       MyLogger.info('Receive verify message from other user: $publicKey');
       return;
     }
-    if(!_verify!.ver(signedMessage.data, signedMessage.signature)) {
+    if(!_verifySignature(signedMessage.data, signedMessage.signature)) {
       MyLogger.info('Verify publish message failed');
       return;
     }
@@ -255,7 +256,7 @@ class VersionChainVillager {
 
   void _onSendBroadcast(BroadcastMessages msg) {
     String json = jsonEncode(msg);
-    String signature = _signing!.sign(json);
+    String signature = _genSignature(json);
     SignedMessage signedMessage = SignedMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
     String signedMessageJson = jsonEncode(signedMessage);
     _village?.sendPublish(signedMessageJson);
@@ -269,11 +270,11 @@ class VersionChainVillager {
       timestamp: timestamp,
       data: encryptedChainJson,
     );
-    String signature = _signing!.sign(rawResource.getFeature());
+    String signature = _genSignature(rawResource.getFeature());
     var signedResource = SignedResource.fromRaw(rawResource, signature);
 
     List<SignedResource> resourceList = [signedResource];
-    String signatureOfList = _signing!.sign(SignedResources.getFeature(resourceList));
+    String signatureOfList = _genSignature(SignedResources.getFeature(resourceList));
     SignedResources signedResources = SignedResources(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signatureOfList);
     String signedResourcesJson = jsonEncode(signedResources);
     _village?.sendVersionTree(signedResourcesJson);
@@ -282,7 +283,7 @@ class VersionChainVillager {
   void _onSendRequireVersions(List<String> versions) {
     var requiredVersions = RequireVersions(requiredVersions: versions);
     String json = jsonEncode(requiredVersions);
-    String signature = _signing!.sign(json);
+    String signature = _genSignature(json);
     SignedMessage signedMessage = SignedMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
     String signedMessageJson = jsonEncode(signedMessage);
     _village?.sendRequireVersions(signedMessageJson);
@@ -298,7 +299,7 @@ class VersionChainVillager {
         timestamp: version.createdAt,
         data: encryptedContent,
       );
-      String signature = _signing!.sign(unsignedResource.getFeature());
+      String signature = _genSignature(unsignedResource.getFeature());
       SignedResource signedResource = SignedResource.fromRaw(unsignedResource, signature);
 
       resourceList.add(signedResource);
@@ -313,16 +314,23 @@ class VersionChainVillager {
           timestamp: object.createdAt,
           data: encryptedContent,
         );
-        String signature = _signing!.sign(rawObject.getFeature());
+        String signature = _genSignature(rawObject.getFeature());
         SignedResource signedObject = SignedResource.fromRaw(rawObject, signature);
 
         resourceList.add(signedObject);
       }
     }
-    String signature = _signing!.sign(SignedResources.getFeature(resourceList));
+    String signature = _genSignature(SignedResources.getFeature(resourceList));
     final signedResources = SignedResources(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signature);
     String json = jsonEncode(signedResources);
 
     _village?.sendVersions(json);
+  }
+
+  String _genSignature(String text) {
+    return _signing!.sign(HashUtil.hashText(text));
+  }
+  bool _verifySignature(String text, String stringSignature) {
+    return _verify!.ver(HashUtil.hashText(text), stringSignature);
   }
 }
