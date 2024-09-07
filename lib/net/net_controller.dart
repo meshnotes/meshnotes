@@ -114,7 +114,7 @@ class NetworkController {
   NetworkStatus getNetworkStatus() {
     return _networkStatus;
   }
-  bool isAlong() {
+  bool isAlone() {
     if(_networkStatus != NetworkStatus.running) {
       return true;
     }

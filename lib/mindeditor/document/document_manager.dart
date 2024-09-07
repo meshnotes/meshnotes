@@ -33,10 +33,13 @@ class DocumentManager {
   int _currentVersionTimestamp = 0;
   bool _syncing = false;
   Timer? _idleTimer;
+  int _lastSyncTime = 0;
+  final Set<String> _allMissingVersions = {};
 
   DocumentManager({
     required DbHelper db,
   }): _db = db {
+    _allMissingVersions.addAll(_loadAllUnavailableNodes());
     Controller.instance.evenTasksManager.addAfterInitTask(() {
       Future(() {
         checkConsistency();
@@ -45,8 +48,8 @@ class DocumentManager {
     // Periodically send newest version to peers
     Timer.periodic(const Duration(seconds: Constants.timeoutOfPeriodSync), (timer) {
       final now = Util.getTimeStamp();
-      if(now - _currentVersionTimestamp < 15000) return; // Ignore if the newest version is generated within 15s
-      Controller.instance.sendVersionBroadcast();
+      _checkSyncingStatus(now);
+      _checkIfSendVersionBroadcast(now);
     });
   }
 
@@ -176,6 +179,9 @@ class DocumentManager {
       if(_db.getObject(key) == null) {
         _db.storeObject(key, content, timestamp, Constants.createdFromPeer, Constants.statusAvailable);
       }
+      if(_allMissingVersions.contains(key)) {
+        _allMissingVersions.remove(key);
+      }
     }
     var _versionMap = _genVersionMapFromDb();
     _tryToMergeVersionTree(_versionMap);
@@ -185,6 +191,7 @@ class DocumentManager {
   void _setSyncing() {
     _syncStatus = SyncStatus.waiting;
     _syncing = true;
+    _lastSyncTime = Util.getTimeStamp();
   }
   void _setMerging() {
     _syncStatus = SyncStatus.merging;
@@ -192,6 +199,7 @@ class DocumentManager {
   void _clearSyncing() {
     _syncStatus = SyncStatus.idle;
     _syncing = false;
+    _lastSyncTime = 0;
   }
 
   void checkConsistency() {
@@ -205,9 +213,10 @@ class DocumentManager {
   /// 3. If all versions are ready, merge versions
   void _tryToMergeVersionTree(Map<String, DagNode> newMap) {
     Set<DagNode> missingVersions = _findWaitingOrMissingVersions(newMap);
+    _allMissingVersions.addAll(missingVersions.map((e) => e.versionHash));
     bool forceMerge = _checkForceMergeOrNot(missingVersions);
     if(missingVersions.isNotEmpty && !forceMerge) {
-      Controller.instance.sendRequireVersions(missingVersions.map((e) => e.versionHash).toList());
+      Controller.instance.sendRequireVersions(_allMissingVersions.toList());
     } else {
       _removeDeprecatedVersions(newMap);
       MyLogger.info('Try to merge');
@@ -223,7 +232,7 @@ class DocumentManager {
   /// 5. Refresh view
   void _mergeVersions(Map<String, DagNode> map) {
     _setMerging();
-    var leafNodes = _findLeafNodesInDag(map);
+    var leafNodes = _findAvailableLeafNodesInDag(map);
     MyLogger.info('_mergeVersions: find leaf nodes: $leafNodes');
     leafNodes.remove(_currentVersion);
     for(var leafHash in leafNodes) {
@@ -234,10 +243,14 @@ class DocumentManager {
     Controller.instance.refreshDocNavigator();
     _clearSyncing();
   }
-  /// Find all nodes that is not parent of any other node
-  Set<String> _findLeafNodesInDag(Map<String, DagNode> map) {
+  /// Find all nodes that is available and is not parent of any other node
+  Set<String> _findAvailableLeafNodesInDag(Map<String, DagNode> map) {
     Set<String> result = map.keys.toSet();
     for(var e in map.values) {
+      if(e.status != Constants.statusAvailable) {
+        result.remove(e.versionHash);
+        continue;
+      }
       var parents = e.parents;
       for(var p in parents) {
         result.remove(p.versionHash);
@@ -436,7 +449,7 @@ class DocumentManager {
       String parents = _buildParents(node.parents);
       int timestamp = node.createdAt;
       var localVersion = _db.getVersionData(versionHash);
-      if(localVersion == null) { // If the version is not exists, create one and set it as from_peer/unavailable
+      if(localVersion == null) { // If the version is not exists, create one and set it as from_peer/waiting
         _db.storeVersion(versionHash, parents, timestamp, Constants.createdFromPeer, Constants.statusWaiting);
       }
     }
@@ -669,10 +682,13 @@ class DocumentManager {
   Set<DagNode> _findWaitingOrMissingVersions(Map<String, DagNode> map) {
     Set<DagNode> missing = {};
     for(final e in map.entries) {
-      //TODO Should also consider version's status
       final versionHash = e.key;
+      final node = e.value;
       var content = _db.getObject(versionHash);
       if(content == null) {
+        missing.add(e.value);
+      }
+      if(node.status == Constants.statusWaiting || node.status == Constants.statusMissing) {
         missing.add(e.value);
       }
     }
@@ -876,6 +892,16 @@ class DocumentManager {
   void _checkObjectsIntegrity() {
     // Not implemented yet
   }
+  Set<String> _loadAllUnavailableNodes() {
+    var versions = _db.getAllVersions();
+    Set<String> result = {};
+    for(final version in versions) {
+      if(version.status == Constants.statusMissing || version.status == Constants.statusWaiting) {
+        result.add(version.versionHash);
+      }
+    }
+    return result;
+  }
 
   static BlockContent _genDefaultTitleBlock(String title) {
     var blockContent = BlockContent(
@@ -889,5 +915,26 @@ class DocumentManager {
   static DocContent _genDocContentWithTitle(String docId, String blockId, BlockContent blockContent) {
     DocContentItem block = DocContentItem(blockId: blockId, blockHash: '');
     return DocContent(contents: [block]);
+  }
+
+  void _checkSyncingStatus(int now) {
+    if(_lastSyncTime == 0 || now - _lastSyncTime < 30000) return;
+    // Clearing syncing flag if timeout(>30s)
+    if(isSyncing()) {
+      _clearSyncing();
+    }
+    if(_allMissingVersions.isNotEmpty) {
+      for(var hash in _allMissingVersions) {
+        var node = _db.getVersionData(hash);
+        if(node?.status == Constants.statusWaiting) {
+          _db.updateVersionStatus(hash, Constants.statusMissing);
+        }
+      }
+    }
+  }
+  void _checkIfSendVersionBroadcast(int now) {
+    if(now - _currentVersionTimestamp < 15000) return;
+    // Broadcast latest version if the it has been generated over 15s
+    Controller.instance.sendVersionBroadcast();
   }
 }

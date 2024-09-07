@@ -33,7 +33,7 @@ class Controller {
   final FocusNode globalFocusNode = FocusNode();
   final Environment environment = Environment();
   final Device device = Device();
-  late final Setting setting;// = Setting.defaultSetting;
+  late final Setting setting; // = Setting.defaultSetting;
   // Mouse and gesture handler
   late final GestureHandler gestureHandler;
   late final NetworkController network;
@@ -240,7 +240,7 @@ class Controller {
   /// 2. Currently not modified or syncing
   /// 3. the newest version is valid(not '')
   void sendVersionBroadcast() {
-    if(network.isAlong()) return;
+    if(network.isAlone()) return;
     if(docManager.hasModified() || docManager.isSyncing()) return;
     var latestVersion = docManager.getLatestVersion();
     if(latestVersion.isEmpty) return;
@@ -250,7 +250,7 @@ class Controller {
   }
   bool tryToSaveAndSendVersionTree() {
     // If there is no network peer, don't generate new version and send
-    if(network.isAlong()) return false;
+    if(network.isAlone()) return false;
     // If there is any modification, generate a new version tree, and try to sync this version
     if(!docManager.hasModified() || docManager.isSyncing()) return false;
     docManager.genNewVersionTree();
@@ -280,12 +280,14 @@ class Controller {
     MyLogger.info('receive version broadcast');
     final version = dbHelper.getVersionData(latestVersion);
     if(version == null) {
+      MyLogger.info('receiveVersionBroadcast: need entire version tree for tree node $latestVersion');
       // Send require version tree
       sendRequireVersionTree(latestVersion);
       return;
     }
     final object = dbHelper.getObject(latestVersion);
     if(object == null) {
+      MyLogger.info('receiveVersionBroadcast: need version objects for tree node $latestVersion');
       sendRequireVersions([latestVersion]);
     }
   }
