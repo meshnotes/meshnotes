@@ -48,7 +48,7 @@ class Village implements ApplicationController {
   /// Handle the data received from lower layer
   @override
   void onData(VillagerNode node, String appName, String type, String data) {
-    MyLogger.info('${logPrefix}: Receive village data($data) of type($type) to application($appName)');
+    MyLogger.debug('${logPrefix}: Receive village data of type($type) to application($appName): ${data.substring(0, 100)}');
     var appType = _mapOfAppMessageType[type];
     if(appType == null) {
       MyLogger.warn('onData: receive unrecognized app type: $type, data=$data');
@@ -78,22 +78,22 @@ class Village implements ApplicationController {
   }
 
   void sendPublish(String msgJson) {
-    MyLogger.info('sendPublish: Preparing to send message: $msgJson');
+    MyLogger.info('sendPublish: Preparing to send publish: ${msgJson.substring(0, 100)}');
     //TODO Optimize the code below to only send message to selected nodes
     _sendToAllNodesOfUser(AppMessageType.publishAppType, msgJson);
   }
   void sendVersionTree(String resourceJson) {
-    MyLogger.info('sendVersionTree: Preparing to send resource: $resourceJson');
+    MyLogger.info('sendVersionTree: Preparing to send version tree: ${resourceJson.substring(0, 100)}');
     //TODO Optimize the code below to only send message to selected nodes
     _sendToAllNodesOfUser(AppMessageType.provideAppType, resourceJson);
   }
   void sendRequireVersions(String requiredVersions) {
-    MyLogger.info('sendRequireVersions: Preparing to send require_versions: $requiredVersions');
+    MyLogger.info('sendRequireVersions: Preparing to send require_versions: ${requiredVersions.substring(0, 100)}');
     //TODO Optimize the code below to only send message to selected nodes
     _sendToAllNodesOfUser(AppMessageType.queryAppType, requiredVersions);
   }
   void sendVersions(String sendVersions) {
-    MyLogger.info('sendVersions: Preparing to send send_versions: $sendVersions');
+    MyLogger.info('sendVersions: Preparing to send versions: ${sendVersions.substring(0, 100)}');
     //TODO Optimize the code below to only send message to selected nodes
     _sendToAllNodesOfUser(AppMessageType.provideAppType, sendVersions);
   }

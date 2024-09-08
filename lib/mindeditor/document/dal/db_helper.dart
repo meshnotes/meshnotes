@@ -210,7 +210,7 @@ class DbHelper {
       String parents = row['parents'];
       int timestamp = row['created_at'];
       int? createdFrom = row['created_from'];
-      int? dataStatus = row['data_status'];
+      int? dataStatus = row['status'];
       result.add(VersionDataModel(
         versionHash: versionHash,
         parents: parents,
@@ -297,7 +297,7 @@ class DbHelper {
   }
 
   void updateVersionStatus(String hash, int status) {
-    const sql = 'UPDATE version SET status=? WHERE tree_hash=?';
+    const sql = 'UPDATE versions SET status=? WHERE tree_hash=?';
     _database.execute(sql, [status, hash]);
   }
 

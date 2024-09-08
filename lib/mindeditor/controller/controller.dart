@@ -243,9 +243,9 @@ class Controller {
     if(network.isAlone()) return;
     if(docManager.hasModified() || docManager.isSyncing()) return;
     var latestVersion = docManager.getLatestVersion();
+    MyLogger.info('sendVersionBroadcast: latestVersion=$latestVersion');
     if(latestVersion.isEmpty) return;
 
-    MyLogger.info('sendVersionBroadcast: latest version=$latestVersion');
     network.sendVersionBroadcast(latestVersion);
   }
   bool tryToSaveAndSendVersionTree() {
@@ -277,7 +277,12 @@ class Controller {
     /// 1. Check if already have latestVersion
     /// 2. If not, send require version tree
     /// 3. If there is the version, but no object, send require version
-    MyLogger.info('receive version broadcast');
+    MyLogger.info('receive version broadcast, latestVersion=$latestVersion');
+    if(docManager.isSyncing()) {
+      MyLogger.info('receiveVersionBroadcast: too busy to handle version broadcast: $latestVersion');
+      //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
+      return;
+    }
     final version = dbHelper.getVersionData(latestVersion);
     if(version == null) {
       MyLogger.info('receiveVersionBroadcast: need entire version tree for tree node $latestVersion');
@@ -315,6 +320,7 @@ class Controller {
     network.sendVersions(versions);
   }
   void receiveResources(List<UnsignedResource> resources) {
+    MyLogger.info('receiveResources: receive resources: $resources');
     List<VersionChain> versionChains = [];
     List<UnsignedResource> nonChainResources = [];
     for(var res in resources) {

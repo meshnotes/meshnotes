@@ -62,6 +62,11 @@ class UnsignedResource {
         'timestamp: $timestamp\n'
         'data: $data';
   }
+
+  @override
+  String toString() {
+    return 'URes($key)';
+  }
 }
 
 class SignedResource {
@@ -100,6 +105,11 @@ class SignedResource {
       'data': data,
       'sign': signature
     };
+  }
+
+  @override
+  String toString() {
+    return 'SRes($key)';
   }
 }
 
@@ -143,6 +153,11 @@ class SignedResources {
       result.add(signedResource);
     }
     return result;
+  }
+
+  @override
+  String toString() {
+    return '$resources';
   }
 }
 

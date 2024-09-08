@@ -34,12 +34,15 @@ class DocumentManager {
   bool _syncing = false;
   Timer? _idleTimer;
   int _lastSyncTime = 0;
-  final Set<String> _allMissingVersions = {};
+  final Set<String> _allWaitingVersions = {};
+  final Map<String, int> _retryCounter = {};
 
   DocumentManager({
     required DbHelper db,
   }): _db = db {
-    _allMissingVersions.addAll(_loadAllUnavailableNodes());
+    _allWaitingVersions.addAll(_loadAllUnavailableNodes());
+    _initRetryCounter(_allWaitingVersions);
+    MyLogger.info('efantest: loaded missing versions: $_allWaitingVersions');
     Controller.instance.evenTasksManager.addAfterInitTask(() {
       Future(() {
         checkConsistency();
@@ -172,6 +175,7 @@ class DocumentManager {
   /// 2. Load version tree
   /// 3. Try to merge entire version tree
   void assembleResources(List<UnsignedResource> resources) {
+    MyLogger.info('assembleResources: resources=$resources');
     for(var res in resources) {
       String key = res.key;
       int timestamp = res.timestamp;
@@ -179,8 +183,9 @@ class DocumentManager {
       if(_db.getObject(key) == null) {
         _db.storeObject(key, content, timestamp, Constants.createdFromPeer, Constants.statusAvailable);
       }
-      if(_allMissingVersions.contains(key)) {
-        _allMissingVersions.remove(key);
+      if(_allWaitingVersions.contains(key)) {
+        _allWaitingVersions.remove(key);
+        _db.updateVersionStatus(key, Constants.statusAvailable);
       }
     }
     var _versionMap = _genVersionMapFromDb();
@@ -213,10 +218,11 @@ class DocumentManager {
   /// 3. If all versions are ready, merge versions
   void _tryToMergeVersionTree(Map<String, DagNode> newMap) {
     Set<DagNode> missingVersions = _findWaitingOrMissingVersions(newMap);
-    _allMissingVersions.addAll(missingVersions.map((e) => e.versionHash));
+    _allWaitingVersions.addAll(missingVersions.map((e) => e.versionHash));
+    _increaseRetryCounterAndFilter(_allWaitingVersions);
     bool forceMerge = _checkForceMergeOrNot(missingVersions);
     if(missingVersions.isNotEmpty && !forceMerge) {
-      Controller.instance.sendRequireVersions(_allMissingVersions.toList());
+      Controller.instance.sendRequireVersions(_allWaitingVersions.toList());
     } else {
       _removeDeprecatedVersions(newMap);
       MyLogger.info('Try to merge');
@@ -235,6 +241,7 @@ class DocumentManager {
     var leafNodes = _findAvailableLeafNodesInDag(map);
     MyLogger.info('_mergeVersions: find leaf nodes: $leafNodes');
     leafNodes.remove(_currentVersion);
+    MyLogger.info('_mergeVersions: remove current node: $_currentVersion');
     for(var leafHash in leafNodes) {
       String commonVersionHash = _getCommonAncestor(_currentVersion, leafHash, map);
       MyLogger.info('_mergeVersions: Try to merge version($_currentVersion) and version($leafHash) by common version($commonVersionHash)');
@@ -688,7 +695,7 @@ class DocumentManager {
       if(content == null) {
         missing.add(e.value);
       }
-      if(node.status == Constants.statusWaiting || node.status == Constants.statusMissing) {
+      if(node.status == Constants.statusWaiting) {// || node.status == Constants.statusMissing) {
         missing.add(e.value);
       }
     }
@@ -704,6 +711,7 @@ class DocumentManager {
         _recursiveRemoveDeprecatedNodes(node, map, toRemove);
       }
     }
+    MyLogger.info('Deprecated versions to be removed: $toRemove');
     map.removeWhere((key, _) => toRemove.contains(key));
   }
 
@@ -896,7 +904,7 @@ class DocumentManager {
     var versions = _db.getAllVersions();
     Set<String> result = {};
     for(final version in versions) {
-      if(version.status == Constants.statusMissing || version.status == Constants.statusWaiting) {
+      if(version.status == Constants.statusMissing) {// || version.status == Constants.statusWaiting) {
         result.add(version.versionHash);
       }
     }
@@ -919,22 +927,48 @@ class DocumentManager {
 
   void _checkSyncingStatus(int now) {
     if(_lastSyncTime == 0 || now - _lastSyncTime < 30000) return;
-    // Clearing syncing flag if timeout(>30s)
-    if(isSyncing()) {
-      _clearSyncing();
-    }
-    if(_allMissingVersions.isNotEmpty) {
-      for(var hash in _allMissingVersions) {
+    MyLogger.info('_checkSyncingStatus: try to clear waiting versions and retry');
+    // // Clearing syncing flag if timeout(>30s)
+    // if(isSyncing()) {
+    //   _clearSyncing();
+    // }
+    if(_allWaitingVersions.isNotEmpty) {
+      for(var hash in _allWaitingVersions) {
         var node = _db.getVersionData(hash);
         if(node?.status == Constants.statusWaiting) {
           _db.updateVersionStatus(hash, Constants.statusMissing);
         }
       }
+      _allWaitingVersions.clear();
     }
+    assembleResources([]);
   }
   void _checkIfSendVersionBroadcast(int now) {
     if(now - _currentVersionTimestamp < 15000) return;
     // Broadcast latest version if the it has been generated over 15s
     Controller.instance.sendVersionBroadcast();
+  }
+
+  void _initRetryCounter(Set<String> missingVersions) {
+    _retryCounter.clear();
+    for(var hash in missingVersions) {
+      _retryCounter[hash] = 0;
+    }
+  }
+  void _increaseRetryCounterAndFilter(Set<String> retriedVersions) {
+    Set<String> versionsExceedMaxRetryCount = {};
+    for(final version in retriedVersions) {
+      int count = _retryCounter[version]?? 0;
+      count += 1;
+      _retryCounter[version] = count;
+      if(count > 3) {
+        versionsExceedMaxRetryCount.add(version);
+      }
+    }
+    for(final version in versionsExceedMaxRetryCount) {
+      MyLogger.info('_increaseRetryCounterAndFilter: version($version) exceed max retry count, remove it from waiting list');
+      _db.updateVersionStatus(version, Constants.statusMissing);
+      retriedVersions.remove(version);
+    }
   }
 }

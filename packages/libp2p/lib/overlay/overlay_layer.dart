@@ -113,7 +113,7 @@ class VillageOverlay implements ApplicationController {
     final nodes = _findAllNodes();
     MyLogger.info('${logPrefix} sendToAllNodesOfUser: find nodes: $nodes');
     for(var node in nodes) {
-      MyLogger.info('${logPrefix} sendToAllNodesOfUser: send to node: $node, type: $type, data: $data');
+      MyLogger.info('${logPrefix} sendToAllNodesOfUser: send to node: $node, type: $type, data: ${data.substring(0, 100)}');
       sendData(appKey, app, node, type, data);
     }
   }
