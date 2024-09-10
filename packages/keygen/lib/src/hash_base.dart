@@ -13,4 +13,11 @@ class HashUtil {
     final bin = utf8.encode(text);
     return hashBytes(bin);
   }
+
+  static String formatHash(String hash) {
+    if(hash.length <= 13) {
+      return hash;
+    }
+    return '${hash.substring(0, 6)}...${hash.substring(hash.length - 4)}';
+  }
 }

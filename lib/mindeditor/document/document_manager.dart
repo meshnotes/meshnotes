@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
@@ -774,7 +775,7 @@ class DocumentManager {
   }
 
   VersionContent? _merge(String version1, String version2, String commonVersion) {
-    MyLogger.info('_merge: merging version($version1) and version($version2) based on version($commonVersion)');
+    MyLogger.info('_merge: merging version(${HashUtil.formatHash(version1)}) and version(${HashUtil.formatHash(version2)}) based on version(${HashUtil.formatHash(commonVersion)})');
     final versionContent1 = _loadVersionContent(version1);
     final versionContent2 = _loadVersionContent(version2);
 
@@ -803,9 +804,9 @@ class DocumentManager {
     var solvedOperations = _solveConflicts(conflicts);
     operations.addAll(solvedOperations);
     var contentVersion = mm.mergeVersions(operations, [version1, version2]);
-    MyLogger.info('Merge version($version1) and version($version2) based on version($commonVersion) '
+    MyLogger.info('Merge version(${HashUtil.formatHash(version1)}) and version(${HashUtil.formatHash(version2)}) based on version(${HashUtil.formatHash(commonVersion)}) '
         'with ${operations.length} operations(including ${conflicts.length} conflicts), '
-        'generate new version(${contentVersion.getHash()})');
+        'generate new version(${HashUtil.formatHash(contentVersion.getHash())})');
     return contentVersion;
   }
   VersionContent? _loadVersionContent(String versionHash) {
