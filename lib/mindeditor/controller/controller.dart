@@ -290,8 +290,7 @@ class Controller {
       sendRequireVersionTree(latestVersion);
       return;
     }
-    final object = dbHelper.getObject(latestVersion);
-    if(object == null) {
+    if(!dbHelper.hasObject(latestVersion)) {
       MyLogger.info('receiveVersionBroadcast: need version objects for tree node $latestVersion');
       sendRequireVersions([latestVersion]);
     }

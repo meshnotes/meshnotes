@@ -268,8 +268,7 @@ class ParagraphDesc {
 
     var block = getBlockContent();
     var hash = block.getHash();
-    var oldObject = _db!.getObject(hash);
-    if(oldObject == null) {
+    if(!_db!.hasObject(hash)) {
       _db!.storeObject(hash, jsonEncode(block), timestamp, Constants.createdFromLocal, Constants.statusAvailable);
     }
   }

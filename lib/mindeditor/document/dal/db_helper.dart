@@ -259,6 +259,16 @@ class DbHelper {
     return result;
   }
 
+  bool hasObject(String hash) {
+    const sql = 'SELECT COUNT(*) FROM objects WHERE obj_hash=?';
+    final resultSet = _database.select(sql, [hash]);
+    if(resultSet.isEmpty) {
+      return false;
+    }
+    final row = resultSet.first;
+    int count = row[0];
+    return count > 0;
+  }
   ObjectDataModel? getObject(String hash) {
     const sql = 'SELECT obj_hash, data, updated_at FROM objects WHERE obj_hash=?';
     final resultSet = _database.select(sql, [hash]);

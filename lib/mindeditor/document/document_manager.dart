@@ -181,7 +181,7 @@ class DocumentManager {
       String key = res.key;
       int timestamp = res.timestamp;
       String content = res.data;
-      if(_db.getObject(key) == null) {
+      if(!_db.hasObject(key)) {
         _db.storeObject(key, content, timestamp, Constants.createdFromPeer, Constants.statusAvailable);
       }
       if(_allWaitingVersions.contains(key)) {
@@ -697,8 +697,7 @@ class DocumentManager {
     for(final e in map.entries) {
       final versionHash = e.key;
       final node = e.value;
-      var content = _db.getObject(versionHash);
-      if(content == null) {
+      if(!_db.hasObject(versionHash)) {
         missing.add(e.value);
       }
       if(node.status == Constants.statusWaiting) {// || node.status == Constants.statusMissing) {
@@ -812,9 +811,9 @@ class DocumentManager {
   VersionContent? _loadVersionContent(String versionHash) {
     if(versionHash == '') return null;
 
-    var data = _db.getObject(versionHash);
-    MyLogger.info('_loadVersionContent: ($data)');
-    return data == null? null: VersionContent.fromJson(jsonDecode(data.data));
+    var versionObject = _db.getObject(versionHash);
+    MyLogger.info('_loadVersionContent: ($versionObject)');
+    return versionObject == null? null: VersionContent.fromJson(jsonDecode(versionObject.data));
   }
 
   List<VersionDataModel> _getValidVersionMap(String newestVersion) {
@@ -900,7 +899,7 @@ class DocumentManager {
       var newDoc = cm.mergeDocument(totalOperations);
       var now = Util.getTimeStamp();
       var newDocHash = newDoc.getHash();
-      if(_db.getObject(newDocHash) == null) { // Create a local merged document
+      if(!_db.hasObject(newDocHash)) { // Create a local merged document if not exists
         _db.storeObject(newDocHash, jsonEncode(newDoc), now, Constants.createdFromLocal, Constants.statusAvailable);
       }
       var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: newDocHash, timestamp: now);
@@ -933,13 +932,12 @@ class DocumentManager {
     int countOfProblem = 0;
     for(final version in versions) {
       final hash = version.versionHash;
-      final object = _db.getObject(hash);
-      if(object == null) {
-        if(version.status != Constants.statusWaiting) {
-          _db.updateVersionStatus(hash, Constants.statusWaiting);
+      if(!_db.hasObject(hash)) {
+        if(version.status != Constants.statusWaiting || version.status != Constants.statusMissing) {
+          // _db.updateVersionStatus(hash, Constants.statusWaiting);
         }
         countOfProblem++;
-        MyLogger.warn('Find data inconsistency of version $hash');
+        MyLogger.warn('Find data inconsistency for version ${HashUtil.formatHash(hash)}');
       }
     }
     MyLogger.info('Find $countOfProblem inconsistency issue(s)');
