@@ -224,9 +224,16 @@ class DocumentManager {
     if(missingVersions.isNotEmpty && !forceMerge) {
       Controller.instance.sendRequireVersions(_allWaitingVersions.toList());
     } else {
-      _removeDeprecatedVersions(newMap);
-      MyLogger.info('Try to merge');
-      _mergeVersions(newMap);
+      var leafNodes = _findAvailableLeafNodesInDag(newMap); // Find available leaf nodes before removing unavailable nodes
+      leafNodes.remove(_currentVersion);
+      if(leafNodes.isEmpty) {
+        MyLogger.info('Try to merge, but no leaf nodes available');
+        return;
+      }
+      removeMissingVersions(newMap);
+      removeDeprecatedVersions(newMap);
+      MyLogger.info('Try to merge $_currentVersion with $leafNodes');
+      _mergeVersions(newMap, leafNodes);
     }
   }
   /// Merge all leaf nodes of versions
@@ -236,11 +243,9 @@ class DocumentManager {
   ///   2.2. Merge current version and leaf version based on common ancestor, and we get a new merged version
   ///   2.3 Update current version to that newly merged version
   /// 5. Refresh view
-  void _mergeVersions(Map<String, DagNode> map) {
+  void _mergeVersions(Map<String, DagNode> map, Set<String> leafNodes) {
     _setMerging();
-    var leafNodes = _findAvailableLeafNodesInDag(map);
     MyLogger.info('_mergeVersions: find leaf nodes: $leafNodes');
-    leafNodes.remove(_currentVersion);
     MyLogger.info('_mergeVersions: remove current node: $_currentVersion');
     for(var leafHash in leafNodes) {
       String commonVersionHash = _getCommonAncestor(_currentVersion, leafHash, map);
@@ -701,21 +706,62 @@ class DocumentManager {
     }
     return missing;
   }
-  /// Remove all the deprecated version nodes from the map, along with their parents recursively
-  void _removeDeprecatedVersions(Map<String, DagNode> map) {
-    MyLogger.info('Try to deprecated nodes');
-    Set<String> toRemove = {};
-    for(final e in map.entries) {
-      final node = e.value;
-      if(node.status == Constants.statusDeprecated) {
-        _recursiveRemoveDeprecatedNodes(node, map, toRemove);
+
+  /// Remove all missing or waiting version nodes from the map
+  static void removeMissingVersions(Map<String, DagNode> map) {
+    /// 1. Find all unavailable(missing or waiting) nodes
+    /// 2. For each unavailable node, remove it from its children nodes' parents list, replace with its parents
+    /// 3. Remove unavailable nodes from the map
+    final unavailableNodes = <DagNode>{};
+    // Step 1
+    for(final node in map.values) {
+      if(node.status == Constants.statusWaiting || node.status == Constants.statusMissing) {
+        unavailableNodes.add(node);
       }
     }
-    MyLogger.info('Deprecated versions to be removed: $toRemove');
-    map.removeWhere((key, _) => toRemove.contains(key));
+    MyLogger.info('Unavailable versions to remove: $unavailableNodes');
+    // Step 2
+    for(final badNode in unavailableNodes) {
+      for(final node in map.values) {
+        Set<DagNode> parents = node.parents.toSet(); // Change to set, to avoid redundant
+        if(parents.contains(badNode)) {
+          parents.remove(badNode);
+          parents.addAll(badNode.parents);
+          node.parents = parents.toList();
+        }
+      }
+    }
+    // Step 3
+    map.removeWhere((_, value) => unavailableNodes.contains(value));
+  }
+  /// Remove all the deprecated version nodes from the map, along with their parents recursively
+  static void removeDeprecatedVersions(Map<String, DagNode> map) {
+    /// 1. Find all deprecated nodes
+    /// 2. For each deprecated node, remove it from its children nodes' parents list
+    /// 3. Remove unavailable nodes from the map
+    MyLogger.info('Try to deprecated nodes');
+    // Step 1
+    Set<DagNode> deprecatedNodes = {};
+    for(final node in map.values) {
+      if(node.status == Constants.statusDeprecated) {
+        deprecatedNodes.add(node);
+      }
+    }
+    MyLogger.info('Deprecated versions to remove: $deprecatedNodes');
+    // Step 2
+    for(final d in deprecatedNodes) {
+      for(final node in map.values) {
+        final parents = node.parents;
+        if(parents.contains(d)) {
+          parents.remove(d);
+        }
+      }
+    }
+    // Step 3
+    map.removeWhere((_, value) => deprecatedNodes.contains(value));
   }
 
-  void _recursiveRemoveDeprecatedNodes(DagNode node, Map<String, DagNode> map, Set<String> toRemove) {
+  static void _recursiveRemoveDeprecatedNodes(DagNode node, Map<String, DagNode> map, Set<String> toRemove) {
     const tmpRemoveTag = -999999; // Use this tag instead of searching node in the toRemove set to avoid time consuming
     final parents = node.parents;
     for(final p in parents) {
