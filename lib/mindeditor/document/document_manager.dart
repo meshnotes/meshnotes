@@ -930,6 +930,7 @@ class DocumentManager {
   void _checkVersionIntegrity() {
     var versions = _db.getAllVersions();
     int countOfProblem = 0;
+    int countOfGood = 0;
     for(final version in versions) {
       final hash = version.versionHash;
       if(!_db.hasObject(hash)) {
@@ -938,9 +939,12 @@ class DocumentManager {
         }
         countOfProblem++;
         MyLogger.warn('Find data inconsistency for version ${HashUtil.formatHash(hash)}');
+      } else {
+        countOfGood++;
       }
     }
     MyLogger.info('Find $countOfProblem inconsistency issue(s)');
+    CallbackRegistry.getFloatingViewManager()?.showEditorToast('Versions: $countOfGood good, $countOfProblem bad');
   }
   void _checkObjectsIntegrity() {
     // Not implemented yet
