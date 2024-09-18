@@ -2,6 +2,7 @@ import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/net/status.dart';
 import 'package:mesh_note/page/title_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:my_log/my_log.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../document/paragraph_desc.dart';
 import '../mind_editor.dart';
@@ -21,6 +22,7 @@ class CallbackRegistry {
   static final Map<String, Function(String?, String?, int?)> _editingBlockFormatWatcher = {};
   static Function()? _screenShotHandler;
   static Function(NetworkStatus)? _networkStatusWatcher;
+  static Function(String)? _showToastCallback;
 
   static void registerTitleBar(DocumentTitleBarState _s) {
     _titleBarState = _s;
@@ -185,5 +187,13 @@ class CallbackRegistry {
   }
   static void triggerScreenShot() {
     _screenShotHandler?.call();
+  }
+
+  static void registerShowToast(void Function(String) showToastCallback) {
+    _showToastCallback = showToastCallback;
+  }
+  static void showToast(String content) {
+    MyLogger.info('showToast: $content, _showToastCallback=$_showToastCallback');
+    _showToastCallback?.call(content);
   }
 }

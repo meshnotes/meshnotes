@@ -97,6 +97,7 @@ class DocumentManager {
       }
     }
     currentDocId = docId;
+    CallbackRegistry.showToast('Open document: $docId');
   }
 
   String newDocument() {
@@ -944,7 +945,7 @@ class DocumentManager {
       }
     }
     MyLogger.info('Find $countOfProblem inconsistency issue(s)');
-    CallbackRegistry.getFloatingViewManager()?.showEditorToast('Versions: $countOfGood good, $countOfProblem bad');
+    CallbackRegistry.showToast('Versions: $countOfGood good, $countOfProblem bad');
   }
   void _checkObjectsIntegrity() {
     // Not implemented yet

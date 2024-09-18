@@ -84,7 +84,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     var stack = Stack(
       children: [
         lowestLayer,
-        ..._floatingViewManager.getWidgets(),
+        ..._floatingViewManager.getWidgetsForEditor(),
       ],
     );
     var expanded = Expanded(
@@ -450,7 +450,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       //     duration: const Duration(milliseconds: 2000),
       //   )
       // );
-      CallbackRegistry.getFloatingViewManager()?.showEditorToast('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters');
+      CallbackRegistry.showToast('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters');
       // refreshTextEditingValue();
       return;
     }
