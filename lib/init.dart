@@ -6,9 +6,10 @@ import 'mindeditor/controller/controller.dart';
 Future<void> appInit() async {
   WidgetsFlutterBinding.ensureInitialized();
   MyLogger.init(name: 'main', debug: false);
-  await Controller.instance.initAll();
+  final controller = Controller();
+  await controller.initAll();
   // Make title bar looks better
-  if(Controller.instance.environment.isAndroid()) {
+  if(controller.environment.isAndroid()) {
     var style = const SystemUiOverlayStyle(statusBarColor: Colors.transparent);
     SystemChrome.setSystemUIOverlayStyle(style);
   }

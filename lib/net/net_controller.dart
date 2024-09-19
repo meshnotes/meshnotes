@@ -133,6 +133,7 @@ class NetworkController {
   bool isStarted() => _networkStatus != NetworkStatus.unknown;
 
   void _onMessage(Message msg) {
+    final controller = Controller();
     switch(msg.cmd) {
       case Command.terminate:
       case Command.startVillage:
@@ -169,16 +170,16 @@ class NetworkController {
         final param = msg.parameter as BroadcastMessages;
         final latestVersion = param.messages['latest_version'];
         if(latestVersion != null) {
-          Controller.instance.receiveVersionBroadcast(latestVersion);
+          controller.receiveVersionBroadcast(latestVersion);
         }
         break;
       case Command.receiveProvide:
         final param = msg.parameter as ReceiveProvideParameter;
-        Controller.instance.receiveResources(param.resources);
+        controller.receiveResources(param.resources);
         break;
       case Command.receiveQuery:
         final param = msg.parameter as ReceiveQueryParameter;
-        Controller.instance.receiveRequireVersions(param.requiredObjects);
+        controller.receiveRequireVersions(param.requiredObjects);
         break;
     }
   }

@@ -15,7 +15,7 @@ class NetworkDetailView extends StatelessWidget {
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return NetworkDetailView(nodes: Controller.instance.network.getNetworkDetails());
+        return NetworkDetailView(nodes: Controller().network.getNetworkDetails());
       },
       fullscreenDialog: false,
     ));
@@ -24,7 +24,7 @@ class NetworkDetailView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double padding = Constants.settingViewPhonePadding.toDouble();
-    if(Controller.instance.environment.isDesktop()) {
+    if(Controller().environment.isDesktop()) {
       padding = Constants.settingViewDesktopPadding.toDouble();
     }
     var topButtons = _buildTopButtons(context);

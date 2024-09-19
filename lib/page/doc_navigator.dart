@@ -35,14 +35,15 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   List<DocDataModel> docList = [];
   int? selected;
   _NetworkStatus _networkStatus = _NetworkStatus.lost;
+  final controller = Controller();
 
   @override
   void initState() {
     super.initState();
     CallbackRegistry.registerDocumentChangedWatcher(watcherKey, refreshDocumentList);
     CallbackRegistry.registerNetworkStatusWatcher(_onNetworkStatusChanged);
-    docList = Controller.instance.docManager.getAllDocuments();
-    final _netStatus = Controller.instance.network.getNetworkStatus();
+    docList = controller.docManager.getAllDocuments();
+    final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
   }
 
@@ -62,7 +63,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       child: const Text('New Document'),
       onPressed: () {
         MyLogger.info('new document');
-        Controller.instance.newDocument();
+        controller.newDocument();
         if(widget.smallView && widget.jumpAction != null) {
           widget.jumpAction!();
         } else {
@@ -88,7 +89,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
             title: Text(docList[index].title),
             onTap: () {
               var docId = docList[index].docId;
-              Controller.instance.openDocument(docId);
+              controller.openDocument(docId);
               setState(() {
                 selected = index;
               });
@@ -182,7 +183,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       // padding: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 0),
       child: const Icon(CupertinoIcons.gear),
       onPressed: () {
-        if(Controller.instance.environment.isSmallView(context)) {
+        if(controller.environment.isSmallView(context)) {
           SmallScreenSettingPage.route(context);
         } else {
           LargeScreenSettingPage.route(context);
@@ -199,7 +200,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
 
   void refreshDocumentList() {
     setState(() {
-      docList = Controller.instance.docManager.getAllDocuments();
+      docList = controller.docManager.getAllDocuments();
     });
   }
 
@@ -307,7 +308,7 @@ class NetworkStatusIcon extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.fromLTRB(0, 50, 0, 0),
           child: Material(
-            child: NetworkDetailView(nodes: Controller.instance.network.getNetworkDetails()),
+            child: NetworkDetailView(nodes: Controller().network.getNetworkDetails()),
           ),
         );
       },

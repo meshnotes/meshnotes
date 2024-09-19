@@ -20,6 +20,8 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
   static bool lastSmallView = false;
   final bool smallView;
   final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey();
+  final controller = Controller();
+
   DocumentView({
     Key? key,
     this.jumpAction,
@@ -39,7 +41,7 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
     //   child: editor,
     // );
     Widget? view;
-    var titleBar = DocumentTitleBar(controller: Controller.instance);
+    var titleBar = DocumentTitleBar(controller: controller);
     var actionBar = <Widget>[
       PopupMenuButton(
         onSelected: (value) {
@@ -51,7 +53,7 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
               //TODO add search code here
               break;
             case syncKey:
-              Controller.instance.tryToSaveAndSendVersionTree();
+              controller.tryToSaveAndSendVersionTree();
               break;
           }
         },
@@ -117,8 +119,8 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
       );
     }
     if(lastSmallView != smallView) { // 如果窗口大小刚刚发生了变化，那么与文档相关的UI都要刷新一遍
-      // if (Controller.instance.document != null) {
-      //   Controller.instance.openDocumentForUi();
+      // if (controller.document != null) {
+      //   controller.openDocumentForUi();
       // }
     }
     lastSmallView = smallView;

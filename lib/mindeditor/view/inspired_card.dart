@@ -93,8 +93,9 @@ class _InspiredCardViewState extends State<InspiredCardView> {
       controller: controller.getController(),
       itemCount: widget.seed.ids.length,
       itemBuilder: (context, index) {
+        final controller = Controller();
         return FutureBuilder<ParagraphDesc?>(
-          future: Controller.instance.docManager.getContentOfInspiredSeed(widget.seed, index),
+          future: controller.docManager.getContentOfInspiredSeed(widget.seed, index),
           builder: (BuildContext context, AsyncSnapshot<ParagraphDesc?> snapshot) {
             Widget _child;
             if(snapshot.hasData) {
@@ -104,11 +105,11 @@ class _InspiredCardViewState extends State<InspiredCardView> {
                 Widget block = Center(
                   child: MindEditBlock(
                     texts: para,
-                    controller: Controller.instance,
+                    controller: controller,
                     readOnly: true,
                   ),
                 );
-                if(Controller.instance.environment.isDesktop()) {
+                if(controller.environment.isDesktop()) {
                   final padding = Constants.cardViewDesktopInnerPadding.toDouble();
                   block = Padding(
                     padding: EdgeInsets.fromLTRB(padding, 0, padding, 0),

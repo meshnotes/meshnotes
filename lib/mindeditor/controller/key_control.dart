@@ -76,12 +76,12 @@ class KeyboardControl {
   }
 
   static bool _handleDelKeys(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
-    final selectionController = Controller.instance.selectionController;
+    final selectionController = Controller().selectionController;
     if(!selectionController.isCollapsed()) {
       selectionController.deleteSelectedContent();
       return true;
     }
-    var editingState = Controller.instance.getEditingBlockState();
+    var editingState = Controller().getEditingBlockState();
     if(editingState == null) {
       return false;
     }
@@ -97,10 +97,11 @@ class KeyboardControl {
 
   static bool _handleNewLine(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
     MyLogger.info('_handleNewLine: spawn new line');
-    if(!Controller.instance.selectionController.isCollapsed()) {
-      Controller.instance.selectionController.deleteSelectedContent();
+    final controller = Controller();
+    if(!controller.selectionController.isCollapsed()) {
+      controller.selectionController.deleteSelectedContent();
     }
-    var editingState = Controller.instance.getEditingBlockState();
+    var editingState = controller.getEditingBlockState();
     if(editingState == null) {
       return false;
     }
@@ -109,14 +110,15 @@ class KeyboardControl {
   }
 
   static void _moveCursorLeft(FunctionKeys funcKeys) {
-    final selectionController = Controller.instance.selectionController;
+    final controller = Controller();
+    final selectionController = controller.selectionController;
     // If currently in selection state, and SHIFT key is not pressed, cancel selection and move to left side of selection
     if(!selectionController.isCollapsed() && funcKeys.nothing()) {
       selectionController.collapseToStart();
       return;
     }
 
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
     // Find the left position, it may at the end of previous block
     var (newBlockIndex, newPos) = _findPreviousBlockIdAndPos(selectionController, paragraphs);
@@ -129,14 +131,15 @@ class KeyboardControl {
     }
   }
   static void _moveCursorRight(FunctionKeys funcKeys) {
-    final selectionController = Controller.instance.selectionController;
+    final controller = Controller();
+    final selectionController = controller.selectionController;
     // If currently in selection state, and SHIFT key is not pressed, cancel selection and move to right side of selection
     if(!selectionController.isCollapsed() && funcKeys.nothing()) {
       selectionController.collapseToEnd();
       return;
     }
 
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
     // Find the right position, it may at the beginning of next block
     var (newBlockIndex, newPos) = _findNextBlockIdAndPos(selectionController, paragraphs);
@@ -149,9 +152,10 @@ class KeyboardControl {
     }
   }
   static void _moveCursorUp(FunctionKeys funcKeys) {
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
-    final selectionController = Controller.instance.selectionController;
+    final selectionController = controller.selectionController;
     // Find the position at the previous line
     var (newBlockIndex, newPos) = _findBlockIdAndPosAtPreviousLine(selectionController, paragraphs);
     if(newBlockIndex < 0 || newPos < 0) return;
@@ -163,9 +167,10 @@ class KeyboardControl {
     }
   }
   static void _moveCursorDown(FunctionKeys funcKeys) {
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
-    final selectionController = Controller.instance.selectionController;
+    final selectionController = controller.selectionController;
     // Find the position at the next line
     var (newBlockIndex, newPos) = _findBlockIdAndPosAtNextLine(selectionController, paragraphs);
     if(newBlockIndex < 0 || newPos < 0) return;

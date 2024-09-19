@@ -37,6 +37,7 @@ class DocumentManager {
   int _lastSyncTime = 0;
   final Set<String> _allWaitingVersions = {};
   final Map<String, int> _retryCounter = {};
+  final controller = Controller();
 
   DocumentManager({
     required DbHelper db,
@@ -44,7 +45,7 @@ class DocumentManager {
     _allWaitingVersions.addAll(_loadAllUnavailableNodes());
     _initRetryCounter(_allWaitingVersions);
     MyLogger.info('efantest: loaded missing versions: $_allWaitingVersions');
-    Controller.instance.evenTasksManager.addAfterInitTask(() {
+    controller.evenTasksManager.addAfterInitTask(() {
       Future(() {
         checkConsistency();
       });
@@ -83,7 +84,7 @@ class DocumentManager {
     }
     // If modified, sync it before opening new document
     if(hasModified()) {
-      Controller.instance.tryToSaveAndSendVersionTree();
+      controller.tryToSaveAndSendVersionTree();
     }
 
     // If the document was not open, load it from db
@@ -224,7 +225,7 @@ class DocumentManager {
     _increaseRetryCounterAndFilter(_allWaitingVersions);
     bool forceMerge = _checkForceMergeOrNot(missingVersions);
     if(missingVersions.isNotEmpty && !forceMerge) {
-      Controller.instance.sendRequireVersions(_allWaitingVersions.toList());
+      controller.sendRequireVersions(_allWaitingVersions.toList());
     } else {
       var leafNodes = _findAvailableLeafNodesInDag(newMap); // Find available leaf nodes before removing unavailable nodes
       leafNodes.remove(_currentVersion);
@@ -254,7 +255,7 @@ class DocumentManager {
       MyLogger.info('_mergeVersions: Try to merge version($_currentVersion) and version($leafHash) by common version($commonVersionHash)');
       _mergeCurrentAndSave(leafHash, commonVersionHash);
     }
-    Controller.instance.refreshDocNavigator();
+    controller.refreshDocNavigator();
     _clearSyncing();
   }
   /// Find all nodes that is available and is not parent of any other node
@@ -363,7 +364,7 @@ class DocumentManager {
     // If document is currently opening, refresh it
     if(currentDocId == docId) {
       MyLogger.info('_updateDoc: refresh current document');
-      var blockState = Controller.instance.getEditingBlockState();
+      var blockState = controller.getEditingBlockState();
       var currentBlockId = blockState?.getBlockId();
       var position = blockState?.widget.texts.getTextSelection()?.extentOffset;
       CallbackRegistry.refreshDoc(activeBlockId: currentBlockId, position: position?? 0);
@@ -422,8 +423,8 @@ class DocumentManager {
   void setIdle() {
     _idleTimer?.cancel();
     _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfSyncIdle), () {
-      Controller.instance.evenTasksManager.triggerIdle();
-      Controller.instance.tryToSaveAndSendVersionTree();
+      controller.evenTasksManager.triggerIdle();
+      controller.tryToSaveAndSendVersionTree();
       _idleTimer = null;
     });
   }
@@ -996,7 +997,7 @@ class DocumentManager {
   void _checkIfSendVersionBroadcast(int now) {
     if(now - _currentVersionTimestamp < 15000) return;
     // Broadcast latest version if the it has been generated over 15s
-    Controller.instance.sendVersionBroadcast();
+    controller.sendVersionBroadcast();
   }
 
   void _initRetryCounter(Set<String> missingVersions) {

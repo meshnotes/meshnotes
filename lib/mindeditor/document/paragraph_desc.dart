@@ -239,7 +239,7 @@ class ParagraphDesc {
     _showBaseLeader = showBaseLeader;
     _showExtentLeader = showExtentLeader;
     if(isEditing) {
-      Controller.instance.setEditingBlockId(getBlockId());
+      Controller().setEditingBlockId(getBlockId());
     }
   }
   bool isCollapsed() {
@@ -460,7 +460,7 @@ class ParagraphDesc {
     _triggerSelectionChanged(block?.widget.texts, _editingPosition);
   }
   void _triggerSelectionChanged(ParagraphDesc? para, TextSelection? selection) {
-    var controller = Controller.instance;
+    var controller = Controller();
     if(para != null && selection != null) {
       var textSpanStyle = para.getTextSpansStyle(selection.start, selection.end);
       controller.triggerSelectionChanged(textSpanStyle);
@@ -711,7 +711,7 @@ class ParagraphDesc {
     if(isTitle()) return;
     _idleTimer?.cancel();
     _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfInputIdle), () {
-      Controller.instance.pluginManager.produceBlockContentChangedEvent(getBlockId(), getPlainText());
+      Controller().pluginManager.produceBlockContentChangedEvent(getBlockId(), getPlainText());
       _idleTimer = null;
     });
   }

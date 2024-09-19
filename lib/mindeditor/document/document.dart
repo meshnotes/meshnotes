@@ -19,6 +19,7 @@ class Document {
   String? _editingBlockId;
   DocumentManager? parent;
   final DbHelper? _db;
+  final controller = Controller();
 
   Document({
     required this.id,
@@ -190,19 +191,19 @@ class Document {
     _lastUpdate = now;
     setModified();
 
-    Controller.instance.refreshDocNavigator();
+    controller.refreshDocNavigator();
   }
 
   void clearTextSelection() {
-    Controller.instance.selectionController.clearSelection();
+    controller.selectionController.clearSelection();
     for(var p in paragraphs) {
       p.clearTextSelection();
     }
   }
   void clearEditingBlock() {
     _editingBlockId = null;
-    Controller.instance.triggerBlockFormatChanged(null);
-    Controller.instance.triggerSelectionChanged(null);
+    controller.triggerBlockFormatChanged(null);
+    controller.triggerSelectionChanged(null);
   }
   void setEditingBlockId(String _id) {
     _editingBlockId = _id;
@@ -212,7 +213,7 @@ class Document {
       return;
     }
     var para = getParagraph(_id);
-    Controller.instance.triggerBlockFormatChanged(para);
+    controller.triggerBlockFormatChanged(para);
   }
   String? getEditingBlockId() {
     return _editingBlockId;

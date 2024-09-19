@@ -51,7 +51,7 @@ class SelectionController {
   }
 
   void requestCursorAtGlobalOffset(Offset offset) {
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final paragraphs = Controller().document?.paragraphs;
     if(paragraphs == null) return;
 
     final blockState = _findBlockState(paragraphs, offset, SelectionExtentType.extent);
@@ -68,7 +68,7 @@ class SelectionController {
   }
 
   void updateSelectionInBlock(String blockId, TextSelection newSelection, bool requestKeyboard) {
-    var paragraphs = Controller.instance.document?.paragraphs;
+    var paragraphs = Controller().document?.paragraphs;
     if(paragraphs == null) return;
 
     int blockIndex = 0;
@@ -103,7 +103,8 @@ class SelectionController {
   /// Only use when there's no corresponding MindEditBlockState yet.
   /// This scenario is only happened in editing or pasting multi-line texts.
   void updateSelectionWithoutBlockState(String blockId, TextSelection newSelection) {
-    var paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    var paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
 
     int blockIndex = 0;
@@ -112,13 +113,13 @@ class SelectionController {
     }
     if(blockIndex >= paragraphs.length) return;
     _updateSelection(blockIndex, newSelection.baseOffset, blockIndex, newSelection.extentOffset, paragraphs);
-    Controller.instance.setEditingBlockId(blockId);
+    controller.setEditingBlockId(blockId);
     resetCursor();
     CallbackRegistry.requestKeyboard();
   }
 
   void updateSelectionByOffset(Offset offset, {SelectionExtentType type = SelectionExtentType.extent}) {
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final paragraphs = Controller().document?.paragraphs;
     if(paragraphs == null) return;
 
     final block = _findBlockState(paragraphs, offset, type);
@@ -148,7 +149,7 @@ class SelectionController {
     }
   }
   void updateSelectionByIndexAndPos(int blockIndex, int pos, {SelectionExtentType type = SelectionExtentType.extent}) {
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final paragraphs = Controller().document?.paragraphs;
     if(paragraphs == null) return;
 
     int baseBlockIndex = lastBaseBlockIndex;
@@ -171,7 +172,7 @@ class SelectionController {
   }
 
   void updateSelectionByPosRange(Offset globalOffset) {
-    final controller = Controller.instance;
+    final controller = Controller();
     final document = controller.document;
     if(document == null) return;
 
@@ -192,7 +193,8 @@ class SelectionController {
     return startPos;
   }
   String getSelectedContent() {
-    var paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return '';
 
     var (startBlockIndex, _) = _getStartIndexAndPosFromLastMember();
@@ -222,7 +224,8 @@ class SelectionController {
     collapseTo(endBlockIndex, endBlockPos);
   }
   void collapseTo(int blockIndex, int pos) {
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
 
     var (startBlockIndex, _) = _getStartIndexAndPosFromLastMember();
@@ -265,7 +268,8 @@ class SelectionController {
 
   void deleteSelectedContent({bool keepExtentBlock = false, int deltaPos = 0, bool refreshView=true}) {
     if(isCollapsed()) return;
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
 
     List<String> toBeRemove = [];
@@ -289,7 +293,7 @@ class SelectionController {
     }
     if(toBeRemove.isNotEmpty) {
       for(var blockId in toBeRemove) {
-        Controller.instance.document?.removeParagraph(blockId);
+        controller.document?.removeParagraph(blockId);
       }
     }
     if(startBlockIndex != endBlockIndex) {
@@ -297,7 +301,7 @@ class SelectionController {
       startBlockState?.mergeParagraph(endBlockId);
     }
     if(lastBaseBlockIndex != lastExtentBlockIndex) {
-      Controller.instance.setEditingBlockId(startBlockId);
+      controller.setEditingBlockId(startBlockId);
       if(refreshView) {
         // If select from up to bottom, the the new extent position should consider the start position of base block.
         // Because start block and end block has merged.
@@ -313,7 +317,8 @@ class SelectionController {
 
   void _refreshCursor() {
     if(lastExtentBlockIndex < 0) return;
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
     final block = paragraphs[lastExtentBlockIndex];
     if(!block.hasCursor()) {
@@ -331,7 +336,8 @@ class SelectionController {
   }
   void _releaseCursor() {
     if(lastExtentBlockIndex < 0) return;
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
     final block = paragraphs[lastExtentBlockIndex];
     if(!block.hasCursor()) return;
@@ -488,7 +494,8 @@ class SelectionController {
   int _getIndexOfBlock(String? blockId) {
     if(blockId == null) return -1;
 
-    final paragraphs = Controller.instance.document?.paragraphs;
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return -1;
     int idx = 0;
     for(var para in paragraphs) {

@@ -34,6 +34,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   MindBlockImplRenderObject? _render;
   Widget? _leading;
   final LayerLink _layerLink = LayerLink();
+  final controller = Controller();
 
   void setRender(MindBlockImplRenderObject r) {
     _render = r;
@@ -171,7 +172,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       // },
     );
     Widget container = gesture;
-    if(Controller.instance.isDebugMode) {
+    if(controller.isDebugMode) {
       container = Container(
         decoration: BoxDecoration(
           border: Border.all(color: Colors.black12, width: 4),
@@ -191,7 +192,7 @@ class MindEditBlockState extends State<MindEditBlock> {
 
   Widget? _buildHandler() {
     // Display block handler only on desktop environment and non-readonly mode
-    if(Controller.instance.environment.isDesktop() && !widget.readOnly) {
+    if(controller.environment.isDesktop() && !widget.readOnly) {
       return BlockHandler(
         show: _mouseEntered,
         controller: widget.controller,
@@ -739,9 +740,9 @@ class MindEditBlockState extends State<MindEditBlock> {
     final currentSize = Rect.fromLTWH(blockOffset.dx, blockOffset.dy, render.size.width, render.size.height);
     final totalSize = CallbackRegistry.getEditStateSize();
     MyLogger.info('spawnNewLineAtOffset: currentSize=$currentSize, totalSize=$totalSize');
-    if(totalSize != null && totalSize.bottom - currentSize.bottom <= 5 + Controller.instance.setting.blockNormalLineHeight + 5 + 10) {
+    if(totalSize != null && totalSize.bottom - currentSize.bottom <= 5 + controller.setting.blockNormalLineHeight + 5 + 10) {
       MyLogger.info('spawnNewLineAtOffset: need scroll');
-      CallbackRegistry.scrollDown(5 + Controller.instance.setting.blockNormalLineHeight + 5 + 10);
+      CallbackRegistry.scrollDown(5 + controller.setting.blockNormalLineHeight + 5 + 10);
     }
     return newItem.getBlockId();
   }
@@ -785,13 +786,13 @@ class MindEditBlockState extends State<MindEditBlock> {
 
   void _updateNavigatorViewIfNeeded() {
     if(widget.texts.isTitle()) {
-      Controller.instance.refreshDocNavigator();
-      CallbackRegistry.resetTitleBar(Controller.instance.document!.getTitlePath());
+      controller.refreshDocNavigator();
+      CallbackRegistry.resetTitleBar(controller.document!.getTitlePath());
     }
   }
 
   void _triggerBlockModified() {
-    Controller.instance.docManager.setIdle();
+    controller.docManager.setIdle();
   }
 }
 

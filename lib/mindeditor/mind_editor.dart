@@ -24,7 +24,7 @@ class MindEditor extends StatefulWidget {
 
 class MindEditorState extends State<MindEditor> {
   final GlobalKey screenShotKey = GlobalKey();
-  Controller controller = Controller.instance;
+  final controller = Controller();
   Document? document;
   final GlobalKey _toolBarKey = GlobalKey();
 
@@ -82,7 +82,7 @@ class MindEditorState extends State<MindEditor> {
       context: context,
     );
     var padding = const EdgeInsets.all(1.0);
-    if(Controller.instance.environment.isMobile()) {
+    if(controller.environment.isMobile()) {
       padding = const EdgeInsets.fromLTRB(1.0, 1.0, 1.0, 12.0); // Leave a little space for mobile phone's controller bar
     }
     var container = Container(
@@ -122,7 +122,7 @@ class MindEditorState extends State<MindEditor> {
     });
   }
 
-  double get paddingSize => Controller.instance.environment.isDesktop()? 0.0: 10.0;
+  double get paddingSize => controller.environment.isDesktop()? 0.0: 10.0;
 
   void _takeScreenShot() async {
     MyLogger.info('Taking screen shot');
@@ -152,8 +152,8 @@ class MindEditorState extends State<MindEditor> {
         ),
       ),
     );
-    ui.Size imageSize = ui.Size(Controller.instance.device.safeWidth, 2000);
-    var devicePixelRation = Controller.instance.device.pixelRatio;
+    ui.Size imageSize = ui.Size(controller.device.safeWidth, 2000);
+    var devicePixelRation = controller.device.pixelRatio;
     final RenderRepaintBoundary repaintBoundary = RenderRepaintBoundary();
     final RenderView renderView = RenderView(
       view: ui.PlatformDispatcher.instance.views.single,
@@ -203,7 +203,7 @@ class MindEditorState extends State<MindEditor> {
   //   return byteData?.buffer.asUint8List();
   // }
   Future<bool> promote() async {
-    if(Controller.instance.environment.isIos()) {
+    if(controller.environment.isIos()) {
       var status = await Permission.photos.status;
       if(status.isDenied) {
         Map<Permission, PermissionStatus> _ = await [
@@ -211,7 +211,7 @@ class MindEditorState extends State<MindEditor> {
         ].request();
       }
       return status.isGranted;
-    } else if(Controller.instance.environment.isAndroid()){
+    } else if(controller.environment.isAndroid()){
       var status = await Permission.storage.status;
       if(status.isDenied) {
         Map<Permission, PermissionStatus> _ = await [
@@ -224,7 +224,7 @@ class MindEditorState extends State<MindEditor> {
   }
   _saveImage(Uint8List pixels) async {
     var status = await Permission.photos.status;
-    if(Controller.instance.environment.isIos()) {
+    if(controller.environment.isIos()) {
       if(status.isGranted) {
         // final result = await ImageGallerySaver.saveImage(pixels, quality: 60, name: 'mesh_note');
         // if(result != null) {
@@ -235,7 +235,7 @@ class MindEditorState extends State<MindEditor> {
       // } else if(status.isDenied) {
         MyLogger.info('iOS permission denied');
       }
-    } else if(Controller.instance.environment.isAndroid()) {
+    } else if(controller.environment.isAndroid()) {
       if(status.isGranted) {
         // final result = await ImageGallerySaver.saveImage(pixels, quality: 60);
         // if(result != null) {

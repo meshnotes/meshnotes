@@ -23,6 +23,7 @@ class _StackPageViewState extends State<StackPageView> {
   final documentViewKey = GlobalKey();
   final _toastLayerKey = GlobalKey<_FloatingToastViewState>();
   final animationDuration = 200;
+  final controller = Controller();
   int position = 0;
   double savedScreenWidth = 0;
 
@@ -46,8 +47,8 @@ class _StackPageViewState extends State<StackPageView> {
   }
 
   Widget _buildMainView(BuildContext context) {
-    final smallView = Controller.instance.environment.isSmallView(context);
-    var userInfo = Controller.instance.userPrivateInfo;
+    final smallView = controller.environment.isSmallView(context);
+    var userInfo = controller.userPrivateInfo;
     if(userInfo == null) {
       return _buildSignInView(context);
     }
@@ -62,7 +63,7 @@ class _StackPageViewState extends State<StackPageView> {
     /// 1. Update user name and key settings
     /// 2. Try to start network again
     /// 3. set state to update UI
-    Controller.instance.userPrivateInfo = userInfo;
+    controller.userPrivateInfo = userInfo;
     final base64Str = userInfo.toBase64();
     final userNameSetting = SettingData(
       name: Constants.settingKeyUserInfo,
@@ -70,8 +71,8 @@ class _StackPageViewState extends State<StackPageView> {
       comment: Constants.settingCommentUserInfo,
       value: base64Str,
     );
-    Controller.instance.setting.saveSettings([userNameSetting]);
-    Controller.instance.tryStartingNetwork();
+    controller.setting.saveSettings([userNameSetting]);
+    controller.tryStartingNetwork();
     setState(() {
     });
   }

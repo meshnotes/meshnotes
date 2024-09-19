@@ -7,13 +7,13 @@ import '../../util/util.dart';
 
 class EditorController {
   static String getSelectedContent() {
-    final selectionController = Controller.instance.selectionController;
+    final selectionController = Controller().selectionController;
     var content = selectionController.getSelectedContent();
     return content;
   }
 
   static void deleteSelectedContent() {
-    final selectionController = Controller.instance.selectionController;
+    final selectionController = Controller().selectionController;
     selectionController.deleteSelectedContent();
   }
   static Future<void> copySelectedContentToClipboard() async {

@@ -114,6 +114,6 @@ class _InspiredCardPageState extends State<InspiredCardPage> {
   }
 
   void _initInspiredSeed() {
-    seedFuture = Controller.instance.docManager.getInspiredSeed();
+    seedFuture = Controller().docManager.getInspiredSeed();
   }
 }

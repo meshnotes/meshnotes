@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
-import 'package:mesh_note/mindeditor/view/floating_view.dart';
 import 'package:my_log/my_log.dart';
 
 import '../controller/controller.dart';
@@ -123,7 +122,7 @@ class SelectionHandleLayer {
         // Handle circle has an offset from actual point of text line because it is at the bottom of cursor.
         var globalOffset = details.globalPosition + const Offset(0, -_handleSize);
         _isDragging = true;
-        Controller.instance.selectionController.updateSelectionByOffset(globalOffset, type: type);
+        Controller().selectionController.updateSelectionByOffset(globalOffset, type: type);
       },
       onPanEnd: (DragEndDetails details) {
         MyLogger.info('selection handle: drag end');

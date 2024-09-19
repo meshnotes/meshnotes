@@ -30,7 +30,7 @@ class DbHelper {
     return _tryToLoadLibrary('sqlite3.dll');
   }
   static DynamicLibrary _tryToLoadLibrary(String fileName) {
-    final List<String> lookupPath = Controller.instance.environment.getLibraryPaths();
+    final List<String> lookupPath = Controller().environment.getLibraryPaths();
     dynamic lastError;
     for(var path in lookupPath) {
       String fullPath = '$path/$fileName';
@@ -49,7 +49,7 @@ class DbHelper {
   Future<void> init() async {
     open.overrideFor(OperatingSystem.linux, _openOnLinux);
     open.overrideFor(OperatingSystem.windows, _openOnWindows);
-    final dbFile = await Controller.instance.environment.getExistFileFromLibraryPathsByEnvironment(dbFileName);
+    final dbFile = await Controller().environment.getExistFileFromLibraryPathsByEnvironment(dbFileName);
     MyLogger.info('MeshNotesDB: start opening mesh_notes db: $dbFile');
     final db = sqlite3.open(dbFile);
     MyLogger.debug('MeshNotesDB: finish loading sqlite3');

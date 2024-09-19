@@ -45,6 +45,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   int _activeBlockLastIndex = -1;
   double _currentScrollPixel = 0.0;
   late FloatingViewManager _floatingViewManager;
+  final controller = Controller();
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -95,7 +96,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   GestureDetector _buildLowestLayer() {
     Widget listView = _buildBlockList();
-    if(Controller.instance.isDebugMode) {
+    if(controller.isDebugMode) {
       listView = Container(
         decoration: BoxDecoration(
           border: Border.all(
@@ -107,7 +108,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       );
     }
 
-    bool hidePan = Controller.instance.environment.isMobile();
+    bool hidePan = controller.environment.isMobile();
     var gesture = GestureDetector(
       child: listView,
       onTapDown: (TapDownDetails details) {
@@ -226,7 +227,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     }
     widget.focusNode.unfocus();
     _hideKeyboard = true;
-    // Controller.instance.selectionController.releaseCursor();
+    // controller.selectionController.releaseCursor();
     // widget.controller.clearEditingBlock();
   }
   void showKeyboard() {
@@ -310,7 +311,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   Widget _constructBlock(ParagraphDesc para, {bool readOnly = false}) {
     Widget blockItem = _buildBlockFromDesc(para, readOnly);
-    if(Controller.instance.isDebugMode) {
+    if(controller.isDebugMode) {
       blockItem = Container(
         child: blockItem,
         decoration: BoxDecoration(
@@ -445,12 +446,12 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       // CallbackRegistry.showSnackBar(
       //   SnackBar(
       //     backgroundColor: Colors.orangeAccent,
-      //     content: Text('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters'),
+      //     content: Text('Text exceed limit of ${controller.setting.blockMaxCharacterLength} characters'),
       //     behavior: SnackBarBehavior.floating,
       //     duration: const Duration(milliseconds: 2000),
       //   )
       // );
-      CallbackRegistry.showToast('Text exceed limit of ${Controller.instance.setting.blockMaxCharacterLength} characters');
+      CallbackRegistry.showToast('Text exceed limit of ${controller.setting.blockMaxCharacterLength} characters');
       // refreshTextEditingValue();
       return;
     }

@@ -17,7 +17,7 @@ class LargeScreenSettingPage extends StatefulWidget {
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return LargeScreenSettingPage(settings: Controller.instance.setting.getSettings());
+        return LargeScreenSettingPage(settings: Controller().setting.getSettings());
       },
       fullscreenDialog: true,
     ));
@@ -185,7 +185,7 @@ class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
     }
     everChanged = false;
     //TODO 这里应该做成异步保存，用Future返回结果
-    Controller.instance.setting.saveSettings(settingsToSave);
+    Controller().setting.saveSettings(settingsToSave);
     setState(() {
     });
   }

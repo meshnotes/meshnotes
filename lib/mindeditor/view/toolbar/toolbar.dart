@@ -125,7 +125,7 @@ class MindToolBar extends StatelessWidget {
   }
 
   static AppearanceSetting _buildDefaultAppearance(BuildContext context) {
-    if(Controller.instance.environment.isMobile()) {
+    if(Controller().environment.isMobile()) {
       return AppearanceSetting(
         iconSize: 28,
         size: 32,
@@ -208,7 +208,7 @@ class MindToolBar extends StatelessWidget {
   }
 
   List<Widget> _buildPluginButtons() {
-    var pluginButton = Controller.instance.pluginManager.buildButtons(
+    var pluginButton = Controller().pluginManager.buildButtons(
       appearance: appearance,
       controller: controller,
     );
@@ -246,7 +246,7 @@ class _MovableToolbarState extends State<MovableToolbar> {
         child: widget.child,
         onChange: (Size size) {
           MyLogger.verbose('Measure Toolbar size=$size');
-          Controller.instance.setToolbarHeight(size.height);
+          Controller().setToolbarHeight(size.height);
           onToolbarSize(size.width);
         }
     );

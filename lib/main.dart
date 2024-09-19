@@ -44,11 +44,12 @@ class _AppLifecyclePageState extends State<MeshApp> {
   @override
   void initState() {
     super.initState();
-    if(Controller.instance.environment.isMobile()) {
+    final controller = Controller();
+    if(controller.environment.isMobile()) {
       _listener = AppLifecycleListener(
         onStateChange: _onStateChanged,
       );
-    } else if(Controller.instance.environment.isDesktop()) {
+    } else if(controller.environment.isDesktop()) {
       FlutterWindowClose.setWindowShouldCloseHandler(_beforeClose);
     }
   }
@@ -133,7 +134,7 @@ class _AppLifecyclePageState extends State<MeshApp> {
   }
 
   Future<bool> _beforeClose() async {
-    final controller = Controller.instance;
+    final controller = Controller();
     if(controller.network.isStarted()) {
       if(controller.tryToSaveAndSendVersionTree()) {
         await Future.delayed(const Duration(seconds: 1));

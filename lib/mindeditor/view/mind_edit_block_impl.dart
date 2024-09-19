@@ -247,7 +247,7 @@ class MindBlockImplRenderObject extends RenderBox {
     // _tryToDrawLeaderLayer(context, baseOffsetRect, currentCursorRect, offset);
   }
   void _drawCursor(Canvas canvas, Offset offset, double height) {
-    final editCursor = Controller.instance.selectionController.getCursor();
+    final editCursor = Controller().selectionController.getCursor();
     editCursor.paint(canvas, currentCursorRect!, offset);
   }
   void _drawSelectionBoxes(Canvas canvas, Offset offset, TextSelection textSelection, double height) {
@@ -267,7 +267,7 @@ class MindBlockImplRenderObject extends RenderBox {
       return;
     }
     final composing = editingValue.composing;
-    final leadingPos = Controller.instance.selectionController.lastExtentBlockPos - editingValue.selection.extentOffset;
+    final leadingPos = Controller().selectionController.lastExtentBlockPos - editingValue.selection.extentOffset;
     final paint = Paint()..color = Colors.black..style = PaintingStyle.stroke;
     Offset startPos = _convertOffsetFromPosition(TextPosition(offset: composing.start + leadingPos));
     Offset endPos = _convertOffsetFromPosition(TextPosition(offset: composing.end + leadingPos));

@@ -18,7 +18,7 @@ class SmallScreenSettingPage extends StatefulWidget {
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return SmallScreenSettingPage(settings: Controller.instance.setting.getSettings());
+        return SmallScreenSettingPage(settings: Controller().setting.getSettings());
       },
       fullscreenDialog: true,
     ));
@@ -158,7 +158,7 @@ class _SmallScreenSettingPageState extends State<SmallScreenSettingPage> {
     ));
   }
   void _onSave() {
-    Controller.instance.setting.saveSettings(widget.settings);
+    Controller().setting.saveSettings(widget.settings);
   }
   void _exitWithoutSaving() {
     Navigator.pop(context);

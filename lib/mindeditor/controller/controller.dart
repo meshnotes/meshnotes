@@ -56,9 +56,12 @@ class Controller {
     _toolbarHeight = height;
   }
 
-  // 为了避免Controller在各种Widget被重新创建，使用全局唯一实例
-  static final Controller _theOne = Controller();
-  static Controller get instance => _theOne;
+  // Use singleton pattern to ensure Controller is not recreated
+  static final Controller _theOne = Controller._internal();
+  Controller._internal();
+  factory Controller() {
+    return _theOne;
+  }
 
   Future<bool> initAll() async {
     dbHelper = DbHelper();

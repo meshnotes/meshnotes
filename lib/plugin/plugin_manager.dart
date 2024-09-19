@@ -21,6 +21,7 @@ class PluginManager {
   OverlayEntry? _overlayEntry;
   final List<SettingData> _pluginSupportedSettings = [];
   final Map<PluginProxy, PluginRegisterInformation> _pluginInstances = {};
+  final controller = Controller();
 
   void initPluginManager() {
     for(var plugin in _plugins) {
@@ -90,9 +91,9 @@ class PluginManager {
   }
 
   String getSelectedOrFocusedContent() {
-    var content = Controller.instance.selectionController.getSelectedContent();
+    var content = controller.selectionController.getSelectedContent();
     if(content.isEmpty) {
-      content = Controller.instance.getEditingBlockState()?.getPlainText()?? '';
+      content = controller.getEditingBlockState()?.getPlainText()?? '';
     }
     return content;
   }
@@ -101,14 +102,14 @@ class PluginManager {
 
     String pluginName = _pluginInstances[proxy]!.pluginName;
     String key = '${Constants.settingKeyPluginPrefix}/$pluginName/$pluginKey';
-    return Controller.instance.setting.getSetting(key);
+    return controller.setting.getSetting(key);
   }
   void sendTextToClipboard(String text) {
     //TODO should add toast notification while finished
     EditorController.copyTextToClipboard(text);
   }
   String? appendTextToNextBlock(String blockId, String text) {
-    var blockState = Controller.instance.getBlockState(blockId);
+    var blockState = controller.getBlockState(blockId);
     if(blockState == null) return null;
 
     text = text.replaceAll('\r', '');
@@ -119,7 +120,7 @@ class PluginManager {
   }
 
   String? getEditingBlockId() {
-    return Controller.instance.getEditingBlockId();
+    return controller.getEditingBlockId();
   }
 
   void closeDialog() {
@@ -133,7 +134,7 @@ class PluginManager {
       closeDialog();
     }
     CallbackRegistry.hideKeyboard();
-    final isSmallView = Controller.instance.environment.isSmallView(_context!);
+    final isSmallView = controller.environment.isSmallView(_context!);
     _overlayEntry = OverlayEntry(
       builder: (context) {
         double width = 300;
@@ -168,7 +169,7 @@ class PluginManager {
           child: dialog,
         );
         // double horizonPadding = 8.0;
-        // double verticalPadding = Controller.instance.getToolbarHeight()?? 16.0;
+        // double verticalPadding = controller.getToolbarHeight()?? 16.0;
         var container = Container(
           margin: const EdgeInsets.fromLTRB(0, 128, 0, 0),
           alignment: Alignment.bottomRight,
@@ -194,7 +195,7 @@ class PluginManager {
   void addExtra(PluginProxyImpl proxy, String blockId, String content) {
     var pluginInfo = _pluginInstances[proxy];
     if(pluginInfo == null) return;
-    var blockState = Controller.instance.getBlockState(blockId);
+    var blockState = controller.getBlockState(blockId);
     //TODO should check if document is still opening here
     if(blockState == null) return;
     final pluginName = pluginInfo.pluginName;
@@ -204,7 +205,7 @@ class PluginManager {
   void clearExtra(PluginProxyImpl proxy, String blockId) {
     var pluginInfo = _pluginInstances[proxy];
     if(pluginInfo == null) return;
-    var blockState = Controller.instance.getBlockState(blockId);
+    var blockState = controller.getBlockState(blockId);
     //TODO should check if document is still opening here
     if(blockState == null) return;
     final pluginName = pluginInfo.pluginName;
