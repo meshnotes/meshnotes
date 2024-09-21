@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
@@ -26,6 +25,7 @@ class _StackPageViewState extends State<StackPageView> {
   final controller = Controller();
   int position = 0;
   double savedScreenWidth = 0;
+  bool canPop = true;
 
   @override
   void initState() {
@@ -38,13 +38,28 @@ class _StackPageViewState extends State<StackPageView> {
     MyLogger.debug('StackPageView: build page, width=${MediaQuery.of(context).size.width}, height=${MediaQuery.of(context).size.height}');
     Widget mainView = _buildMainView(context);
     Widget toastLayer = _buildToastLayer(context);
-    return Stack(
+    final stack = Stack(
       children: [
         mainView,
         toastLayer,
       ],
     );
+    final popScope = PopScope(
+      child: stack,
+      canPop: canPop,
+      onPopInvoked: (didPop) {
+        MyLogger.info('StackPageView: pop, didPop=$didPop');
+        if(!canPop) {
+          _switchToNavigatorView();
+          return;
+        }
+      },
+    );
+
+    return popScope;
+
   }
+
 
   Widget _buildMainView(BuildContext context) {
     final smallView = controller.environment.isSmallView(context);
@@ -145,11 +160,13 @@ class _StackPageViewState extends State<StackPageView> {
   void _switchToDocumentView() {
     setState(() {
       position = -1;
+      canPop = false;
     });
   }
   void _switchToNavigatorView() {
     setState(() {
       position = 0;
+      canPop = true;
     });
   }
 
