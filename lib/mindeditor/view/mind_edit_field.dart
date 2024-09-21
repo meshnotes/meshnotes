@@ -78,7 +78,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       final render = context.findRenderObject()! as RenderBox;
       _currentSize = render.localToGlobal(Offset.zero) & render.size;
     });
-    if(_hasFocus) {
+    if(_hasFocus && !_hideKeyboard) {
       _focusAttachment!.reparent();
     }
     Widget lowestLayer = _buildLowestLayer();
@@ -115,8 +115,17 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         MyLogger.debug('MindEditFieldState: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onTapOrDoubleTap(details);
       },
+      onTap: () {
+        MyLogger.debug('MindEditFieldState: on tap, id=${widget.key}');
+        widget.controller.gestureHandler.onTap();
+      },
+      onTapCancel: () {
+        MyLogger.debug('MindEditFieldState: on tap cancel, id=${widget.key}');
+        widget.controller.gestureHandler.onTapCancel();
+      },
       onPanStart: hidePan? null: (DragStartDetails details) {
         MyLogger.info('MindEditFieldState: on pan start, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
+
         widget.controller.gestureHandler.onPanStart(details);
       },
       onPanUpdate: hidePan? null: (DragUpdateDetails details) {

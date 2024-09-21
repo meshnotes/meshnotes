@@ -6,9 +6,11 @@ import 'controller.dart';
 
 class GestureHandler {
   int _lastTapDownTime = 0;
-  Offset? _lastClickOffset;
+  TapDownDetails? _lastTapDownDetails;
+  bool _isDoubleTap = false;
   static const int _doubleTapInterval = 300;
   static const double _maxOffsetDelta = 10.0;
+
   Controller controller;
 
   GestureHandler({
@@ -18,20 +20,42 @@ class GestureHandler {
   void onTapOrDoubleTap(TapDownDetails details) {
     int now = Util.getTimeStamp();
     var globalOffset = details.globalPosition;
-    if(_lastClickOffset != null && (_lastClickOffset! - globalOffset).distance < _maxOffsetDelta && now - _lastTapDownTime < _doubleTapInterval) {
-      _onDoubleTapDown(details);
-      _lastClickOffset = null;
+    if(_lastTapDownDetails != null && (_lastTapDownDetails!.globalPosition - globalOffset).distance < _maxOffsetDelta && now - _lastTapDownTime < _doubleTapInterval) {
+      _lastTapDownDetails = details;
+      _isDoubleTap = true;
       _lastTapDownTime = 0;
     } else {
-      _onTapDown(details);
-      _lastClickOffset = globalOffset;
+      _lastTapDownDetails = details;
       _lastTapDownTime = now;
     }
   }
+  void onTap() {
+    if(_lastTapDownDetails == null) return;
 
-  void _onTapDown(TapDownDetails details) {
+    if(_isDoubleTap) {
+      _onDoubleTap(_lastTapDownDetails!);
+      _isDoubleTap = false;
+    } else {
+      _onTap(_lastTapDownDetails!);
+    }
+  }
+  void onTapCancel() {
+    _lastTapDownDetails = null;
+    _isDoubleTap = false;
+    _lastTapDownTime = 0;
+  }
+
+  void _onDoubleTap(TapDownDetails details) {
+    _setShouldShowHandles(details.kind);
     final globalOffset = details.globalPosition;
-    MyLogger.debug('onTapDown, offset=$globalOffset');
+    MyLogger.debug('onDoubleTap, offset=$globalOffset');
+    // Should close IME to clear the composing texts
+    CallbackRegistry.rudelyCloseIME();
+    _onSelectWord(globalOffset);
+  }
+  void _onTap(TapDownDetails details) {
+    final globalOffset = details.globalPosition;
+    MyLogger.debug('onTap, offset=$globalOffset');
     // Should close IME to clear the composing texts
     CallbackRegistry.rudelyCloseIME();
     controller.selectionController.requestCursorAtGlobalOffset(globalOffset);
@@ -75,13 +99,6 @@ class GestureHandler {
   }
 
   void onLongPressStart(LongPressStartDetails details, String blockId) {
-    _onSelectWord(details.globalPosition);
-  }
-
-  void _onDoubleTapDown(TapDownDetails details) {
-    _setShouldShowHandles(details.kind);
-    // Should close IME to clear the composing texts
-    CallbackRegistry.rudelyCloseIME();
     _onSelectWord(details.globalPosition);
   }
 
