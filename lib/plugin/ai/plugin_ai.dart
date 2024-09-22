@@ -8,6 +8,7 @@ import 'package:my_log/my_log.dart';
 import 'abstract_agent.dart';
 import 'kimi_agent.dart';
 import 'openai_agent.dart';
+import 'prompt.dart';
 
 class PluginAI implements PluginInstance {
   static const _dialogTitle = 'AI assistant';
@@ -114,14 +115,10 @@ class PluginAI implements PluginInstance {
   void _blockChangedHandler(BlockChangedEventData data) {
     MyLogger.info('AI plugin receive block changed: id=${data.blockId}, content=${data.content}');
     var executor = _buildAiExecutor();
-    const prompt = 'Here is a piece of note, please check if it is meaningful, or inspiring, '
-        'or corresponds to some allusions, famous quotes, if so, write a brief comment(by the original language), '
-        'provide expansion suggestions, use JSON format {"comment": comment, "suggestion": suggestion}. '
-        'if not, such as that doesn\'t make sense, or nothing worth highlight, just reply with raw text None. '
-        'Please reply directly, without any other content, best to keep it within 300 words';
-    const systemPrompt = 'You are a learned sage, adept at offering advice, unearthing the highlights or errors in others\' language, and pointing them out in an acceptable manner';
-    executor?.execute(userPrompt: '$prompt: ${data.content}', systemPrompt: systemPrompt).then((value) {
-      MyLogger.info('Here is reply: $value');
+    final userPrompt = 'Here is the user\'s note: ${data.content}';
+    const systemPrompt = Prompts.systemPromptForBlockSuggestion;
+    executor?.execute(userPrompt: userPrompt, systemPrompt: systemPrompt).then((value) {
+      MyLogger.info('Here is AI\'s reply: $value');
       final trimValue = value.trim();
       if(noneExpression.contains(trimValue)) {
         _proxy.clearExtra(data.blockId);

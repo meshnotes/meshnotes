@@ -20,10 +20,6 @@ class KimiExecutor implements AiExecutor {
     OpenAI.apiKey = apiKey;
     OpenAI.showLogs = true;
     var messages = <OpenAIChatCompletionChoiceMessageModel>[
-      const OpenAIChatCompletionChoiceMessageModel(
-        role: OpenAIChatMessageRole.system,
-        content: 'Answer question directly, no more than 300 words, better in 50 words, and in the language of original text',//'请直接回答问题，尽量控制字数在100以内，不要超过300',
-      ),
       OpenAIChatCompletionChoiceMessageModel(
         role: OpenAIChatMessageRole.user,
         content: userPrompt,

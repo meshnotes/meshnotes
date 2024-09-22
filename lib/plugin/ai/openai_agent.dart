@@ -14,18 +14,21 @@ class OpenAiExecutor implements AiExecutor {
   Future<String> execute({required String userPrompt, String? systemPrompt}) async {
     OpenAI.apiKey = apiKey;
     OpenAI.showLogs = true;
+    var messages = <OpenAIChatCompletionChoiceMessageModel>[
+      OpenAIChatCompletionChoiceMessageModel(
+        role: OpenAIChatMessageRole.user,
+        content: userPrompt,
+      ),
+    ];
+    if(systemPrompt != null) {
+      messages.insert(0, OpenAIChatCompletionChoiceMessageModel(
+        role: OpenAIChatMessageRole.system,
+        content: systemPrompt,
+      ));
+    }
     OpenAIChatCompletionModel completion = await OpenAI.instance.chat.create(
       model: 'gpt-4-turbo',
-      messages: [
-        const OpenAIChatCompletionChoiceMessageModel(
-          role: OpenAIChatMessageRole.system,
-          content: 'Answer the question directly, in the original language. make the answer within 300 words, better no more than 100 words',
-        ),
-        OpenAIChatCompletionChoiceMessageModel(
-          role: OpenAIChatMessageRole.user,
-          content: userPrompt,
-        ),
-      ],
+      messages: messages,
       temperature: 0.3,
     );
     return completion.choices.first.message.content;
