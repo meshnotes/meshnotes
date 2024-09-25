@@ -6,6 +6,8 @@ import 'package:my_log/my_log.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../controller/callback_registry.dart';
 
+/// This Button's icon will be changed according to the current selection.
+//TODO This should be optimized
 class TextSelectionChangedButton extends StatefulWidget {
   final AppearanceSetting appearance;
   final Controller controller;
@@ -36,7 +38,7 @@ class _TextSelectionChangedButtonState extends State<TextSelectionChangedButton>
   @override
   void initState() {
     super.initState();
-    MyLogger.debug('efantest: building selection_changed button key=${widget.buttonKey}');
+    MyLogger.debug('_TextSelectionChangedButtonState: building selection_changed button key=${widget.buttonKey}');
     CallbackRegistry.registerSelectionChangedWatcher(widget.buttonKey, (TextSelection? selection) {
       _setOn(widget.trigger(selection));
     });

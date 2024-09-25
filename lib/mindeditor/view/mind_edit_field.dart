@@ -229,6 +229,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       _focusAttachment!.reparent();
       widget.focusNode.requestFocus();
     }
+    controller.uiEventManager.triggerKeyboardStateOpen(true);
   }
   void hideKeyboard() {
     if(!_hasFocus) {
@@ -236,6 +237,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     }
     widget.focusNode.unfocus();
     _hideKeyboard = true;
+    controller.uiEventManager.triggerKeyboardStateOpen(false);
     // controller.selectionController.releaseCursor();
     // widget.controller.clearEditingBlock();
   }
@@ -243,10 +245,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     _hideKeyboard = false;
     requestKeyboard();
   }
+  bool isKeyboardOpen() => !_hideKeyboard && _hasFocus;
 
   void openOrCloseConnection() {
     MyLogger.debug('openOrCloseConnection: widget.focusNode=${widget.focusNode.hasFocus}');
-    if(!_hideKeyboard && widget.focusNode.hasFocus && widget.focusNode.consumeKeyboardToken()) {
+    if(!_hideKeyboard && _hasFocus && widget.focusNode.consumeKeyboardToken()) {
       _openConnectionIfNeeded();
     } else if(!widget.focusNode.hasFocus) {
       _closeConnectionIfNeeded();

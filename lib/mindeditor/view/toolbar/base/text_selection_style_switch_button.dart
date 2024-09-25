@@ -6,6 +6,7 @@ import 'package:my_log/my_log.dart';
 import '../../../controller/callback_registry.dart';
 import '../../../document/paragraph_desc.dart';
 
+/// This Button's icon will be changed according to the current text selection style.
 class TextSelectionStyleSwitchButton extends StatefulWidget {
   final AppearanceSetting appearance;
   final Controller controller;
@@ -36,7 +37,7 @@ class _TextSelectionStyleSwitchButtonState extends State<TextSelectionStyleSwitc
   @override
   void initState() {
     super.initState();
-    MyLogger.debug('efantest: building toolbar switch button key=${widget.buttonKey}');
+    MyLogger.debug('_TextSelectionStyleSwitchButtonState: building toolbar switch button key=${widget.buttonKey}');
     CallbackRegistry.registerSelectionStyleWatcher(widget.buttonKey, (TextSpansStyle? style) {
       _setOn(widget.showOrNot(style));
     });

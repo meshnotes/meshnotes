@@ -13,7 +13,7 @@ import 'package:my_log/my_log.dart';
 import 'block_type_button.dart';
 import 'bold_text_button.dart';
 import 'copy_paste_button.dart';
-import 'hide_keyboard_button.dart';
+import 'keyboard_button.dart';
 import 'italic_text_button.dart';
 
 class MindToolBar extends StatelessWidget {
@@ -177,7 +177,7 @@ class MindToolBar extends StatelessWidget {
       ...pluginButtons,
     ];
     if(controller.environment.isMobile()) {
-      Widget hideKeyboardButton = HideKeyboardButton(
+      Widget hideKeyboardButton = ShowOrHideKeyboardButton(
         appearance: appearance,
         controller: controller,
       );

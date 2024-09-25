@@ -12,7 +12,6 @@ class EvenTasksManager {
       task.call();
     }
   }
-
   void triggerIdle() {
     for(final task in _idleTasks) {
       task.call();

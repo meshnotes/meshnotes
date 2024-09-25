@@ -14,6 +14,7 @@ import 'package:mesh_note/net/net_controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/tasks/event_tasks.dart';
+import 'package:mesh_note/tasks/ui_event_manager.dart';
 import 'package:my_log/my_log.dart';
 import '../../net/init.dart';
 import '../../net/version_chain_api.dart';
@@ -43,6 +44,7 @@ class Controller {
   UserPrivateInfo? userPrivateInfo;
   late final PluginManager _pluginManager;
   final EvenTasksManager evenTasksManager = EvenTasksManager();
+  final UIEventManager uiEventManager = UIEventManager();
   double? _toolbarHeight;
 
   // Getters
