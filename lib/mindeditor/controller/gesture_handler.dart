@@ -54,6 +54,7 @@ class GestureHandler {
     _onSelectWord(globalOffset);
   }
   void _onTap(TapDownDetails details) {
+    _setShouldShowHandles(details.kind);
     final globalOffset = details.globalPosition;
     MyLogger.debug('onTap, offset=$globalOffset');
     // Should close IME to clear the composing texts

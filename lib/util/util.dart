@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/widgets.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 
 class Util {
@@ -8,6 +9,12 @@ class Util {
   }
   static int getRandom(int max) {
     return Random().nextInt(max);
+  }
+
+  static void runInPostFrame(Function() callback) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      callback();
+    });
   }
 }
 

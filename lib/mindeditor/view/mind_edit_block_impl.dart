@@ -52,9 +52,8 @@ class MindBlockImplRenderObject extends RenderBox {
   late MyRenderParagraph paragraph;
   late MyRenderParagraph placeHolder;
   Controller controller;
-  Rect? currentCursorRect;
   double fontSize;
-  Rect? currentBox;
+  Rect? _currentBox;
 
   MindBlockImplRenderObject({
     Key? key,
@@ -192,11 +191,12 @@ class MindBlockImplRenderObject extends RenderBox {
     return defaultTextColor;
   }
 
+  Rect? getCurrentBox() => _currentBox;
   void updateCurrentBox() {
-    currentBox = _getCurrentRenderGlobalRect();
+    _currentBox = _getCurrentRenderGlobalRect();
   }
   void clearCurrentBox() {
-    currentBox = null;
+    _currentBox = null;
   }
 
   @override
@@ -211,26 +211,23 @@ class MindBlockImplRenderObject extends RenderBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     updateCurrentBox();
-    MyLogger.debug('paint: blockId=${texts.getBlockId()}, currentBox=$currentBox, idx=${texts.getBlockIndex()}');
+    MyLogger.debug('paint: blockId=${texts.getBlockId()}, currentBox=$_currentBox, idx=${texts.getBlockIndex()}');
     final canvas = context.canvas;
     final hasCursor = texts.hasCursor();
     var textSelection = texts.getTextSelection();
-    Rect? baseOffsetRect;
     if(textSelection != null) {
       final _lineHeight = paragraph.getPreferredHeight();
       MyLogger.verbose('MindEditBlockImplRenderObject: lineHeight=$_lineHeight');
       var currentTextPos = TextPosition(offset: textSelection.extentOffset);
       // MyLogger.info('MindEditBlockImplRenderObject: currentTextPos=$currentTextPos, extent=${textSelection.extentOffset}');
-      currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
+      final currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
       MyLogger.debug('paint: index=${texts.getBlockIndex()}, currentCursorRect=$currentCursorRect');
-      var baseTextPos = TextPosition(offset: textSelection.baseOffset);
-      baseOffsetRect = _calculateCursorRectByPosition(baseTextPos, height: _lineHeight);
       if(!textSelection.isCollapsed) {
         _drawSelectionBoxes(canvas, offset, textSelection, _lineHeight);
       }
 
       if(!readOnly && hasCursor) {
-        _drawCursor(canvas, offset, _lineHeight);
+        _drawCursor(canvas, offset, currentCursorRect);
         _drawComposing(canvas, offset, _lineHeight); // Draw underline when input method is composing
       }
     }
@@ -242,13 +239,18 @@ class MindBlockImplRenderObject extends RenderBox {
     } else {
       paragraph.paint(context, offset);
     }
-    _tryToUpdateHandleOffset(baseOffsetRect, currentCursorRect);
-    // Try to draw leader layer if needed
-    // _tryToDrawLeaderLayer(context, baseOffsetRect, currentCursorRect, offset);
   }
-  void _drawCursor(Canvas canvas, Offset offset, double height) {
+  Offset? getCursorOffsetOfPos(int pos) {
+    final lineHeight = paragraph.getPreferredHeight();
+    final rect = _calculateCursorRectByPosition(TextPosition(offset: pos), height: lineHeight);
+    var localPoint = Offset(rect.left, rect.bottom);
+    var globalPoint = localToGlobal(localPoint);
+    return globalPoint;
+  }
+
+  void _drawCursor(Canvas canvas, Offset offset, Rect currentCursorRect) {
     final editCursor = Controller().selectionController.getCursor();
-    editCursor.paint(canvas, currentCursorRect!, offset);
+    editCursor.paint(canvas, currentCursorRect, offset);
   }
   void _drawSelectionBoxes(Canvas canvas, Offset offset, TextSelection textSelection, double height) {
     var boxes = paragraph.getBoxesForSelection(textSelection);
@@ -274,22 +276,6 @@ class MindBlockImplRenderObject extends RenderBox {
     Offset from = startPos.translate(0, height) + offset;
     Offset to = endPos.translate(0, height) + offset;
     canvas.drawLine(from, to, paint);
-  }
-  void _tryToUpdateHandleOffset(Rect? baseRect, Rect? extentRect) {
-    if(texts.showBaseLeader() && baseRect != null) {
-      var basePoint = Offset(baseRect.left, baseRect.bottom);
-      var globalPoint = localToGlobal(basePoint);
-      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-        controller.selectionController.updateBaseHandlePoint(globalPoint);
-      });
-    }
-    if(texts.showExtentLeader() && extentRect != null) {
-      var extentPoint = Offset(extentRect.left, extentRect.bottom);
-      var globalPoint = localToGlobal(extentPoint);
-      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-        controller.selectionController.updateExtentHandlePoint(globalPoint);
-      });
-    }
   }
 
   Rect _getCurrentRenderGlobalRect() {

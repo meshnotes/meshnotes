@@ -77,6 +77,7 @@ class _MultiStatesButtonState<T> extends State<MultiStatesButton<T>> {
   Widget _buildEmptyButton() => Container();
 
   void _onStateChange(T value) {
+    if(currentState == value) return;
     MyLogger.info('state change to $value');
     setState(() {
       currentState = value;

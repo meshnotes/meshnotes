@@ -8,11 +8,11 @@ import '../controller/selection_controller.dart';
 class SelectionHandleLayer {
   Widget? _handleOfStart;
   Widget? _handleOfEnd;
+  Widget? _handleOfCursor;
+  // Widget? _handleOfCursor;
   _PositionedHandleState? _handleStateOfBase;
   _PositionedHandleState? _handleStateOfExtent;
-  BuildContext? _context;
-  Offset? _baseHandleOffset;
-  Offset? _extentHandleOffset;
+  _PositionedHandleState? _handleStateOfCursor;
   static const _handleSize = 16.0;
   static const _handleDragSize = 32.0;
   bool _isDragging = false;
@@ -22,24 +22,25 @@ class SelectionHandleLayer {
   void dispose() {
     //TODO should optimize here, _context should be cleared when dispose. But current implementation will cover the valid _context, because
     //TODO old MindEditFieldState.dispose() will invoked after new MindEditFieldState.initState()
-    // _context = null;
-    hideTextSelectionHandles();
-    _baseHandleOffset = null;
-    _extentHandleOffset = null;
+    _hideTextSelectionHandles();
   }
 
   void updateContext(BuildContext context) {
-    _context = context;
   }
   void updateBaseHandleOffset(Offset? offset) {
     if(offset == null) return;
-    _baseHandleOffset = offset + const Offset(-_handleDragSize / 2, 0);
-    _handleStateOfBase?.updatePosition(_baseHandleOffset!);
+    final deltaOffset = _convertToDragOffset(offset);
+    _handleStateOfBase?.updatePosition(deltaOffset);
   }
   void updateExtentHandleOffset(Offset? offset) {
     if(offset == null) return;
-    _extentHandleOffset = offset + const Offset(-_handleDragSize / 2, 0);
-    _handleStateOfExtent?.updatePosition(_extentHandleOffset!);
+    final deltaOffset = _convertToDragOffset(offset);
+    _handleStateOfExtent?.updatePosition(deltaOffset);
+  }
+  void updateCursorHandleOffset(Offset? offset) {
+    if(offset == null) return;
+    final deltaOffset = _convertToDragOffset(offset);
+    _handleStateOfCursor?.updatePosition(deltaOffset);
   }
   void updateBaseHandleOffsetByDelta(Offset delta) {
     _handleStateOfBase?.updatePositionByDelta(delta);
@@ -47,11 +48,17 @@ class SelectionHandleLayer {
   void updateExtentHandleOffsetByDelta(Offset delta) {
     _handleStateOfExtent?.updatePositionByDelta(delta);
   }
+  void updateCursorHandleOffsetByDelta(Offset delta) {
+    _handleStateOfCursor?.updatePositionByDelta(delta);
+  }
   void updateHandleStateOfBase(_PositionedHandleState state) {
     _handleStateOfBase = state;
   }
   void updateHandleStateOfExtent(_PositionedHandleState state) {
     _handleStateOfExtent = state;
+  }
+  void updateHandleStateOfCursor(_PositionedHandleState state) {
+    _handleStateOfCursor = state;
   }
   Offset? convertGlobalOffsetToSelectionLayer(Offset global) {
     final floatingViewManager = CallbackRegistry.getFloatingViewManager();
@@ -59,42 +66,77 @@ class SelectionHandleLayer {
   }
 
   void hide() {
-    hideTextSelectionHandles();
+    _hideTextSelectionHandles();
   }
-  void showTextSelectionHandles() {
-    if(_context == null || _handleOfStart != null || _handleOfEnd != null) { // No context or already displayed handles
+  void showOrUpdateTextSelectionHandles(Offset? baseCursorOffset, Offset? extentCursorOffset) {
+    if(baseCursorOffset == null || extentCursorOffset == null) {
+      _hideTextSelectionHandles();
       return;
     }
-    if(_baseHandleOffset == null || _extentHandleOffset == null) {
+    if(_handleStateOfBase != null && _handleStateOfExtent != null) { // Already displayed handles
+      updateBaseHandleOffset(baseCursorOffset);
+      updateExtentHandleOffset(extentCursorOffset);
       return;
+    }
+    if(_handleStateOfCursor != null) {
+      _hideTextSelectionHandles();
     }
     final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     if(floatingViewManager != null) {
-      _handleOfStart = _buildStartHandle();
-      _handleOfEnd = _buildEndHandle();
+      _handleOfStart = _buildStartHandle(_convertToDragOffset(baseCursorOffset));
+      _handleOfEnd = _buildEndHandle(_convertToDragOffset(extentCursorOffset));
       floatingViewManager.addSelectionHandles(_handleOfStart!, _handleOfEnd!);
     }
   }
-
-  void hideTextSelectionHandles() {
-    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
-    if(_handleOfStart != null && _handleOfEnd != null) {
-      floatingViewManager?.removeSelectionHandles(_handleOfStart!, _handleOfEnd!);
+  void showOrUpdateCursorHandle(Offset? extentCursorOffset) {
+    if(extentCursorOffset == null) {
+      _hideTextSelectionHandles();
+      return;
     }
+    if(_handleStateOfCursor != null) { // No context or already displayed handles
+      updateCursorHandleOffset(extentCursorOffset);
+      return;
+    }
+    if(_handleStateOfBase != null || _handleStateOfExtent != null) {
+      _hideTextSelectionHandles();
+    }
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
+    if(floatingViewManager != null) {
+      _handleOfCursor = _buildCursorHandle(_convertToDragOffset(extentCursorOffset));
+      floatingViewManager.addCursorHandle(_handleOfCursor!);
+    }
+  }
+
+  void _hideTextSelectionHandles() {
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
+    floatingViewManager?.clearAllHandles();
     _handleOfStart = null;
     _handleStateOfBase = null;
     _handleOfEnd = null;
     _handleStateOfExtent = null;
+    _handleOfCursor = null;
+    _handleStateOfCursor = null;
     _isDragging = false;
   }
 
-  Widget _buildStartHandle() {
-    return _buildHandle(SelectionExtentType.base);
+  Offset _convertToDragOffset(Offset offset) {
+    final deltaOffset = offset + const Offset(-_handleDragSize / 2, 0);
+    return deltaOffset;
   }
-  Widget _buildEndHandle() {
-    return _buildHandle(SelectionExtentType.extent);
+
+  Widget _buildStartHandle(Offset offset) {
+    MyLogger.info('efantest: _buildStartHandle: $offset');
+    return _buildHandle(SelectionExtentType.base, offset);
   }
-  Widget _buildHandle(SelectionExtentType type) {
+  Widget _buildEndHandle(Offset offset) {
+    return _buildHandle(SelectionExtentType.extent, offset);
+  }
+  Widget _buildCursorHandle(Offset offset) {
+    return _buildHandle(SelectionExtentType.cursor, offset);
+  }
+
+  Widget _buildHandle(SelectionExtentType type, Offset offset) {
+    MyLogger.info('efantest: _buildHandle: $type, $offset');
     var paintContainer = Container(
       alignment: Alignment.topCenter,
       child: SizedBox(
@@ -118,7 +160,7 @@ class SelectionHandleLayer {
         _isDragging = true;
       },
       onPanUpdate: (DragUpdateDetails details) {
-        MyLogger.debug('selection handle: drag update');
+        MyLogger.info('selection handle: drag update');
         // Handle circle has an offset from actual point of text line because it is at the bottom of cursor.
         var globalOffset = details.globalPosition + const Offset(0, -_handleSize);
         _isDragging = true;
@@ -134,16 +176,8 @@ class SelectionHandleLayer {
       },
       child: dragContainer,
     );
-    Offset offset;
-    switch(type) {
-      case SelectionExtentType.base:
-        offset = _baseHandleOffset!;
-        break;
-      case SelectionExtentType.extent:
-        offset = _extentHandleOffset!;
-        break;
-    }
     return PositionedHandle(
+      key: UniqueKey(), //TODO Maybe better to use a global key
       initPosition: offset,
       child: gesture,
       type: type,
@@ -202,6 +236,9 @@ class _PositionedHandleState extends State<PositionedHandle> {
         break;
       case SelectionExtentType.extent:
         widget.parentLayer.updateHandleStateOfExtent(this);
+        break;
+      case SelectionExtentType.cursor:
+        widget.parentLayer.updateHandleStateOfCursor(this);
         break;
     }
     super.initState();

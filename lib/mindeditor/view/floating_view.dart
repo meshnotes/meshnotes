@@ -3,14 +3,25 @@ import 'package:flutter/material.dart';
 class FloatingViewManager {
   late Widget _selectionLayer;
   late Widget _pluginTipsLayer;
+  late Widget _popupMenuLayer;
   final _selectionKey = GlobalKey<_FloatingStackViewState>();
   final _pluginTipsKey = GlobalKey<_FloatingStackViewState>();
+  final _popupMenuKey = GlobalKey<_FloatingStackViewState>();
 
   FloatingViewManager() {
     _selectionLayer = _buildSelectionLayer();
     _pluginTipsLayer = _buildPluginTipsLayer();
+    _popupMenuLayer = _buildPopupMenuLayer();
   }
 
+  List<Widget> getWidgetsForEditor() {
+    return [
+      _selectionLayer,
+      _popupMenuLayer,
+      _pluginTipsLayer,
+    ];
+  }
+  
   void showBlockTips(BuildContext context, String content, LayerLink layerLink) {
     var tipsWidget = _TipsDialog(
       content: content,
@@ -21,26 +32,34 @@ class FloatingViewManager {
     );
     _pluginTipsKey.currentState?.addLayer(tipsWidget);
   }
-
-  List<Widget> getWidgetsForEditor() {
-    return [
-      _selectionLayer,
-      _pluginTipsLayer,
-    ];
+  
+  void addCursorHandle(Widget handle) {
+    _selectionKey.currentState?.addLayer(handle);
   }
-
   void addSelectionHandles(Widget handle1, Widget handle2) {
-    _selectionKey.currentState?.addLayer(handle1);
-    _selectionKey.currentState?.addLayer(handle2);
+    _selectionKey.currentState?.addLayers(handle1, handle2);
   }
   void removeSelectionHandles(Widget handle1, Widget handle2) {
     _selectionKey.currentState?.removeLayer(handle1);
     _selectionKey.currentState?.removeLayer(handle2);
   }
+  void clearAllHandles() {
+    _selectionKey.currentState?.clearLayer();
+  }
 
   Offset? convertGlobalOffsetToSelectionLayer(Offset global) {
     final render = _selectionKey.currentContext?.findRenderObject() as RenderBox?;
     return render?.globalToLocal(global);
+  }
+
+  void addPopupMenu(Widget menu) {
+    _popupMenuKey.currentState?.addLayer(menu);
+  }
+  void removePopupMenu(Widget menu) {
+    _popupMenuKey.currentState?.removeLayer(menu);
+  }
+  void clearPopupMenu() {
+    _popupMenuKey.currentState?.clearLayer();
   }
 
   Widget _buildSelectionLayer() {
@@ -51,6 +70,11 @@ class FloatingViewManager {
   Widget _buildPluginTipsLayer() {
     return _FloatingStackView(
       key: _pluginTipsKey,
+    );
+  }
+  Widget _buildPopupMenuLayer() {
+    return _FloatingStackView(
+      key: _popupMenuKey,
     );
   }
 }
@@ -74,6 +98,11 @@ class _FloatingStackViewState extends State<_FloatingStackView> {
     return stack;
   }
 
+  void addLayers(Widget _w1, Widget _w2) {
+    setState(() {
+      views.addAll([_w1, _w2]);
+    });
+  }
   void addLayer(Widget _w) {
     setState(() {
       views.add(_w);
