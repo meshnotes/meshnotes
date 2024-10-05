@@ -96,21 +96,25 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   GestureDetector _buildLowestLayer() {
     Widget listView = _buildBlockList();
+    Widget container = Container(
+      padding: const EdgeInsets.fromLTRB(10.0, 0.0, 10.0, 0.0),
+      child: listView,
+    );
     if(controller.isDebugMode) {
-      listView = Container(
+      container = Container(
         decoration: BoxDecoration(
           border: Border.all(
             color: Colors.grey,
             width: 5,
           ),
         ),
-        child: listView,
+        child: container,
       );
     }
 
     bool hidePan = controller.environment.isMobile();
     var gesture = GestureDetector(
-      child: listView,
+      child: container,
       onTapDown: (TapDownDetails details) {
         MyLogger.debug('MindEditFieldState: on tap down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onTapOrDoubleTap(details);

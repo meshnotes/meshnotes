@@ -22,7 +22,7 @@ class SelectionHandleLayer {
   void dispose() {
     //TODO should optimize here, _context should be cleared when dispose. But current implementation will cover the valid _context, because
     //TODO old MindEditFieldState.dispose() will invoked after new MindEditFieldState.initState()
-    _hideTextSelectionHandles();
+    _hideTextSelectionHandles(clearLayout: false); // Don't clear layout here, because it will cause a setState() call
   }
 
   void updateContext(BuildContext context) {
@@ -107,9 +107,11 @@ class SelectionHandleLayer {
     }
   }
 
-  void _hideTextSelectionHandles() {
+  void _hideTextSelectionHandles({bool clearLayout = true}) {
     final floatingViewManager = CallbackRegistry.getFloatingViewManager();
-    floatingViewManager?.clearAllHandles();
+    if(clearLayout) {
+      floatingViewManager?.clearAllHandles();
+    }
     _handleOfStart = null;
     _handleStateOfBase = null;
     _handleOfEnd = null;

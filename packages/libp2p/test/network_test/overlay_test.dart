@@ -6,8 +6,6 @@ import 'package:my_log/my_log.dart';
 import 'package:test/test.dart';
 
 void main() {
-  var serverPort = 8182;
-  var serverDeviceId = 'server_device';
   var clientDeviceId = 'client_device';
 
   test('Connecting to non-exists upper node, try to exponential backoff after connection failed', timeout: Timeout(Duration(seconds: 60)), () async {

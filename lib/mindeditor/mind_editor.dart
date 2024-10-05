@@ -60,7 +60,7 @@ class MindEditorState extends State<MindEditor> {
       children: [
         Expanded(
           child: editorArea,
-          // 这里用来放侧边区域，如引用线
+          // Reserve for side area, e.g. reference line
         ),
       ],
     );
@@ -106,7 +106,6 @@ class MindEditorState extends State<MindEditor> {
       ],
     );
     var withPadding = Container(
-      padding: const EdgeInsets.fromLTRB(10.0, 0.0, 0.0, 0.0),
       child: columnWrapper,
     );
     var expanded = Expanded(

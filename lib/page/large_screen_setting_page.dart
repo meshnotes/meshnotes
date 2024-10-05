@@ -48,7 +48,7 @@ class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
   @override
   Widget build(BuildContext context) {
     double padding = Constants.settingViewDesktopPadding.toDouble();
-    var topButtons = _buildTopButtons(context);
+    var _ = _buildTopButtons(context); //TODO Perhaps better to delete this
     var settingBody = _buildSettings(context);
     var bottomButtons = _buildBottomButtons(context);
     return Scaffold(
