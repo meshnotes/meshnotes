@@ -16,7 +16,7 @@ mixin ResizableViewMixin {
         Navigator.of(context).popAndPushNamed(routeName);
         // , (route) {
         //   resizing = false;
-        //   MyLogger.info('efantest: pop route=$route');
+        //   MyLogger.info('routeIfResize: pop route=$route');
         //   return false;
         // });
       });

@@ -60,14 +60,14 @@ class _InspiredCardViewState extends State<InspiredCardView> {
             }
             if(dragUpdate != Offset.infinite) {
               var horizontalOffset = _newOffset.dx - dragUpdate.dx;
-              MyLogger.debug('efantest: horizontalOffset=$horizontalOffset');
+              MyLogger.debug('_InspiredCardViewState: horizontalOffset=$horizontalOffset');
               dragUpdate = _newOffset;
               controller.moveTo(horizontalOffset);
             }
           },
           onPanEnd: (DragEndDetails e) {
             var horizontalDelta = dragUpdate.dx - dragStart.dx;
-            MyLogger.debug('efantest: InspiredCard gesture: start=$dragStart, end=$dragUpdate, delta=$horizontalDelta');
+            MyLogger.debug('_InspiredCardViewState: InspiredCard gesture: start=$dragStart, end=$dragUpdate, delta=$horizontalDelta');
             if(horizontalDelta > Constants.cardViewDragThreshold) {
               _jumpPrevious();
             } else if(horizontalDelta < - Constants.cardViewDragThreshold) {

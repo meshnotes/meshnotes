@@ -1,10 +1,10 @@
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/appearance_setting.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
-import '../../../controller/callback_registry.dart';
-import '../../../document/paragraph_desc.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 
 /// This Button's icon will be changed according to the current text selection style.
 class TextSelectionStyleSwitchButton extends StatefulWidget {

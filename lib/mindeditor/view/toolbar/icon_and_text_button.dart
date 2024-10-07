@@ -3,7 +3,7 @@ import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
-import 'appearance_setting.dart';
+import 'base/appearance_setting.dart';
 
 class IconAndTextButton extends StatelessWidget {
   final AppearanceSetting appearance;
@@ -32,7 +32,7 @@ class IconAndTextButton extends StatelessWidget {
       controller: controller,
       tip: 'Comment',
       onPressed: () {
-        MyLogger.debug('efantest: comment pressed');
+        MyLogger.debug('IconAndTextButton: comment pressed');
         CallbackRegistry.hideKeyboard();
       },
     );

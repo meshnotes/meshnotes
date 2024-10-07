@@ -300,7 +300,7 @@ class MindBlockImplRenderObject extends RenderBox {
     return textPosition.offset;
   }
   // void updateCursor(Offset offset) {
-  //   debugPrint('efantest: update [$uniqueKey] cursor for id=${texts.id}');
+  //   debugPrint('updateCursor: update [$uniqueKey] cursor for id=${texts.id}');
   //   var currentTextPos = paragraph.getPositionForOffset(offset);
   //   var node = controller.getDocTreeNode(texts.id)!;
   //   node.editingPosition = EditingPosition()..totalPosition = currentTextPos.offset;

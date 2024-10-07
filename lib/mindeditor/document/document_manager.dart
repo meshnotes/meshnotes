@@ -44,7 +44,7 @@ class DocumentManager {
   }): _db = db {
     _allWaitingVersions.addAll(_loadAllUnavailableNodes());
     _initRetryCounter(_allWaitingVersions);
-    MyLogger.info('efantest: loaded missing versions: $_allWaitingVersions');
+    MyLogger.info('DocumentManager: loaded missing versions: $_allWaitingVersions');
     controller.evenTasksManager.addAfterInitTask(() {
       Future(() {
         checkConsistency();

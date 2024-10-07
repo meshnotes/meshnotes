@@ -1,9 +1,9 @@
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/appearance_setting.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
-import '../../../controller/callback_registry.dart';
 
 class BlockFormatButton extends StatefulWidget {
   final AppearanceSetting appearance;
@@ -35,7 +35,6 @@ class _BlockFormatButtonState extends State<BlockFormatButton> {
   @override
   void initState() {
     super.initState();
-    MyLogger.debug('efantest: building block format button: ${widget.buttonKey}');
     CallbackRegistry.registerEditingBlockFormatWatcher(widget.buttonKey, (String? type, String? listing, int? level) {
       _setOn(widget.showOrNot(type, listing, level));
     });
@@ -43,7 +42,6 @@ class _BlockFormatButtonState extends State<BlockFormatButton> {
   @override
   void dispose() {
     super.dispose();
-    MyLogger.debug('efantest: destroying block format button: ${widget.buttonKey}');
     CallbackRegistry.unregisterEditingBlockFormatWatcher(widget.buttonKey);
   }
 

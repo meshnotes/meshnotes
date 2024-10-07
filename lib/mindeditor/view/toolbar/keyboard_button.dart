@@ -1,9 +1,8 @@
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/appearance_setting.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
-
 import 'base/multi_states_button.dart';
 
 

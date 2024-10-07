@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/editor_controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/text_selection_changed_switch_button.dart';
 import 'package:super_clipboard/super_clipboard.dart';
-import '../../controller/callback_registry.dart';
-import '../../controller/controller.dart';
-import 'appearance_setting.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'base/appearance_setting.dart';
 
 class CopyButton extends StatelessWidget {
   final AppearanceSetting appearance;

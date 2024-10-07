@@ -2,7 +2,7 @@ import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
-import 'appearance_setting.dart';
+import 'base/appearance_setting.dart';
 
 class ColoringTextButton extends StatelessWidget {
   final AppearanceSetting appearance;
@@ -29,7 +29,7 @@ class ColoringTextButton extends StatelessWidget {
       controller: controller,
       tip: 'Text color',
       onPressed: () {
-        MyLogger.debug('efantest: text color pressed');
+        MyLogger.debug('ColoringTextButton: text color pressed');
       },
     );
   }

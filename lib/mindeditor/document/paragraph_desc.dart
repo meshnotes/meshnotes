@@ -512,7 +512,7 @@ class ParagraphDesc {
     } else {
       texts = _parseJson(raw);
     }
-    MyLogger.verbose('efantest: _parseTexts result=$texts');
+    MyLogger.verbose('_parseTexts: result=$texts');
     _updateTexts(texts);
   }
 

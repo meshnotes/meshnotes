@@ -1,5 +1,5 @@
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/appearance_setting.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'package:flutter/material.dart';
 
 class ToolbarButton extends StatefulWidget {

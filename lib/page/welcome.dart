@@ -10,7 +10,7 @@ class WelcomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    MyLogger.info('efantest: screenWidth=$screenWidth');
+    MyLogger.info('WelcomeView: screenWidth=$screenWidth');
     Timer(const Duration(milliseconds: 500), () {
       Navigator.of(context).pushReplacementNamed(Constants.largeScreenViewName);
     });

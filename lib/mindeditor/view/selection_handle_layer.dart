@@ -127,7 +127,6 @@ class SelectionHandleLayer {
   }
 
   Widget _buildStartHandle(Offset offset) {
-    MyLogger.info('efantest: _buildStartHandle: $offset');
     return _buildHandle(SelectionExtentType.base, offset);
   }
   Widget _buildEndHandle(Offset offset) {
@@ -138,7 +137,6 @@ class SelectionHandleLayer {
   }
 
   Widget _buildHandle(SelectionExtentType type, Offset offset) {
-    MyLogger.info('efantest: _buildHandle: $type, $offset');
     var paintContainer = Container(
       alignment: Alignment.topCenter,
       child: SizedBox(

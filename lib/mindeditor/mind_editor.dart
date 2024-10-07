@@ -76,7 +76,7 @@ class MindEditorState extends State<MindEditor> {
   }
 
   Widget _buildToolbar() {
-    var toolbarView = MindToolBar.basic(
+    var toolbarView = MindEditorToolBar.basic(
       key: _toolBarKey,
       controller: controller,
       context: context,
@@ -115,7 +115,7 @@ class MindEditorState extends State<MindEditor> {
   }
 
   void open(Document doc) {
-    MyLogger.debug('efantest: refresh document');
+    MyLogger.debug('MindEditor: re-open document');
     setState(() {
       document = doc;
     });
@@ -127,14 +127,14 @@ class MindEditorState extends State<MindEditor> {
     MyLogger.info('Taking screen shot');
     var pixels = await _getPixelsFromReadOnlyWidget();
     if(pixels == null) {
-      MyLogger.debug('efantest: pixels is null');
+      MyLogger.debug('_takeScreenShot: pixels is null');
       return;
     }
-    MyLogger.info('efantest: Get permission');
+    MyLogger.info('_takeScreenShot: Get permission');
     bool permission = await promote();
 
     if(permission) {
-      MyLogger.info('efantest: Save image');
+      MyLogger.info('_takeScreenShot: Save image');
       _saveImage(pixels);
     }
   }
@@ -188,7 +188,7 @@ class MindEditorState extends State<MindEditor> {
     final ui.Image image = await repaintBoundary.toImage(pixelRatio: devicePixelRation);
     final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     if(byteData == null) {
-      MyLogger.info('efantest: byteData is null');
+      MyLogger.info('_getPixelsFromReadOnlyWidget: byteData is null');
     }
     return byteData?.buffer.asUint8List();
   }

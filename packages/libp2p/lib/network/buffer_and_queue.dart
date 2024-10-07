@@ -20,7 +20,7 @@ class RetryFrame {
   void updateRetry() {
     _resendCount++;
     _lastSentTimestamp = networkNow();
-    MyLogger.debug('efantest: updateResend() called, _resendCount=$_resendCount}');
+    MyLogger.debug('updateRetry: updateResend() called, _resendCount=$_resendCount}');
   }
   int getResendCount() {
     return _resendCount;

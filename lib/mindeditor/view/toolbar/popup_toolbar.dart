@@ -15,13 +15,13 @@ import 'copy_paste_button.dart';
 import 'keyboard_button.dart';
 import 'italic_text_button.dart';
 
-class MindEditorToolBar extends StatelessWidget {
+class PopupToolbar extends StatelessWidget {
   final Controller controller;
   final double toolBarHeight;
   final List<Widget> children;
   final AppearanceSetting appearance;
 
-  const MindEditorToolBar({
+  const PopupToolbar({
     Key? key,
     required this.controller,
     this.toolBarHeight = 36,
@@ -29,7 +29,7 @@ class MindEditorToolBar extends StatelessWidget {
     required this.appearance,
   }): super(key: key);
 
-  factory MindEditorToolBar.basic({
+  factory PopupToolbar.basic({
     Key? key,
     required Controller controller,
     required BuildContext context,
@@ -115,7 +115,7 @@ class MindEditorToolBar extends StatelessWidget {
         controller: controller,
       ),
     ];
-    return MindEditorToolBar(
+    return PopupToolbar(
       key: key,
       controller: controller,
       children: buttons,

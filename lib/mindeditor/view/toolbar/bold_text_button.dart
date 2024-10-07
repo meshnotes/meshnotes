@@ -2,8 +2,8 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/text_selection_style_switch_button.dart';
 import 'package:flutter/material.dart';
-import '../../document/paragraph_desc.dart';
-import 'appearance_setting.dart';
+import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
+import 'base/appearance_setting.dart';
 
 class BoldTextButton extends StatelessWidget {
   final AppearanceSetting appearance;

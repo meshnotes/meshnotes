@@ -8,7 +8,7 @@ import 'package:mesh_note/plugin/ai/plugin_ai.dart';
 import 'package:my_log/my_log.dart';
 import '../mindeditor/controller/controller.dart';
 import '../mindeditor/setting/constants.dart';
-import '../mindeditor/view/toolbar/appearance_setting.dart';
+import '../mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'plugin_api.dart';
 
 List<PluginInstance> _plugins = [

@@ -1,8 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:my_log/my_log.dart';
-
-import '../appearance_setting.dart';
+import 'appearance_setting.dart';
 import 'toolbar_button.dart';
 
 class StateNotifier<T> {

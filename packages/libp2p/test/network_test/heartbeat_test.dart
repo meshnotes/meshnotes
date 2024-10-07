@@ -43,12 +43,12 @@ void main() {
 
     await Future.delayed(Duration(milliseconds: 2000));
     var lastContact = clientConnection.getLastContactTime();
-    MyLogger.info('efantest: $lastContact, $now');
+    MyLogger.info('heartbeat test: $lastContact, $now');
     expect(lastContact > now, true);
     now = networkNow();
 
     await Future.delayed(Duration(milliseconds: 2000));
-    MyLogger.info('efantest: $lastContact, $now');
+    MyLogger.info('heartbeat test: $lastContact, $now');
     lastContact = clientConnection.getLastContactTime();
     expect(lastContact > now, true);
 
