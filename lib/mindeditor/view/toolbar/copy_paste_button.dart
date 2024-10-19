@@ -56,8 +56,8 @@ class CutButton extends StatelessWidget {
       trigger: (TextSelection? selection) {
         return (selection != null && !selection.isCollapsed);
       },
-      onPressed: () {
-        EditorController.cutToClipboard();
+      onPressed: () async {
+        await EditorController.cutToClipboard();
         CallbackRegistry.requestFocus();
       },
     );

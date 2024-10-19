@@ -51,6 +51,10 @@ class FloatingViewManager {
     final render = _selectionKey.currentContext?.findRenderObject() as RenderBox?;
     return render?.globalToLocal(global);
   }
+  Offset? convertGlobalOffsetToPopupMenuLayer(Offset global) {
+    final render = _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
+    return render?.globalToLocal(global);
+  }
 
   void addPopupMenu(Widget menu) {
     _popupMenuKey.currentState?.addLayer(menu);

@@ -9,7 +9,7 @@ class IconAndTextButton extends StatelessWidget {
   final String text;
   final String tip;
   final IconData? iconData;
-  final Function onPressed;
+  final Function() onPressed;
   const IconAndTextButton({
     Key? key,
     required this.controller,
@@ -34,9 +34,7 @@ class IconAndTextButton extends StatelessWidget {
       appearance: appearance,
       controller: controller,
       tip: tip,
-      onPressed: () {
-        onPressed();
-      },
+      onPressed: onPressed,
     );
   }
 }

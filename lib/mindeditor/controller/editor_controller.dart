@@ -2,10 +2,14 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:my_log/my_log.dart';
 import 'package:super_clipboard/super_clipboard.dart';
-
 import '../../util/util.dart';
 
 class EditorController {
+  static void selectAll() {
+    final selectionController = Controller().selectionController;
+    selectionController.selectAll();
+  }
+  
   static String getSelectedContent() {
     final selectionController = Controller().selectionController;
     var content = selectionController.getSelectedContent();

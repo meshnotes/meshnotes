@@ -3,16 +3,18 @@ import 'package:mesh_note/mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/icon_and_text_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
+import '../../controller/callback_registry.dart';
+import '../../controller/editor_controller.dart';
 import 'base/movable_button.dart';
 
-class PopupToolbar extends StatelessWidget {
+class EditorPopupToolbar extends StatelessWidget {
   final Controller controller;
   final double toolBarHeight;
   final double maxWidth;
   final List<Widget> children;
   final AppearanceSetting appearance;
 
-  const PopupToolbar({
+  const EditorPopupToolbar({
     Key? key,
     required this.controller,
     this.toolBarHeight = 36,
@@ -21,7 +23,7 @@ class PopupToolbar extends StatelessWidget {
     required this.maxWidth,
   }): super(key: key);
 
-  factory PopupToolbar.basic({
+  factory EditorPopupToolbar.basic({
     Key? key,
     required Controller controller,
     required BuildContext context,
@@ -35,25 +37,8 @@ class PopupToolbar extends StatelessWidget {
         text: 'All',
         tip: 'Select all content',
         onPressed: () {
-          MyLogger.info('Select');
-        },
-      ),
-      IconAndTextButton(
-        appearance: defaultAppearance,
-        controller: controller,
-        text: 'Copy',
-        tip: 'Copy content',
-        onPressed: () {
-          MyLogger.info('Copy');
-        },
-      ),
-      IconAndTextButton(
-        appearance: defaultAppearance,
-        controller: controller,
-        text: 'Cut',
-        tip: 'Cut content',
-        onPressed: () {
-          MyLogger.info('Cut');
+          MyLogger.info('popup menu Select All');
+          EditorController.selectAll();
         },
       ),
       IconAndTextButton(
@@ -61,13 +46,38 @@ class PopupToolbar extends StatelessWidget {
         controller: controller,
         text: 'Paste',
         tip: 'Paste content',
-        onPressed: () {
-          MyLogger.info('Paste');
+        onPressed: () async {
+          MyLogger.info('popup menu Paste');
+          await EditorController.pasteToBlock();
         },
       ),
     ];
+    if(!controller.selectionController.isCollapsed()) {
+      buttons.add(IconAndTextButton(
+        appearance: defaultAppearance,
+        controller: controller,
+        text: 'Copy',
+        tip: 'Copy content',
+        onPressed: () async {
+          MyLogger.info('popup menu Copy');
+          await EditorController.copySelectedContentToClipboard();
+          CallbackRegistry.requestFocus();
+        },
+      ));
+      buttons.add(IconAndTextButton(
+        appearance: defaultAppearance,
+        controller: controller,
+        text: 'Cut',
+        tip: 'Cut content',
+        onPressed: () async {
+          MyLogger.info('popup menu Cut');
+          await EditorController.cutToClipboard();
+          CallbackRegistry.requestFocus();
+        },
+      ));
+    }
     final children = _addDivider(buttons);
-    return PopupToolbar(
+    return EditorPopupToolbar(
       key: key,
       controller: controller,
       children: children,

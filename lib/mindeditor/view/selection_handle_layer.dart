@@ -141,7 +141,6 @@ class SelectionHandleLayer {
 
   Widget _buildHandle(SelectionExtentType type, Offset offset) {
     final controller = Controller();
-    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     var paintContainer = Container(
       alignment: Alignment.topCenter,
       child: SizedBox(
@@ -158,7 +157,6 @@ class SelectionHandleLayer {
       alignment: Alignment.topCenter,
       child: paintContainer,
     );
-    final layerLink = LayerLink();
     var gesture = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onPanStart: (DragStartDetails details) {
@@ -171,7 +169,7 @@ class SelectionHandleLayer {
         var globalOffset = details.globalPosition + const Offset(0, -_handleSize);
         _isDragging = true;
         controller.selectionController.updateSelectionByOffset(globalOffset, type: type);
-        floatingViewManager?.clearPopupMenu();
+        controller.selectionController.clearPopupMenu();
       },
       onPanEnd: (DragEndDetails details) {
         MyLogger.info('selection handle: drag end');
@@ -179,23 +177,18 @@ class SelectionHandleLayer {
       },
       onPanCancel: () {
         MyLogger.info('selection handle: drag cancel');
-        floatingViewManager?.clearPopupMenu();
         _isDragging = false;
       },
       onTapUp: (TapUpDetails details) {
-        MyLogger.info('selection handle is tapped');
-        controller.selectionController.showPopupMenu(position: details.globalPosition, layerLink: layerLink);
+        MyLogger.info('selection handle is tapped: ${details.globalPosition}');
+        controller.selectionController.showPopupMenu(globalPosition: details.globalPosition);
       },
       child: dragContainer,
-    );
-    final compositedTransformTarget = CompositedTransformTarget(
-      link: layerLink,
-      child: gesture,
     );
     return PositionedHandle(
       key: UniqueKey(), //TODO Maybe better to use a global key
       initPosition: offset,
-      child: compositedTransformTarget,
+      child: gesture,
       type: type,
       parentLayer: this,
     );

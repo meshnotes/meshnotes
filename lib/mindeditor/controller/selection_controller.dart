@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block_impl.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/popup_toolbar.dart';
+import 'package:mesh_note/mindeditor/view/toolbar/editor_popup_menu.dart';
 import 'package:my_log/my_log.dart';
 import '../view/edit_cursor.dart';
 import '../view/selection_handle_layer.dart';
@@ -260,6 +260,13 @@ class SelectionController {
     return lastBaseBlockIndex == lastExtentBlockIndex;
   }
 
+  void selectAll() {
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
+    if(paragraphs == null) return;
+    _updateSelection(0, 0, paragraphs.length - 1, paragraphs.last.getPlainText().length, paragraphs);
+  }
+
   // Setters
   void updateContext(BuildContext context) {
     _selectionHandleLayer.updateContext(context);
@@ -273,36 +280,38 @@ class SelectionController {
   void updateHandlesPointByDelta(Offset delta) {
     _selectionHandleLayer.updateBaseHandleOffsetByDelta(delta);
     _selectionHandleLayer.updateExtentHandleOffsetByDelta(delta);
+    _selectionHandleLayer.updateCursorHandleOffsetByDelta(delta);
   }
   void setShouldShowSelectionHandle(bool _b) {
     MyLogger.info('setShouldShowSelectionHandle: $_b');
     _shouldShowSelectionHandle = _b;
   }
 
-  void showPopupMenu({required Offset position, required LayerLink layerLink}) {
-    CallbackRegistry.getFloatingViewManager()?.clearPopupMenu();
+  void showPopupMenu({required Offset globalPosition}) {
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
+    floatingViewManager?.clearPopupMenu();
+    var localPosition = floatingViewManager?.convertGlobalOffsetToPopupMenuLayer(globalPosition) ?? globalPosition;
     final widget = LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final popupMenu = PopupToolbar.basic(controller: Controller(), context: context, maxWidth: width);
+        final popupMenu = EditorPopupToolbar.basic(controller: Controller(), context: context, maxWidth: width);
         final container = Container(
-          constraints: BoxConstraints(minWidth: width, maxWidth: width, maxHeight: 50),
-          child: Container(
-            alignment: Alignment.center,
-            child: popupMenu,
-          ),
+          alignment: Alignment.topCenter,
+          child: popupMenu,
         );
-        final follower = CompositedTransformFollower(
-          link: layerLink,
-          child: container,
-          offset: Offset(width / 2 -position.dx, 10),
-          targetAnchor: Alignment.center,
-          followerAnchor: Alignment.topCenter,
+        final column = Column(
+          children: [
+            SizedBox(width: 10, height: localPosition.dy + 15,),
+            container,
+          ],
         );
-        return follower;
+        return column;
       },
     );
-    CallbackRegistry.getFloatingViewManager()?.addPopupMenu(widget);
+    floatingViewManager?.addPopupMenu(widget);
+  }
+  void clearPopupMenu() {
+    CallbackRegistry.getFloatingViewManager()?.clearPopupMenu();
   }
 
   void deleteSelectedContent({bool keepExtentBlock = false, int deltaPos = 0, bool refreshView=true}) {
