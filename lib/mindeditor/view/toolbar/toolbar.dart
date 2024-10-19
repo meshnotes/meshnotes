@@ -8,6 +8,7 @@ import 'package:mesh_note/mindeditor/view/toolbar/icon_and_text_button.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/strikethrough_text_button.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/underline_text_button.dart';
 import 'package:flutter/material.dart';
+import 'package:my_log/my_log.dart';
 import 'base/movable_button.dart';
 import 'block_type_button.dart';
 import 'bold_text_button.dart';
@@ -39,6 +40,11 @@ class MindEditorToolBar extends StatelessWidget {
       IconAndTextButton(
         appearance: defaultAppearance,
         controller: controller,
+        text: 'Comment',
+        tip: 'Comment',
+        onPressed: () {
+          MyLogger.debug('IconAndTextButton: Comment pressed');
+        },
       ),
       BoldTextButton(
         appearance: defaultAppearance,

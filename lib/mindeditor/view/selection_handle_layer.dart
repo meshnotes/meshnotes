@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:my_log/my_log.dart';
-
-import '../controller/controller.dart';
-import '../controller/selection_controller.dart';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/mindeditor/controller/selection_controller.dart';
 
 class SelectionHandleLayer {
   Widget? _handleOfStart;
@@ -73,16 +72,18 @@ class SelectionHandleLayer {
       _hideTextSelectionHandles();
       return;
     }
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     if(_handleStateOfBase != null && _handleStateOfExtent != null) { // Already displayed handles
       updateBaseHandleOffset(baseCursorOffset);
       updateExtentHandleOffset(extentCursorOffset);
+      floatingViewManager?.clearPopupMenu();
       return;
     }
     if(_handleStateOfCursor != null) {
       _hideTextSelectionHandles();
     }
-    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     if(floatingViewManager != null) {
+      floatingViewManager.clearPopupMenu();
       _handleOfStart = _buildStartHandle(_convertToDragOffset(baseCursorOffset));
       _handleOfEnd = _buildEndHandle(_convertToDragOffset(extentCursorOffset));
       floatingViewManager.addSelectionHandles(_handleOfStart!, _handleOfEnd!);
@@ -93,15 +94,17 @@ class SelectionHandleLayer {
       _hideTextSelectionHandles();
       return;
     }
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     if(_handleStateOfCursor != null) { // No context or already displayed handles
       updateCursorHandleOffset(extentCursorOffset);
+      floatingViewManager?.clearPopupMenu();
       return;
     }
     if(_handleStateOfBase != null || _handleStateOfExtent != null) {
       _hideTextSelectionHandles();
     }
-    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     if(floatingViewManager != null) {
+      floatingViewManager.clearPopupMenu();
       _handleOfCursor = _buildCursorHandle(_convertToDragOffset(extentCursorOffset));
       floatingViewManager.addCursorHandle(_handleOfCursor!);
     }
@@ -137,6 +140,8 @@ class SelectionHandleLayer {
   }
 
   Widget _buildHandle(SelectionExtentType type, Offset offset) {
+    final controller = Controller();
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     var paintContainer = Container(
       alignment: Alignment.topCenter,
       child: SizedBox(
@@ -153,6 +158,7 @@ class SelectionHandleLayer {
       alignment: Alignment.topCenter,
       child: paintContainer,
     );
+    final layerLink = LayerLink();
     var gesture = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onPanStart: (DragStartDetails details) {
@@ -164,7 +170,8 @@ class SelectionHandleLayer {
         // Handle circle has an offset from actual point of text line because it is at the bottom of cursor.
         var globalOffset = details.globalPosition + const Offset(0, -_handleSize);
         _isDragging = true;
-        Controller().selectionController.updateSelectionByOffset(globalOffset, type: type);
+        controller.selectionController.updateSelectionByOffset(globalOffset, type: type);
+        floatingViewManager?.clearPopupMenu();
       },
       onPanEnd: (DragEndDetails details) {
         MyLogger.info('selection handle: drag end');
@@ -172,14 +179,23 @@ class SelectionHandleLayer {
       },
       onPanCancel: () {
         MyLogger.info('selection handle: drag cancel');
+        floatingViewManager?.clearPopupMenu();
         _isDragging = false;
       },
+      onTapUp: (TapUpDetails details) {
+        MyLogger.info('selection handle is tapped');
+        controller.selectionController.showPopupMenu(position: details.globalPosition, layerLink: layerLink);
+      },
       child: dragContainer,
+    );
+    final compositedTransformTarget = CompositedTransformTarget(
+      link: layerLink,
+      child: gesture,
     );
     return PositionedHandle(
       key: UniqueKey(), //TODO Maybe better to use a global key
       initPosition: offset,
-      child: gesture,
+      child: compositedTransformTarget,
       type: type,
       parentLayer: this,
     );

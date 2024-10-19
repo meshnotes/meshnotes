@@ -54,7 +54,7 @@ class _ToolbarButtonState extends State<ToolbarButton> {
       ),
       alignment: Alignment.center,
       color: widget.isOn? _triggeredBackgroundColor: backgroundColor,
-      padding: const EdgeInsets.all(4),
+      padding: widget.appearance.padding?? const EdgeInsets.all(4),
       child: widget.icon,
     );
     var mouseRegion = MouseRegion(
@@ -79,12 +79,5 @@ class _ToolbarButtonState extends State<ToolbarButton> {
       child: gesture,
     );
     return toolTip;
-    // return ConstrainedBox(
-    //   constraints: BoxConstraints.tightFor(
-    //     width: width?? appearance.iconSize + (appearance.size - appearance.iconSize) / 2,
-    //     height: height?? appearance.size
-    //   ),
-    //   child: toolTip,
-    // );
   }
 }
