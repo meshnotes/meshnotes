@@ -73,7 +73,6 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   @override
   Widget build(BuildContext context) {
     MyLogger.info('MindEditFieldState: build block list, _hasFocus=$_hasFocus');
-    _updateContext(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final render = context.findRenderObject()! as RenderBox;
       _currentSize = render.localToGlobal(Offset.zero) & render.size;
@@ -684,10 +683,6 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
   void _updateLastEditingValue(TextEditingValue newValue) {
     _lastEditingValue = newValue;
-  }
-  void _updateContext(BuildContext context) {
-    widget.controller.selectionController.updateContext(context);
-    widget.controller.pluginManager.updateContext(context);
   }
   void _deleteSelectionOrCharacter() {
     if(!widget.controller.selectionController.isCollapsed()) {

@@ -17,8 +17,6 @@ List<PluginInstance> _plugins = [
 
 class PluginManager {
   List<ToolbarInformation> toolbarInfo = [];
-  BuildContext? _context;
-  OverlayEntry? _overlayEntry;
   final List<SettingData> _pluginSupportedSettings = [];
   final Map<PluginProxy, PluginRegisterInformation> _pluginInstances = {};
   final controller = Controller();
@@ -33,10 +31,6 @@ class PluginManager {
     for(var plugin in _plugins) {
       plugin.start();
     }
-  }
-
-  void updateContext(BuildContext context) {
-    _context = context;
   }
 
   /// Register plugin
@@ -124,19 +118,14 @@ class PluginManager {
   }
 
   void closeDialog() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
+    CallbackRegistry.getFloatingViewManager()?.clearPluginDialog();
   }
   void showDialog(String title, Widget subChild) {
-    if(_context == null) return;
-
-    if(_overlayEntry != null) {
-      closeDialog();
-    }
+    closeDialog();
     CallbackRegistry.hideKeyboard();
-    final isSmallView = controller.environment.isSmallView(_context!);
-    _overlayEntry = OverlayEntry(
-      builder: (context) {
+    final widget = LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallView = controller.environment.isSmallView(context);
         double width = 300;
         double height = 300;
         if(isSmallView) {
@@ -185,7 +174,7 @@ class PluginManager {
         return container;
       }
     );
-    Overlay.of(_context!).insert(_overlayEntry!);
+    CallbackRegistry.getFloatingViewManager()?.showPluginDialog(widget);
   }
 
   List<SettingData> getPluginSupportedSettings() {

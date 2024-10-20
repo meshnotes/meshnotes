@@ -2,23 +2,27 @@ import 'package:flutter/material.dart';
 
 class FloatingViewManager {
   late Widget _selectionLayer;
-  late Widget _extraLayer;
+  late Widget _pluginTipsLayer;
   late Widget _popupMenuLayer;
+  late Widget _pluginDialogLayer;
   final _selectionKey = GlobalKey<_FloatingStackViewState>();
-  final _extraKey = GlobalKey<_FloatingStackViewState>();
+  final _pluginTipsKey = GlobalKey<_FloatingStackViewState>();
   final _popupMenuKey = GlobalKey<_FloatingStackViewState>();
+  final _pluginDialogKey = GlobalKey<_FloatingStackViewState>();
 
   FloatingViewManager() {
     _selectionLayer = _buildSelectionLayer();
-    _extraLayer = _buildExtraLayer();
+    _pluginTipsLayer = _buildExtraLayer();
     _popupMenuLayer = _buildPopupMenuLayer();
+    _pluginDialogLayer = _buildPluginDialogLayer();
   }
 
   List<Widget> getWidgetsForEditor() {
     return [
       _selectionLayer,
       _popupMenuLayer,
-      _extraLayer,
+      _pluginTipsLayer,
+      _pluginDialogLayer,
     ];
   }
   
@@ -30,10 +34,10 @@ class FloatingViewManager {
         clearBlockTips();
       },
     );
-    _extraKey.currentState?.addLayer(tipsWidget);
+    _pluginTipsKey.currentState?.addLayer(tipsWidget);
   }
   void clearBlockTips() {
-    _extraKey.currentState?.clearLayer();
+    _pluginTipsKey.currentState?.clearLayer();
   }
   
   void addCursorHandle(Widget handle) {
@@ -69,6 +73,13 @@ class FloatingViewManager {
     _popupMenuKey.currentState?.clearLayer();
   }
 
+  void showPluginDialog(Widget dialog) {
+    _pluginDialogKey.currentState?.addLayer(dialog);
+  }
+  void clearPluginDialog() {
+    _pluginDialogKey.currentState?.clearLayer();
+  }
+
   Widget _buildSelectionLayer() {
     return _FloatingStackView(
       key: _selectionKey,
@@ -76,12 +87,17 @@ class FloatingViewManager {
   }
   Widget _buildExtraLayer() {
     return _FloatingStackView(
-      key: _extraKey,
+      key: _pluginTipsKey,
     );
   }
   Widget _buildPopupMenuLayer() {
     return _FloatingStackView(
       key: _popupMenuKey,
+    );
+  }
+  Widget _buildPluginDialogLayer() {
+    return _FloatingStackView(
+      key: _pluginDialogKey,
     );
   }
 }

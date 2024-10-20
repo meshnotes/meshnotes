@@ -6,10 +6,13 @@ Generally speaking, the application has a top most app layer, and then editor la
 ![Image for layers](./assets/layers.jpg "Layers")
 
 # App Layers
-Currently only a toast layer is used, to display messages to user.
+Currently only a toast layer is used, to display instant messages to user.
 
 # Editor Layers
-There are 3 layers related to the editor.
+There are 4 layers related to the editor.
 1. Selection layer: to display the selection area(blue semitransparent rectangle) and handles(small blue rectangles for user to drag, only in mobile mode).
-2. Popup menu layer: to display the popup menu, for user to select all, copy, cut, and paste.
-3. Plugin tips layer: to display the plugin tips. Currently using for AI hints.
+4. Plugin tips layer: to display the plugin tips. Currently using for AI hints(currently in every block's extra area).
+3. Popup menu layer: to display the popup menu, for user to select all, copy, cut, and paste.
+4. Plugin dialog layer: to display the plugin dialog.
+
+So the selection rectangle and handles are in the lowest layer, might be covered by plugin tips. And plugin tips might be covered by popup menu. Plugin dialog is on the top of everything.

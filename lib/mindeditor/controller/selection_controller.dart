@@ -268,9 +268,6 @@ class SelectionController {
   }
 
   // Setters
-  void updateContext(BuildContext context) {
-    _selectionHandleLayer.updateContext(context);
-  }
   void updateBaseHandlePoint(Offset offset) {
     _selectionHandleLayer.updateBaseHandleOffset(offset);
   }

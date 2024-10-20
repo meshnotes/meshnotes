@@ -30,8 +30,6 @@ class SelectionHandleLayer {
     _hideTextSelectionHandles(clearLayout: false); // Don't clear layout here, because it will cause a setState() call
   }
 
-  void updateContext(BuildContext context) {
-  }
   void updateBaseHandleOffset(Offset? offset) {
     if(offset == null) return;
     final deltaOffset = _convertToDragOffset(offset);
