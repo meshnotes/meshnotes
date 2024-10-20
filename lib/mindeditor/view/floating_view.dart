@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 
 class FloatingViewManager {
   late Widget _selectionLayer;
-  late Widget _pluginTipsLayer;
+  late Widget _extraLayer;
   late Widget _popupMenuLayer;
   final _selectionKey = GlobalKey<_FloatingStackViewState>();
-  final _pluginTipsKey = GlobalKey<_FloatingStackViewState>();
+  final _extraKey = GlobalKey<_FloatingStackViewState>();
   final _popupMenuKey = GlobalKey<_FloatingStackViewState>();
 
   FloatingViewManager() {
     _selectionLayer = _buildSelectionLayer();
-    _pluginTipsLayer = _buildPluginTipsLayer();
+    _extraLayer = _buildExtraLayer();
     _popupMenuLayer = _buildPopupMenuLayer();
   }
 
@@ -18,7 +18,7 @@ class FloatingViewManager {
     return [
       _selectionLayer,
       _popupMenuLayer,
-      _pluginTipsLayer,
+      _extraLayer,
     ];
   }
   
@@ -27,10 +27,13 @@ class FloatingViewManager {
       content: content,
       layerLink: layerLink,
       closeCallback: () {
-        _pluginTipsKey.currentState?.clearLayer();
+        clearBlockTips();
       },
     );
-    _pluginTipsKey.currentState?.addLayer(tipsWidget);
+    _extraKey.currentState?.addLayer(tipsWidget);
+  }
+  void clearBlockTips() {
+    _extraKey.currentState?.clearLayer();
   }
   
   void addCursorHandle(Widget handle) {
@@ -71,9 +74,9 @@ class FloatingViewManager {
       key: _selectionKey,
     );
   }
-  Widget _buildPluginTipsLayer() {
+  Widget _buildExtraLayer() {
     return _FloatingStackView(
-      key: _pluginTipsKey,
+      key: _extraKey,
     );
   }
   Widget _buildPopupMenuLayer() {

@@ -98,7 +98,6 @@ class DocumentManager {
       }
     }
     currentDocId = docId;
-    CallbackRegistry.showToast('Open document: $docId');
   }
 
   String newDocument() {
