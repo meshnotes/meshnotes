@@ -178,7 +178,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     super.dispose();
   }
 
-  Rect getCurrentSize() => _currentSize!;
+  Rect getCurrentSize() {
+    final render = context.findRenderObject()! as RenderBox;
+    _currentSize = render.localToGlobal(Offset.zero) & render.size;
+    return _currentSize!;
+  }
 
   void scrollDown(double delta) {
     _scrollController.jumpTo(_scrollController.offset + delta);

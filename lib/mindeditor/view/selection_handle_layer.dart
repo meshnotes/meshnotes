@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/controller/selection_controller.dart';
@@ -15,6 +18,9 @@ class SelectionHandleLayer {
   static const _handleSize = 16.0;
   static const _handleDragSize = 32.0;
   bool _isDragging = false;
+  int _lastScrollTime = 0;
+  Timer? _scrollTimer;
+  Offset? _lastScrollGlobalOffset;
 
   bool isDragging() => _isDragging;
 
@@ -162,6 +168,10 @@ class SelectionHandleLayer {
       onPanStart: (DragStartDetails details) {
         MyLogger.info('selection handle: drag start');
         _isDragging = true;
+        _lastScrollGlobalOffset = details.globalPosition;
+        _scrollTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+          _tryToScroll(controller, _lastScrollGlobalOffset!, type);
+        });
       },
       onPanUpdate: (DragUpdateDetails details) {
         MyLogger.info('selection handle: drag update');
@@ -170,14 +180,18 @@ class SelectionHandleLayer {
         _isDragging = true;
         controller.selectionController.updateSelectionByOffset(globalOffset, type: type);
         controller.selectionController.clearPopupMenu();
+        // _tryToScroll(globalOffset);
+        _lastScrollGlobalOffset = globalOffset;
       },
       onPanEnd: (DragEndDetails details) {
         MyLogger.info('selection handle: drag end');
         _isDragging = false;
+        _scrollTimer?.cancel();
       },
       onPanCancel: () {
         MyLogger.info('selection handle: drag cancel');
         _isDragging = false;
+        _scrollTimer?.cancel();
       },
       onTapUp: (TapUpDetails details) {
         MyLogger.info('selection handle is tapped: ${details.globalPosition}');
@@ -192,6 +206,30 @@ class SelectionHandleLayer {
       type: type,
       parentLayer: this,
     );
+  }
+
+  void _tryToScroll(Controller controller, Offset globalOffset, SelectionExtentType type) {
+    final now = Util.getTimeStamp();
+    if(now - _lastScrollTime < 100) return;
+
+    final editableSize = CallbackRegistry.getEditStateSize();
+    if(editableSize == null) return;
+
+    const double boundDelta = 50;
+    const double scrollDelta = 10;
+
+    double upperBound = editableSize.top + boundDelta;
+    double lowerBound = editableSize.bottom - boundDelta;
+    final currentY = globalOffset.dy;
+    if(currentY < upperBound || currentY > lowerBound) {
+      if(currentY < upperBound) {
+        CallbackRegistry.scrollUp(scrollDelta);
+      } else if(currentY > lowerBound) {
+        CallbackRegistry.scrollDown(scrollDelta);
+      }
+      controller.selectionController.updateSelectionByOffset(globalOffset, type: type);
+      _lastScrollTime = now;
+    }
   }
 }
 
