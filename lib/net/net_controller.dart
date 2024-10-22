@@ -28,14 +28,15 @@ class NetworkController {
     if(isStarted()) return;
 
     MyLogger.info('Spawning isolate and start listening');
-    final serverList = settings.getSetting(Constants.settingKeyServerList)?? Constants.settingDefaultServerList;
+    final rawServerList = settings.getSetting(Constants.settingKeyServerList)?? Constants.settingDefaultServerList;
+    final cleanedServerList = rawServerList.replaceAll('，', ',').replaceAll('：', ':');
     final localPort = settings.getSetting(Constants.settingKeyLocalPort)?? Constants.settingDefaultLocalPort;
     _networkStatus = NetworkStatus.starting;
     _receivePort.listen((data) {
       if(data is SendPort) {
         MyLogger.info('Get SendPort from network isolate, start village protocol');
         _sendPort = data;
-        _gracefulStartVillage(localPort, serverList, deviceId, userPrivateInfo);
+        _gracefulStartVillage(localPort, cleanedServerList, deviceId, userPrivateInfo);
       } else if(data is Message) {
         if(_sendPort != null) {
           _onMessage(data);
