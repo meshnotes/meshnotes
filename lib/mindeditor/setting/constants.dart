@@ -74,7 +74,7 @@ class Constants {
   static const String settingDefaultServerList = '';
   static const String settingKeyLocalPort = 'local_port';
   static const String settingNameLocalPort = 'Local Port';
-  static const String settingCommentLocalPort = 'Local Port(0 for random)';
+  static const String settingCommentLocalPort = 'Local Port(0 for random, $settingDefaultLocalPort is default)';
   static const String settingDefaultLocalPort = '17974';
   static const String settingKeyTest = 'just_for_test';
   static const String settingNameTest = 'Just for test';

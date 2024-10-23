@@ -4,6 +4,7 @@ import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block_impl.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/editor_popup_menu.dart';
+import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import '../view/edit_cursor.dart';
 import '../view/selection_handle_layer.dart';
@@ -465,15 +466,17 @@ class SelectionController {
     // CallbackRegistry.refreshTextEditingValue();
     resetCursor();
 
-    // Update handles' offsets
-    Offset? baseCursorOffset, extentCursorOffset;
-    if(baseRender != null) {
-      baseCursorOffset = baseRender.getCursorOffsetOfPos(lastBaseBlockPos);
-    }
-    if(extentRender != null) {
-      extentCursorOffset = extentRender.getCursorOffsetOfPos(lastExtentBlockPos);
-    }
-    _showOrHideSelectionHandles(baseCursorOffset, extentCursorOffset);
+    // Update handles' offsets. Should run in post frame, because getCursorOffsetOfPos needs layout
+    Util.runInPostFrame(() {
+      Offset? baseCursorOffset, extentCursorOffset;
+      if(baseRender != null) {
+        baseCursorOffset = baseRender.getCursorOffsetOfPos(lastBaseBlockPos);
+      }
+      if(extentRender != null) {
+        extentCursorOffset = extentRender.getCursorOffsetOfPos(lastExtentBlockPos);
+      }
+      _showOrHideSelectionHandles(baseCursorOffset, extentCursorOffset);
+    });
   }
 
   /// Find which block contains the globalPosition
