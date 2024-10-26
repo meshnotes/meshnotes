@@ -129,7 +129,7 @@ class MindBlockImplRenderObject extends RenderBox {
   }
 
   static TextSpan _buildTextSpanAndCalcTotalLength(ParagraphDesc texts, double defaultFontSize) {
-    if(texts.getType().startsWith(Constants.blockTypeHeadlinePrefix)) {
+    if(texts.getBlockType().startsWith(Constants.blockTypeHeadlinePrefix)) {
       return TextSpan(
         text: texts.getPlainText(),
         style: _getDefaultTextStyle(size: defaultFontSize),

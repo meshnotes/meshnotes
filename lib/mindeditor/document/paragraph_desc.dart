@@ -404,7 +404,7 @@ class ParagraphDesc {
     ;
   }
 
-  String getType() {
+  String getBlockType() {
     return _convertBlockType(_type);
   }
   bool setBlockType(String blockType) {
@@ -413,7 +413,7 @@ class ParagraphDesc {
     return true;
   }
 
-  String getListing() {
+  String getBlockListing() {
     return _convertBlockListing(_listing);
   }
   bool setBlockListing(String blockListing) {

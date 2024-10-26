@@ -88,7 +88,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     if(widget.texts.isTitle()) {
       fontSize = widget.controller.setting.blockTitleFontSize;
     } else {
-      switch(widget.texts.getType()) {
+      switch(widget.texts.getBlockType()) {
         case Constants.blockTypeHeadline1:
           fontSize = widget.controller.setting.blockHeadline1FontSize;
           break;
@@ -99,7 +99,7 @@ class MindEditBlockState extends State<MindEditBlock> {
           fontSize = widget.controller.setting.blockHeadline3FontSize;
           break;
       }
-      switch(widget.texts.getListing()) {
+      switch(widget.texts.getBlockListing()) {
         case Constants.blockListTypeBulleted:
           _leading = SizedBox(
             height: fontSize,
@@ -592,7 +592,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     return _triggerSelectedTextSpanStyle(TextDesc.underlineKey);
   }
   String getBlockType() {
-    return widget.texts.getType();
+    return widget.texts.getBlockType();
   }
   bool setBlockType(String type) {
     if(widget.texts.isTitle()) { // Cannot set block type in title block
@@ -613,7 +613,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
 
   String getBlockListing() {
-    return widget.texts.getListing();
+    return widget.texts.getBlockListing();
   }
   bool setBlockListing(String l) {
     if(widget.texts.isTitle()) { // Cannot set listing type in title block
@@ -809,7 +809,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
 
   String _getCurrentListing() {
-    return widget.texts.getListing();
+    return widget.texts.getBlockListing();
   }
 
   int _getCurrentLevel() {
