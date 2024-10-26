@@ -10,6 +10,7 @@ import 'package:mesh_note/mindeditor/view/toolbar/underline_text_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
 import 'base/movable_button.dart';
+import 'block_indent_button.dart';
 import 'block_type_button.dart';
 import 'bold_text_button.dart';
 import 'copy_paste_button.dart';
@@ -74,11 +75,23 @@ class MindEditorToolBar extends StatelessWidget {
         appearance: defaultAppearance,
         controller: controller,
       ),
+      BlockIndentDecreaseButton(
+        controller: controller,
+        appearance: defaultAppearance,
+        icon: Icons.format_indent_decrease,
+        tips: 'Decrease level',
+      ),
+      BlockIndentIncreaseButton(
+        controller: controller,
+        appearance: defaultAppearance,
+        icon: Icons.format_indent_increase,
+        tips: 'Increase level',
+      ),
       BlockListingButton(
         controller: controller,
         appearance: defaultAppearance,
         listing: Constants.blockListTypeBulleted,
-        icon: const Icon(Icons.format_list_bulleted),
+        icon: Icons.format_list_bulleted,
         tips: 'Bulleted List',
       ),
       // BlockTypeButton2.fromTitle(
@@ -91,7 +104,7 @@ class MindEditorToolBar extends StatelessWidget {
       BlockCheckedButton(
         controller: controller,
         appearance: defaultAppearance,
-        icon: const Icon(Icons.check_box_rounded),
+        icon: Icons.check_box_rounded,
         tips: 'Checked list',
         listing: Constants.blockListTypeChecked,
       ),
@@ -130,19 +143,19 @@ class MindEditorToolBar extends StatelessWidget {
   }
 
   static AppearanceSetting _buildDefaultAppearance(BuildContext context) {
+    // For mobile environment, make the button bigger
+    double iconSize = 18;
+    double size = 36;
     if(Controller().environment.isMobile()) {
-      return AppearanceSetting(
-        iconSize: 28,
-        size: 32,
-        fillColor: Theme.of(context).canvasColor,
-        hoverColor: Theme.of(context).colorScheme.background,
-      );
+      iconSize = 28;
+      size = 32;
     }
     return AppearanceSetting(
-      iconSize: 18,
-      size: 36,
+      iconSize: iconSize,
+      size: size,
       fillColor: Theme.of(context).canvasColor,
       hoverColor: Theme.of(context).colorScheme.background,
+      disabledColor: Theme.of(context).disabledColor,
     );
   }
 

@@ -108,20 +108,18 @@ class EditorPopupToolbar extends StatelessWidget {
 
   static AppearanceSetting _buildDefaultAppearance(BuildContext context) {
     const padding = EdgeInsets.fromLTRB(16, 4, 16, 4);
+    double iconSize = 18;
+    double size = 36;
     if(Controller().environment.isMobile()) {
-      return AppearanceSetting(
-        iconSize: 28,
-        size: 32,
-        fillColor: Theme.of(context).canvasColor,
-        hoverColor: Theme.of(context).colorScheme.background,
-        padding: padding,
-      );
+      iconSize = 28;
+      size = 32;
     }
     return AppearanceSetting(
-      iconSize: 18,
-      size: 36,
+      iconSize: iconSize,
+      size: size,
       fillColor: Theme.of(context).canvasColor,
       hoverColor: Theme.of(context).colorScheme.background,
+      disabledColor: Theme.of(context).disabledColor,
       padding: padding,
     );
   }

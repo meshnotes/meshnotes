@@ -65,7 +65,7 @@ class _MultiStatesButtonState<T> extends State<MultiStatesButton<T>> {
     if(iconData == null || tip == null) return _buildEmptyButton();
     
     return ToolbarButton(
-      icon: Icon(iconData),
+      icon: Icon(iconData, size: widget.appearance.iconSize),
       appearance: widget.appearance,
       controller: widget.controller,
       tip: tip,

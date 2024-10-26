@@ -68,13 +68,21 @@ class MindEditBlockState extends State<MindEditBlock> {
         // CallbackRegistry.requestKeyboard();
       }
     }
+    var levelSpace = _buildLevelSpace();
     var blockImpl = _buildBlockImpl();
     var handler = _buildHandler();
     var extra = _buildExtra();
-    var result = _buildAll(handler, blockImpl, extra);
+    var result = _buildAll(levelSpace, handler, blockImpl, extra);
     return result;
   }
 
+  Widget? _buildLevelSpace() {
+    if(widget.ignoreLevel || widget.texts.getBlockLevel() == 0) {
+      return null;
+    }
+    final spaceLength = widget.texts.getBlockLevel() * Constants.tabWidth;
+    return SizedBox(width: spaceLength,);
+  }
   Widget _buildBlockImpl() {
     var fontSize = widget.controller.setting.blockNormalFontSize;
     if(widget.texts.isTitle()) {
@@ -230,7 +238,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     );
   }
 
-  Widget _buildAll(Widget? handler, Widget block, Widget extraWidget) {
+  Widget _buildAll(Widget? levelSpace, Widget? handler, Widget block, Widget extraWidget) {
     var items = <Widget>[block, extraWidget];
     if(_leading != null) {
       items.insert(0, _leading!);
@@ -256,6 +264,9 @@ class MindEditBlockState extends State<MindEditBlock> {
         },
       );
       return blockMouseRegion;
+    }
+    if(levelSpace != null) {
+      items.insert(0, levelSpace);
     }
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
@@ -622,6 +633,27 @@ class MindEditBlockState extends State<MindEditBlock> {
     return result;
   }
 
+  int getBlockLevel() {
+    return widget.texts.getBlockLevel();
+  }
+  bool setBlockLevel(int level) {
+    if(widget.texts.isTitle()) { // Cannot set level in title block
+      return false;
+    }
+    return _setBlockLevel(level);
+  }
+  bool _setBlockLevel(int newLevel) {
+    var paragraph = widget.texts;
+    bool result = paragraph.setBlockLevel(newLevel);
+    if(result) {
+      _getRender()?.updateParagraph();
+      _getRender()?.markNeedsLayout();
+      widget.controller.triggerBlockFormatChanged(paragraph);
+      _triggerBlockModified();
+    }
+    return result;
+  }
+
   /// Set span type of selected text
   /// 1. Find the selection range
   /// 2. Invoke triggerSelectedTextSpanStyle to change the style
@@ -781,7 +813,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
 
   int _getCurrentLevel() {
-    return widget.texts.getLevel();
+    return widget.texts.getBlockLevel();
   }
 
   void _updateNavigatorViewIfNeeded() {

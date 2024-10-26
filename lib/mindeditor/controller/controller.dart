@@ -236,7 +236,7 @@ class Controller {
   void triggerBlockFormatChanged(ParagraphDesc? para) {
     var type = para?.getType();
     var listing = para?.getListing();
-    var level = para?.getLevel();
+    var level = para?.getBlockLevel();
     CallbackRegistry.triggerEditingBlockFormatEvent(type, listing, level);
   }
 

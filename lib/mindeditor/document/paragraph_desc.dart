@@ -161,18 +161,6 @@ class ParagraphDesc {
     return -1;
   }
 
-  String getType() {
-    return _convertBlockType(_type);
-  }
-
-  String getListing() {
-    return _convertBlockListing(_listing);
-  }
-
-  int getLevel() {
-    return _level;
-  }
-
   void setDocument(Document p) {
     _parent = p;
   }
@@ -416,15 +404,29 @@ class ParagraphDesc {
     ;
   }
 
+  String getType() {
+    return _convertBlockType(_type);
+  }
   bool setBlockType(String blockType) {
     var newType = _parseBlockType(blockType);
     _updateBlockType(newType);
     return true;
   }
 
+  String getListing() {
+    return _convertBlockListing(_listing);
+  }
   bool setBlockListing(String blockListing) {
     var newListing = _parseBlockListing(blockListing);
     _updateBlockListing(newListing);
+    return true;
+  }
+
+  int getBlockLevel() {
+    return _level;
+  }
+  bool setBlockLevel(int level) {
+    _updateBlockLevel(level);
     return true;
   }
 
@@ -557,7 +559,7 @@ class ParagraphDesc {
   }
 
   void _updateBlockType(_BlockType newType) {
-    if(newType != _type) {
+    if(_type != newType) {
       _type = newType;
       _storeBlock();
     }
@@ -594,7 +596,7 @@ class ParagraphDesc {
   }
 
   void _updateBlockListing(_BlockListing newListing) {
-    if(newListing != _listing) {
+    if(_listing != newListing) {
       _listing = newListing;
       _storeBlock();
     }
@@ -622,6 +624,12 @@ class ParagraphDesc {
         return Constants.blockListTypeCheckedConfirm;
       case _BlockListing.none:
         return Constants.blockListTypeNone;
+    }
+  }
+  void _updateBlockLevel(int newLevel) {
+    if(_level != newLevel) {
+      _level = newLevel;
+      _storeBlock();
     }
   }
 

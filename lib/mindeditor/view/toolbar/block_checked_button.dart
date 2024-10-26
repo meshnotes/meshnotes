@@ -9,7 +9,7 @@ import 'package:mesh_note/mindeditor/controller/controller.dart';
 class BlockCheckedButton extends StatelessWidget {
   final Controller controller;
   final AppearanceSetting appearance;
-  final Widget icon;
+  final IconData icon;
   final String tips;
   final String listing;
 
@@ -27,9 +27,9 @@ class BlockCheckedButton extends StatelessWidget {
     return BlockFormatButton(
       controller: controller,
       appearance: appearance,
-      icon: icon,
+      iconData: icon,
       tip: tips,
-      showOrNot: (String? _type, String? _listing, int? _level) {
+      activeOrNot: (String? _type, String? _listing, int? _level) {
         return listing == _listing;
       },
       onPressed: () {

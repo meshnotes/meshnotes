@@ -5,6 +5,7 @@ class AppearanceSetting {
   double size;
   Color fillColor;
   Color hoverColor;
+  Color disabledColor;
   EdgeInsets? padding;
 
   AppearanceSetting({
@@ -12,6 +13,7 @@ class AppearanceSetting {
     required this.size,
     required this.fillColor,
     required this.hoverColor,
+    required this.disabledColor,
     this.padding,
   });
 }

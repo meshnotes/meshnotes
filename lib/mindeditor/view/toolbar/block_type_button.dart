@@ -42,9 +42,9 @@ class BlockTypeButton extends StatelessWidget {
     return BlockFormatButton(
       controller: controller,
       appearance: appearance,
-      icon: icon,
+      iconWidget: icon,
       tip: tips,
-      showOrNot: (String? _type, String? _listing, int? _level) {
+      activeOrNot: (String? _type, String? _listing, int? _level) {
         return type == _type;
       },
       onPressed: () {

@@ -73,7 +73,7 @@ class PluginManager {
     var result = <Widget>[];
     for(var item in toolbarInfo) {
       var button = ToolbarButton(
-        icon: Icon(item.buttonIcon),
+        icon: Icon(item.buttonIcon, size: appearance.iconSize),
         appearance: appearance,
         tip: item.tip,
         controller: controller,
