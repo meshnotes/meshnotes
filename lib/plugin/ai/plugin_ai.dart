@@ -392,7 +392,7 @@ class _AIChatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget? resultWidget;
     if(content.result.isEmpty) {
-      resultWidget = LoadingAnimationWidget.prograssiveDots(color: Colors.black54, size: 14.0);
+      resultWidget = LoadingAnimationWidget.progressiveDots(color: Colors.black54, size: 14.0);
       // return Text('Querying: ${content.prompt}');
     } else {
       resultWidget = Text(content.result);

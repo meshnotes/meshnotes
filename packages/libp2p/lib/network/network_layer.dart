@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:libp2p/network/incomplete_pool.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
 import 'package:libp2p/network/protocol/packet.dart';
 import 'package:libp2p/utils.dart';
 import 'peer.dart';
+import 'protocol/util.dart';
 
 enum NetworkStatus {
   invalid,
@@ -14,7 +16,7 @@ enum NetworkStatus {
 
 // Stateless Object Transfer Protocol
 class SOTPNetworkLayer {
-  static const multicastGroup = '224.0.179.74';
+  static const multicastGroup = '224.0.0.179'; // Only 224.0.0.0/8 could be received by all devices, by test result
   static const logPrefix = '[Network]';
   final connectionPool = ConnectionPool();
   final incompletePool = IncompletePool();
@@ -24,6 +26,7 @@ class SOTPNetworkLayer {
   late int realPort;
   RawDatagramSocket? _udp;
   RawDatagramSocket get udp => _udp!;
+  List<RawDatagramSocket> _broadcastSockets = [];
   NetworkStatus _status = NetworkStatus.invalid;
   NetworkStatus getStatus() => _status;
   int maxTimeout = 3000;
@@ -64,9 +67,6 @@ class SOTPNetworkLayer {
   start() async {
     _udp = await RawDatagramSocket.bind(localIp, localPort);
     realPort = udp.port;
-    if(useMulticast) {
-      udp.joinMulticast(InternetAddress(multicastGroup));
-    }
     _status = NetworkStatus.running;
     udp.listen((event) {
       if(event == RawSocketEvent.read) {
@@ -119,6 +119,10 @@ class SOTPNetworkLayer {
         }
       }
     });
+    if (useMulticast) {
+      _udp?.joinMulticast(InternetAddress(multicastGroup));
+      _startBroadcast(); // Bind every interface with random port, to send multicast message
+    }
     timer = Timer.periodic(Duration(milliseconds: 1000), _networkTimerHandler);
     startedCallback?.call();
   }
@@ -217,28 +221,37 @@ class SOTPNetworkLayer {
   }
   void _onAnnounce(PacketAnnounce packet, InternetAddress ip, int port) {
     String peerDeviceId = packet.deviceId;
+    String peerIp = buildIpAddress(packet.address);
+    int peerPort = packet.port;
     if(peerDeviceId == _deviceId) return;
-    MyLogger.info('${logPrefix} receive announce message from ${ip.address}:$port, with deviceId($peerDeviceId)');
-    _sendAnnounceAck(ip, port);
-    onDetected?.call(peerDeviceId, ip, port);
+    MyLogger.debug('${logPrefix} receive announce message from ${ip.address}:$port, with peerIP($peerIp):peerPort($peerPort), deviceId($peerDeviceId), my deviceId(${_deviceId})');
+    _sendAnnounceAck(ip, peerPort);
+    onDetected?.call(peerDeviceId, ip, peerPort); // announce message is sent from broadcast socket, so use peerPort to contact to peer
   }
   void _onAnnounceAck(PacketAnnounce packet, InternetAddress ip, int port) {
     String peerDeviceId = packet.deviceId;
+    String peerIp = buildIpAddress(packet.address);
+    int peerPort = packet.port;
+    MyLogger.debug('${logPrefix} receive announce_ack message from ${ip.address}:$port, with peerIP($peerIp):peerPort($peerPort), deviceId($peerDeviceId)');
     if(peerDeviceId == _deviceId) return; // Impossible
-    MyLogger.info('${logPrefix} receive announce_ack message from ${ip.address}:$port, with deviceId($peerDeviceId)');
-    onDetected?.call(peerDeviceId, ip, port);
+    onDetected?.call(peerDeviceId, ip, port); // Unlike _onAnnounce, announce_ack is sent from service socket, so use port directly
   }
 
-  void _sendAnnounce(InternetAddress ip, int port) {
+  void _sendAnnounce(RawDatagramSocket socket, InternetAddress ip, Uint8List address, int port) {
+    int intAddress = address.buffer.asByteData().getInt32(0);
     PacketAnnounce reply = PacketAnnounce(
       deviceId: _deviceId,
+      address: intAddress,
+      port: port,
       header: PacketHeader(type: PacketType.announce, destConnectionId: 0, packetNumber: 0),
     );
-    _sendDelegate(reply.toBytes(), ip, port);
+    _sendDelegate(reply.toBytes(), ip, port, socket: socket);
   }
   void _sendAnnounceAck(InternetAddress ip, int port) {
     PacketAnnounce reply = PacketAnnounce(
       deviceId: _deviceId,
+      address: 0,
+      port: localPort,
       header: PacketHeader(type: PacketType.announceAck, destConnectionId: 0, packetNumber: 0),
     );
     _sendDelegate(reply.toBytes(), ip, port);
@@ -254,7 +267,6 @@ class SOTPNetworkLayer {
 
     peer.onClose();
   }
-
   Peer? _getConnectionFromHeader(PacketHeader header) {
     var peer = connectionPool.getConnectionById(header.destConnectionId);
     if(peer?.getStatus() != ConnectionStatus.established) {
@@ -263,20 +275,42 @@ class SOTPNetworkLayer {
     return peer;
   }
 
+  void _startBroadcast() async {
+    List<NetworkInterface> interfaces = await NetworkInterface.list();
+    
+    for(var interface in interfaces) {
+      for(var addr in interface.addresses) {
+        try {
+          var socket = await RawDatagramSocket.bind(addr, 0);
+          if(useMulticast) {
+            socket.joinMulticast(InternetAddress(multicastGroup));
+          }
+          _broadcastSockets.add(socket);
+
+          MyLogger.info('${logPrefix} Bind broadcast socket to ${addr.address}:${socket.port}');
+        } catch(e) {
+          MyLogger.warn('${logPrefix} Failed to bind broadcast socket to ${addr.address}: $e');
+          continue;
+        }
+      }
+    }
+  }
+
   int _generateId() {
     while(true) {
       int id = randomId();
-      // FIXME 这里有个问题，可能会跟incompletePool的id重复
+      // FIXME May duplicated with incompletePool's id
       if(connectionPool.getConnectionById(id) == null) {
         return id;
       }
     }
   }
 
-  int _sendDelegate(List<int> data, InternetAddress ip, int port) {
+  int _sendDelegate(List<int> data, InternetAddress ip, int port, {RawDatagramSocket? socket = null}) {
+    if(socket == null) socket = udp;
     var sendData = _networkCondition?.sendHook?.call(data)?? true;
     if(sendData) {
-      return udp.send(data, ip, port);
+      return socket.send(data, ip, port);
     } else {
       return 0;
     }
@@ -312,9 +346,15 @@ class SOTPNetworkLayer {
   }
   void _tryMulticast(int now) {
     if(now - _lastSentMulticast > _maxMulticastInterval) {
-      MyLogger.info('${logPrefix} send multicast message to $multicastGroup');
-      _sendAnnounce(InternetAddress(multicastGroup), localPort);
+      MyLogger.info('${logPrefix} Send multicast message to $multicastGroup');
+      for(var socket in _broadcastSockets) {
+        _tryMulticastForEveryInterface(now, socket);
+      }
       _lastSentMulticast = now;
     }
+  }
+  void _tryMulticastForEveryInterface(int now, RawDatagramSocket socket) {
+    MyLogger.debug('${logPrefix} Send multicast message from ${socket.address.address}:${socket.port}');
+    _sendAnnounce(socket, InternetAddress(multicastGroup), socket.address.rawAddress, localPort);
   }
 }

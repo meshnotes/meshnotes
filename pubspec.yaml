@@ -62,7 +62,7 @@ dependencies:
   android_id: ^0.3.6
   super_clipboard: ^0.8.5
   dart_openai: ^3.0.0
-  loading_animation_widget: ^1.2.1
+  loading_animation_widget: ^1.2.2
   libp2p:
     path: packages/libp2p
   my_log:

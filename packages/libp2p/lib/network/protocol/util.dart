@@ -54,3 +54,7 @@ int buildBytes8(List<int> list, int start) {
   }
   return list[start] & 0xFF;
 }
+
+String buildIpAddress(int address) {
+  return '${(address >> 24) & 0xFF}.${(address >> 16) & 0xFF}.${(address >> 8) & 0xFF}.${address & 0xFF}';
+}

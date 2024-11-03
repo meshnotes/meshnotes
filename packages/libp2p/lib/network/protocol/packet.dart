@@ -46,7 +46,7 @@ class PacketHeader {
   }
 
   static int getLength() {
-    return 12;
+    return 4 + 4 + 4;
   }
 }
 
@@ -143,52 +143,58 @@ class PacketData extends Packet {
 /// +---------------+
 /// | header        |
 /// +---------------+
-/// | len(2)        |
+/// | IP(4)         |
 /// +---------------+
-/// | deviceId(len) |
+/// | port(2)       |
+/// +---------------+
+/// | deviceId      |
 /// +---------------+
 class PacketAnnounce extends Packet {
+  int address;
+  int port;
   String deviceId;
 
   PacketAnnounce({
+    required this.address,
+    required this.port,
     required this.deviceId,
     required super.header,
   });
 
   factory PacketAnnounce.fromBytes(List<int> bytes) {
     var header = PacketHeader.fromBytes(bytes);
-    int len = buildBytes16(bytes, PacketHeader.getLength());
-    final data = bytes.sublist(PacketHeader.getLength() + 2);
-    if(data.length != len) {
-      //TODO invalid frame
-    }
-    String deviceId = utf8.decode(data);
-    return PacketAnnounce(header: header, deviceId: deviceId);
+    int start = PacketHeader.getLength();
+    int address = buildBytes32(bytes, start);
+    start += 4;
+    int port = buildBytes16(bytes, start);
+    start += 2;
+    String deviceId = utf8.decode(bytes.sublist(start));
+    return PacketAnnounce(address: address, port: port, deviceId: deviceId, header: header);
   }
 
   @override
   List<int> toBytes() {
     var result = List.filled(getLength(), 0);
     header.fillBytes(result);
-    int len = deviceId.length;
     int start = PacketHeader.getLength();
-    fillBytes16(result, start, len);
+    fillBytes32(result, start, address);
+    start += 4;
+    fillBytes16(result, start, port);
     start += 2;
     var bytes = utf8.encode(deviceId);
-    result.setRange(start, start + len, bytes);
+    result.setRange(start, start + bytes.length, bytes);
     return result;
   }
 
   int getLength() {
     int headerLength = PacketHeader.getLength();
-    int len = deviceId.length;
-    return headerLength + len + 2;
+    int deviceIdLength = utf8.encode(deviceId).length;
+    return headerLength + 4 + 2 + deviceIdLength; // IP(4) + port(2) + deviceId
   }
 
   static bool isValid(List<int> data) {
     int headerLength = PacketHeader.getLength();
-    int len = buildBytes16(data, headerLength);
-    return data.length == headerLength + 2 + len;
+    return data.length > headerLength + 4 + 2;
   }
 }
 
@@ -196,7 +202,7 @@ class PacketAnnounce extends Packet {
 /// +---------------+
 /// | header        |
 /// +---------------+
-/// | tag           |
+/// | tag(4)        |
 /// +---------------+
 class PacketBye extends Packet {
   int tag;

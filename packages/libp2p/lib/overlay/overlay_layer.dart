@@ -189,12 +189,15 @@ class VillageOverlay implements ApplicationController {
   }
   void _onDetected(String peerDeviceId, InternetAddress peerIp, int peerPort) {
     // Let the peer with smaller device id to connect
+    MyLogger.debug('${logPrefix} Detected peer($peerDeviceId) with address(${peerIp.address}:$peerPort)');
     if(_deviceId.compareTo(peerDeviceId) < 0) {
+      MyLogger.debug('${logPrefix} My deviceId(${_deviceId}) is smaller than peerDeviceId($peerDeviceId), so try to connect');
       for(var node in _villagers) {
         if(node.ip == peerIp && node.port == peerPort) { // Already in the _villagers list
           return;
         }
       }
+      MyLogger.info('${logPrefix} Try to connect to new node(${peerIp.address}:$peerPort)');
       var node = VillagerNode(host: peerIp.address, port: peerPort)
         ..ip = peerIp;
       _villagers.add(node);
