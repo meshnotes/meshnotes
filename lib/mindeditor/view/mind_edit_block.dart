@@ -759,7 +759,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     var newTexts = _cutCurrentPositionAndGetRemains(offset);
     var currentBlockId = widget.texts.getBlockId();
     var doc = widget.controller.document!;
-    var newItem = ParagraphDesc(texts: newTexts, listing: _getCurrentListing(), level: _getCurrentLevel());
+    var newItem = ParagraphDesc(texts: newTexts, listing: _getCurrentListingAndFillEmpty(), level: _getCurrentLevel());
     doc.insertNewParagraphAfterId(currentBlockId, newItem);
 
     CallbackRegistry.refreshDoc(activeBlockId: newItem.getBlockId());
@@ -786,7 +786,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     List<String> result = [];
     for(var line in texts) {
       var textDesc = TextDesc()..text = line;
-      var para = ParagraphDesc(texts: [textDesc], listing: _getCurrentListing(), level: _getCurrentLevel());
+      var para = ParagraphDesc(texts: [textDesc], listing: _getCurrentListingAndFillEmpty(), level: _getCurrentLevel());
       paragraphs.add(para);
       result.add(para.getBlockId());
     }
@@ -808,8 +808,8 @@ class MindEditBlockState extends State<MindEditBlock> {
     setState(() {});
   }
 
-  String _getCurrentListing() {
-    return widget.texts.getBlockListing();
+  String _getCurrentListingAndFillEmpty() {
+    return widget.texts.getBlockListingAndFillEmpty();
   }
 
   int _getCurrentLevel() {

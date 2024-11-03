@@ -413,6 +413,13 @@ class ParagraphDesc {
     return true;
   }
 
+  String getBlockListingAndFillEmpty() {
+    var listing = _listing;
+    if(listing == _BlockListing.checkedConfirm) {
+      listing = _BlockListing.checked;
+    }
+    return _convertBlockListing(listing);
+  }
   String getBlockListing() {
     return _convertBlockListing(_listing);
   }
