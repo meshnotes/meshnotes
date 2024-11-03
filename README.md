@@ -22,10 +22,8 @@ Both these two ways you need to run mesh notes on both devices. But by the third
 
 ## Building and testing environment
 Build and test in Flutter 3.19.6 stable, with Dart 3.3.4.
-
-Xcode 15.1
-
-Windows: Cursor 0.42.3 + Visual Studio 2019
+For mac: Cursor 0.42.3 + Xcode 15.1
+For windows: Visual Studio 2019
 
 ## How to setup environment and run it
 1. Install rust, the super_clipboard package needs it. Please refer to [package super_clipboard](https://pub.dev/packages/super_clipboard)
@@ -33,6 +31,23 @@ Windows: Cursor 0.42.3 + Visual Studio 2019
 3. Run flutter `run -d <your device>` to run and debug
 4. Run flutter `run -d <your device> --release` to run it in release mode
 5. Run flutter `build <macos/windows> --release` to build it in release mode
+
+# Using Mesh Notes
+Mesh Notes is a note application, I use it to write down light-weight text contents, like my reading notes, my memo, my idea about anything.
+It supports synchronizing data between your own devices. Currently only when your devices are all connected to your LAN environment. The Internet P2P synchronizing will be supported in the future.
+
+## Before using it
+It's strongly recommended that you create your own key before using it. Although you may select "Just want to try it". But the synchronizing feature requires a public-private key pair.
+
+## How to synchronize data between devices
+Currently only supports synchronizing data in Local Area Network(LAN).
+1. Using local multicasting
+Connect your devices into the same WIFI or the same LAN Switch, launch Mesh Notes, wait for a minute, they will synchronize data automatically, no configuration is required.
+2. Set the server IP
+The first way may not work, since some WIFI router may disable the local multicast. Use one of your devices as the server(you'll need to set it as fixed IP, let's say 192.168.1.100), and set other devices' server IP and port to be 192.168.1.100:17974(17974 is the default port). Launch Mesh Notes on your devices, they will synchronize data in a minute.
+3. Synchronizing anywhere
+Not supported yet, but this feature is in the plan.
+In the previous two ways, your data is saved on your own devices
 
 # Source code structure
 There are 5 parts of code:
@@ -58,5 +73,10 @@ There are 5 parts of code:
 - overlay/: the overlay layer manage the topologic of peers, based on the network layer.
 - application/: the top layer of libp2p, implements the "chain of version" protocol.
 
+## Source code for plugins
+
+## Proposal for ROP(Reader Oriented Programming)
+
 # Documentation for implementation details
 [Screen layers for UI elements](./documentation/layers.md "Layers")
+
