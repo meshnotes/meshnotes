@@ -21,9 +21,9 @@ Both these two ways you need to run mesh notes on both devices. But by the third
 3. Using a server to synchronize data between devices. But the server runs like a tracker in BT, it won't store data permanently. The data is safe only when stored in your devices.
 
 ## Building and testing environment
-Build and test in Flutter 3.19.6 stable, with Dart 3.3.4.
+Build and test in Flutter 3.22.0 stable, with Dart 3.4.0.
 For mac: Cursor 0.42.3 + Xcode 15.1
-For windows: Visual Studio 2019
+For windows: Visual Studio 2022
 
 ## How to setup environment and run it
 1. Install rust, the super_clipboard package needs it. Please refer to [package super_clipboard](https://pub.dev/packages/super_clipboard)

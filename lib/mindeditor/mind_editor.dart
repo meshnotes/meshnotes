@@ -161,8 +161,9 @@ class MindEditorState extends State<MindEditor> {
         child: repaintBoundary,
       ),
       configuration: ViewConfiguration(
-          size: imageSize,
-          devicePixelRatio: devicePixelRation
+        physicalConstraints: BoxConstraints(maxWidth: imageSize.width, maxHeight: imageSize.height),
+        // size: imageSize,
+        devicePixelRatio: devicePixelRation
       ),
     );
 

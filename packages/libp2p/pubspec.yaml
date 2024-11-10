@@ -5,7 +5,7 @@ publish_to: none
 #homepage: http://xxx.yyy.zzz
 
 environment:
-  sdk: ">=3.1.0 <=3.3.4"
+  sdk: ">=3.4.0"
 
 dependencies:
   sqlite3: ^1.10.1
