@@ -62,6 +62,7 @@ class KeyboardControl {
 
   static bool _handleMoveKeys(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
     // Should close IME to clear the composing texts
+    Controller().selectionController.setShouldShowSelectionHandle(false);
     CallbackRegistry.rudelyCloseIME();
     if(_key == _leftKey) {
       _moveCursorLeft(funcKeys);
@@ -77,6 +78,7 @@ class KeyboardControl {
 
   static bool _handleDelKeys(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
     final selectionController = Controller().selectionController;
+    selectionController.setShouldShowSelectionHandle(false);
     if(!selectionController.isCollapsed()) {
       selectionController.deleteSelectedContent();
       return true;
@@ -98,6 +100,7 @@ class KeyboardControl {
   static bool _handleNewLine(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
     MyLogger.info('_handleNewLine: spawn new line');
     final controller = Controller();
+    controller.selectionController.setShouldShowSelectionHandle(false);
     if(!controller.selectionController.isCollapsed()) {
       controller.selectionController.deleteSelectedContent();
     }

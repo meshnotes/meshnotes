@@ -320,9 +320,14 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   Widget _buildBlockList() {
     var builder = ListView.builder(
       controller: _scrollController,
-      itemCount: widget.document.paragraphs.length,
+      itemCount: widget.document.paragraphs.length + 1,
       itemBuilder: (context, index) {
-        return _constructBlock(widget.document.paragraphs[index]);
+        if(index < widget.document.paragraphs.length) {
+          return _constructBlock(widget.document.paragraphs[index]);
+        }
+        return const SizedBox(
+          height: 50,
+        );
       },
     );
     return builder;
@@ -432,6 +437,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   @override
   void updateEditingValue(TextEditingValue value) {
+    // Hide selection handle when editing
+    controller.selectionController.setShouldShowSelectionHandle(false);
+
     // Check following situations first:
     // 1. In iOS environment, using _initialTextValue to detect deletion in soft keyboard
     //   1.1. Check deletion
