@@ -61,8 +61,11 @@ dependencies:
   device_info_plus: ^9.1.1
   android_id: ^0.3.6
   super_clipboard: ^0.8.5
-  dart_openai: ^3.0.0
+  dart_openai: ^4.0.0
   loading_animation_widget: ^1.2.2
+  mp_audio_stream: ^0.2.0
+  record: ^5.2.0
+  record_windows: ^1.0.4
   libp2p:
     path: packages/libp2p
   my_log:
@@ -86,7 +89,7 @@ flutter_icons:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  test: ^1.16.0
+  test:
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your

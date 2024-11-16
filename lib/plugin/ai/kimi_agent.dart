@@ -22,13 +22,13 @@ class KimiExecutor implements AiExecutor {
     var messages = <OpenAIChatCompletionChoiceMessageModel>[
       OpenAIChatCompletionChoiceMessageModel(
         role: OpenAIChatMessageRole.user,
-        content: userPrompt,
+        content: [OpenAIChatCompletionChoiceMessageContentItemModel(text: userPrompt, type: 'text')],
       ),
     ];
     if(systemPrompt != null) {
       messages.insert(0, OpenAIChatCompletionChoiceMessageModel(
         role: OpenAIChatMessageRole.system,
-        content: systemPrompt,
+        content: [OpenAIChatCompletionChoiceMessageContentItemModel(text: systemPrompt, type: 'text')],
       ));
     }
     MyLogger.debug('kimi execute: messages=$messages');
@@ -37,6 +37,11 @@ class KimiExecutor implements AiExecutor {
       messages: messages,
       temperature: 0.3,
     );
-    return completion.choices.first.message.content;
+    return completion.choices.first.message.content!.first.text!;
+  }
+
+  @override
+  String getApiKey() {
+    return apiKey;
   }
 }

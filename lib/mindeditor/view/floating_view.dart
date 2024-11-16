@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
+import 'floating_stack_layer.dart';
+
 class FloatingViewManager {
   late Widget _selectionLayer;
   late Widget _pluginTipsLayer;
   late Widget _popupMenuLayer;
   late Widget _pluginDialogLayer;
-  final _selectionKey = GlobalKey<_FloatingStackViewState>();
-  final _pluginTipsKey = GlobalKey<_FloatingStackViewState>();
-  final _popupMenuKey = GlobalKey<_FloatingStackViewState>();
-  final _pluginDialogKey = GlobalKey<_FloatingStackViewState>();
+  final _selectionKey = GlobalKey<FloatingStackViewState>();
+  final _pluginTipsKey = GlobalKey<FloatingStackViewState>();
+  final _popupMenuKey = GlobalKey<FloatingStackViewState>();
+  final _pluginDialogKey = GlobalKey<FloatingStackViewState>();
 
   FloatingViewManager() {
     _selectionLayer = _buildSelectionLayer();
@@ -81,65 +83,24 @@ class FloatingViewManager {
   }
 
   Widget _buildSelectionLayer() {
-    return _FloatingStackView(
+    return FloatingStackView(
       key: _selectionKey,
     );
   }
   Widget _buildExtraLayer() {
-    return _FloatingStackView(
+    return FloatingStackView(
       key: _pluginTipsKey,
     );
   }
   Widget _buildPopupMenuLayer() {
-    return _FloatingStackView(
+    return FloatingStackView(
       key: _popupMenuKey,
     );
   }
   Widget _buildPluginDialogLayer() {
-    return _FloatingStackView(
+    return FloatingStackView(
       key: _pluginDialogKey,
     );
-  }
-}
-
-class _FloatingStackView extends StatefulWidget {
-  const _FloatingStackView({
-    super.key,
-  });
-
-  @override
-  State<StatefulWidget> createState() => _FloatingStackViewState();
-}
-class _FloatingStackViewState extends State<_FloatingStackView> {
-  List<Widget> views = [];
-
-  @override
-  Widget build(BuildContext context) {
-    final stack = Stack(
-      children: views,
-    );
-    return stack;
-  }
-
-  void addLayers(Widget _w1, Widget _w2) {
-    setState(() {
-      views.addAll([_w1, _w2]);
-    });
-  }
-  void addLayer(Widget _w) {
-    setState(() {
-      views.add(_w);
-    });
-  }
-  void clearLayer() {
-    setState(() {
-      views.clear();
-    });
-  }
-  void removeLayer(Widget _w) {
-    setState(() {
-      views.remove(_w);
-    });
   }
 }
 

@@ -23,6 +23,8 @@ class CallbackRegistry {
   static Function()? _screenShotHandler;
   static Function(NetworkStatus)? _networkStatusWatcher;
   static Function(String)? _showToastCallback;
+  static Function(String, Widget)? _showGlobalDialogCallback;
+  static Function()? _clearGlobalDialogCallback;
 
   static void registerTitleBar(DocumentTitleBarState _s) {
     _titleBarState = _s;
@@ -192,11 +194,26 @@ class CallbackRegistry {
     _screenShotHandler?.call();
   }
 
+  // Followings are callbacks for show toast and dialog in global layers
   static void registerShowToast(void Function(String) showToastCallback) {
     _showToastCallback = showToastCallback;
   }
   static void showToast(String content) {
     MyLogger.info('showToast: $content, _showToastCallback=$_showToastCallback');
     _showToastCallback?.call(content);
+  }
+
+  static void registerShowGlobalDialog(void Function(String, Widget) showGlobalDialogCallback) {
+    _showGlobalDialogCallback = showGlobalDialogCallback;
+  }
+  static void showGlobalDialog(String title, Widget child) {
+    _showGlobalDialogCallback?.call(title, child);
+  }
+
+  static void registerClearGlobalDialog(void Function() clearGlobalDialogCallback) {
+    _clearGlobalDialogCallback = clearGlobalDialogCallback;
+  }
+  static void clearGlobalDialog() {
+    _clearGlobalDialogCallback?.call();
   }
 }

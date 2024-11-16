@@ -156,7 +156,7 @@ class Setting {
   String? getSetting(String key) {
     if (_settingMap.containsKey(key)) {
       final setting = _settingMap[key]!;
-      return setting.value;
+      return setting.value?.trim();
     }
     return null;
   }

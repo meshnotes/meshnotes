@@ -122,59 +122,22 @@ class PluginManager {
   }
   void showDialog(String title, Widget subChild) {
     closeDialog();
-    CallbackRegistry.hideKeyboard();
-    final widget = LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmallView = controller.environment.isSmallView(context);
-        double width = 300;
-        double height = 300;
-        if(isSmallView) {
-          width = double.infinity;
-          height = double.infinity;
-        }
-        var child = Container(
-          child: subChild,
-        );
-        var titleBar = _buildTitleBar(title);
-        var column = Column(
-          children: [
-            titleBar,
-            Expanded(
-              child: child,
-            ),
-          ],
-        );
-        var dialog = Scaffold(
-          // elevation: 32.0,
-          // type: MaterialType.transparency,
-          body: Container(
-            padding: const EdgeInsets.all(8.0),
-            child: column,
-          ),
-        );
-        var box = SizedBox(
-          width: width,
-          height: height,
-          child: dialog,
-        );
-        // double horizonPadding = 8.0;
-        // double verticalPadding = controller.getToolbarHeight()?? 16.0;
-        var container = Container(
-          margin: const EdgeInsets.fromLTRB(0, 128, 0, 0),
-          alignment: Alignment.bottomRight,
-          child: Material(
-            elevation: 1.0,
-            child: box,
-          ),
-        );
-        // var align = Align(
-        //   alignment: Alignment.bottomRight,
-        //   child: container,
-        // );
-        return container;
-      }
-    );
+    final widget = _createDialog(title, subChild, closeDialog);
     CallbackRegistry.getFloatingViewManager()?.showPluginDialog(widget);
+  }
+  
+
+  void closeGlobalDialog() {
+    CallbackRegistry.clearGlobalDialog();
+  }
+  void showGlobalDialog(String title, Widget widget) {
+    closeGlobalDialog();
+    // final widget = _createDialog(title, child, closeGlobalDialog);
+    CallbackRegistry.showGlobalDialog(title, widget);
+  }
+
+  void showToast(String message) {
+    CallbackRegistry.showToast(message);
   }
 
   List<SettingData> getPluginSupportedSettings() {
@@ -202,11 +165,28 @@ class PluginManager {
     blockState.clearExtra(key);
   }
 
-  Widget _buildTitleBar(String title) {
+  List<void Function(BlockChangedEventData)> blockContentChangedEventHandlerQueue = [];
+  void registerBlockContentChangeEventListener(void Function(BlockChangedEventData) handler) {
+    var queue = blockContentChangedEventHandlerQueue;
+    if(queue.contains(handler)) return;
+    queue.add(handler);
+  }
+  void produceBlockContentChangedEvent(String blockId, String content) {
+    var queue = blockContentChangedEventHandlerQueue;
+    final data = BlockChangedEventData(blockId: blockId, content: content);
+    for(var callback in queue) {
+      callback.call(data);
+    }
+  }
+
+  Widget _buildTitleBar(String title, void Function() closeCallback) {
+    if(title.isEmpty) {
+      return Container();
+    }
     var titleText = Text(title);
     var button = CupertinoButton(
       child: const Icon(Icons.close),
-      onPressed: closeDialog,
+      onPressed: closeCallback,
     );
     var row = Row(
       children: [
@@ -223,18 +203,61 @@ class PluginManager {
     );
     return row;
   }
-  List<void Function(BlockChangedEventData)> blockContentChangedEventHandlerQueue = [];
-  void registerBlockContentChangeEventListener(void Function(BlockChangedEventData) handler) {
-    var queue = blockContentChangedEventHandlerQueue;
-    if(queue.contains(handler)) return;
-    queue.add(handler);
-  }
-  void produceBlockContentChangedEvent(String blockId, String content) {
-    var queue = blockContentChangedEventHandlerQueue;
-    final data = BlockChangedEventData(blockId: blockId, content: content);
-    for(var callback in queue) {
-      callback.call(data);
-    }
+  Widget _createDialog(String title, Widget subChild, void Function() closeCallback) {
+    CallbackRegistry.hideKeyboard();
+    final widget = LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallView = controller.environment.isSmallView(context);
+        double width = 300;
+        double height = 300;
+        if(isSmallView) {
+          width = double.infinity;
+          height = double.infinity;
+        }
+        var child = Container(
+          child: subChild,
+        );
+        var titleBar = _buildTitleBar(title, closeCallback);
+        var column = Column(
+          children: [
+            titleBar,
+            Expanded(
+              child: child,
+            ),
+          ],
+        );
+        var dialog = Scaffold(
+          // elevation: 32.0,
+          // type: MaterialType.transparency,
+          body: Container(
+            padding: const EdgeInsets.all(8.0),
+            child: column,
+          ),
+        );
+        var box = SizedBox(
+          width: width,
+          height: height,
+          child: dialog,
+        );
+        // double horizonPadding = 8.0;
+        // double verticalPadding = controller.getToolbarHeight()?? 16.0;
+        var container = Container(
+          margin: const EdgeInsets.fromLTRB(5, 128, 5, 5),
+          alignment: Alignment.bottomRight,
+          child: Material(
+            elevation: 8.0,
+            borderRadius: BorderRadius.circular(8.0),
+            child: box,
+          ),
+        );
+        // var align = Align(
+        //   alignment: Alignment.bottomRight,
+        //   child: container,
+        // );
+        return container;
+      }
+    );
+    return widget;
   }
 }
 
@@ -255,6 +278,24 @@ class PluginProxyImpl implements PluginProxy {
   @override
   void showDialog(String title, Widget child) {
     _manager.showDialog(title, child);
+  }
+  @override
+  void closeDialog() {
+    _manager.closeDialog();
+  }
+
+  @override
+  void showGlobalDialog(String title, Widget child) {
+    _manager.showGlobalDialog(title, child);
+  }
+  @override
+  void closeGlobalDialog() {
+    _manager.closeGlobalDialog();
+  }
+
+  @override
+  void showToast(String message) {
+    _manager.showToast(message);
   }
 
   @override
