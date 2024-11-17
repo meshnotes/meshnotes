@@ -245,6 +245,9 @@ class MindEditBlockState extends State<MindEditBlock> {
     }
     if(handler != null) {
       items.insert(0, handler);
+      if(levelSpace != null) {
+        items.insert(0, levelSpace);
+      }
       var row = Row(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
