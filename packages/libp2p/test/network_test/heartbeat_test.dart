@@ -17,7 +17,7 @@ void main() {
     var serverEstablished = Completer<bool>();
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       newConnectCallback: (c) {
         serverEstablished.complete(true);
       },
@@ -28,7 +28,7 @@ void main() {
     var clientEstablished = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       connectOkCallback: (c) {
         clientEstablished.complete(true);
       },
@@ -70,7 +70,7 @@ void main() {
     Peer? serverConnection;
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       newConnectCallback: (c) {
         serverEstablished.complete(true);
         serverConnection = c;
@@ -82,7 +82,7 @@ void main() {
     var clientEstablished = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       connectOkCallback: (c) {
         clientEstablished.complete(true);
       },

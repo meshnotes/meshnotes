@@ -7,12 +7,12 @@ import 'network/network_layer.dart';
 
 Future<SOTPNetworkLayer> startListening(int bindPort) async {
   String deviceId = 'abc';
-  var network = SOTPNetworkLayer(localIp: InternetAddress.anyIPv4, localPort: bindPort, deviceId: deviceId,
+  var network = SOTPNetworkLayer(localIp: InternetAddress.anyIPv4, servicePort: bindPort, deviceId: deviceId,
     connectOkCallback: (c) {
       print('Connection established to ${c.ip}:${c.port} with source connection Id ${c.getSourceId()} and dest connection Id ${c.getDestinationId()}');
     }
   );
-  print('Start listening on port ${network.localPort}');
+  print('Start listening on port ${network.servicePort}');
   await network.start();
   return network;
   // return connection;

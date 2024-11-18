@@ -20,7 +20,7 @@ void main() {
     Peer? serverConnection;
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: 'x',
       newConnectCallback: (c) {
         serverEstablished.complete(true);
@@ -32,7 +32,7 @@ void main() {
     var clientEstablished = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: 'x',
       connectOkCallback: (c) {
         clientEstablished.complete(true);
@@ -70,7 +70,7 @@ void main() {
     Peer? serverConnection;
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: 'x',
       newConnectCallback: (c) {
         serverEstablished.complete(true);
@@ -83,7 +83,7 @@ void main() {
     var clientEstablished = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: 'x',
       connectOkCallback: (c) {
         clientEstablished.complete(true);
@@ -148,7 +148,7 @@ void main() {
     Peer? serverConnection;
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: 'x',
       newConnectCallback: (c) {
         serverEstablished.complete(true);
@@ -160,7 +160,7 @@ void main() {
     var clientEstablished = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: 'x',
       connectOkCallback: (c) {
         clientEstablished.complete(true);
@@ -243,7 +243,7 @@ Future<void> testSendObject(String localIp, int serverPort, int dataSize, {bool 
   Peer? serverConnection;
   var server = SOTPNetworkLayer(
     localIp: serverIp,
-    localPort: serverPort,
+    servicePort: serverPort,
     deviceId: 'x',
     newConnectCallback: (c) {
       serverEstablished.complete(true);
@@ -255,7 +255,7 @@ Future<void> testSendObject(String localIp, int serverPort, int dataSize, {bool 
   var clientEstablished = Completer<bool>();
   var client = SOTPNetworkLayer(
     localIp: InternetAddress(localIp),
-    localPort: 0,
+    servicePort: 0,
     deviceId: 'x',
     connectOkCallback: (c) {
       clientEstablished.complete(true);

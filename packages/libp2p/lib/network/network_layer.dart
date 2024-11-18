@@ -16,13 +16,14 @@ enum NetworkStatus {
 
 // Stateless Object Transfer Protocol
 class SOTPNetworkLayer {
-  static const multicastGroup = '224.0.0.179'; // Only 224.0.0.0/8 could be received by all devices, by test result
+  static const multicastGroup = '224.0.0.179'; // Only 224.0.0.0/8 could be received by windows devices, by test result
+  static const multicastGroup2 = '239.0.179.74'; // Try to send to other multicast address
   static const logPrefix = '[Network]';
   final connectionPool = ConnectionPool();
   final incompletePool = IncompletePool();
   late Timer timer;
   InternetAddress localIp;
-  int localPort;
+  int servicePort;
   late int realPort;
   RawDatagramSocket? _udp;
   RawDatagramSocket get udp => _udp!;
@@ -54,7 +55,7 @@ class SOTPNetworkLayer {
 
   SOTPNetworkLayer({
     required this.localIp,
-    required this.localPort,
+    required this.servicePort,
     this.connectOkCallback,
     this.newConnectCallback,
     this.onReceivePacket,
@@ -65,7 +66,7 @@ class SOTPNetworkLayer {
   }) : _networkCondition = networkCondition, _deviceId = deviceId;
 
   start() async {
-    _udp = await RawDatagramSocket.bind(localIp, localPort);
+    _udp = await RawDatagramSocket.bind(localIp, servicePort);
     realPort = udp.port;
     _status = NetworkStatus.running;
     udp.listen((event) {
@@ -103,12 +104,12 @@ class SOTPNetworkLayer {
             _onData(packet as PacketData);
             break;
           case PacketType.announce:
-            if(peerIp == localIp && port == localPort) break; // Ignore packet from itself
+            if(peerIp == localIp && port == servicePort) break; // Ignore packet from itself
             _onAnnounce(packet as PacketAnnounce, peerIp, port);
             break;
           case PacketType.announceAck:
             if(!useMulticast) break; // Ignore announce_ack if not supporting multicast
-            if(peerIp == localIp && port == localPort) break; // Ignore packet from itself
+            if(peerIp == localIp && port == servicePort) break; // Ignore packet from itself
             _onAnnounceAck(packet as PacketAnnounce, peerIp, port);
             break;
           case PacketType.bye:
@@ -121,6 +122,7 @@ class SOTPNetworkLayer {
     });
     if (useMulticast) {
       _udp?.joinMulticast(InternetAddress(multicastGroup));
+      _udp?.joinMulticast(InternetAddress(multicastGroup2));
       _startBroadcast(); // Bind every interface with random port, to send multicast message
     }
     timer = Timer.periodic(Duration(milliseconds: 1000), _networkTimerHandler);
@@ -224,7 +226,7 @@ class SOTPNetworkLayer {
     String peerIp = buildIpAddress(packet.address);
     int peerPort = packet.port;
     if(peerDeviceId == _deviceId) return;
-    MyLogger.debug('${logPrefix} receive announce message from ${ip.address}:$port, with peerIP($peerIp):peerPort($peerPort), deviceId($peerDeviceId), my deviceId(${_deviceId})');
+    MyLogger.info('${logPrefix} receive announce message from ${ip.address}:$port, with peerIP($peerIp):peerPort($peerPort), deviceId($peerDeviceId), my deviceId(${_deviceId})');
     _sendAnnounceAck(ip, peerPort);
     onDetected?.call(peerDeviceId, ip, peerPort); // announce message is sent from broadcast socket, so use peerPort to contact to peer
   }
@@ -232,26 +234,26 @@ class SOTPNetworkLayer {
     String peerDeviceId = packet.deviceId;
     String peerIp = buildIpAddress(packet.address);
     int peerPort = packet.port;
-    MyLogger.debug('${logPrefix} receive announce_ack message from ${ip.address}:$port, with peerIP($peerIp):peerPort($peerPort), deviceId($peerDeviceId)');
     if(peerDeviceId == _deviceId) return; // Impossible
+    MyLogger.debug('${logPrefix} receive announce_ack message from ${ip.address}:$port, with peerIP($peerIp):peerPort($peerPort), deviceId($peerDeviceId)');
     onDetected?.call(peerDeviceId, ip, port); // Unlike _onAnnounce, announce_ack is sent from service socket, so use port directly
   }
 
-  void _sendAnnounce(RawDatagramSocket socket, InternetAddress ip, Uint8List address, int port) {
-    int intAddress = address.buffer.asByteData().getInt32(0);
+  void _sendAnnounce(RawDatagramSocket socket, InternetAddress targetAddress, int targetPort, Uint8List myAddress, int myPort) {
+    int intAddress = myAddress.buffer.asByteData().getInt32(0);
     PacketAnnounce reply = PacketAnnounce(
       deviceId: _deviceId,
       address: intAddress,
-      port: port,
+      port: myPort,
       header: PacketHeader(type: PacketType.announce, destConnectionId: 0, packetNumber: 0),
     );
-    _sendDelegate(reply.toBytes(), ip, port, socket: socket);
+    _sendDelegate(reply.toBytes(), targetAddress, targetPort, socket: socket);
   }
   void _sendAnnounceAck(InternetAddress ip, int port) {
     PacketAnnounce reply = PacketAnnounce(
       deviceId: _deviceId,
       address: 0,
-      port: localPort,
+      port: servicePort,
       header: PacketHeader(type: PacketType.announceAck, destConnectionId: 0, packetNumber: 0),
     );
     _sendDelegate(reply.toBytes(), ip, port);
@@ -282,9 +284,9 @@ class SOTPNetworkLayer {
       for(var addr in interface.addresses) {
         try {
           var socket = await RawDatagramSocket.bind(addr, 0);
-          if(useMulticast) {
-            socket.joinMulticast(InternetAddress(multicastGroup));
-          }
+          socket.joinMulticast(InternetAddress(multicastGroup));
+          socket.joinMulticast(InternetAddress(multicastGroup2));
+          socket.multicastLoopback = false;
           _broadcastSockets.add(socket);
 
           MyLogger.info('${logPrefix} Bind broadcast socket to ${addr.address}:${socket.port}');
@@ -346,7 +348,7 @@ class SOTPNetworkLayer {
   }
   void _tryMulticast(int now) {
     if(now - _lastSentMulticast > _maxMulticastInterval) {
-      MyLogger.info('${logPrefix} Send multicast message to $multicastGroup');
+      MyLogger.info('${logPrefix} Send multicast message to $multicastGroup and $multicastGroup2');
       for(var socket in _broadcastSockets) {
         _tryMulticastForEveryInterface(now, socket);
       }
@@ -355,6 +357,9 @@ class SOTPNetworkLayer {
   }
   void _tryMulticastForEveryInterface(int now, RawDatagramSocket socket) {
     MyLogger.debug('${logPrefix} Send multicast message from ${socket.address.address}:${socket.port}');
-    _sendAnnounce(socket, InternetAddress(multicastGroup), socket.address.rawAddress, localPort);
+    // Use service port as both the localPort and target port
+    // _sendAnnounce(socket, InternetAddress(multicastGroup), servicePort, socket.address.rawAddress, servicePort);
+    _sendAnnounce(socket, InternetAddress(multicastGroup), servicePort, InternetAddress(multicastGroup).rawAddress, servicePort);
+    _sendAnnounce(socket, InternetAddress(multicastGroup2), servicePort, InternetAddress(multicastGroup2).rawAddress, servicePort);
   }
 }

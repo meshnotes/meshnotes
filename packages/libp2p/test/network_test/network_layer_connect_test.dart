@@ -25,7 +25,7 @@ void main() {
     var lastClientPacketNumber = 0;
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       newConnectCallback: (c) {
         serverEstablished.complete(true);
       },
@@ -47,7 +47,7 @@ void main() {
     var lastServerPacketNumber = 0;
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       connectOkCallback: (c) {
         sourceId = c.getSourceId();
         destId = c.getDestinationId();
@@ -115,7 +115,7 @@ void main() {
     var serverEstablished = Completer<bool>();
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort, newConnectCallback: (c) {
+      servicePort: serverPort, newConnectCallback: (c) {
         serverEstablished.complete(true);
       },
       deviceId: serverDeviceId,
@@ -127,7 +127,7 @@ void main() {
     var clientEstablished = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       connectOkCallback: (c) {
         sourceId = c.getSourceId();
         destId = c.getDestinationId();
@@ -237,7 +237,7 @@ void main() {
     var lastClientPacketNumber = 0;
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: serverDeviceId,
       newConnectCallback: (c) {
         serverEstablished.complete(true);
@@ -270,7 +270,7 @@ void main() {
     var lastServerPacketNumber = 0;
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: clientDeviceId,
       connectOkCallback: (c) {
         sourceId = c.getSourceId();
@@ -393,7 +393,7 @@ void main() {
     var lastClientPacketNumber = 0;
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: serverDeviceId,
       newConnectCallback: (c) {
         serverEstablished.complete(true);
@@ -416,7 +416,7 @@ void main() {
     var lastServerPacketNumber = 0;
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: clientDeviceId,
       connectOkCallback: (c) {
         sourceId = c.getSourceId();
@@ -539,7 +539,7 @@ void main() {
     var loopbackIp = "127.0.0.1";
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: serverDeviceId,
     );
     await server.start();
@@ -548,7 +548,7 @@ void main() {
     var clientFailed = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: clientDeviceId,
     );
     await client.start();
@@ -579,7 +579,7 @@ void main() {
     var loopbackIp = "127.0.0.1";
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: serverDeviceId,
     );
     await server.start();
@@ -587,7 +587,7 @@ void main() {
     var clientClosed = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: clientDeviceId,
     );
     await client.start();
@@ -622,7 +622,7 @@ void main() {
     var loopbackIp = "127.0.0.1";
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: serverDeviceId,
     );
     await server.start();
@@ -630,7 +630,7 @@ void main() {
     var clientClosed = Completer<bool>();
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: clientDeviceId,
     );
     await client.start();
@@ -668,7 +668,7 @@ void main() {
     var serverClosed = Completer<bool>();
     var server = SOTPNetworkLayer(
       localIp: serverIp,
-      localPort: serverPort,
+      servicePort: serverPort,
       deviceId: serverDeviceId,
       newConnectCallback: (peer) {
         serverPeer = peer;
@@ -683,7 +683,7 @@ void main() {
 
     var client = SOTPNetworkLayer(
       localIp: InternetAddress(loopbackIp),
-      localPort: 0,
+      servicePort: 0,
       deviceId: clientDeviceId,
     );
     await client.start();

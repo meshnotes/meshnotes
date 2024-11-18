@@ -22,8 +22,9 @@ Both these two ways you need to run mesh notes on both devices. But by the third
 
 ## Building and testing environment
 Build and test in Flutter 3.22.0 stable, with Dart 3.4.0.
-For mac: Cursor 0.42.3 + Xcode 15.1
-For windows: Visual Studio 2022
+For mac: Xcode 15.1
+For windows: Visual Studio 2022 + Rust 1.76.0
+IDE: Cursor
 
 ## How to setup environment and run it
 1. Install rust, the super_clipboard package needs it. Please refer to [package super_clipboard](https://pub.dev/packages/super_clipboard)

@@ -65,7 +65,7 @@ class VillageOverlay implements ApplicationController {
     InternetAddress localIp = InternetAddress.anyIPv4;
     __network = SOTPNetworkLayer(
       localIp: localIp,
-      localPort: _localPort,
+      servicePort: _localPort,
       connectOkCallback: _onConnected,
       newConnectCallback: _onNewConnect,
       onDetected: _onDetected,
