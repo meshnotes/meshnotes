@@ -19,7 +19,7 @@ class PluginAI implements PluginInstance {
   static const String settingCommentPluginOpenAiApiKey = 'API Key for OpenAI';
   static const String settingKeyPluginDefaultAiService = 'default_ai_service';
   static const String settingNamePluginDefaultAiService = 'AI service provider';
-  static const String settingCommentPluginDefaultAiService = 'Default AI service(e.g. chatgpt, or kimi.ai)';
+  static const String settingCommentPluginDefaultAiService = 'Choose AI service(e.g. chatgpt, or kimi.ai. Default is chatgpt)';
   static const String settingDefaultPluginDefaultAiService = 'chatgpt';
   late PluginProxy _proxy;
 

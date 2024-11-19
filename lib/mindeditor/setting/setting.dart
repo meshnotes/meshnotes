@@ -99,9 +99,15 @@ class Setting {
     var file = File(settingFileName);
     if(file.existsSync()) {
       var settings = _getSettingsFromFile(file);
-      for(final key in settings.keys) {
-        if(!_settingMap.containsKey(key)) continue;
-        _settingMap[key]!.value = settings[key]??'';
+      for(final e in settings.entries) {
+        final key = e.key;
+        final value = e.value;
+        final oldSetting = _settingMap[key];
+        if(oldSetting == null) {
+          _settingMap[key] = SettingData(name: key, value: value);
+        } else {
+          oldSetting.value = value;
+        }
       }
     }
   }
@@ -125,22 +131,6 @@ class Setting {
     String value = line.substring(idx + 1).trim();
     return (key, value);
   }
-  void loadFromDb(DbHelper db) {
-    _settingMap.clear();
-    for(final item in _settingsSupported) {
-      _settingMap[item.name] = item;
-    }
-    var settings = db.getSettings();
-    for(final e in settings.entries) {
-      String key = e.key;
-      String value = e.value;
-      if(_settingMap.containsKey(key)) {
-        _settingMap[key]!.value = value;
-      } else {
-        _settingMap[key] = SettingData(name: key, value: value);
-      }
-    }
-  }
 
   List<SettingData> getSettings() {
     var result = <SettingData>[];
@@ -153,12 +143,14 @@ class Setting {
     MyLogger.debug('getSettings: result=$result');
     return result;
   }
+  // Return trimmed value of setting or default value, or null if not found
   String? getSetting(String key) {
-    if (_settingMap.containsKey(key)) {
-      final setting = _settingMap[key]!;
-      return setting.value?.trim();
+    final setting = _settingMap[key];
+    var value = setting?.value;
+    if(value == null || value.isEmpty) {
+      value = setting?.defaultValue;
     }
-    return null;
+    return value?.trim();
   }
   bool saveSettings(List<SettingData> settings) {
     var toBeSave = <String, String>{};
