@@ -40,10 +40,15 @@ class Constants {
   static const String flagNameCurrentVersionTimestamp = 'current_version_timestamp';
   static const int createdFromLocal = 0;
   static const int createdFromPeer = 1;
+  // Status in object table and version table
   static const int statusAvailable = 0; // data is available, created from local or already sync from peer
   static const int statusWaiting = -1; // meta data is sync from peer in a short time, but waiting detail data
   static const int statusDeprecated = -2; // data is deprecated from local or peer, all its parents will be deprecated
   static const int statusMissing = -3; // data sync failed for several times, so it is considered to be missing, will try later
+  // Sync status in version table
+  static const int syncStatusNew = 0; // not synced
+  static const int syncStatusSyncing = 1; // syncing
+  static const int syncStatusSynced = 2; // synced
 
   // InspiredCard related
   static const int cardMaximumWidth = 800;

@@ -13,7 +13,7 @@ import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
-import 'sync_status.dart';
+import 'version_tree_status.dart';
 import 'package:mesh_note/mindeditor/document/text_desc.dart';
 import 'package:my_log/my_log.dart';
 import '../../net/version_chain_api.dart';
@@ -23,6 +23,7 @@ import 'collaborate/diff_manager.dart';
 
 class DocumentManager {
   SyncStatus _syncStatus = SyncStatus.idle;
+  VersionStatus _versionStatus = VersionStatus.idle;
   bool _hasModified = false;
   final DbHelper _db;
   final Map<String, Document> _documents = {};
@@ -32,7 +33,6 @@ class DocumentManager {
   List<DocDataModel> _docTitles = [];
   String _currentVersion = '';
   int _currentVersionTimestamp = 0;
-  bool _syncing = false;
   Timer? _idleTimer;
   int _lastSyncTime = 0;
   final Set<String> _allWaitingVersions = {};
@@ -118,12 +118,44 @@ class DocumentManager {
     return _currentVersion;
   }
 
-  void genNewVersionTree() {
+  void genNewVersionTree({String? parent}) {
     if(!hasModified()) return;
+    if(isGenerating() || isSyncing()) return;
+    _setGenerating();
     final now = Util.getTimeStamp();
-    var version = _genVersionAndClearModified(now);
-    _storeVersionFromLocalAndUpdateCurrentVersion(version, _currentVersion, now);
+    final parents = [parent?? _currentVersion];
+    var version = _genVersionAndClearModified(now, parents);
+    _storeVersionFromLocalAndUpdateCurrentVersion(version, parents, now);
+    _clearGenerating();
+    final _ = _getValidVersionMap(_currentVersion); // Just for test, to check version tree's size
   }
+  // If current version is not synced, and has 0 or 1 parent, override it
+  void tryToGenNewVersionTreeAndOverrideCurrent() {
+    // If current version is not exists, generate a new version tree
+    if(_currentVersion.isEmpty) {
+      genNewVersionTree();
+      return;
+    }
+    final versionData = _db.getVersionData(_currentVersion);
+    // If current version is synced, or is not created from local, it is better not to override and deprecate it.
+    // So generate a new version tree
+    if(versionData == null || versionData.syncStatus != Constants.syncStatusNew || versionData.createdFrom != Constants.createdFromLocal) {
+      genNewVersionTree();
+      return;
+    }
+    // If current version has more than one parent, it cannot be overridden, so generate a new version tree
+    final parents = _splitParents(versionData.parents);
+    if(parents.length > 1) {
+      genNewVersionTree();
+      return;
+    }
+    final savedCurrentVersion = _currentVersion;
+    final parent = parents.length == 1? parents.first: null;
+    MyLogger.info('tryToGenNewVersionTreeAndOverrideCurrent: parent=$parent');
+    genNewVersionTree(parent: parent);
+    _deprecateVersion(savedCurrentVersion);
+  }
+
   (List<VersionDataModel>, int) genCurrentVersionTree() {
     if(_currentVersion.isEmpty || _currentVersionTimestamp == 0) return ([], 0); // Not ready
     return (_getValidVersionMap(_currentVersion), _currentVersionTimestamp);
@@ -194,10 +226,16 @@ class DocumentManager {
     _tryToMergeVersionTree(_versionMap);
   }
 
-  bool isSyncing() => _syncing || _syncStatus != SyncStatus.idle;
+  bool isGenerating() => _versionStatus != VersionStatus.idle;
+  void _setGenerating() {
+    _versionStatus = VersionStatus.generating;
+  }
+  void _clearGenerating() {
+    _versionStatus = VersionStatus.idle;
+  }
+  bool isSyncing() => _syncStatus != SyncStatus.idle;
   void _setSyncing() {
     _syncStatus = SyncStatus.waiting;
-    _syncing = true;
     _lastSyncTime = Util.getTimeStamp();
   }
   void _setMerging() {
@@ -205,13 +243,20 @@ class DocumentManager {
   }
   void _clearSyncing() {
     _syncStatus = SyncStatus.idle;
-    _syncing = false;
     _lastSyncTime = 0;
   }
+  bool isBusy() => isGenerating() || isSyncing();
 
   void checkConsistency() {
     _checkVersionIntegrity();
     _checkObjectsIntegrity();
+  }
+
+  void markCurrentVersionAsSyncing() {
+    final versionData = _db.getVersionData(_currentVersion);
+    // Not possible to be null
+    if(versionData == null || versionData.syncStatus != Constants.syncStatusNew) return;
+    _db.updateVersionStatus(_currentVersion, Constants.syncStatusSyncing);
   }
 
   /// Try to merge entire version tree, called after receiving new version_tree or receiving missing versions.
@@ -295,7 +340,7 @@ class DocumentManager {
 
     bool fastForward = newVersionHash == _currentVersion || newVersionHash == targetVersion;
     var now = fastForward? contentVersion.timestamp: Util.getTimeStamp();
-    var parents = fastForward? '': '$_currentVersion,$targetVersion'; // Ignore parents if fast_forward
+    List<String> parents = fastForward? []: [_currentVersion, targetVersion]; // Ignore parents if fast_forward
     _storeVersionFromLocalAndUpdateCurrentVersion(contentVersion, parents, now, fastForward: fastForward);
   }
   void _updateDoc(VersionContentItem node, Map<String, String> objects) {
@@ -437,7 +482,8 @@ class DocumentManager {
     return null;
   }
 
-  void _storeVersionFromLocalAndUpdateCurrentVersion(VersionContent version, String parents, int now, {bool fastForward = false}) {
+  void _storeVersionFromLocalAndUpdateCurrentVersion(VersionContent version, List<String> parents, int now, {bool fastForward = false}) {
+    MyLogger.info('storeVersionFromLocalAndUpdateCurrentVersion: parents=${parents.join(',')}');
     final hash = version.getHash();
     if(fastForward) {
       MyLogger.info('Fast forward to version($hash)');
@@ -448,7 +494,7 @@ class DocumentManager {
       final jsonStr = jsonEncode(version);
       // Save version object, version tree, current_version flag, and current_version_timestamp flag
       _db.storeObject(hash, jsonStr, now, Constants.createdFromLocal, Constants.statusAvailable);
-      _db.storeVersion(hash, parents, now, Constants.createdFromLocal, Constants.statusAvailable);
+      _db.storeVersion(hash, parents.join(','), now, Constants.createdFromLocal, Constants.statusAvailable);
       _db.setFlag(Constants.flagNameCurrentVersion, hash);
       _db.setFlag(Constants.flagNameCurrentVersionTimestamp, now.toString());
 
@@ -469,12 +515,12 @@ class DocumentManager {
     }
   }
 
-  VersionContent _genVersionAndClearModified(int now) {
+  VersionContent _genVersionAndClearModified(int now, List<String> parents) {
     List<Document> modifiedDocuments = _findModifiedDocuments();
     Map<String, String> newHashes = _genAndSaveDocuments(modifiedDocuments);
     _updateDocumentHashes(newHashes, now);
     var docTable = _genDocTreeNodeList(_docTitles);
-    var version = VersionContent(table: docTable, timestamp: now, parentsHash: [_currentVersion]);
+    var version = VersionContent(table: docTable, timestamp: now, parentsHash: parents);
     _clearModified(modifiedDocuments);
     return version;
   }
@@ -820,6 +866,8 @@ class DocumentManager {
   List<VersionDataModel> _getValidVersionMap(String newestVersion) {
     var versions = _db.getAllVersions();
     versions = filterUnreachableVersions(versions, newestVersion);
+    CallbackRegistry.showToast('version tree has ${versions.length} nodes');
+    MyLogger.info('_getValidVersionMap: version tree has ${versions.length} nodes');
     return versions;
   }
   static List<VersionDataModel> filterUnreachableVersions(List<VersionDataModel> versions, String newestVersion) {
@@ -1020,5 +1068,9 @@ class DocumentManager {
       _db.updateVersionStatus(version, Constants.statusMissing);
       retriedVersions.remove(version);
     }
+  }
+
+  void _deprecateVersion(String versionHash) {
+    _db.updateVersionStatus(versionHash, Constants.statusDeprecated);
   }
 }

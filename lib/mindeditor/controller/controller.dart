@@ -246,7 +246,7 @@ class Controller {
   /// 3. the newest version is valid(not '')
   void sendVersionBroadcast() {
     if(network.isAlone()) return;
-    if(docManager.hasModified() || docManager.isSyncing()) return;
+    if(docManager.hasModified() || docManager.isBusy()) return;
     var latestVersion = docManager.getLatestVersion();
     MyLogger.info('sendVersionBroadcast: latestVersion=$latestVersion');
     if(latestVersion.isEmpty) return;
@@ -254,12 +254,19 @@ class Controller {
     network.sendVersionBroadcast(latestVersion);
   }
   bool tryToSaveAndSendVersionTree() {
-    // If there is no network peer, don't generate new version and send
-    if(network.isAlone()) return false;
-    // If there is any modification, generate a new version tree, and try to sync this version
-    if(!docManager.hasModified() || docManager.isSyncing()) return false;
-    docManager.genNewVersionTree();
-    return _sendCurrentVersionTree();
+    // If there is no modification, or is currently syncing, don't generate new version tree
+    if(!docManager.hasModified() || docManager.isBusy()) return false;
+
+    // If there is no network peer, try to generate a new version tree and override current version
+    // The purpose is to reduce the version tree size
+    final isAlone = network.isAlone();
+    if(isAlone) {
+      docManager.tryToGenNewVersionTreeAndOverrideCurrent();
+      return true;
+    } else {
+      docManager.genNewVersionTree();
+      return _sendCurrentVersionTree();
+    }
   }
   bool _sendCurrentVersionTree() {
     var (versionData, timestamp) = docManager.genCurrentVersionTree();
@@ -268,6 +275,7 @@ class Controller {
     }
     MyLogger.info('sendVersionTree: $versionData');
     network.sendNewVersionTree(versionData, timestamp);
+    docManager.markCurrentVersionAsSyncing();
     return true;
   }
   void sendRequireVersions(List<String> missingVersions) {
@@ -283,7 +291,7 @@ class Controller {
     /// 2. If not, send require version tree
     /// 3. If there is the version, but no object, send require version
     MyLogger.info('receive version broadcast, latestVersion=$latestVersion');
-    if(docManager.isSyncing()) {
+    if(docManager.isBusy()) {
       MyLogger.info('receiveVersionBroadcast: too busy to handle version broadcast: $latestVersion');
       //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
       return;
@@ -301,7 +309,7 @@ class Controller {
     }
   }
   void receiveVersionTree(List<VersionNode> dag) {
-    if(docManager.isSyncing()) {
+    if(docManager.isBusy()) {
       MyLogger.info('receiveVersionTree: too busy to handle version tree: $dag');
       //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
       return;

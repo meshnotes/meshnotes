@@ -181,7 +181,7 @@ class DbHelper {
   }
 
   VersionDataModel? getVersionData(String versionHash) {
-    const sql = 'SELECT parents, created_at, created_from, status FROM versions WHERE tree_hash=?';
+    const sql = 'SELECT parents, created_at, created_from, status, sync_status FROM versions WHERE tree_hash=?';
     final resultSet = _database.select(sql, [versionHash]);
     if(resultSet.isEmpty) {
       return null;
@@ -191,17 +191,19 @@ class DbHelper {
     int createdAt = row['created_at'];
     int? createdFrom = row['created_from'];
     int? dataStatus = row['status'];
+    int? syncStatus = row['sync_status'];
     return VersionDataModel(
       versionHash: versionHash,
       parents: parents,
       createdAt: createdAt,
       createdFrom: createdFrom?? Constants.createdFromPeer,
       status: dataStatus?? Constants.statusWaiting,
+      syncStatus: syncStatus?? Constants.syncStatusNew,
     );
   }
 
   List<VersionDataModel> getAllVersions() {
-    const sql = 'SELECT tree_hash, parents, created_at, created_from, status FROM versions';
+    const sql = 'SELECT tree_hash, parents, created_at, created_from, status, sync_status FROM versions';
     final resultSet = _database.select(sql);
     List<VersionDataModel> result = [];
     for(final row in resultSet) {
@@ -211,12 +213,14 @@ class DbHelper {
       int timestamp = row['created_at'];
       int? createdFrom = row['created_from'];
       int? dataStatus = row['status'];
+      int? syncStatus = row['sync_status'];
       result.add(VersionDataModel(
         versionHash: versionHash,
         parents: parents,
         createdAt: timestamp,
         createdFrom: createdFrom?? Constants.createdFromPeer,
         status: dataStatus?? Constants.statusWaiting,
+        syncStatus: syncStatus?? Constants.syncStatusNew,
       ));
     }
     return result;

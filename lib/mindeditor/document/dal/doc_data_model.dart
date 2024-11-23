@@ -44,6 +44,7 @@ class VersionDataModel {
   int createdAt;
   int createdFrom;
   int status;
+  int syncStatus;
 
   VersionDataModel({
     required this.versionHash,
@@ -51,6 +52,7 @@ class VersionDataModel {
     required this.createdAt,
     required this.createdFrom,
     required this.status,
+    required this.syncStatus,
   });
 }
 

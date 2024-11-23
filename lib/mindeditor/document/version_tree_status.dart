@@ -3,3 +3,8 @@ enum SyncStatus {
   waiting,
   merging,
 }
+
+enum VersionStatus {
+  idle,
+  generating,
+}
