@@ -314,6 +314,10 @@ class DbHelper {
     const sql = 'UPDATE versions SET status=? WHERE version_hash=?';
     _database.execute(sql, [status, hash]);
   }
+  void updateVersionSyncStatus(String hash, int syncStatus) {
+    const sql = 'UPDATE versions SET sync_status=? WHERE version_hash=?';
+    _database.execute(sql, [syncStatus, hash]);
+  }
 
   String? getFlag(String name) {
     const sql = 'SELECT value FROM flags WHERE name=?';

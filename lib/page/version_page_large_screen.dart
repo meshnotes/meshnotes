@@ -10,7 +10,7 @@ import '../mindeditor/controller/controller.dart';
 import '../mindeditor/document/dal/doc_data_model.dart';
 
 const double nodeContainerWidth = 100.0;
-const double nodeContainerHeight = 50.0;
+const double nodeContainerHeight = 60.0;
 const double nodeContainerXSpace = 50.0;
 const double nodeContainerYSpace = 20.0;
 
@@ -43,6 +43,7 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
   int maxRow = 0;
   final horizontalScrollController = ScrollController();
   final verticalScrollController = ScrollController();
+  String? selectedVersion;
 
   @override
   void initState() {
@@ -171,8 +172,10 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
   }
 
   List<Widget> _buildNodeWidgets() {
-    final validBorder = Border.all(color: Colors.black);
-    final invalidBorder = Border.all(color: const Color.fromARGB(255, 193, 193, 193));
+    final selectedBorder = Border.all(color: Colors.blue, width: 3, strokeAlign: BorderSide.strokeAlignOutside);
+    final childSelectedBorder = Border.all(color: Colors.green, width: 2, strokeAlign: BorderSide.strokeAlignOutside);
+    final validBorder = Border.all(color: Colors.black, strokeAlign: BorderSide.strokeAlignOutside);
+    final invalidBorder = Border.all(color: const Color.fromARGB(255, 193, 193, 193), strokeAlign: BorderSide.strokeAlignOutside);
     const validColor = Colors.white;
     const currentVersionColor =  Color(0xFFE3F2FD);
     const invalidColor = Color.fromARGB(255, 245, 245, 245);
@@ -182,12 +185,16 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
     final widgets = <Widget>[];
     for(final column in levelNodes) {
       for(final node in column) {
+        final isSelected = node.name == selectedVersion;
+        final isChildSelected = node.children.any((child) => child.name == selectedVersion);
+
         final color = node.name == currentVersion ? currentVersionColor : node.status == Constants.statusAvailable ? validColor : invalidColor;
         final textDecoration = node.status == Constants.statusDeprecated ? deprecatedTextDecoration : defaultTextDecoration;
+        final border = isSelected ? selectedBorder : isChildSelected ? childSelectedBorder : node.status == Constants.statusAvailable ? validBorder : invalidBorder;
         final container = Container(
           padding: const EdgeInsets.fromLTRB(5, 2, 5, 2),
           decoration: BoxDecoration(
-            border: node.status == Constants.statusAvailable ? validBorder : invalidBorder,
+            border: border,
             borderRadius: BorderRadius.circular(8),
             color: color,
           ),
@@ -207,25 +214,41 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
                   ),
                 ),
               ),
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    node.createdAt,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFFBDBDBD),
-                    ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  node.createdAt,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFBDBDBD),
+                  ),
+                ),
+              ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  node.isLocal ? 'Local' : 'Remote',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFBDBDBD),
                   ),
                 ),
               ),
             ],
           ),
         );
+        final gestureDetector = GestureDetector(
+          onTap: () {
+            setState(() {
+              selectedVersion = node.name;
+            });
+          },
+          child: container,
+        );
         final widget = Positioned(
           left: node._getLeft(),
           top: node._getTop(),
-          child: container,
+          child: gestureDetector,
         );
         widgets.add(widget);
       }
@@ -290,6 +313,7 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
       final node = Node(name: version.versionHash, createdAt: DateFormat('yyyy-MM-dd').format(DateTime.fromMillisecondsSinceEpoch(version.createdAt)));
       node.status = version.status;
       node.syncStatus = version.syncStatus;
+      node.isLocal = version.createdFrom == Constants.createdFromLocal;
       map[version.versionHash] = node;
     }
     for(final version in versions) {
@@ -354,6 +378,7 @@ class Node {
   int depth = -1;
   int row = 0;
   int column = 0;
+  bool isLocal = true;
 
   Node({
     required this.name,
@@ -434,8 +459,8 @@ class _LinesPainter extends CustomPainter {
   }
 
   void _drawArrow(Path path, double x0, double y0, double xn, double yn) {
-    final arrowAngle = math.pi / 6;
-    final arrowLength = 10;
+    const arrowAngle = math.pi / 6;
+    const arrowLength = 10;
     final dx = x0 - xn;
     final dy = y0 - yn;
     final angle = math.atan2(dy, dx);

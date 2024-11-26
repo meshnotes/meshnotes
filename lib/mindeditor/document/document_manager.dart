@@ -269,7 +269,7 @@ class DocumentManager {
     final versionData = _db.getVersionData(_currentVersion);
     // Not possible to be null
     if(versionData == null || versionData.syncStatus != Constants.syncStatusNew) return;
-    _db.updateVersionStatus(_currentVersion, Constants.syncStatusSyncing);
+    _db.updateVersionSyncStatus(_currentVersion, Constants.syncStatusSyncing);
   }
 
   /// Try to merge entire version tree, called after receiving new version_tree or receiving missing versions.
