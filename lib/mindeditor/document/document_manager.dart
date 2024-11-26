@@ -114,6 +114,16 @@ class DocumentManager {
     return docId;
   }
 
+  List<VersionDataModel> getCurrentRawVersionTree() {
+    var versions = _db.getAllVersions();
+    return versions;
+  }
+  List<VersionDataModel> getCurrentValidVersionTree() {
+    if(_currentVersion.isEmpty || _currentVersionTimestamp == 0) return []; // Not ready
+    final versions = _getValidVersionMap(_currentVersion);
+    return versions;
+  }
+
   String getLatestVersion() {
     return _currentVersion;
   }
@@ -127,7 +137,8 @@ class DocumentManager {
     var version = _genVersionAndClearModified(now, parents);
     _storeVersionFromLocalAndUpdateCurrentVersion(version, parents, now);
     _clearGenerating();
-    final _ = _getValidVersionMap(_currentVersion); // Just for test, to check version tree's size
+    final versions = _getValidVersionMap(_currentVersion); // Just for test, to check version tree's size
+    CallbackRegistry.showToast('version tree has ${versions.length} nodes');
   }
   // If current version is not synced, and has 0 or 1 parent, override it
   void tryToGenNewVersionTreeAndOverrideCurrent() {
@@ -144,7 +155,7 @@ class DocumentManager {
       return;
     }
     // If current version has more than one parent, it cannot be overridden, so generate a new version tree
-    final parents = _splitParents(versionData.parents);
+    final parents = versionData.getParentsList();
     if(parents.length > 1) {
       genNewVersionTree();
       return;
@@ -158,7 +169,9 @@ class DocumentManager {
 
   (List<VersionDataModel>, int) genCurrentVersionTree() {
     if(_currentVersion.isEmpty || _currentVersionTimestamp == 0) return ([], 0); // Not ready
-    return (_getValidVersionMap(_currentVersion), _currentVersionTimestamp);
+    final versions = _getValidVersionMap(_currentVersion);
+    CallbackRegistry.showToast('version tree has ${versions.length} nodes');
+    return (versions, _currentVersionTimestamp);
   }
 
   /// Generate new version tree by merging local and remote version tree.
@@ -636,7 +649,7 @@ class DocumentManager {
     // Generate version parents pointer
     for(var item in _allVersions) {
       final versionHash = item.versionHash;
-      final parents = _splitParents(item.parents);
+      final parents = item.getParentsList();
       final currentNode = _map[versionHash]!;
       for(var p in parents) {
         var parentNode = _map[p];
@@ -676,10 +689,6 @@ class DocumentManager {
       }
     }
     return result;
-  }
-  static List<String> _splitParents(String parents) {
-    List<String> _sp = parents.split(',');
-    return _sp;
   }
   // Map<String, DagNode> _mergeLocalAndRemoteMap(Map<String, DagNode> localMap, Map<String, DagNode> remoteMap) {
   //   for(var e in remoteMap.entries) {
@@ -866,7 +875,6 @@ class DocumentManager {
   List<VersionDataModel> _getValidVersionMap(String newestVersion) {
     var versions = _db.getAllVersions();
     versions = filterUnreachableVersions(versions, newestVersion);
-    CallbackRegistry.showToast('version tree has ${versions.length} nodes');
     MyLogger.info('_getValidVersionMap: version tree has ${versions.length} nodes');
     return versions;
   }
@@ -890,7 +898,7 @@ class DocumentManager {
       if(current == null) continue;
 
       visited[currentHash] = true;
-      var parents = _splitParents(current.parents);
+      final parents = current.getParentsList();
       waitingQueue.addAll(parents);
     }
     List<VersionDataModel> result = [];

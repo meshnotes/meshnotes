@@ -4,12 +4,14 @@ import 'package:mesh_note/page/resizable_view.dart';
 import 'package:mesh_note/page/title_bar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'version_page_large_screen.dart';
 import '../mindeditor/controller/controller.dart';
 
 class DocumentView extends StatelessWidget with ResizableViewMixin {
   static const screenShotKey = 'screenshot';
   static const searchKey = 'search';
   static const syncKey = 'sync';
+  static const versionKey = 'version';
 
   final Function()? jumpAction;
   @override
@@ -55,6 +57,9 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
             case syncKey:
               controller.tryToSaveAndSendVersionTree();
               break;
+            case versionKey:
+              VersionPageLargeScreen.route(context);
+              break;
           }
         },
         itemBuilder: (BuildContext ctx) {
@@ -75,6 +80,10 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
             const PopupMenuItem(
               child: Text('Sync'),
               value: syncKey,
+            ),
+            const PopupMenuItem(
+              child: Text('Version Map'),
+              value: versionKey,
             ),
           ];
         },

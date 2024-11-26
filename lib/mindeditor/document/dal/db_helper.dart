@@ -181,7 +181,7 @@ class DbHelper {
   }
 
   VersionDataModel? getVersionData(String versionHash) {
-    const sql = 'SELECT parents, created_at, created_from, status, sync_status FROM versions WHERE tree_hash=?';
+    const sql = 'SELECT parents, created_at, created_from, status, sync_status FROM versions WHERE version_hash=?';
     final resultSet = _database.select(sql, [versionHash]);
     if(resultSet.isEmpty) {
       return null;
@@ -203,12 +203,12 @@ class DbHelper {
   }
 
   List<VersionDataModel> getAllVersions() {
-    const sql = 'SELECT tree_hash, parents, created_at, created_from, status, sync_status FROM versions';
+    const sql = 'SELECT version_hash, parents, created_at, created_from, status, sync_status FROM versions';
     final resultSet = _database.select(sql);
     List<VersionDataModel> result = [];
     for(final row in resultSet) {
       MyLogger.verbose('getAllVersions: row=$row');
-      String versionHash = row['tree_hash'];
+      String versionHash = row['version_hash'];
       String parents = row['parents'];
       int timestamp = row['created_at'];
       int? createdFrom = row['created_from'];
@@ -226,11 +226,11 @@ class DbHelper {
     return result;
   }
   List<String> getAllValidVersionHashes() {
-    const sql = 'SELECT tree_hash FROM versions';
+    const sql = 'SELECT version_hash FROM versions';
     final resultSet = _database.select(sql);
     List<String> result = [];
     for(final row in resultSet) {
-      String versionHash = row['tree_hash'];
+      String versionHash = row['version_hash'];
       result.add(versionHash);
     }
     return result;
@@ -306,12 +306,12 @@ class DbHelper {
 
   void storeVersion(String hash, String parents, int timestamp, int createdFrom, int status) {
     //TODO Log an error while conflict
-    const sql = 'INSERT INTO versions(tree_hash, parents, created_at, created_from, status) VALUES(?, ?, ?, ?, ?)';
+    const sql = 'INSERT INTO versions(version_hash, parents, created_at, created_from, status) VALUES(?, ?, ?, ?, ?)';
     _database.execute(sql, [hash, parents, timestamp, createdFrom, status]);
   }
 
   void updateVersionStatus(String hash, int status) {
-    const sql = 'UPDATE versions SET status=? WHERE tree_hash=?';
+    const sql = 'UPDATE versions SET status=? WHERE version_hash=?';
     _database.execute(sql, [status, hash]);
   }
 

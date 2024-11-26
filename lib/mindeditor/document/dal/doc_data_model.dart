@@ -54,6 +54,8 @@ class VersionDataModel {
     required this.status,
     required this.syncStatus,
   });
+
+  List<String> getParentsList() => parents.split(',');
 }
 
 class ObjectDataModel {

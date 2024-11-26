@@ -348,7 +348,7 @@ class SOTPNetworkLayer {
   }
   void _tryMulticast(int now) {
     if(now - _lastSentMulticast > _maxMulticastInterval) {
-      MyLogger.info('${logPrefix} Send multicast message to $multicastGroup and $multicastGroup2');
+      MyLogger.debug('${logPrefix} Send multicast message to $multicastGroup and $multicastGroup2');
       for(var socket in _broadcastSockets) {
         _tryMulticastForEveryInterface(now, socket);
       }
