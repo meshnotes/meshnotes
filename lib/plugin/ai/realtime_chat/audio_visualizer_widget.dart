@@ -23,12 +23,16 @@ class AudioVisualizerWidget extends StatefulWidget {
 class AudioVisualizerWidgetState extends State<AudioVisualizerWidget> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final List<double> _barHeights = List.generate(5, (index) => 10 + Random().nextDouble() * 40);
+  final List<Duration> _barDurations = List.generate(
+    5,
+    (index) => Duration(milliseconds: 400 + Random().nextInt(400)),
+  );
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
     if (widget.isPlaying) {
@@ -59,7 +63,9 @@ class AudioVisualizerWidgetState extends State<AudioVisualizerWidget> with Singl
   }
 
   void playAnimation() {
-    _controller.repeat(reverse: true);
+    if(_controller.status == AnimationStatus.dismissed) {
+      _controller.repeat(reverse: true);
+    }
   }
 
   @override
@@ -72,17 +78,22 @@ class AudioVisualizerWidgetState extends State<AudioVisualizerWidget> with Singl
           crossAxisAlignment: CrossAxisAlignment.center,
           children: List.generate(
             5,
-            (index) => Padding(
-              padding: EdgeInsets.symmetric(horizontal: widget.spacing),
-              child: Container(
-                width: widget.barWidth,
-                height: _barHeights[index] * (0.5 + _controller.value),
-                decoration: BoxDecoration(
-                  color: widget.color,
-                  borderRadius: BorderRadius.circular(widget.barWidth / 2),
+            (index) {
+              final sinValue = sin(
+                (_controller.value * 2 * pi) * (_barDurations[0].inMilliseconds / _barDurations[index].inMilliseconds)
+              );
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: widget.spacing),
+                child: Container(
+                  width: widget.barWidth,
+                  height: _barHeights[index] * (0.3 + 0.7 * sinValue.abs()),
+                  decoration: BoxDecoration(
+                    color: widget.color,
+                    borderRadius: BorderRadius.circular(widget.barWidth / 2),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         );
       },

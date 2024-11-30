@@ -32,8 +32,11 @@ class AudioPlayerProxy {
   int currentContentIndex = 0;
   int startPointInCurrentItemId = 0;
   int currentPlayedMs = 0;
+  Function? onPlaying;
 
-  AudioPlayerProxy() {
+  AudioPlayerProxy({
+    this.onPlaying,
+  }) {
     audioStream.init(channels: 1, sampleRate: sampleRate);
   }
 
@@ -156,9 +159,10 @@ class AudioPlayerProxy {
           currentPlayedMs = 0;
         }
         final len = audioData.length;
-        audioStream.push(audioData);
         int delayMilliseconds = (len / sampleRate * 1000).toInt();
         MyLogger.debug('AudioPlayerProxy loop delay $delayMilliseconds ms');
+        audioStream.push(audioData);
+        onPlaying?.call();
         await Future.delayed(Duration(milliseconds: delayMilliseconds));
         currentPlayedMs += delayMilliseconds;
       } else {

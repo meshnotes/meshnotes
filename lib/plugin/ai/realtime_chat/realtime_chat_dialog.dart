@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
+import 'package:my_log/my_log.dart';
 import 'audio_visualizer_widget.dart';
 import 'realtime_proxy.dart';
 
@@ -42,6 +43,8 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       onErrorShutdown: () {
         widget.closeCallback?.call();
       },
+      startVisualizerAnimation: _startVisualizerAnimation,
+      stopVisualizerAnimation: _stopVisualizerAnimation,
     );
     proxy.connect();
   }
@@ -81,7 +84,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
           const Spacer(),
           AudioVisualizerWidget(
             key: visualizerKey,
-            isPlaying: false,
+            isPlaying: false, // Don't play animation before connected
             color: const Color(0xFF2196F3),
           ),
           Align(
@@ -151,5 +154,13 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
 
   void _onClose() {
     widget.closeCallback?.call();
+  }
+
+  void _startVisualizerAnimation() {
+    visualizerKey.currentState?.playAnimation();
+  }
+
+  void _stopVisualizerAnimation() {
+    visualizerKey.currentState?.pauseAnimation();
   }
 }

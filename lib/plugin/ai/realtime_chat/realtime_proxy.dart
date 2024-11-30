@@ -30,6 +30,9 @@ class RealtimeProxy {
   Function(String)? showToastCallback;
   Function()? onErrorShutdown;
   Timer? resetRetryCountTimer;
+  Function? startVisualizerAnimation;
+  Function? stopVisualizerAnimation;
+  Timer? _animationTimer;
 
   // ignore: constant_identifier_names
   static const int MAX_ERROR_RETRY_COUNT = 3;
@@ -38,6 +41,8 @@ class RealtimeProxy {
     required this.apiKey,
     this.showToastCallback,
     this.onErrorShutdown,
+    this.startVisualizerAnimation,
+    this.stopVisualizerAnimation,
   });
 
   Future<bool> connect() async {
@@ -69,7 +74,7 @@ class RealtimeProxy {
       MyLogger.info('Connected to Realtime API');
     }
     await _openRecord();
-    audioPlayerProxy = AudioPlayerProxy();
+    audioPlayerProxy = AudioPlayerProxy(onPlaying: _onAudioActive); // play animation when playing audio
     return connected;
   }
 
@@ -82,6 +87,7 @@ class RealtimeProxy {
     client.shutdown();
     audioPlayerProxy.shutdown();
     record.stop();
+    _animationTimer?.cancel();
   }
 
   Future<void> _openRecord() async {
@@ -98,6 +104,7 @@ class RealtimeProxy {
         }
         // MyLogger.info('Voice chat: ${data.length} bytes');
         appendInputAudio(data);
+        _onAudioActive(); // play animation
         // audioPlayerProxy.play(data);
       });
     }
@@ -179,5 +186,18 @@ class RealtimeProxy {
         errorRetryCount = 0;
       });
     }
+  }
+
+  void _onAudioActive() {
+    startVisualizerAnimation?.call();
+    if(stopVisualizerAnimation != null) {
+      _startAnimationTimer();
+    }
+  }
+  void _startAnimationTimer() {
+    _animationTimer?.cancel();
+    _animationTimer = Timer(const Duration(milliseconds: 100), () {
+      stopVisualizerAnimation?.call();
+    });
   }
 }

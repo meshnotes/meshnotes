@@ -15,12 +15,25 @@ class PluginAI implements PluginInstance {
   static const String settingNamePluginKimiApiKey = 'API key for Kimi.ai';
   static const String settingCommentPluginKimiApiKey = 'API key for kimi.ai';
   static const String settingKeyPluginOpenAiApiKey = 'openai_api_key';
+
   static const String settingNamePluginOpenAiApiKey = 'API key for OpenAI';
   static const String settingCommentPluginOpenAiApiKey = 'API Key for OpenAI';
   static const String settingKeyPluginDefaultAiService = 'default_ai_service';
+
   static const String settingNamePluginDefaultAiService = 'AI service provider';
   static const String settingCommentPluginDefaultAiService = 'Choose AI service(e.g. chatgpt, or kimi.ai. Default is chatgpt)';
   static const String settingDefaultPluginDefaultAiService = 'chatgpt';
+
+  static const String settingKeyUseAiForExtra = 'use_ai_for_extra';
+  static const String settingNameUseAiForExtra = 'Use AI for block extra';
+  static const String settingCommentUseAiForExtra = 'Use AI to generate extra information for the block';
+  static const String settingDefaultUseAiForExtra = 'false';
+
+  static const String settingKeyAllowSendingNotesToAi = 'allow_sending_notes_to_ai';
+  static const String settingNameAllowSendingNotesToAi = 'Allow sending notes to AI';
+  static const String settingCommentAllowSendingNotesToAi = 'Allow sending notes content to AI(except for the private notes)';
+  static const String settingDefaultAllowSendingNotesToAi = 'false';
+
   late PluginProxy _proxy;
 
   @override
@@ -59,6 +72,18 @@ class PluginAI implements PluginInstance {
         settingName: settingNamePluginDefaultAiService,
         settingComment: settingCommentPluginDefaultAiService,
         settingDefaultValue: settingDefaultPluginDefaultAiService,
+      ),
+      PluginSetting(
+        settingKey: settingKeyUseAiForExtra,
+        settingName: settingNameUseAiForExtra,
+        settingComment: settingCommentUseAiForExtra,
+        settingDefaultValue: settingDefaultUseAiForExtra,
+      ),
+      PluginSetting(
+        settingKey: settingKeyAllowSendingNotesToAi,
+        settingName: settingNameAllowSendingNotesToAi,
+        settingComment: settingCommentAllowSendingNotesToAi,
+        settingDefaultValue: settingDefaultAllowSendingNotesToAi,
       ),
     ];
     return result;
@@ -107,6 +132,10 @@ class PluginAI implements PluginInstance {
   }
   List<String> noneExpression = ['None', 'None.', 'none', 'none.'];
   void _blockChangedHandler(BlockChangedEventData data) {
+    if(_proxy.getSettingValue(settingKeyUseAiForExtra)?.toLowerCase() != 'true') {
+      MyLogger.debug('AI plugin for extra is not enabled');
+      return;
+    }
     MyLogger.info('AI plugin receive block changed: id=${data.blockId}, content=${data.content}');
     var executor = _buildAiExecutor();
     final userPrompt = 'Here is the user\'s note: ${data.content}';
