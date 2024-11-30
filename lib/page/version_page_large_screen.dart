@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_switch/flutter_switch.dart';
 import 'package:keygen/keygen.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:my_log/my_log.dart';
@@ -13,6 +12,8 @@ const double nodeContainerWidth = 100.0;
 const double nodeContainerHeight = 60.0;
 const double nodeContainerXSpace = 50.0;
 const double nodeContainerYSpace = 20.0;
+const double selectedBorderWidth = 3.0;
+const double parentSelectedBorderWidth = 2.0;
 
 class VersionPageLargeScreen extends StatefulWidget {
   const VersionPageLargeScreen({
@@ -44,6 +45,8 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
   final horizontalScrollController = ScrollController();
   final verticalScrollController = ScrollController();
   String? selectedVersion;
+  final linesKey = GlobalKey();
+  final activeLinesKey = GlobalKey();
 
   @override
   void initState() {
@@ -56,17 +59,27 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
     final container = _buildGraph();
     final buttons = Row(
       children: [
-        Expanded(child: Container(),),
-        FlutterSwitch(
-          value: showAll,
-          onToggle: (value) {
-            setState(() {
-              showAll = value;
-              _generateVersionTreeData();
-            });
-          },
-          activeText: 'Show All',
-          inactiveText: 'Show Valid',
+        Expanded(child: Container()),
+        Row(
+          children: [
+            const Text(
+              'Show All',
+              style: TextStyle(
+                color: CupertinoColors.secondaryLabel,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(width: 8),  // 文字和开关之间的间距
+            CupertinoSwitch(
+              value: showAll,
+              onChanged: (value) {
+                setState(() {
+                  showAll = value;
+                  _generateVersionTreeData();
+                });
+              },
+            ),
+          ],
         ),
         IconButton(
           onPressed: () {
@@ -96,14 +109,18 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
     final canvasWidth = maxColumn * (nodeContainerWidth + nodeContainerXSpace) + nodeContainerXSpace;
     final canvasHeight = maxRow * (nodeContainerHeight + nodeContainerYSpace) + nodeContainerYSpace;
     final nodeWidgets = _buildNodeWidgets();
-    final customPaint = _buildLines(canvasWidth, canvasHeight);
+    final allLines = _buildLines(canvasWidth, canvasHeight);
+    final activeLines = _buildActiveLines(canvasWidth, canvasHeight);
     final sizedBox = SizedBox(
       width: canvasWidth,
       height: canvasHeight,
       child: Stack(
         children: [
-          customPaint,
+          allLines,
           ...nodeWidgets,
+          IgnorePointer(
+            child: activeLines,
+          ),
         ],
       ),
     );
@@ -119,7 +136,7 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
     );
     final layout = LayoutBuilder(
       builder: (context, constraints) {
-        MyLogger.info('constraints=$constraints');
+        MyLogger.debug('_buildGraph: constraints=$constraints');
         final maxWidth = constraints.maxWidth;
         final maxHeight = constraints.maxHeight;
         final gestureDetector = GestureDetector(
@@ -137,43 +154,11 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
       },
     );
     return layout;
-    // final rowData = <Widget>[];
-    // for(final level in levelNodes) {
-    //   final column = <Widget>[];
-    //   for(final node in level) {
-    //     final text = HashUtil.formatHash(node.name);
-    //     final container = Container(
-    //       decoration: BoxDecoration(
-    //         border: Border.all(color: Colors.grey),
-    //         color: node.name == currentVersion ? Colors.blue : Colors.transparent,
-    //       ),
-    //       padding: const EdgeInsets.fromLTRB(5, 2, 5, 2),
-    //       child: Column(
-    //         children: [
-    //           Text(text),
-    //           Text(node.createdAt),
-    //         ],
-    //       ),
-    //     );
-    //     column.add(container);
-    //   }
-    //   rowData.add(Column(
-    //     children: column,
-    //   ));
-    // }
-    // final row = Row(
-    //   children: rowData,
-    // );
-    // final scrollView = SingleChildScrollView(
-    //   child: row,
-    //   scrollDirection: Axis.horizontal,
-    // );
-    // return scrollView;
   }
 
   List<Widget> _buildNodeWidgets() {
-    final selectedBorder = Border.all(color: Colors.blue, width: 3, strokeAlign: BorderSide.strokeAlignOutside);
-    final childSelectedBorder = Border.all(color: Colors.green, width: 2, strokeAlign: BorderSide.strokeAlignOutside);
+    final selectedBorder = Border.all(color: Colors.blue, width: selectedBorderWidth, strokeAlign: BorderSide.strokeAlignOutside);
+    final childSelectedBorder = Border.all(color: Colors.green, width: parentSelectedBorderWidth, strokeAlign: BorderSide.strokeAlignOutside);
     final validBorder = Border.all(color: Colors.black, strokeAlign: BorderSide.strokeAlignOutside);
     final invalidBorder = Border.all(color: const Color.fromARGB(255, 193, 193, 193), strokeAlign: BorderSide.strokeAlignOutside);
     const validColor = Colors.white;
@@ -256,9 +241,40 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
     return widgets;
   }
 
-  CustomPaint _buildLines(double canvasWidth, double canvasHeight) {
+  Widget _buildLines(double canvasWidth, double canvasHeight) {
     final paint = CustomPaint(
+      key: linesKey,
       painter: _LinesPainter(canvasWidth: canvasWidth, canvasHeight: canvasHeight, versionMap: versionMap),
+      size: Size(canvasWidth, canvasHeight),
+    );
+    return paint;
+  }
+  Widget _buildActiveLines(double canvasWidth, double canvasHeight) {
+    if(selectedVersion == null) {
+      return const SizedBox();
+    }
+    final selectNode = versionMap[selectedVersion];
+    if(selectNode == null) {
+      return const SizedBox();
+    }
+    final activeNodes = <String, Node>{};
+    activeNodes[selectNode.name] = selectNode;
+
+    final myPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = Colors.red
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    final paint = CustomPaint(
+      key: activeLinesKey,
+      painter: _LinesPainter(
+        canvasWidth: canvasWidth,
+        canvasHeight: canvasHeight,
+        versionMap: activeNodes,
+        myPaint: myPaint,
+        selectedBorderWidth: selectedBorderWidth,
+        parentSelectedBorderWidth: parentSelectedBorderWidth,
+      ),
       size: Size(canvasWidth, canvasHeight),
     );
     return paint;
@@ -280,7 +296,7 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
     for(final head in heads) {
       _updateLevel(head, versionMap);
     }
-    MyLogger.info('maxDepth=$maxDepth');
+    MyLogger.debug('_generateVersionTreeData: maxDepth=$maxDepth');
 
     for(int i = 0; i <= maxDepth; i++) {
       levelNodes.add([]);
@@ -310,7 +326,7 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
     // 2. Build the parent-child relationship
     final map = <String, Node>{};
     for(final version in versions) {
-      final node = Node(name: version.versionHash, createdAt: DateFormat('yyyy-MM-dd').format(DateTime.fromMillisecondsSinceEpoch(version.createdAt)));
+      final node = Node(name: version.versionHash, createdAt: DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(version.createdAt)));
       node.status = version.status;
       node.syncStatus = version.syncStatus;
       node.isLocal = version.createdFrom == Constants.createdFromLocal;
@@ -320,7 +336,7 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
       final key = version.versionHash;
       final node = map[key];
       if(node == null) { // Impossible
-        MyLogger.err('_convertToNode: version $key not found');
+        MyLogger.warn('_convertToNode: version $key not found');
         continue;
       }
       final parents = version.getParentsList();
@@ -328,7 +344,7 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
         if(parent.isEmpty) continue;
         final parentNode = map[parent];
         if(parentNode == null) { // Impossible
-          MyLogger.err('_convertToNode: parent $parent of $key not found');
+          MyLogger.warn('_convertToNode: parent $parent of $key not found');
           continue;
         }
         parentNode.children.add(node);
@@ -404,26 +420,28 @@ class _LinesPainter extends CustomPainter {
   double canvasWidth;
   double canvasHeight;
   Map<String, Node> versionMap;
+  Paint? myPaint;
+  double? selectedBorderWidth;
+  double? parentSelectedBorderWidth;
+  static const int arrowLength = 10;
+  static const double arrowAngle = math.pi / 6;
 
   _LinesPainter({
     required this.canvasWidth,
     required this.canvasHeight,
     required this.versionMap,
+    this.myPaint,
+    this.selectedBorderWidth = 1,
+    this.parentSelectedBorderWidth = 1,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    MyLogger.info('paint canvasWidth=$canvasWidth, canvasHeight=$canvasHeight');
-    Paint paint = Paint()
+    MyLogger.debug('paint canvasWidth=$canvasWidth, canvasHeight=$canvasHeight');
+    Paint paint = myPaint ?? (Paint()
       ..style = PaintingStyle.stroke
       ..color = const Color(0xFFE0E0E0)
-      ..strokeWidth = 2;
-    // canvas.drawLine(Offset(600, 45), Offset(950, 45), paint);
-    // Path path = Path();
-    // path.moveTo(600, 45);
-    // path.lineTo(950, 45);
-    // // path.lineTo(600, 45 + 50);
-    // canvas.drawPath(path, paint);
+      ..strokeWidth = 2);
     for(final node in versionMap.values) {
       for(final parent in node.parents) {
         _drawLine(canvas, node, parent, paint);
@@ -439,31 +457,37 @@ class _LinesPainter extends CustomPainter {
 
   void _drawLine(Canvas canvas, Node node, Node parent, Paint paint) {
     final path = Path();
-    final x0 = node._getRight();
+    final x0 = node._getRight() + selectedBorderWidth! + paint.strokeWidth / 2;
     final y0 = node._getCenter();
-    final xn = parent._getLeft();
+    var xn = parent._getLeft() - parentSelectedBorderWidth!;
     final yn = parent._getCenter();
     path.moveTo(x0, y0);
     if(node.column == parent.column - 1) {
+      final angle = _getAngle(x0, y0, xn, yn);
+      xn += paint.strokeWidth * math.cos(angle); // Adjust to not overlap with the border
       path.lineTo(xn, yn);
-      _drawArrow(path, x0, y0, xn, yn);
+      _drawArrow(path, x0, y0, xn, yn, angle);
     } else {
       double x1 = (x0 + xn) / 2;
       double y1 = 0;
       double x2 = (x0 + xn) / 2;
       double y2 = canvasHeight;
+      final angle = _getAngle(x2, y2, xn, yn);
+      xn += paint.strokeWidth * math.cos(angle);
       path.cubicTo(x1, y1, x2, y2, xn, yn);
-      _drawArrow(path, x2, y2, xn, yn);
+      _drawArrow(path, x2, y2, xn, yn, angle);
     }
     canvas.drawPath(path, paint);
   }
 
-  void _drawArrow(Path path, double x0, double y0, double xn, double yn) {
-    const arrowAngle = math.pi / 6;
-    const arrowLength = 10;
+  double _getAngle(double x0, double y0, double xn, double yn) {
     final dx = x0 - xn;
     final dy = y0 - yn;
     final angle = math.atan2(dy, dx);
+    return angle;
+  }
+
+  void _drawArrow(Path path, double x0, double y0, double xn, double yn, double angle) {
     final p1x = xn + arrowLength * math.cos(angle + arrowAngle);
     final p1y = yn + arrowLength * math.sin(angle + arrowAngle);
     final p2x = xn + arrowLength * math.cos(angle - arrowAngle);
