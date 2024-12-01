@@ -122,6 +122,15 @@ class DocumentManager {
     return docId;
   }
 
+  bool createDocument(String title, String content) {
+    final now = Util.getTimeStamp();
+    final doc = Document.createDocument(_db, title, content, this, now);
+    final docId = doc.id;
+    _documents[docId] = doc;
+    _docTitles.add(DocDataModel(docId: docId, title: title, hash: '', timestamp: now));
+    return docId.isNotEmpty;
+  }
+
   List<VersionDataModel> getCurrentRawVersionTree() {
     var versions = _db.getAllVersions();
     return versions;

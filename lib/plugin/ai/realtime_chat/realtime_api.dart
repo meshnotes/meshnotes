@@ -8,6 +8,7 @@ class RealtimeApi {
   final String url = 'wss://api.openai.com/v1/realtime';
   final String model = 'gpt-4o-realtime-preview-2024-10-01';
   final String apiKey;
+  final List<Map<String, dynamic>>? toolsDescription;
   final String defaultInstructions = 'You are a helpful assistant, try to chat with user or answer the user\'s question politely.';
   final String instructionsWithUserContent = '''
 You are an intelligent assistant for MeshNotes(an notebook app), 
@@ -30,12 +31,14 @@ Chatting Instructions:
   final void Function()? onInterrupt;
   final void Function(Object, StackTrace)? onWsError;
   final void Function()? onWsClose;
+  final void Function(String, String, String)? onFunctionCall;
 
   // ignore: constant_identifier_names
   static const int MAX_RECONNECT_TIMES = 3;
 
   RealtimeApi({
     required this.apiKey,
+    this.toolsDescription,
     this.onAiAudioDelta,
     this.onInterrupt,
     this.onAiTranscriptDelta,
@@ -43,6 +46,7 @@ Chatting Instructions:
     this.onUserTranscriptDone,
     this.onWsError,
     this.onWsClose,
+    this.onFunctionCall,
   });
 
   Future<bool> connect({String? userContents, String? history}) async {
@@ -111,7 +115,7 @@ Chatting Instructions:
         'prefix_padding_ms': 500,
         'silence_duration_ms': 200,
       },
-      'tools': [],
+      'tools': toolsDescription?? [],
       'tool_choice': 'auto',
       'temperature': 0.8,
     };
@@ -143,6 +147,30 @@ Chatting Instructions:
       'audio_end_ms': truncateInfo.audioEndMs,
     };
     ws!.add(jsonEncode(truncateObject));
+  }
+
+  // Called when function call is done
+  void sendFunctionResult(String callId, String result) {
+    final sendFunctionResultObject = {
+      'type': 'conversation.item.create',
+      'item': {
+        'type': 'function_call_output',
+        'call_id': callId,
+        'output': result,
+      },
+    };
+    ws!.add(jsonEncode(sendFunctionResultObject));
+  }
+  // Called when the function call result need to be informed to user
+  void informUserToolResult(String callId) {
+    final informUserToolResultObject = {
+      'type': 'response.create',
+      'response': {
+        'modalities': ['text', 'audio'],
+        'instructions': 'please tell user about the tool result of call_id=$callId.',
+      },
+    };
+    ws!.add(jsonEncode(informUserToolResultObject));
   }
 
   void _onData(dynamic data) {
@@ -202,6 +230,11 @@ Chatting Instructions:
     } else if(type == 'response.audio_transcript.done') {
       final text = json['transcript'] as String;
       onAiTranscriptDone?.call(text);
+    } else if(type == 'response.function_call_arguments.done') {
+      final callId = json['call_id'] as String;
+      final name = json['name'] as String;
+      final arguments = json['arguments'] as String;
+      onFunctionCall?.call(callId, name, arguments);
     } else {
       MyLogger.debug('Realtime API: $json');
     }

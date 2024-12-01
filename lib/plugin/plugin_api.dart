@@ -28,6 +28,7 @@ abstract class PluginProxy {
   void addExtra(String blockId, String content);
   void clearExtra(String blockId);
   UserNotes? getUserNotes();
+  bool createNote(String title, String content);
 }
 
 abstract class PluginInstance {

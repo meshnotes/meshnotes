@@ -115,7 +115,10 @@ class ParagraphDesc {
     String listing,
     int level,
   ): _id = _id, _type = _parseBlockType(type), _listing = _parseBlockListing(listing), _level = level, _extra = _parseExtra('') {
-    _parseTexts(raw);
+    _parseTextDescJson(raw);
+  }
+  ParagraphDesc.fromRawString(String raw): _id = IdGen.getUid(), _type = _BlockType.text, _listing = _BlockListing.none, _level = 0, _extra = _parseExtra('') {
+    _parseRawStringAsTextDesc(raw);
   }
   ParagraphDesc.fromTitle(String text):
     _id = Constants.keyTitleId,
@@ -123,7 +126,7 @@ class ParagraphDesc {
     _listing = _BlockListing.none,
     _level = 0,
     _extra = _parseExtra('') {
-    _parseTexts(text);
+    _parseTextDescJson(text);
   }
   factory ParagraphDesc.buildFromJson({
     required String id,
@@ -509,24 +512,33 @@ class ParagraphDesc {
     return block;
   }
 
-  void _parseTexts(String raw) {
+  void _parseRawStringAsTextDesc(String raw) {
     if(raw.isEmpty) {
       _updateTexts([TextDesc()]);
       return;
     }
+    final texts = [TextDesc()..text = raw];
+    _updateTexts(texts);
+  }
+  
+  void _parseTextDescJson(String jsonStr) {
+    if(jsonStr.isEmpty) {
+      _updateTexts([TextDesc()]);
+      return;
+    }
     List<TextDesc> texts = [];
-    if(isTitle()) { // 标题只是普通文本，其他块是json文本
-      var textDesc = TextDesc()..text = raw;
+    if(isTitle()) { // Title is plain text, other block is json text
+      var textDesc = TextDesc()..text = jsonStr;
       texts = [textDesc];
     } else {
-      texts = _parseJson(raw);
+      texts = _parseJson(jsonStr);
     }
     MyLogger.verbose('_parseTexts: result=$texts');
     _updateTexts(texts);
   }
 
-  List<TextDesc> _parseJson(String raw) {
-    List l = jsonDecode(raw);
+  List<TextDesc> _parseJson(String jsonStr) {
+    List l = jsonDecode(jsonStr);
     List<TextDesc> result = [];
     for(var span in l) {
       if(span is! Map) {

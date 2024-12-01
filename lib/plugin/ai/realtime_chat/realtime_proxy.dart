@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
 import 'package:my_log/my_log.dart';
 import 'package:record/record.dart';
 import 'audio_player_proxy.dart';
+import 'function_call.dart';
 import 'realtime_api.dart';
 import 'chat_messages.dart';
 
@@ -44,13 +46,14 @@ class RealtimeProxy {
   Timer? _animationTimer;
   _State _state = _State.idle;
   Function(ChatMessages)? onChatMessagesUpdated;
-
+  AiTools? tools;
   // ignore: constant_identifier_names
   static const int MAX_ERROR_RETRY_COUNT = 3;
 
   RealtimeProxy({
     required this.apiKey,
     this.userNotes,
+    this.tools,
     this.showToastCallback,
     this.onErrorShutdown,
     this.startVisualizerAnimation,
@@ -68,6 +71,7 @@ class RealtimeProxy {
     _state = _State.connecting;
     client = RealtimeApi(
       apiKey: apiKey,
+      toolsDescription: tools?.getDescription(),
       onAiAudioDelta: _onAudioDelta,
       onInterrupt: _onInterrupt,
       onAiTranscriptDelta: _onAiTranscriptDelta,
@@ -75,6 +79,7 @@ class RealtimeProxy {
       onUserTranscriptDone: _onUserTranscriptDone,
       onWsError: _onWsError,
       onWsClose: _onWsClose,
+      onFunctionCall: _onFunctionCall,
     );
     // Connect to Realtime API
     bool connected = false;
@@ -148,19 +153,19 @@ class RealtimeProxy {
   }
 
   void _onAiTranscriptDelta(String text) {
-    MyLogger.info('AI transcript delta: $text');
+    MyLogger.debug('AI transcript delta: $text');
     chatMessages.updateAiTranscriptDelta(text);
     onChatMessagesUpdated?.call(chatMessages);
   }
 
   void _onAiTranscriptDone(String text) {
-    MyLogger.info('AI transcript done: $text');
+    MyLogger.debug('AI transcript done: $text');
     chatMessages.updateAiTranscriptDone(text);
     onChatMessagesUpdated?.call(chatMessages);
   }
 
   void _onUserTranscriptDone(String text) {
-    MyLogger.info('User transcript done: $text');
+    MyLogger.debug('User transcript done: $text');
     chatMessages.updateUserTranscriptDone(text);
     onChatMessagesUpdated?.call(chatMessages);
   }
@@ -241,5 +246,18 @@ class RealtimeProxy {
     _animationTimer = Timer(Duration(milliseconds: duration), () {
       stopVisualizerAnimation?.call();
     });
+  }
+
+  Future<void> _onFunctionCall(String callId, String name, String arguments) async {
+    MyLogger.info('Function call: $callId $name $arguments');
+    final result = tools?.invokeFunction(name, arguments);
+    if(result == null) {
+      MyLogger.warn('Function not found: name=$name');
+    } else {
+      client.sendFunctionResult(callId, jsonEncode(result));
+      if(result.shouldInformUser) {
+        client.informUserToolResult(callId);
+      }
+    }
   }
 }

@@ -63,6 +63,25 @@ class Document {
     return doc;
   }
 
+  factory Document.createDocument(DbHelper db, String title, String content, DocumentManager parent, int now) {
+    var docId = db.newDocument(now);
+    final titlePara = ParagraphDesc.fromTitle(title);
+    List<ParagraphDesc> paragraphs = [titlePara];
+    for(var line in content.split('\n')) {
+      var para = ParagraphDesc.fromRawString(line);
+      paragraphs.add(para);
+    }
+    Document doc = Document(
+      id: docId,
+      paras: paragraphs,
+      parent: parent,
+      time: now,
+      db: db,
+    );
+    doc._flushDocStructure();
+    return doc;
+  }
+
   void updateBlocks(Document newDoc) {
     var _oldMap = _mapOfParagraphs;
     paragraphs = newDoc.paragraphs;

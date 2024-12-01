@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
+import 'ai_tools_manager.dart';
 import 'audio_visualizer_widget.dart';
 import 'chat_messages.dart';
 import 'realtime_proxy.dart';
@@ -26,7 +27,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   static const double dialogWidth = 400; // fixed width and height of dialog
   static const double dialogHeight = 100;
   static const double paddingToScreenEdge = 5;
-  late RealtimeProxy proxy;
+  late RealtimeProxy realtime;
   bool _isMuted = false;
   final visualizerKey = GlobalKey<AudioVisualizerWidgetState>();
   final subtitlesKey = GlobalKey<SubtitlesState>();
@@ -34,16 +35,19 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   double _yPosition = -1;
   bool _isLoading = false;
   bool _isError = false;
+  late AiToolsManager _toolsManager;
 
   @override
   void initState() {
     super.initState();
     _isLoading = true;
     _isError = false;
+    _toolsManager = AiToolsManager(pluginProxy: widget.proxy);
     final userNotes = widget.proxy.getUserNotes();
-    proxy = RealtimeProxy(
+    realtime = RealtimeProxy(
       apiKey: widget.apiKey,
       userNotes: userNotes,
+      tools: _toolsManager.buildTools(),
       showToastCallback: (error) {
         widget.proxy.showToast(error);
       },
@@ -54,7 +58,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       stopVisualizerAnimation: _stopVisualizerAnimation,
       onChatMessagesUpdated: _onChatMessagesUpdated,
     );
-    proxy.connect().then((value) {
+    realtime.connect().then((value) {
       if(value) {
         setState(() {
           _isLoading = false;
@@ -72,7 +76,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   @override
   void dispose() {
     super.dispose();
-    proxy.shutdown();
+    realtime.shutdown();
   }
 
   @override
@@ -103,7 +107,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
           Expanded(
             child: Subtitles(
               key: subtitlesKey,
-              messages: proxy.chatMessages,
+              messages: realtime.chatMessages,
             ),
           ),
           Column(

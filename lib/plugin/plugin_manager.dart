@@ -192,6 +192,13 @@ class PluginManager {
     return UserNotes(notes: notes);
   }
 
+  bool createNote(String title, String content) {
+    final docManager = controller.docManager;
+    final result = docManager.createDocument(title, content);
+    controller.refreshDocNavigator();
+    return result;
+  }
+
   List<void Function(BlockChangedEventData)> blockContentChangedEventHandlerQueue = [];
   void registerBlockContentChangeEventListener(void Function(BlockChangedEventData) handler) {
     var queue = blockContentChangedEventHandlerQueue;
@@ -363,5 +370,10 @@ class PluginProxyImpl implements PluginProxy {
   @override
   UserNotes? getUserNotes() {
     return _manager.getUserNotes();
+  }
+
+  @override
+  bool createNote(String title, String content) {
+    return _manager.createNote(title, content);
   }
 }
