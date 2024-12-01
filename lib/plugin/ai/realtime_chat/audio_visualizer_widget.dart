@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 class AudioVisualizerWidget extends StatefulWidget {
@@ -63,7 +62,7 @@ class AudioVisualizerWidgetState extends State<AudioVisualizerWidget> with Singl
   }
 
   void playAnimation() {
-    if(_controller.status == AnimationStatus.dismissed) {
+    if(!_controller.isAnimating) {
       _controller.repeat(reverse: true);
     }
   }

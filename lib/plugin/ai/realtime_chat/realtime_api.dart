@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:my_log/my_log.dart';
-
 import 'audio_player_proxy.dart';
 
 class RealtimeApi {
@@ -35,6 +34,10 @@ class RealtimeApi {
 
   Future<bool> connect() async {
     return await _connect(null);
+  }
+
+  Future<bool> connectWithHistory(String history) async {
+    return await _connect(history);
   }
 
   Future<bool> reconnect({String? history}) async {

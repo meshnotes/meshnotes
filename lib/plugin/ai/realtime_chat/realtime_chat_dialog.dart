@@ -1,10 +1,10 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
-import 'package:my_log/my_log.dart';
 import 'audio_visualizer_widget.dart';
+import 'chat_messages.dart';
 import 'realtime_proxy.dart';
+import 'subtitles.dart';
 
 class RealtimeChatDialog extends StatefulWidget {
   final void Function()? closeCallback;
@@ -23,18 +23,23 @@ class RealtimeChatDialog extends StatefulWidget {
 }
 
 class RealtimeChatDialogState extends State<RealtimeChatDialog> {
-  static const double dialogWidth = 100; // fixed width and height of dialog
+  static const double dialogWidth = 400; // fixed width and height of dialog
   static const double dialogHeight = 100;
   static const double paddingToScreenEdge = 5;
   late RealtimeProxy proxy;
   bool _isMuted = false;
   final visualizerKey = GlobalKey<AudioVisualizerWidgetState>();
+  final subtitlesKey = GlobalKey<SubtitlesState>();
   double _xPosition = -1;
   double _yPosition = -1;
+  bool _isLoading = false;
+  bool _isError = false;
 
   @override
   void initState() {
     super.initState();
+    _isLoading = true;
+    _isError = false;
     proxy = RealtimeProxy(
       apiKey: widget.apiKey,
       showToastCallback: (error) {
@@ -45,8 +50,21 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       },
       startVisualizerAnimation: _startVisualizerAnimation,
       stopVisualizerAnimation: _stopVisualizerAnimation,
+      onChatMessagesUpdated: _onChatMessagesUpdated,
     );
-    proxy.connect();
+    proxy.connect().then((value) {
+      if(value) {
+        setState(() {
+          _isLoading = false;
+          _isError = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _isError = true;
+        });
+      }
+    });
   }
 
   @override
@@ -78,75 +96,106 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
           ),
         ],
       ),
-      child: Column(
-        // alignment: Alignment.center,
+      child: Row(
         children: [
-          const Spacer(),
-          AudioVisualizerWidget(
-            key: visualizerKey,
-            isPlaying: false, // Don't play animation before connected
-            color: const Color(0xFF2196F3),
-          ),
-          Align(
-            alignment: Alignment.bottomLeft,
-              child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: _isMuted? Colors.red : null),
-                  color: _isMuted ? Colors.red : null,
-                  onPressed: () {
-                    setState(() {
-                      _isMuted = !_isMuted;
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.stop, color: Colors.black),
-                  onPressed: _onClose,
-                ),
-              ],
+          Expanded(
+            child: Subtitles(
+              key: subtitlesKey,
+              messages: proxy.chatMessages,
             ),
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(),
+              Align(
+                alignment: Alignment.topLeft,
+                child: _isError 
+                  ? const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 24,
+                    )
+                  : (_isLoading 
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+                          ),
+                        )
+                      : AudioVisualizerWidget(
+                          key: visualizerKey,
+                          isPlaying: false,
+                          color: const Color(0xFF2196F3),
+                        )
+                    ),
+              ),
+              const Spacer(),
+              Align(
+                alignment: Alignment.bottomLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, 
+                        color: _isMuted? Colors.red : null),
+                      onPressed: () {
+                        setState(() {
+                          _isMuted = !_isMuted;
+                        });
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.stop, color: Colors.black),
+                      onPressed: _onClose,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
 
+    final gesture = GestureDetector(
+      onPanUpdate: (details) {
+        setState(() {
+          final newX = _xPosition + details.delta.dx;
+          final newY = _yPosition + details.delta.dy;
+          
+          final screenWidth = MediaQuery.of(context).size.width;
+          final screenHeight = MediaQuery.of(context).size.height;
+          
+          _xPosition = newX.clamp(paddingToScreenEdge, screenWidth - dialogWidth - paddingToScreenEdge);
+          _yPosition = newY.clamp(paddingToScreenEdge, screenHeight - dialogHeight - paddingToScreenEdge);
+
+          final distanceToTop = _yPosition;
+          final distanceToBottom = screenHeight - (_yPosition + dialogHeight);
+          final distanceToLeft = _xPosition;
+          final distanceToRight = screenWidth - (_xPosition + dialogWidth);
+          final minimalDistance = min(distanceToTop, min(distanceToBottom, min(distanceToLeft, distanceToRight)));
+
+          // Snap to the edge with the minimal distance
+          if(distanceToTop == minimalDistance) { // Snap to top
+            _yPosition = paddingToScreenEdge;
+          } else if(distanceToBottom == minimalDistance) { // Snap to bottom
+            _yPosition = screenHeight - dialogHeight - paddingToScreenEdge;
+          } else if(distanceToLeft == minimalDistance) { // Snap to left
+            _xPosition = paddingToScreenEdge;
+          } else { // Snap to right
+            _xPosition = screenWidth - dialogWidth - paddingToScreenEdge;
+          }
+        });
+      },
+      child: container,
+    );
     final positioned = Positioned(
       left: _xPosition,
       top: _yPosition,
-      child: GestureDetector(
-        onPanUpdate: (details) {
-          setState(() {
-            final newX = details.globalPosition.dx;
-            final newY = details.globalPosition.dy;
-            
-            final screenWidth = MediaQuery.of(context).size.width;
-            final screenHeight = MediaQuery.of(context).size.height;
-            
-            _xPosition = newX.clamp(paddingToScreenEdge, screenWidth - dialogWidth - paddingToScreenEdge);
-            _yPosition = newY.clamp(paddingToScreenEdge, screenHeight - dialogHeight - paddingToScreenEdge);
-
-            final distanceToTop = _yPosition;
-            final distanceToBottom = screenHeight - (_yPosition + dialogHeight);
-            final distanceToLeft = _xPosition;
-            final distanceToRight = screenWidth - (_xPosition + dialogWidth);
-            final minimalDistance = min(distanceToTop, min(distanceToBottom, min(distanceToLeft, distanceToRight)));
-
-            // Snap to the edge with the minimal distance
-            if(distanceToTop == minimalDistance) { // Snap to top
-              _yPosition = paddingToScreenEdge;
-            } else if(distanceToBottom == minimalDistance) { // Snap to bottom
-              _yPosition = screenHeight - dialogHeight - paddingToScreenEdge;
-            } else if(distanceToLeft == minimalDistance) { // Snap to left
-              _xPosition = paddingToScreenEdge;
-            } else { // Snap to right
-              _xPosition = screenWidth - dialogWidth - paddingToScreenEdge;
-            }
-          });
-        },
-        child: container,
-      ),
+      child: gesture,
     );
 
     return positioned;
@@ -162,5 +211,9 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
 
   void _stopVisualizerAnimation() {
     visualizerKey.currentState?.pauseAnimation();
+  }
+
+  void _onChatMessagesUpdated(ChatMessages messages) {
+    subtitlesKey.currentState?.updateMessages(messages);
   }
 }
