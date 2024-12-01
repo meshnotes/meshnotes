@@ -88,6 +88,12 @@ class Setting {
       displayName: Constants.settingNameUserInfo,
       comment: Constants.settingCommentUserInfo,
     ),
+    SettingData( //TODO should use more precise privilege control mechanism, instead of this global setting
+      name: Constants.settingKeyAllowSendingNotesToPlugins,
+      displayName: Constants.settingNameAllowSendingNotesToPlugins,
+      comment: Constants.settingCommentAllowSendingNotesToPlugins,
+      defaultValue: Constants.settingDefaultAllowSendingNotesToPlugins,
+    ),
   ];
 
   void load() {

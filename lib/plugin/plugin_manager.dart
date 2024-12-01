@@ -10,6 +10,7 @@ import '../mindeditor/controller/controller.dart';
 import '../mindeditor/setting/constants.dart';
 import '../mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'plugin_api.dart';
+import 'user_notes_for_plugin.dart';
 
 List<PluginInstance> _plugins = [
   PluginAI(),
@@ -163,6 +164,32 @@ class PluginManager {
     final pluginName = pluginInfo.pluginName;
     final key = 'plugin/$pluginName';
     blockState.clearExtra(key);
+  }
+  UserNotes? getUserNotes() {
+    // Check privilege
+    final allowSendingNotesToPlugins = controller.setting.getSetting(Constants.settingKeyAllowSendingNotesToPlugins);
+    if(allowSendingNotesToPlugins == null || allowSendingNotesToPlugins != 'true') return null;
+
+    final docManager = controller.docManager;
+    final documents = docManager.getAllDocuments();
+    List<UserNote> notes = [];
+    for(var document in documents) {
+      final docId = document.docId;
+      final title = document.title;
+      final doc = docManager.getDocument(docId);
+      if(doc == null) continue;
+      final paras = doc.paragraphs;
+      List<NoteContent> blocks = [];
+      for(var para in paras.sublist(1)) { // Skip the title
+        final blockId = para.getBlockId();
+        final blockContent = para.getPlainText();
+        final userBlock = NoteContent(blockId: blockId, content: blockContent);
+        blocks.add(userBlock);
+      }
+      final userNote = UserNote(noteId: docId, title: title, contents: blocks);
+      notes.add(userNote);
+    }
+    return UserNotes(notes: notes);
   }
 
   List<void Function(BlockChangedEventData)> blockContentChangedEventHandlerQueue = [];
@@ -331,5 +358,10 @@ class PluginProxyImpl implements PluginProxy {
   @override
   void clearExtra(String blockId) {
     _manager.clearExtra(this, blockId);
+  }
+
+  @override
+  UserNotes? getUserNotes() {
+    return _manager.getUserNotes();
   }
 }

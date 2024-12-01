@@ -89,6 +89,11 @@ class Constants {
   static const String settingCommentUserInfo = 'User name and private key information(formatted in base64)';
   static const String settingKeyPluginPrefix = 'plugin';
 
+  static const String settingKeyAllowSendingNotesToPlugins = 'allow_sending_notes_to_plugins';
+  static const String settingNameAllowSendingNotesToPlugins = 'Allow sending notes to plugins';
+  static const String settingCommentAllowSendingNotesToPlugins = 'Allow sending notes content to plugins(except for the private notes)';
+  static const String settingDefaultAllowSendingNotesToPlugins = 'false';
+
   static const String userNameAndKeyOfGuest = 'guest';
 
   static const String resourceKeyVersionTree = 'version_tree';

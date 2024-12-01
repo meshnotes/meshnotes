@@ -468,7 +468,8 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       _updateLastEditingValue(value);
       return;
     }
-    if(value.text.length > widget.controller.setting.blockMaxCharacterLength) {
+    //TODO If has '\n', it's a multi-line text, need other way to check whether it exceeds the limit
+    if(!value.text.contains('\n') && value.text.length > widget.controller.setting.blockMaxCharacterLength) {
       // CallbackRegistry.unregisterCurrentSnackBar();
       // CallbackRegistry.showSnackBar(
       //   SnackBar(

@@ -9,6 +9,19 @@ class RealtimeApi {
   final String model = 'gpt-4o-realtime-preview-2024-10-01';
   final String apiKey;
   final String defaultInstructions = 'You are a helpful assistant, try to chat with user or answer the user\'s question politely.';
+  final String instructionsWithUserContent = '''
+You are an intelligent assistant for MeshNotes(an notebook app), 
+equipped with extensive knowledge. Users will share their notes with you. 
+Please engage in conversation with users based on these notes. 
+During the chat, you may not only discuss the content of the notes 
+but also utilize your vast knowledge to offer suggestions, 
+encouragement, and inspiration to users.
+
+Chatting Instructions:
+1. Keep the language concise and clear, reducing formalities and red tape.
+2. Based on the notes provided by the user, infer the language the user is employing unless the user specifically requests otherwise.
+3. In cases where it cannot be inferred, default to use English.
+''';
   WebSocket? ws;
   final void Function(Uint8List, String, int)? onAiAudioDelta;
   final void Function(String)? onAiTranscriptDelta;
@@ -32,27 +45,28 @@ class RealtimeApi {
     this.onWsClose,
   });
 
-  Future<bool> connect() async {
-    return await _connect(null);
-  }
-
-  Future<bool> connectWithHistory(String history) async {
-    return await _connect(history);
-  }
-
-  Future<bool> reconnect({String? history}) async {
-    return await _connect(history);
+  Future<bool> connect({String? userContents, String? history}) async {
+    return await _connect(userContents, history);
   }
 
   void shutdown() {
     ws?.close();
   }
 
-  Future<bool> _connect(String? history) async {
+  Future<bool> _connect(String? userContents, String? history) async {
     for(int i = 0; i < MAX_RECONNECT_TIMES; i++) {
       if(i > 0) {
         MyLogger.info('Realtime API: reconnecting for the $i-th time...');
       }
+      var instructions = defaultInstructions;
+      // Append user contents and history if any
+      if(userContents != null) { // If there is user content, use the special instructions
+        instructions = instructionsWithUserContent + '\n' + userContents;
+      }
+      if(history != null) {
+        instructions = instructions + '\n' + history;
+      }
+      MyLogger.debug('Realtime API: instructions: $instructions');
       try {
         ws = await WebSocket.connect(
         '$url?model=$model',
@@ -61,8 +75,7 @@ class RealtimeApi {
           'OpenAI-Beta': 'realtime=v1',
           },
         );
-        if(history != null) {
-          final instructions = defaultInstructions + '\nPlease follow the previous conversation history, AI means you, and user means the user.\n' + history;
+        if(history != null || userContents != null) {
           updateSession(modifications: {
             'instructions': instructions,
           });
@@ -110,7 +123,7 @@ class RealtimeApi {
       'event_id': _generateEventId(),
       'session': sessionObject,
     };
-    MyLogger.info('Realtime API: $updateSessionObject');
+    MyLogger.debug('Realtime API update session: $updateSessionObject');
     ws!.add(jsonEncode(updateSessionObject));
   }
 

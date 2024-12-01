@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
 import 'package:my_log/my_log.dart';
 import 'package:record/record.dart';
 import 'audio_player_proxy.dart';
@@ -33,6 +34,7 @@ class RealtimeProxy {
   //   ChatMessage(role: ChatRole.user, content: '那他后来成功了吗？'),
   // ]);
   ChatMessages chatMessages = ChatMessages();
+  UserNotes? userNotes;
   int errorRetryCount = 0;
   Function(String)? showToastCallback;
   Function()? onErrorShutdown;
@@ -48,6 +50,7 @@ class RealtimeProxy {
 
   RealtimeProxy({
     required this.apiKey,
+    this.userNotes,
     this.showToastCallback,
     this.onErrorShutdown,
     this.startVisualizerAnimation,
@@ -55,6 +58,9 @@ class RealtimeProxy {
     this.onChatMessagesUpdated,
   });
 
+  /// 1. Connect to Realtime API
+  /// 2. Open record
+  /// 3. Open audio player
   Future<bool> connect() async {
     if(_state != _State.idle) {
       return false;
@@ -73,9 +79,9 @@ class RealtimeProxy {
     // Connect to Realtime API
     bool connected = false;
     if(chatMessages.isEmpty()) {
-      connected = await client.connect();
+      connected = await client.connect(userContents: _buildUserContents());
     } else {
-      connected = await client.connectWithHistory(_buildHistory());
+      connected = await client.connect(userContents: _buildUserContents(), history: _buildHistory());
     }
     if(connected) {
       MyLogger.info('Connected to Realtime API');
@@ -159,7 +165,18 @@ class RealtimeProxy {
     onChatMessagesUpdated?.call(chatMessages);
   }
 
-  String _buildHistory() {
+  String? _buildUserContents() {
+    if(userNotes == null) {
+      return null;
+    }
+    final content = userNotes!.getNotesContent();
+    String prompt = 'Here is the user\'s content. Be caution, user doesn\'t care the id, only care the content. so it\'s not necessary to mention the id in your response.';
+    return prompt + '\n' + content;
+  }
+  String? _buildHistory() {
+    if(chatMessages.isEmpty()) {
+      return null;
+    }
     final messageHistory = chatMessages.buildHistory();
     String prompt = 'Please continue the conversation, here is the previous chatting history(${ChatRole.user} means user, ${ChatRole.assistant} means you):';
     return prompt + '\n' + messageHistory;
@@ -189,7 +206,7 @@ class RealtimeProxy {
     errorRetryCount++;
     MyLogger.info('Reconnecting for the $errorRetryCount-th time...');
     _state = _State.connecting;
-    bool connected = await client.reconnect(history: _buildHistory());
+    bool connected = await client.connect(userContents: _buildUserContents(), history: _buildHistory());
     if(connected) {
       // After connected, reset the retry count if it's stable running for 10 seconds
       resetRetryCountTimer?.cancel();

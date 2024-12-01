@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'user_notes_for_plugin.dart';
+
 /// Used by PluginInstance. This is the only way for PluginInstance to interact with MeshNotes app
 abstract class PluginProxy {
   // Plugin register
@@ -25,6 +27,7 @@ abstract class PluginProxy {
   String? appendTextToNextBlock(String blockId, String text);
   void addExtra(String blockId, String content);
   void clearExtra(String blockId);
+  UserNotes? getUserNotes();
 }
 
 abstract class PluginInstance {

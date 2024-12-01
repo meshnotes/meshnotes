@@ -40,8 +40,10 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     super.initState();
     _isLoading = true;
     _isError = false;
+    final userNotes = widget.proxy.getUserNotes();
     proxy = RealtimeProxy(
       apiKey: widget.apiKey,
+      userNotes: userNotes,
       showToastCallback: (error) {
         widget.proxy.showToast(error);
       },

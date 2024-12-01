@@ -100,6 +100,14 @@ class DocumentManager {
     currentDocId = docId;
   }
 
+  Document? getDocument(String docId) {
+    if(_documents.containsKey(docId)) return _documents[docId]!;
+    final document = _getDocFromDb(docId);
+    if(document == null) return null;
+    _documents[docId] = document;
+    return document;
+  }
+
   String newDocument() {
     var title = Constants.newDocumentTitle;
     var now = Util.getTimeStamp();

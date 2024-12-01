@@ -29,11 +29,6 @@ class PluginAI implements PluginInstance {
   static const String settingCommentUseAiForExtra = 'Use AI to generate extra information for the block';
   static const String settingDefaultUseAiForExtra = 'false';
 
-  static const String settingKeyAllowSendingNotesToAi = 'allow_sending_notes_to_ai';
-  static const String settingNameAllowSendingNotesToAi = 'Allow sending notes to AI';
-  static const String settingCommentAllowSendingNotesToAi = 'Allow sending notes content to AI(except for the private notes)';
-  static const String settingDefaultAllowSendingNotesToAi = 'false';
-
   late PluginProxy _proxy;
 
   @override
@@ -78,12 +73,6 @@ class PluginAI implements PluginInstance {
         settingName: settingNameUseAiForExtra,
         settingComment: settingCommentUseAiForExtra,
         settingDefaultValue: settingDefaultUseAiForExtra,
-      ),
-      PluginSetting(
-        settingKey: settingKeyAllowSendingNotesToAi,
-        settingName: settingNameAllowSendingNotesToAi,
-        settingComment: settingCommentAllowSendingNotesToAi,
-        settingDefaultValue: settingDefaultAllowSendingNotesToAi,
       ),
     ];
     return result;
