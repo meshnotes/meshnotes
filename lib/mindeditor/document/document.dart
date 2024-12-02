@@ -63,8 +63,7 @@ class Document {
     return doc;
   }
 
-  factory Document.createDocument(DbHelper db, String title, String content, DocumentManager parent, int now) {
-    var docId = db.newDocument(now);
+  factory Document.createDocument(DbHelper db, String docId, String title, String content, DocumentManager parent, int now) {
     final titlePara = ParagraphDesc.fromTitle(title);
     List<ParagraphDesc> paragraphs = [titlePara];
     for(var line in content.split('\n')) {
@@ -78,6 +77,9 @@ class Document {
       time: now,
       db: db,
     );
+    for(var p in paragraphs) {
+      p.flushDb();
+    }
     doc._flushDocStructure();
     return doc;
   }

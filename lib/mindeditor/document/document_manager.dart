@@ -124,8 +124,8 @@ class DocumentManager {
 
   bool createDocument(String title, String content) {
     final now = Util.getTimeStamp();
-    final doc = Document.createDocument(_db, title, content, this, now);
-    final docId = doc.id;
+    final docId = _db.newDocument(now);
+    final doc = Document.createDocument(_db, docId, title, content, this, now);
     _documents[docId] = doc;
     _docTitles.add(DocDataModel(docId: docId, title: title, hash: '', timestamp: now));
     return docId.isNotEmpty;
