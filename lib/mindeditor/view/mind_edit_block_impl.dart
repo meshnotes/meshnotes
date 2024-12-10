@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
@@ -6,7 +7,6 @@ import 'package:my_log/my_log.dart';
 import '../document/paragraph_desc.dart';
 import '../document/text_desc.dart';
 import '../setting/constants.dart';
-import 'my_paragraph.dart';
 
 class MindEditBlockImpl extends SingleChildRenderObjectWidget {
   final ParagraphDesc texts;
@@ -49,8 +49,8 @@ class MindBlockImplRenderObject extends RenderBox {
   bool readOnly;
   MindEditBlockState block;
   ParagraphDesc texts;
-  late MyRenderParagraph paragraph;
-  late MyRenderParagraph placeHolder;
+  late RenderParagraph paragraph;
+  late RenderParagraph placeHolder;
   Controller controller;
   double fontSize;
   Rect? _currentBox;
@@ -68,8 +68,8 @@ class MindBlockImplRenderObject extends RenderBox {
     block.setRender(this);
   }
 
-  static MyRenderParagraph _buildParagraph(ParagraphDesc texts, double fontSize) {
-    return MyRenderParagraph(
+  static RenderParagraph _buildParagraph(ParagraphDesc texts, double fontSize) {
+    return RenderParagraph(
       _buildTextSpanAndCalcTotalLength(texts, fontSize),
       textDirection: TextDirection.ltr,
       strutStyle: StrutStyle(
@@ -77,8 +77,8 @@ class MindBlockImplRenderObject extends RenderBox {
       ),
     );
   }
-  static MyRenderParagraph _buildPlaceHolder(String holderText, double fontSize) {
-    return MyRenderParagraph(
+  static RenderParagraph _buildPlaceHolder(String holderText, double fontSize) {
+    return RenderParagraph(
       TextSpan(
         text: holderText,
         style: TextStyle(
