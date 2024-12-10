@@ -22,7 +22,7 @@ Both these two ways you need to run mesh notes on both devices. But by the third
 
 ## Building and testing environment
 Build and test in Flutter 3.22.0 stable, with Dart 3.4.0.
-For mac: Xcode 15.1
+For mac: Xcode 16.1
 For windows: Visual Studio 2022 + Rust 1.76.0
 IDE: Cursor
 
