@@ -1,6 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
+import 'package:my_log/my_log.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'aec_audio_web_view.dart';
 import 'ai_tools_manager.dart';
 import 'audio_visualizer_widget.dart';
 import 'chat_messages.dart';
@@ -24,8 +31,8 @@ class RealtimeChatDialog extends StatefulWidget {
 }
 
 class RealtimeChatDialogState extends State<RealtimeChatDialog> {
-  static const double dialogWidth = 400; // fixed width and height of dialog
-  static const double dialogHeight = 100;
+  static const double defaultDialogWidth = 400; // fixed width and height of dialog
+  static const double defaultDialogHeight = 100;
   static const double paddingToScreenEdge = 5;
   late RealtimeProxy realtime;
   bool _isMuted = false;
@@ -44,7 +51,11 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     _isError = false;
     _toolsManager = AiToolsManager(pluginProxy: widget.proxy);
     final userNotes = widget.proxy.getUserNotes();
+    final useNativeAudioProxy = _useNativeAudioProxy();
+    //TODO should use FutureBuilder
+
     realtime = RealtimeProxy(
+      usingNativeAudio: useNativeAudioProxy,
       apiKey: widget.apiKey,
       userNotes: userNotes,
       tools: _toolsManager.buildTools(),
@@ -58,17 +69,11 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       stopVisualizerAnimation: _stopVisualizerAnimation,
       onChatMessagesUpdated: _onChatMessagesUpdated,
     );
-    realtime.connect().then((value) {
-      if(value) {
-        setState(() {
-          _isLoading = false;
-          _isError = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _isError = true;
-        });
+    rootBundle.load('assets/pop_sound_pcm24k.pcm').then((value) {
+      realtime.setPopSoundAudioBase64(base64Encode(value.buffer.asUint8List()));
+    }).whenComplete(() {
+      if(useNativeAudioProxy) {
+        _startRealtimeChat();
       }
     });
   }
@@ -81,12 +86,15 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height - 30;
+    final dialogWidth = min(defaultDialogWidth, screenWidth - paddingToScreenEdge * 2);
+    final dialogHeight = min(defaultDialogHeight, screenHeight - paddingToScreenEdge * 2);
     if(_xPosition < 0 || _yPosition < 0) {
-      final screenWidth = MediaQuery.of(context).size.width;
-      final screenHeight = MediaQuery.of(context).size.height - 30;
       _xPosition = screenWidth.clamp(paddingToScreenEdge, screenWidth - dialogWidth - paddingToScreenEdge);
       _yPosition = screenHeight.clamp(paddingToScreenEdge, screenHeight - dialogHeight - paddingToScreenEdge);
     }
+    final webViewAudio = _buildWebViewAudio();
     final container = Container(
       width: dialogWidth,
       height: dialogHeight,
@@ -105,10 +113,13 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       child: Row(
         children: [
           Expanded(
-            child: Subtitles(
-              key: subtitlesKey,
-              messages: realtime.chatMessages,
-            ),
+            child:
+              _isLoading
+                ? Container()
+                : Subtitles(
+                  key: subtitlesKey,
+                  messages: realtime.chatMessages,
+                ),
           ),
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -139,6 +150,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                     ),
               ),
               const Spacer(),
+              if(webViewAudio != null) webViewAudio,
               Align(
                 alignment: Alignment.bottomLeft,
                 child: Row(
@@ -150,6 +162,11 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                       onPressed: () {
                         setState(() {
                           _isMuted = !_isMuted;
+                          if(_isMuted) {
+                            realtime.audioRecorderProxy.mute();
+                          } else {
+                            realtime.audioRecorderProxy.unmute();
+                          }
                         });
                       },
                     ),
@@ -205,6 +222,68 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     );
 
     return positioned;
+  }
+
+  bool _useNativeAudioProxy() {
+    // Currently supports Windows, MacOS, Android, and iOS
+    return !(Platform.isWindows || Platform.isMacOS || Platform.isAndroid || Platform.isIOS);
+  }
+
+  Widget? _buildWebViewAudio() {
+    if(_useNativeAudioProxy()) {
+      return null;
+    }
+    final aecAudioWebView = AecAudioWebView(
+      sampleRate: RealtimeProxy.sampleRate,
+      numChannels: RealtimeProxy.numChannels,
+      sampleSize: RealtimeProxy.sampleSize,
+      onAudioProxyReady: (audioPlayerProxy, audioRecorderProxy) {
+        realtime.setAudioProxies(audioPlayerProxy, audioRecorderProxy);
+        _startRealtimeChat();
+      },
+    );
+    final sizedBox = SizedBox(
+      width: 1,
+      height: 1,
+      child: aecAudioWebView,
+    );
+    return sizedBox;
+  }
+
+  Future<bool> requestPermissions() async {
+    if(Controller().environment.isMobile()) {
+      final statusMicrophone = await Permission.microphone.request();
+      // final statusAudio = await Permission.audio.request();
+      MyLogger.info('statusMicrophone: $statusMicrophone');
+      if(statusMicrophone != PermissionStatus.granted) {
+        return false;
+      }
+    }
+    return true;
+  }
+  void _startRealtimeChat() {
+    requestPermissions().then((granted) {
+      if(granted) {
+        realtime.connect().then((connected) {
+          if(connected) {
+            setState(() {
+              _isLoading = false;
+              _isError = false;
+            });
+          } else {
+            setState(() {
+              _isLoading = false;
+              _isError = true;
+            });
+          }
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _isError = true;
+        });
+      }
+    });
   }
 
   void _onClose() {

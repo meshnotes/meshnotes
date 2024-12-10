@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
 import 'package:my_log/my_log.dart';
-import 'package:record/record.dart';
 import 'audio_player_proxy.dart';
+import 'audio_recorder_proxy.dart';
 import 'function_call.dart';
 import 'realtime_api.dart';
 import 'chat_messages.dart';
@@ -21,7 +21,8 @@ class RealtimeProxy {
   final String apiKey;
   late RealtimeApi client;
   late AudioPlayerProxy audioPlayerProxy;
-  late AudioRecorder record;
+  late AudioRecorderProxy audioRecorderProxy;
+  String? _popSoundAudioBase64;
   bool shouldStop = false; // stop by user
   bool forceStop = false; // stop by too many errors
   // Just for chat history test
@@ -49,9 +50,14 @@ class RealtimeProxy {
   AiTools? tools;
   // ignore: constant_identifier_names
   static const int MAX_ERROR_RETRY_COUNT = 3;
+  static const int sampleRate = 24000;
+  static const int numChannels = 1;
+  static const int sampleSize = 16;
+  final bool usingNativeAudio;
 
   RealtimeProxy({
     required this.apiKey,
+    required this.usingNativeAudio,
     this.userNotes,
     this.tools,
     this.showToastCallback,
@@ -69,6 +75,10 @@ class RealtimeProxy {
       return false;
     }
     _state = _State.connecting;
+    if(usingNativeAudio) {
+      await _openNativeRecorder();
+      _openNativeAudioPlayer();
+    }
     client = RealtimeApi(
       apiKey: apiKey,
       toolsDescription: tools?.getDescription(),
@@ -91,16 +101,28 @@ class RealtimeProxy {
     if(connected) {
       MyLogger.info('Connected to Realtime API');
     }
-    await _openRecord();
-    audioPlayerProxy = AudioPlayerProxy(onPlaying: _onAudioActive); // play animation when playing audio
     if(connected) {
       _state = _State.connected;
+    }
+    if(_popSoundAudioBase64 != null) { // Play a pop sound when connected
+      MyLogger.debug('Play pop sound, $_popSoundAudioBase64');
+      // Timer(const Duration(milliseconds: 1000), () {
+      //   audioPlayerProxy.play(_popSoundAudioBase64!, 'pop_sound', 0);
+      // });
+      await Future.delayed(const Duration(milliseconds: 1000)); // Had to wait for 1s, or no sound on Android. I don't know why.
+      audioPlayerProxy.play(_popSoundAudioBase64!, 'pop_sound', 0);
     }
     return connected;
   }
 
-  void appendInputAudio(Uint8List data) {
-    client.appendInputAudio(data);
+  void setAudioProxies(AudioPlayerProxy player, AudioRecorderProxy recorder) {
+    audioPlayerProxy = player;
+    audioRecorderProxy = recorder;
+    recorder.setOnAudioData(appendInputAudio);
+  }
+
+  void appendInputAudio(String base64Data) {
+    client.appendInputAudio(base64Data);
   }
 
   void shutdown() {
@@ -111,36 +133,29 @@ class RealtimeProxy {
     shouldStop = true;
     client.shutdown();
     audioPlayerProxy.shutdown();
-    record.stop();
+    audioRecorderProxy.stop();
     _animationTimer?.cancel();
     _state = _State.idle;
   }
 
-  Future<void> _openRecord() async {
-    record = AudioRecorder();
-    if(await record.hasPermission()) {
-      final stream = await record.startStream(const RecordConfig(
-        encoder: AudioEncoder.pcm16bits,
-        numChannels: 1,
-        sampleRate: 24000,
-      ));
-      stream.listen((data) {
-        if(shouldStop || forceStop) {
-          return;
-        }
-        // MyLogger.info('Voice chat: ${data.length} bytes');
-        appendInputAudio(data);
-        // if(_isNotSilent(data)) {
-        //   MyLogger.info('Not silent, play animation');
-        //   _onAudioActive(100); // play animation
-        // }
-        // audioPlayerProxy.play(data);
-      });
-    }
+  void setPopSoundAudioBase64(String base64) {
+    _popSoundAudioBase64 = base64;
   }
 
-  void _onAudioDelta(Uint8List data, String itemId, int contentIndex) {
-    audioPlayerProxy.play(data, itemId, contentIndex);
+  Future<void> _openNativeRecorder() async {
+    audioRecorderProxy = NativeAudioRecorderProxy(
+      sampleRate: sampleRate,
+      numChannels: numChannels,
+    );
+    audioRecorderProxy.setOnAudioData(appendInputAudio);
+    audioRecorderProxy.start();
+  }
+  void _openNativeAudioPlayer() {
+    audioPlayerProxy = NativeAudioPlayerProxyImpl(onPlaying: _onAudioActive); // play animation when playing audio
+  }
+
+  void _onAudioDelta(String base64Data, String itemId, int contentIndex) {
+    audioPlayerProxy.play(base64Data, itemId, contentIndex);
   }
 
   void _onInterrupt() {
@@ -175,7 +190,7 @@ class RealtimeProxy {
       return null;
     }
     final content = userNotes!.getNotesContent();
-    String prompt = 'Here is the user\'s content. Be caution, user doesn\'t care the id, only care the content. so it\'s not necessary to mention the id in your response.';
+    String prompt = 'Here is the user\'s content. Refer to this only if user asks about it. Be caution, user doesn\'t care the id, only care the content. so it\'s not necessary to mention the id in your response.';
     return prompt + '\n' + content;
   }
   String? _buildHistory() {

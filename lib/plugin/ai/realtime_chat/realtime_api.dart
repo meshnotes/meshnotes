@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:my_log/my_log.dart';
-import 'audio_player_proxy.dart';
+import 'playing_buffer_info_manager.dart';
 
 class RealtimeApi {
+  bool needSayHelloToUser = false;
   final String url = 'wss://api.openai.com/v1/realtime';
   final String model = 'gpt-4o-realtime-preview-2024-10-01';
   final String apiKey;
@@ -14,17 +14,17 @@ class RealtimeApi {
 You are an intelligent assistant for MeshNotes(an notebook app), 
 equipped with extensive knowledge. Users will share their notes with you. 
 Please engage in conversation with users based on these notes. 
-During the chat, you may not only discuss the content of the notes 
-but also utilize your vast knowledge to offer suggestions, 
-encouragement, and inspiration to users.
+During the chat, user may want to talk about the notes, or just chatting
+with you, or talk anything they want. Please be friendly and helpful.
+Use your vast knowledge to offer suggestions, encouragement, and inspiration to users.
 
 Chatting Instructions:
-1. Keep the language concise and clear, reducing formalities and red tape.
-2. Based on the notes provided by the user, infer the language the user is employing unless the user specifically requests otherwise.
-3. In cases where it cannot be inferred, default to use English.
+1. Keep the reply concise and clear, reducing formalities and red tape.
+2. Use the setting language by default. In cases where it is not set, default to use English.
+3. If you are not sure about the user's question, you can take the initiative to ask the user to repeat it.
 ''';
   WebSocket? ws;
-  final void Function(Uint8List, String, int)? onAiAudioDelta;
+  final void Function(String, String, int)? onAiAudioDelta;
   final void Function(String)? onAiTranscriptDelta;
   final void Function(String)? onAiTranscriptDone;
   final void Function(String)? onUserTranscriptDone;
@@ -87,6 +87,9 @@ Chatting Instructions:
           updateSession();
         }
         ws!.listen(_onData, onError: _onError, onDone: _onClose);
+        if(needSayHelloToUser) {
+          _sayHelloToUser();
+        }
         return true;
       } catch(e) {
         MyLogger.err('Realtime API connect failed: $e');
@@ -131,12 +134,13 @@ Chatting Instructions:
     ws!.add(jsonEncode(updateSessionObject));
   }
 
-  void appendInputAudio(Uint8List data) {
+  void appendInputAudio(String base64Data) {
+    // MyLogger.info('Realtime API append input audio: $base64Data');
     final appendInputAudioObject = {
       'type': 'input_audio_buffer.append',
-      'audio': base64Encode(data),
+      'audio': base64Data,
     };
-    ws!.add(jsonEncode(appendInputAudioObject));
+    ws?.add(jsonEncode(appendInputAudioObject));
   }
 
   void truncate(TruncateInfo truncateInfo) {
@@ -163,14 +167,22 @@ Chatting Instructions:
   }
   // Called when the function call result need to be informed to user
   void informUserToolResult(String callId) {
-    final informUserToolResultObject = {
+    _sendResponseCreate('please tell user about the tool result of call_id=$callId.');
+  }
+
+  void _sayHelloToUser() {
+    _sendResponseCreate('Now play a "dong" sound to inform user that you are ready to chat with him.');
+  }
+
+  void _sendResponseCreate(String text) {
+    final responseCreateObject = {
       'type': 'response.create',
       'response': {
         'modalities': ['text', 'audio'],
-        'instructions': 'please tell user about the tool result of call_id=$callId.',
+        'instructions': text,
       },
     };
-    ws!.add(jsonEncode(informUserToolResultObject));
+    ws!.add(jsonEncode(responseCreateObject));
   }
 
   void _onData(dynamic data) {
@@ -220,10 +232,10 @@ Chatting Instructions:
   void _onResponse(String type, String? eventId, String? itemId, Map<String, dynamic> json) {
     // String? responseId = json['response_id'];
     if(type == 'response.audio.delta') {
+      MyLogger.info('Realtime API: response.audio.delta');
       final audioBase64 = json['delta'];
-      final audio = base64Decode(audioBase64!);
       final contentIndex = json['content_index'] as int;
-      onAiAudioDelta?.call(audio, itemId?? '', contentIndex);
+      onAiAudioDelta?.call(audioBase64, itemId?? '', contentIndex);
     } else if(type == 'response.audio_transcript.delta') {
       final text = json['delta'] as String;
       onAiTranscriptDelta?.call(text);

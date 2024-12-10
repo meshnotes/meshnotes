@@ -216,7 +216,7 @@ class MindBlockImplRenderObject extends RenderBox {
     final hasCursor = texts.hasCursor();
     var textSelection = texts.getTextSelection();
     if(textSelection != null) {
-      final _lineHeight = paragraph.getPreferredHeight();
+      final _lineHeight = paragraph.getFullHeightForCaret(TextPosition(offset: textSelection.extentOffset));
       MyLogger.verbose('MindEditBlockImplRenderObject: lineHeight=$_lineHeight');
       var currentTextPos = TextPosition(offset: textSelection.extentOffset);
       // MyLogger.info('MindEditBlockImplRenderObject: currentTextPos=$currentTextPos, extent=${textSelection.extentOffset}');
@@ -241,7 +241,7 @@ class MindBlockImplRenderObject extends RenderBox {
     }
   }
   Offset? getCursorOffsetOfPos(int pos) {
-    final lineHeight = paragraph.getPreferredHeight();
+    final lineHeight = paragraph.getFullHeightForCaret(TextPosition(offset: pos));
     final rect = _calculateCursorRectByPosition(TextPosition(offset: pos), height: lineHeight);
     var localPoint = Offset(rect.left, rect.bottom);
     var globalPoint = localToGlobal(localPoint);

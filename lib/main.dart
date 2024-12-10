@@ -73,12 +73,13 @@ class _AppLifecyclePageState extends State<MeshApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.black,
+          seedColor: Colors.grey.shade600,
           brightness: Brightness.light,
-          primary: Colors.black,
-          background: Colors.white,
-          // onPrimary: Colors.black,
-          // primarySwatch: Colors.grey,
+          primary: Colors.grey.shade700,
+          secondary: Colors.grey.shade500,
+          surface: Colors.white,
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
         ),
       ),
       debugShowCheckedModeBanner: false,

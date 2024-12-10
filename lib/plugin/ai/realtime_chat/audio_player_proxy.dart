@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:collection';
 import 'package:mp_audio_stream/mp_audio_stream.dart';
 import 'package:my_log/my_log.dart';
+import 'playing_buffer_info_manager.dart';
 
 
 class AudioItem {
@@ -12,14 +14,15 @@ class AudioItem {
   AudioItem(this.data, this.itemId, this.contentIndex);
 }
 
-class TruncateInfo {
-  String itemId;
-  int contentIndex;
-  int audioEndMs;
-  TruncateInfo(this.itemId, this.contentIndex, this.audioEndMs);
+abstract class AudioPlayerProxy {
+  void play(String base64Data, String itemId, int contentIndex);
+  void start();
+  void shutdown();
+  void resume();
+  TruncateInfo? stop();
 }
 
-class AudioPlayerProxy {
+class NativeAudioPlayerProxyImpl extends AudioPlayerProxy {
   final AudioStream audioStream = getAudioStream();
   final Queue<AudioItem> audioQueue = Queue<AudioItem>();
   bool isPlaying = false;
@@ -27,23 +30,23 @@ class AudioPlayerProxy {
   static const int sampleRate = 24000;
   StreamController<AudioItem>? audioStreamController;
   StreamSubscription<AudioItem>? audioStreamSubscription;
+  final playingBufferInfoManager = PlayingBufferInfoManager();
   AudioItem? currentAudioItem;
-  String currentItemId = '';
-  int currentContentIndex = 0;
-  int startPointInCurrentItemId = 0;
   int currentPlayedMs = 0;
   Function(int duration)? onPlaying;
 
-  AudioPlayerProxy({
+  NativeAudioPlayerProxyImpl({
     this.onPlaying,
   }) {
     audioStream.init(channels: 1, sampleRate: sampleRate);
   }
 
+  @override
   void resume() {
     audioStream.resume();
   }
 
+  @override
   void shutdown() {
     isPlaying = false;
     needStop = true;
@@ -104,6 +107,7 @@ class AudioPlayerProxy {
   // }
 
 
+  @override
   TruncateInfo? stop() {
     audioQueue.clear();
     audioStream.resetStat();
@@ -112,21 +116,18 @@ class AudioPlayerProxy {
     // audioStreamController = null;
     // audioStreamSubscription = null;
     // int currentPoint = _getCurrentPointInMillis();
-    if(currentItemId != '') {
-      return TruncateInfo(currentItemId, currentContentIndex, currentPlayedMs);
-    }
-    return null;
+    return playingBufferInfoManager.getTruncateInfo();
   }
 
-  void play(Uint8List data, String itemId, int contentIndex) {
+  @override
+  void play(String base64Data, String itemId, int contentIndex) {
     if (!isPlaying) {
-      currentItemId = '';
-      currentContentIndex = 0;
-      startPointInCurrentItemId = 0;
+      playingBufferInfoManager.playEnded();
       currentPlayedMs = 0;
       start();
     }
     // Convert Uint8List to PCM16
+    final data = base64Decode(base64Data);
     final len = data.length ~/ 2;
     ByteData byteData = ByteData.sublistView(data);
     Float32List floatData = Float32List(len);
@@ -140,6 +141,7 @@ class AudioPlayerProxy {
     //audioStream.push(floatData);
   }
 
+  @override
   void start() {
     loop();
   }
@@ -153,11 +155,7 @@ class AudioPlayerProxy {
         final audioData = item.data;
         final itemId = item.itemId;
         final contentIndex = item.contentIndex;
-        if(currentItemId != itemId) {
-          currentItemId = itemId;
-          currentContentIndex = contentIndex;
-          currentPlayedMs = 0;
-        }
+        playingBufferInfoManager.updatePlayingBufferInfo(itemId, contentIndex, currentPlayedMs);
         final len = audioData.length;
         int delayMilliseconds = (len / sampleRate * 1000).toInt();
         MyLogger.debug('AudioPlayerProxy loop delay $delayMilliseconds ms');

@@ -69,12 +69,14 @@ dependencies:
   record_android: ^1.3.0
   # flutter_switch: ^0.3.2
   intl: ^0.18.0
+  flutter_inappwebview: 6.1.5
   libp2p:
     path: packages/libp2p
   my_log:
     path: packages/my_log
   keygen:
     path: packages/keygen
+  win32: ^5.9.0
 
 flutter_app_name:
   name: 'MeshNote'
@@ -142,7 +144,9 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
 
-assets:
-  - assets/appicon.png
-  - assets/appicon_48.png
-  - assets/icon.png
+  assets:
+    - assets/appicon.png
+    - assets/appicon_48.png
+    - assets/icon.png
+    - assets/pop_sound_pcm24k.pcm
+    - assets/webview/

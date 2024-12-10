@@ -11,13 +11,13 @@ void main() {
     ///      n5
     var newestHash = 'newest';
     List<VersionDataModel> versions = [
-      VersionDataModel(versionHash: newestHash, parents: 'n4', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable),
-      VersionDataModel(versionHash: 'n4', parents: 'n3', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable),
-      VersionDataModel(versionHash: 'n3', parents: 'n2,n5', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable),
-      VersionDataModel(versionHash: 'n2', parents: 'n1', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable),
-      VersionDataModel(versionHash: 'n5', parents: 'n2', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable),
-      VersionDataModel(versionHash: 'n1', parents: '', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable),
-      VersionDataModel(versionHash: 'n6', parents: 'n4', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable),
+      VersionDataModel(versionHash: newestHash, parents: 'n4', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable, syncStatus: Constants.syncStatusNew),
+      VersionDataModel(versionHash: 'n4', parents: 'n3', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable, syncStatus: Constants.syncStatusNew),
+      VersionDataModel(versionHash: 'n3', parents: 'n2,n5', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable, syncStatus: Constants.syncStatusNew),
+      VersionDataModel(versionHash: 'n2', parents: 'n1', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable, syncStatus: Constants.syncStatusNew),
+      VersionDataModel(versionHash: 'n5', parents: 'n2', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable, syncStatus: Constants.syncStatusNew),
+      VersionDataModel(versionHash: 'n1', parents: '', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable, syncStatus: Constants.syncStatusNew),
+      VersionDataModel(versionHash: 'n6', parents: 'n4', createdAt: 0, createdFrom: Constants.createdFromLocal, status: Constants.statusAvailable, syncStatus: Constants.syncStatusNew),
     ];
     final result = DocumentManager.filterUnreachableVersions(versions, newestHash);
     expect(result.length, 6);
