@@ -17,10 +17,19 @@ class SubtitlesState extends State<Subtitles> {
   ChatMessages _messages = ChatMessages();
   final ScrollController _scrollController = ScrollController();
   final listViewKey = GlobalKey();
+  bool _autoScroll = true;
   
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      final currentPosition = _scrollController.position.pixels;
+      if(currentPosition == _scrollController.position.maxScrollExtent) {
+        _autoScroll = true;
+      } else {
+        _autoScroll = false;
+      }
+    });
     _messages = widget.messages;
   }
 
@@ -38,9 +47,8 @@ class SubtitlesState extends State<Subtitles> {
       height: double.infinity,
       child: GestureDetector(
         onVerticalDragUpdate: (details) {
-          _scrollController.position.moveTo(
-            _scrollController.offset - details.delta.dy,
-          );
+          final newPosition = _scrollController.offset - details.delta.dy;
+          _scrollController.position.moveTo(newPosition);
         },
         child: messageView,
       ),
@@ -50,6 +58,8 @@ class SubtitlesState extends State<Subtitles> {
   void updateMessages(ChatMessages messages) {
     setState(() {
       _messages = messages;
+      if(!_autoScroll) return;
+
       Util.runInPostFrame(() {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,

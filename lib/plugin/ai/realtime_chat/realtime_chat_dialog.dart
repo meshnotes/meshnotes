@@ -38,11 +38,13 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   bool _isMuted = false;
   final visualizerKey = GlobalKey<AudioVisualizerWidgetState>();
   final subtitlesKey = GlobalKey<SubtitlesState>();
+  final aecAudioWebViewKey = GlobalKey();
   double _xPosition = -1;
   double _yPosition = -1;
   bool _isLoading = false;
   bool _isError = false;
   late AiToolsManager _toolsManager;
+  late Future<bool> permissionFuture;
 
   @override
   void initState() {
@@ -52,7 +54,6 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     _toolsManager = AiToolsManager(pluginProxy: widget.proxy);
     final userNotes = widget.proxy.getUserNotes();
     final useNativeAudioProxy = _useNativeAudioProxy();
-    //TODO should use FutureBuilder
 
     realtime = RealtimeProxy(
       usingNativeAudio: useNativeAudioProxy,
@@ -76,6 +77,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
         _startRealtimeChat();
       }
     });
+    permissionFuture = requestPermissions();
   }
 
   @override
@@ -94,7 +96,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       _xPosition = screenWidth.clamp(paddingToScreenEdge, screenWidth - dialogWidth - paddingToScreenEdge);
       _yPosition = screenHeight.clamp(paddingToScreenEdge, screenHeight - dialogHeight - paddingToScreenEdge);
     }
-    final webViewAudio = _buildWebViewAudio();
+    final loadingWidget = _buildLoadingWidget();
     final container = Container(
       width: dialogWidth,
       height: dialogHeight,
@@ -113,13 +115,10 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       child: Row(
         children: [
           Expanded(
-            child:
-              _isLoading
-                ? Container()
-                : Subtitles(
-                  key: subtitlesKey,
-                  messages: realtime.chatMessages,
-                ),
+            child: Subtitles(
+              key: subtitlesKey,
+              messages: realtime.chatMessages,
+            ),
           ),
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -127,30 +126,9 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
               const Spacer(),
               Align(
                 alignment: Alignment.topLeft,
-                child: _isError 
-                  ? const Icon(
-                      Icons.error_outline,
-                      color: Colors.red,
-                      size: 24,
-                    )
-                  : (_isLoading 
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
-                          ),
-                        )
-                      : AudioVisualizerWidget(
-                          key: visualizerKey,
-                          isPlaying: false,
-                          color: const Color(0xFF2196F3),
-                        )
-                    ),
+                child: loadingWidget,
               ),
               const Spacer(),
-              if(webViewAudio != null) webViewAudio,
               Align(
                 alignment: Alignment.bottomLeft,
                 child: Row(
@@ -221,7 +199,100 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       child: gesture,
     );
 
-    return positioned;
+    return positioned; 
+  }
+
+  Widget _buildLoadingWidget() {
+    final futureBuilder = FutureBuilder<bool>(
+      future: permissionFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          // Permission request not completed
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        } else if (snapshot.hasData && snapshot.data == true) {
+          // Permission request success
+          if(_isError) {
+            return const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: 24,
+            );
+          } else {
+            final webViewAudio = _buildWebViewAudio();
+            if(_isLoading) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  webViewAudio?? const SizedBox.shrink(),
+                  const Text(
+                    'Loading...',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                      fontStyle: FontStyle.normal,
+                      decoration: TextDecoration.none,
+                      fontWeight: FontWeight.normal,
+                      fontFamily: 'Yuanti SC',
+                    ),
+                  ),
+                ],
+              );
+            } else {
+              MyLogger.info('build audio visualizer');
+              final audioVisualizer = AudioVisualizerWidget(
+                key: visualizerKey,
+                isPlaying: false,
+                color: const Color(0xFF2196F3),
+              );
+              return Column(
+                children: [
+                  webViewAudio?? const SizedBox.shrink(),
+                  audioVisualizer,
+                ],
+              );
+            }
+          }
+        } else {
+          // Permission request failed
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 24,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Permission denied',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black,
+                    fontStyle: FontStyle.normal,
+                    decoration: TextDecoration.none,
+                    fontWeight: FontWeight.normal,
+                    fontFamily: 'Yuanti SC',
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+      },
+    );
+    return futureBuilder;
   }
 
   bool _useNativeAudioProxy() {
@@ -234,6 +305,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       return null;
     }
     final aecAudioWebView = AecAudioWebView(
+      key: aecAudioWebViewKey,
       sampleRate: RealtimeProxy.sampleRate,
       numChannels: RealtimeProxy.numChannels,
       sampleSize: RealtimeProxy.sampleSize,
