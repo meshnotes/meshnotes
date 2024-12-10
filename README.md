@@ -21,9 +21,9 @@ Both these two ways you need to run mesh notes on both devices. But by the third
 3. Using a server to synchronize data between devices. But the server runs like a tracker in BT, it won't store data permanently. The data is safe only when stored in your devices.
 
 ## Building and testing environment
-Build and test in Flutter 3.22.0 stable, with Dart 3.4.0.
+Build and test in Flutter 3.24.0, with Dart 3.5.0.
 For mac: Xcode 15.1
-For windows: Visual Studio 2022 + Rust 1.76.0
+For windows: Visual Studio 2022 + Rust 1.76.0, Need to install Nuget package(dependency of flutter_inappwebview).
 IDE: Cursor
 
 ## How to setup environment and run it
