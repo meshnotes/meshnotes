@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:mesh_note/util/ui_widgets.dart';
 
 class FloatingStackView extends StatefulWidget {
   const FloatingStackView({
@@ -16,7 +18,7 @@ class FloatingStackViewState extends State<FloatingStackView> {
     final stack = Stack(
       children: views,
     );
-    return stack;
+    return WidgetTemplate.buildKeyboardResizableContainer(stack);
   }
 
   void addLayers(Widget _w1, Widget _w2) {

@@ -2,8 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 typedef ActionFunction = void Function();
-class WidgetTemplate {
 
+class WidgetTemplate {
   static Widget buildDefaultButton(IconData icon, String label, ActionFunction? action) {
     return CupertinoButton(
       padding: EdgeInsets.zero,
@@ -74,5 +74,29 @@ class WidgetTemplate {
         controller: controller,
       ),
     );
+  }
+
+  static Widget buildKeyboardResizableContainer(Widget child) {
+    final layoutBuilder = LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        var metrics = MediaQuery.of(context);
+        final width = metrics.size.width;
+        final height = metrics.size.height;
+        final padding = EdgeInsets.fromLTRB(
+          metrics.viewInsets.left + metrics.padding.left,
+          metrics.viewInsets.top + metrics.padding.top,
+          metrics.viewInsets.right + metrics.padding.right,
+          metrics.viewInsets.bottom + metrics.padding.bottom,
+        );
+
+        return Container(
+          width: width,
+          height: height,
+          padding: padding,
+          child: child,
+        );
+      },
+    );
+    return layoutBuilder;
   }
 }

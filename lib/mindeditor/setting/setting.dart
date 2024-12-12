@@ -79,11 +79,6 @@ class Setting {
       defaultValue: Constants.settingDefaultLocalPort,
     ),
     SettingData(
-      name: Constants.settingKeyTest,
-      displayName: Constants.settingNameTest,
-      comment: Constants.settingCommentTest,
-    ),
-    SettingData(
       name: Constants.settingKeyUserInfo,
       displayName: Constants.settingNameUserInfo,
       comment: Constants.settingCommentUserInfo,

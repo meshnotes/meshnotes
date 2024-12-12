@@ -4,6 +4,7 @@ import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/mindeditor/view/floating_stack_layer.dart';
+import 'package:mesh_note/util/ui_widgets.dart';
 import 'package:my_log/my_log.dart';
 import 'sign_in_view.dart';
 import '../mindeditor/controller/controller.dart';
@@ -53,7 +54,7 @@ class _StackPageViewState extends State<StackPageView> {
     final popScope = PopScope(
       child: stack,
       canPop: canPop,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         MyLogger.info('StackPageView: pop, didPop=$didPop');
         if(!canPop) {
           _switchToNavigatorView();
@@ -212,14 +213,14 @@ class _FloatingToastViewState extends State<_FloatingToastView> with TickerProvi
 
   @override
   Widget build(BuildContext context) {
-    final stack = Column(
+    final column = Column(
       children: [
         Expanded(child: Container(height: double.infinity,),),
         ...toasts,
         Container(height: 16.0,),
       ],
     );
-    return stack;
+    return WidgetTemplate.buildKeyboardResizableContainer(column);
   }
 
   void addToast(String content) {
