@@ -73,6 +73,7 @@ class _AppLifecyclePageState extends State<MeshApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
+          surfaceTint: Colors.transparent, // Color of app bar when content scroll up
           seedColor: Colors.grey.shade600,
           brightness: Brightness.light,
           primary: Colors.grey.shade700,
