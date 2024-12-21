@@ -325,8 +325,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         if(index < widget.document.paragraphs.length) {
           return _constructBlock(widget.document.paragraphs[index]);
         }
+        // Here is a block placeholder
         return const SizedBox(
-          height: 50,
+          height: 200,
         );
       },
     );
