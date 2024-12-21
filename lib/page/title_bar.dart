@@ -42,7 +42,17 @@ class DocumentTitleBarState extends State<DocumentTitleBar> {
     var widgets = <Widget>[];
     for(var str in texts) {
       var child = TextButton(
-        child: Text(str),
+        child: Text(
+          str,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black,
+            fontStyle: FontStyle.normal,
+            decoration: TextDecoration.none,
+            fontWeight: FontWeight.normal,
+            // fontFamily: 'Yuanti SC',
+          ),
+        ),
         onPressed: () {},
         style: TextButton.styleFrom(
           padding: widget.controller.setting.titleTextPadding,
