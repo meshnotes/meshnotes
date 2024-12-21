@@ -323,7 +323,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   }
 
   Future<bool> requestPermissions() async {
-    if(Controller().environment.isMobile()) {
+    if(Controller().environment.isMobile()) { // Cannot use this on plugin
       final statusMicrophone = await Permission.microphone.request();
       // final statusAudio = await Permission.audio.request();
       MyLogger.info('statusMicrophone: $statusMicrophone');
