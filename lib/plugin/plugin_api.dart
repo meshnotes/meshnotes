@@ -29,6 +29,7 @@ abstract class PluginProxy {
   void clearExtra(String blockId);
   UserNotes? getUserNotes();
   bool createNote(String title, String content);
+  Platform getPlatform();
 }
 
 abstract class PluginInstance {
@@ -83,4 +84,12 @@ class BlockChangedEventData {
     required this.blockId,
     required this.content,
   });
+}
+
+abstract class Platform {
+  bool isWindows();
+  bool isMacOS();
+  bool isAndroid();
+  bool isIOS();
+  bool isMobile();
 }

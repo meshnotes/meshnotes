@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:my_log/my_log.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -118,6 +116,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
             child: Subtitles(
               key: subtitlesKey,
               messages: realtime.chatMessages,
+              proxy: widget.proxy,
             ),
           ),
           Column(
@@ -203,6 +202,10 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   }
 
   Widget _buildLoadingWidget() {
+    String? fontFamily;
+    if(widget.proxy.getPlatform().isWindows()) {
+      fontFamily = 'Yuanti SC';
+    }
     final futureBuilder = FutureBuilder<bool>(
       future: permissionFuture,
       builder: (context, snapshot) {
@@ -235,7 +238,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                   ),
                   const SizedBox(height: 4),
                   webViewAudio?? const SizedBox.shrink(),
-                  const Text(
+                  Text(
                     'Loading...',
                     style: TextStyle(
                       fontSize: 12,
@@ -243,7 +246,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                       fontStyle: FontStyle.normal,
                       decoration: TextDecoration.none,
                       fontWeight: FontWeight.normal,
-                      fontFamily: 'Yuanti SC',
+                      fontFamily: fontFamily,
                     ),
                   ),
                 ],
@@ -265,16 +268,16 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
           }
         } else {
           // Permission request failed
-          return const Center(
+          return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.error_outline,
                   color: Colors.red,
                   size: 24,
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   'Permission denied',
                   style: TextStyle(
@@ -283,7 +286,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                     fontStyle: FontStyle.normal,
                     decoration: TextDecoration.none,
                     fontWeight: FontWeight.normal,
-                    fontFamily: 'Yuanti SC',
+                    fontFamily: fontFamily,
                   ),
                 ),
               ],
@@ -296,8 +299,8 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   }
 
   bool _useNativeAudioProxy() {
-    // Currently supports Windows, MacOS, Android, and iOS
-    return !(Platform.isWindows || Platform.isMacOS || Platform.isAndroid || Platform.isIOS);
+    final platform = widget.proxy.getPlatform();
+    return !(platform.isWindows() || platform.isMacOS() || platform.isAndroid() || platform.isIOS());
   }
 
   Widget? _buildWebViewAudio() {
@@ -323,7 +326,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   }
 
   Future<bool> requestPermissions() async {
-    if(Controller().environment.isMobile()) {
+    if(widget.proxy.getPlatform().isMobile()) {
       final statusMicrophone = await Permission.microphone.request();
       // final statusAudio = await Permission.audio.request();
       MyLogger.info('statusMicrophone: $statusMicrophone');

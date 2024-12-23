@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/editor_controller.dart';
+import 'package:mesh_note/mindeditor/controller/environment.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:mesh_note/plugin/ai/plugin_ai.dart';
@@ -199,6 +200,12 @@ class PluginManager {
     return result;
   }
 
+  Platform getPlatform() {
+    return PlatformImpl(
+      environment: controller.environment,
+    );
+  }
+
   List<void Function(BlockChangedEventData)> blockContentChangedEventHandlerQueue = [];
   void registerBlockContentChangeEventListener(void Function(BlockChangedEventData) handler) {
     var queue = blockContentChangedEventHandlerQueue;
@@ -375,5 +382,42 @@ class PluginProxyImpl implements PluginProxy {
   @override
   bool createNote(String title, String content) {
     return _manager.createNote(title, content);
+  }
+
+  @override
+  Platform getPlatform() {
+    return _manager.getPlatform();
+  }
+}
+
+class PlatformImpl implements Platform {
+  final Environment _environment;
+  PlatformImpl({
+    required Environment environment,
+  }): _environment = environment;
+
+  @override
+  bool isWindows() {
+    return _environment.isWindows();
+  }
+
+  @override
+  bool isMacOS() {
+    return _environment.isMac();
+  }
+
+  @override
+  bool isAndroid() {
+    return _environment.isAndroid();
+  }
+
+  @override
+  bool isIOS() {
+    return _environment.isIos();
+  }
+
+  @override
+  bool isMobile() {
+    return _environment.isMobile();
   }
 }

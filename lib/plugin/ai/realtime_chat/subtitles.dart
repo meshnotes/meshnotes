@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:mesh_note/plugin/ai/realtime_chat/chat_messages.dart';
+import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:mesh_note/util/util.dart';
 
 class Subtitles extends StatefulWidget {
   final ChatMessages messages;
+  final PluginProxy proxy;
   const Subtitles({
     super.key,
     required this.messages,
+    required this.proxy,
   });
 
   @override
@@ -71,6 +74,10 @@ class SubtitlesState extends State<Subtitles> {
   }
 
   ListView _buildMessageListView() {
+    String? fontFamily;
+    if(widget.proxy.getPlatform().isWindows()) {
+      fontFamily = 'Yuanti SC';
+    }
     List<ChatMessage> messages = _messages.messages;
     const marginOfFirst = EdgeInsets.fromLTRB(0, 0, 0, 0);
     const marginOfOther = EdgeInsets.fromLTRB(0, 4, 0, 0);
@@ -97,13 +104,13 @@ class SubtitlesState extends State<Subtitles> {
           ),
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               color: Colors.black,
               fontStyle: FontStyle.normal,
               decoration: TextDecoration.none,
               fontWeight: FontWeight.normal,
-              fontFamily: 'Yuanti SC',
+              fontFamily: fontFamily,
             ),
           ),
         );

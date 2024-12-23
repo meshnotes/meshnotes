@@ -82,6 +82,9 @@ class _AppLifecyclePageState extends State<MeshApp> {
           onPrimary: Colors.white,
           onSecondary: Colors.white,
         ),
+        popupMenuTheme: const PopupMenuThemeData(
+          color: Colors.white,
+        ),
       ),
       debugShowCheckedModeBanner: false,
       home: const StackPageView(),
