@@ -39,6 +39,7 @@ class EditorPopupToolbar extends StatelessWidget {
         onPressed: () {
           MyLogger.info('popup menu Select All');
           EditorController.selectAll();
+          controller.selectionController.clearPopupMenu();
         },
       ),
       IconAndTextButton(
@@ -49,6 +50,7 @@ class EditorPopupToolbar extends StatelessWidget {
         onPressed: () async {
           MyLogger.info('popup menu Paste');
           await EditorController.pasteToBlock();
+          controller.selectionController.clearPopupMenu();
         },
       ),
     ];
@@ -62,6 +64,7 @@ class EditorPopupToolbar extends StatelessWidget {
           MyLogger.info('popup menu Copy');
           await EditorController.copySelectedContentToClipboard();
           CallbackRegistry.requestFocus();
+          controller.selectionController.clearPopupMenu();
         },
       ));
       buttons.add(IconAndTextButton(
@@ -73,6 +76,7 @@ class EditorPopupToolbar extends StatelessWidget {
           MyLogger.info('popup menu Cut');
           await EditorController.cutToClipboard();
           CallbackRegistry.requestFocus();
+          controller.selectionController.clearPopupMenu();
         },
       ));
     }
