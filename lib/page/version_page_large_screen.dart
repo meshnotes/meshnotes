@@ -326,7 +326,7 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
     // 2. Build the parent-child relationship
     final map = <String, Node>{};
     for(final version in versions) {
-      final node = Node(name: version.versionHash, createdAt: DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(version.createdAt)));
+      final node = Node(name: version.versionHash, createdAt: DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(version.createdAt)));
       node.status = version.status;
       node.syncStatus = version.syncStatus;
       node.isLocal = version.createdFrom == Constants.createdFromLocal;

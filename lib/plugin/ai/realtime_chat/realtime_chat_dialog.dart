@@ -64,6 +64,22 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       onErrorShutdown: () {
         widget.closeCallback?.call();
       },
+      onStateChanged: (state) {
+        if(state == RealtimeConnectionState.connected) {
+          setState(() {
+            _isLoading = false;
+          });
+        } else if(state == RealtimeConnectionState.connecting) {
+          setState(() {
+            _isLoading = true;
+          });
+        } else if(state == RealtimeConnectionState.error) {
+          setState(() {
+            _isLoading = false;
+            _isError = true;
+          });
+        }
+      },
       startVisualizerAnimation: _startVisualizerAnimation,
       stopVisualizerAnimation: _stopVisualizerAnimation,
       onChatMessagesUpdated: _onChatMessagesUpdated,
