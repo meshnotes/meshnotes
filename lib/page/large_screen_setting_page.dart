@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:my_log/my_log.dart';
 import '../mindeditor/setting/constants.dart';
 import '../mindeditor/setting/setting.dart';
 
@@ -37,7 +38,11 @@ class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
   void initState() {
     super.initState();
     for(var item in widget.settings) {
-      newValue.add('');
+      if(item.type == SettingType.bool) {
+        newValue.add(item.value?.toLowerCase() == 'true'? 'true': 'false');
+      } else {
+        newValue.add('');
+      }
       hasChanged.add(false);
       _controllers.add(TextEditingController(text: item.value));
     }
@@ -116,47 +121,95 @@ class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
       // shrinkWrap: true,
       itemBuilder: (context, index) {
         var settingItem = widget.settings[index];
-        var formatters = <TextInputFormatter>[];
-        if(settingItem.isNumber) {
-          formatters.add(FilteringTextInputFormatter.digitsOnly);
+        if(settingItem.type == SettingType.bool) {
+          return _buildBoolSetting(settingItem, index);
         }
-        var row = Row(
-          key: ValueKey(settingItem.name),
-          children: [
-            Expanded(
-              flex: 3,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                alignment: Alignment.centerRight,
-                child: Text((hasChanged[index]? '*': '') + settingItem.displayName!),
-              ),
-            ),
-            Expanded(
-              flex: 7,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                alignment: Alignment.centerLeft,
-                child: CupertinoTextField(
-                  controller: _controllers[index],
-                  placeholder: settingItem.comment,
-                  // decoration: InputDecoration(
-                  //   hintText:
-                  //   border: const OutlineInputBorder(),
-                  // ),
-                  autofocus: true,
-                  inputFormatters: formatters,
-                  onChanged: (text) {
-                    _onTextChanged(index, text);
-                  },
-                ),
-              ),
-            ),
-          ],
-        );
-        return row;
+        return _buildInputSetting(settingItem, index);
       },
     );
     return list;
+  }
+
+  Widget _buildBoolSetting(SettingData settingItem, int index) {
+    MyLogger.info('efantest: value=${newValue[index]}');
+    var row = Row(
+      key: ValueKey(settingItem.name),
+      children: [
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            alignment: Alignment.centerRight,
+            child: Text((hasChanged[index]? '*': '') + settingItem.displayName!),
+          ),
+        ),
+        Expanded(
+          flex: 7,
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            alignment: Alignment.centerLeft,
+            child: CupertinoSwitch(
+              value: newValue[index].toLowerCase() == 'true',
+              onChanged: (value) {
+                _onBoolChanged(index, value);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+    return row;
+  }
+
+  Widget _buildInputSetting(SettingData settingItem, int index) {
+    var formatters = <TextInputFormatter>[];
+    if(settingItem.type == SettingType.number) {
+      formatters.add(FilteringTextInputFormatter.digitsOnly);
+    }
+    var row = Row(
+      key: ValueKey(settingItem.name),
+      children: [
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            alignment: Alignment.centerRight,
+            child: Text((hasChanged[index]? '*': '') + settingItem.displayName!),
+          ),
+        ),
+        Expanded(
+          flex: 7,
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            alignment: Alignment.centerLeft,
+            child: CupertinoTextField(
+              controller: _controllers[index],
+              placeholder: settingItem.comment,
+              // decoration: InputDecoration(
+              //   hintText:
+              //   border: const OutlineInputBorder(),
+              // ),
+              autofocus: true,
+              inputFormatters: formatters,
+              onChanged: (text) {
+                _onTextChanged(index, text);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+    return row;
+  }
+
+  void _onBoolChanged(int index, bool value) {
+    if(index < 0 || index >= widget.settings.length) return;
+    var item = widget.settings[index];
+    setState(() {
+      newValue[index] = value? 'true': 'false';
+      hasChanged[index] = item.value != newValue[index];
+      everChanged = item.value != newValue[index]? true: everChanged;
+    });
   }
 
   void _onTextChanged(int index, String value) {
@@ -184,7 +237,7 @@ class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
       }
     }
     everChanged = false;
-    //TODO 这里应该做成异步保存，用Future返回结果
+    //TODO Should use async save here
     Controller().setting.saveSettings(settingsToSave);
     setState(() {
     });

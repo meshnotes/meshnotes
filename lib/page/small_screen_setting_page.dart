@@ -35,6 +35,7 @@ class _SmallScreenSettingPageState extends State<SmallScreenSettingPage> {
   List<bool> hasChanged = [];
   final List<TextEditingController> _controllers = [];
   bool everChanged = false;
+  static const _settingBodyFlexValue = 7;
 
   @override
   void initState() {
@@ -94,7 +95,7 @@ class _SmallScreenSettingPageState extends State<SmallScreenSettingPage> {
       itemCount: widget.settings.length + 1,
       shrinkWrap: true,
       itemBuilder: (context, index) {
-        if(index == 0) {
+        if(index == 0) { // A padding before the first item
           return Container(
             alignment: Alignment.center,
             width: double.infinity,
@@ -104,45 +105,84 @@ class _SmallScreenSettingPageState extends State<SmallScreenSettingPage> {
         }
         index -= 1;
         var settingItem = widget.settings[index];
-        var formatters = <TextInputFormatter>[];
-        if(settingItem.isNumber) {
-          formatters.add(FilteringTextInputFormatter.digitsOnly);
+        if(settingItem.type == SettingType.bool) {
+          return _buildSwitchSetting(settingItem);
         }
-        var row = Row(
-          key: ValueKey(settingItem.name),
-          children: [
-            Expanded(
-              flex: 7,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  settingItem.displayName!,
-                  style: const TextStyle(fontSize: Constants.styleTitleFontSize,),
-                ),
-              ),
-            ),
-              Container(
-                // padding: const EdgeInsets.all(4),
-                alignment: Alignment.centerRight,
-                child: const Icon(Icons.navigate_next, color: Colors.grey,),
-              ),
-          ],
-        );
-        var gesture = GestureDetector(
-          child: row,
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            _gotoDetail(widget.settings[index]);
-          },
-        );
-        return gesture;
+        return _buildInputSetting(settingItem, index);
       },
       separatorBuilder: (BuildContext context, int index) {
         return Divider(height: 1.0, color: Colors.grey[100],);
       },
     );
     return list;
+  }
+
+  Widget _buildSwitchSetting(SettingData settingItem) {
+    var row = Row(
+      key: ValueKey(settingItem.name),
+      children: [
+        Expanded(
+          flex: _settingBodyFlexValue,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              settingItem.displayName!,
+              style: const TextStyle(fontSize: Constants.styleTitleFontSize,),
+            ),
+          ),
+        ),
+        Container(
+          // padding: const EdgeInsets.all(4),
+          alignment: Alignment.centerRight,
+          child: CupertinoSwitch(
+            value: settingItem.value?.toLowerCase() == 'true',
+            onChanged: (value) {
+              setState(() {
+                settingItem.value = value ? 'true' : 'false';
+              });
+              Controller().setting.saveSettings(widget.settings);
+            },
+          ),
+        ),
+      ],
+    );
+    return row;
+  }
+  Widget _buildInputSetting(SettingData settingItem, int index) {
+    var formatters = <TextInputFormatter>[];
+    if(settingItem.type == SettingType.number) {
+      formatters.add(FilteringTextInputFormatter.digitsOnly);
+    }
+    var row = Row(
+      key: ValueKey(settingItem.name),
+      children: [
+        Expanded(
+          flex: _settingBodyFlexValue,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              settingItem.displayName!,
+              style: const TextStyle(fontSize: Constants.styleTitleFontSize,),
+            ),
+          ),
+        ),
+        Container(
+          // padding: const EdgeInsets.all(4),
+          alignment: Alignment.centerRight,
+          child: const Icon(Icons.navigate_next, color: Colors.grey,),
+        ),
+      ],
+    );
+    var gesture = GestureDetector(
+      child: row,
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        _gotoDetail(widget.settings[index]);
+      },
+    );
+    return gesture;
   }
 
   void _gotoDetail(SettingData settingData) {
