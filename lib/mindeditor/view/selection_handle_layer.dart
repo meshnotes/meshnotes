@@ -80,14 +80,14 @@ class SelectionHandleLayer {
     if(_handleStateOfBase != null && _handleStateOfExtent != null) { // Already displayed handles
       updateBaseHandleOffset(baseCursorOffset);
       updateExtentHandleOffset(extentCursorOffset);
-      floatingViewManager?.clearPopupMenu();
+      // floatingViewManager?.clearPopupMenu();
       return;
     }
     if(_handleStateOfCursor != null) {
       _hideTextSelectionHandles();
     }
     if(floatingViewManager != null) {
-      floatingViewManager.clearPopupMenu();
+      // floatingViewManager.clearPopupMenu();
       _handleOfStart = _buildStartHandle(_convertToDragOffset(baseCursorOffset));
       _handleOfEnd = _buildEndHandle(_convertToDragOffset(extentCursorOffset));
       floatingViewManager.addSelectionHandles(_handleOfStart!, _handleOfEnd!);
@@ -101,14 +101,14 @@ class SelectionHandleLayer {
     final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     if(_handleStateOfCursor != null) { // No context or already displayed handles
       updateCursorHandleOffset(extentCursorOffset);
-      floatingViewManager?.clearPopupMenu();
+      // floatingViewManager?.clearPopupMenu();
       return;
     }
     if(_handleStateOfBase != null || _handleStateOfExtent != null) {
       _hideTextSelectionHandles();
     }
     if(floatingViewManager != null) {
-      floatingViewManager.clearPopupMenu();
+      // floatingViewManager.clearPopupMenu();
       _handleOfCursor = _buildCursorHandle(_convertToDragOffset(extentCursorOffset));
       floatingViewManager.addCursorHandle(_handleOfCursor!);
     }

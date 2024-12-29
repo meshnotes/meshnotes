@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'floating_stack_layer.dart';
 
 class FloatingViewManager {

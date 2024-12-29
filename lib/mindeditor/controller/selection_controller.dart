@@ -291,8 +291,8 @@ class SelectionController {
     var localPosition = floatingViewManager?.convertGlobalOffsetToPopupMenuLayer(globalPosition) ?? globalPosition;
     final widget = LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final popupMenu = EditorPopupToolbar.basic(controller: Controller(), context: context, maxWidth: width);
+        // final width = constraints.maxWidth;
+        final popupMenu = EditorPopupToolbar.basic(controller: Controller(), context: context);
         final container = Container(
           alignment: Alignment.topCenter,
           child: popupMenu,
