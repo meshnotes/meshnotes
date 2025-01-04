@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:mesh_note/util/ui_widgets.dart';
+import 'package:mesh_note/page/widget_templates.dart';
 
 class FloatingStackView extends StatefulWidget {
   const FloatingStackView({

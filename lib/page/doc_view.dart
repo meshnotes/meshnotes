@@ -1,18 +1,13 @@
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/mind_editor.dart';
+import 'package:mesh_note/page/menu.dart';
 import 'package:mesh_note/page/resizable_view.dart';
 import 'package:mesh_note/page/title_bar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'version_page_large_screen.dart';
 import '../mindeditor/controller/controller.dart';
 
 class DocumentView extends StatelessWidget with ResizableViewMixin {
-  static const screenShotKey = 'screenshot';
-  static const searchKey = 'search';
-  static const syncKey = 'sync';
-  static const versionKey = 'version';
-
   final Function()? jumpAction;
   @override
   bool get expectedSmallView => smallView;
@@ -45,49 +40,7 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
     Widget? view;
     var titleBar = DocumentTitleBar(controller: controller);
     var actionBar = <Widget>[
-      PopupMenuButton(
-        onSelected: (value) {
-          switch(value) {
-            case screenShotKey:
-              CallbackRegistry.triggerScreenShot();
-              break;
-            case searchKey:
-              //TODO add search code here
-              break;
-            case syncKey:
-              controller.tryToSaveAndSendVersionTree();
-              break;
-            case versionKey:
-              VersionPageLargeScreen.route(context);
-              break;
-          }
-        },
-        itemBuilder: (BuildContext ctx) {
-          return [
-            const PopupMenuItem(
-              child: Text('ScreenShot'),
-              value: screenShotKey,
-            ),
-            const PopupMenuItem(
-              child: Row(
-                children: [
-                  Icon(CupertinoIcons.doc_text_search),
-                  Text('Search'),
-                ],
-              ),
-              value: searchKey,
-            ),
-            const PopupMenuItem(
-              child: Text('Sync'),
-              value: syncKey,
-            ),
-            const PopupMenuItem(
-              child: Text('Version Map'),
-              value: versionKey,
-            ),
-          ];
-        },
-      ),
+      MainMenu(controller: controller),
     ];
     if(smallView) {
       view = Scaffold(

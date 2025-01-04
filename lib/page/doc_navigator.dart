@@ -1,4 +1,5 @@
 import 'package:mesh_note/mindeditor/view/network_view.dart';
+import 'package:mesh_note/page/widget_templates.dart';
 import 'package:my_log/my_log.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/net/status.dart';
 import 'large_screen_setting_page.dart';
+import 'menu.dart';
 import 'small_screen_setting_page.dart';
 import 'inspired_page.dart';
 import 'resizable_view.dart';
@@ -59,9 +61,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     if(widget.smallView) {
       widget.routeIfResize(context);
     }
-    Widget createButton = TextButton(
-      child: const Text('New Document'),
-      onPressed: () {
+    Widget createButton = WidgetTemplate.buildSmallIconButton(context, Icons.edit_square, 'Add a new note', () {
         MyLogger.info('new document');
         controller.newDocument();
         if(widget.smallView && widget.jumpAction != null) {
@@ -69,11 +69,10 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         } else {
           _routeDocumentViewInSmallView(context);
         }
-      },
-    );
-    Widget content;
+    });
+    Widget titleListView;
     if(docList.isEmpty) {
-      content = Expanded(
+      titleListView = Expanded(
         child: Container(
           child: const Text('No Document'),
           alignment: Alignment.center,
@@ -102,7 +101,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
           );
         },
       );
-      content = Expanded(
+      titleListView = Expanded(
         child: list,
       );
     }
@@ -116,6 +115,9 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         titleSpacing: 0,
         backgroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          MainMenu(controller: controller),
+        ],
       );
     }
     return Scaffold(
@@ -124,7 +126,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         width: double.infinity,
         child: Column(
           children: [
-            content,
+            titleListView,
             createButton,
             systemButtons,
           ],

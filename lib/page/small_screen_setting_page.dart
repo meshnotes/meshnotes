@@ -5,7 +5,7 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import '../mindeditor/setting/constants.dart';
 import '../mindeditor/setting/setting.dart';
-import '../util/ui_widgets.dart';
+import 'widget_templates.dart';
 
 class SmallScreenSettingPage extends StatefulWidget {
   final List<SettingData> settings;

@@ -4,7 +4,7 @@ import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/mindeditor/view/floating_stack_layer.dart';
-import 'package:mesh_note/util/ui_widgets.dart';
+import 'package:mesh_note/page/widget_templates.dart';
 import 'package:my_log/my_log.dart';
 import 'sign_in_view.dart';
 import '../mindeditor/controller/controller.dart';
