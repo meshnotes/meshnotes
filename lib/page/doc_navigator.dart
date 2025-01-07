@@ -116,7 +116,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
-          MainMenu(controller: controller),
+          MainMenu(controller: controller, menuType: MenuType.navigator),
         ],
       );
     }

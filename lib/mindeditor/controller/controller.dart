@@ -211,8 +211,13 @@ class Controller {
 
   // Document
   void _refreshDocumentView() {
-    CallbackRegistry.resetTitleBar(document!.getTitlePath());
-    CallbackRegistry.openDocument(document!);
+    if(document != null) {
+      CallbackRegistry.resetTitleBar(document!.getTitlePath());
+      CallbackRegistry.openDocument(document!);
+    } else {
+      CallbackRegistry.clearTitleBar();
+      CallbackRegistry.closeDocument();
+    }
   }
   void openDocument(String docId) {
     _docManager!.openDocument(docId);
@@ -224,6 +229,16 @@ class Controller {
     // _currentEditorState!.refresh();
     refreshDocNavigator();
     openDocument(docId);
+  }
+  void closeDocument() {
+    _docManager!.closeDocument();
+    _refreshDocumentView();
+  }
+  void deleteDocument() {
+    _docManager!.deleteCurrentDocument();
+    closeDocument();
+    refreshDocNavigator();
+    tryToSaveAndSendVersionTree();
   }
 
   void refreshDocNavigator() {

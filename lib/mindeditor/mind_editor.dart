@@ -115,9 +115,15 @@ class MindEditorState extends State<MindEditor> {
   }
 
   void open(Document doc) {
-    MyLogger.debug('MindEditor: re-open document');
+    MyLogger.debug('MindEditor: open document');
     setState(() {
       document = doc;
+    });
+  }
+  void close() {
+    MyLogger.debug('MindEditor: close document');
+    setState(() {
+      document = null;
     });
   }
 

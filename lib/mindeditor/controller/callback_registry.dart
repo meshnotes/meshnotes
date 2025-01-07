@@ -35,6 +35,9 @@ class CallbackRegistry {
   static void resetTitleBar(List<String> titles) {
     _titleBarState?.setTitles(titles);
   }
+  static void clearTitleBar() {
+    _titleBarState?.clearTitles();
+  }
 
   static void registerEditorState(MindEditorState _s) {
     _editorState = _s;
@@ -44,6 +47,9 @@ class CallbackRegistry {
   }
   static void openDocument(Document doc) {
     _editorState?.open(doc);
+  }
+  static void closeDocument() {
+    _editorState?.close();
   }
 
   static registerFloatingViewManager(FloatingViewManager _f) => _floatingViewManager = _f;

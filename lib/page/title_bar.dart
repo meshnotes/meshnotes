@@ -79,4 +79,10 @@ class DocumentTitleBarState extends State<DocumentTitleBar> {
       titles = _titles;
     });
   }
+
+  void clearTitles() {
+    setState(() {
+      titles = null;
+    });
+  }
 }

@@ -1,21 +1,26 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
-
 import 'version_page_large_screen.dart';
 
+enum MenuType {
+  navigator,
+  editor,
+}
 class MainMenu extends StatelessWidget {
   static const screenShotKey = 'screenshot';
   static const searchKey = 'search';
   static const syncKey = 'sync';
   static const versionKey = 'version';
+  static const deleteKey = 'delete';
   final Controller controller;
+  final MenuType menuType;
 
   const MainMenu({
     super.key,
     required this.controller,
+    required this.menuType,
   });
   
   @override
@@ -42,6 +47,9 @@ class MainMenu extends StatelessWidget {
           case versionKey:
             VersionPageLargeScreen.route(context);
             break;
+          case deleteKey:
+            controller.deleteDocument();
+            break;
         }
       },
       itemBuilder: (BuildContext ctx) {
@@ -49,6 +57,7 @@ class MainMenu extends StatelessWidget {
           _buildPopupMenu(screenShotKey, Icons.camera_alt_outlined, 'Screenshot'),
           _buildPopupMenu(searchKey, Icons.manage_search_outlined, 'Search'),
           _buildPopupMenu(syncKey, Icons.sync_outlined, 'Sync'),
+          if (menuType == MenuType.editor) _buildPopupMenu(deleteKey, Icons.delete_forever_outlined, 'Delete'),
           _buildPopupMenu(versionKey, Icons.history_outlined, 'Version Map'),
         ];
       },

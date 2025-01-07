@@ -99,6 +99,15 @@ class DocumentManager {
     }
     currentDocId = docId;
   }
+  void closeDocument() {
+    if(currentDocId == null) return;
+
+    if(hasModified()) {
+      controller.tryToSaveAndSendVersionTree();
+    }
+    _documents[currentDocId]?.closeDocument();
+    currentDocId = null;
+  }
 
   Document? getDocument(String docId) {
     if(_documents.containsKey(docId)) return _documents[docId]!;
@@ -120,6 +129,19 @@ class DocumentManager {
     _db.storeDocContent(docId, jsonEncode(docContent), now);
     _docTitles.add(DocDataModel(docId: docId, title: title, hash: '', timestamp: now));
     return docId;
+  }
+
+  void deleteDocument(String docId) {
+    _db.deleteDocument(docId);
+    _docTitles.removeWhere((e) => e.docId == docId);
+    _documents.remove(docId);
+    setModified();
+  }
+  void deleteCurrentDocument() {
+    if(currentDocId == null) return;
+
+    deleteDocument(currentDocId!);
+    currentDocId = null;
   }
 
   bool createDocument(String title, String content) {
@@ -366,6 +388,24 @@ class DocumentManager {
 
     for(var doc in contentVersion.table) {
       _updateDoc(doc, {});
+    }
+    // Remove document that is not in new version tree, that means it is deleted
+    List<String> docToDelete = [];
+    for(var docTitle in _docTitles) {
+      final docId = docTitle.docId;
+      bool found = false;
+      for(var docNode in contentVersion.table) {
+        if(docId == docNode.docId) {
+          found = true;
+          break;
+        }
+      }
+      if(!found) {
+        docToDelete.add(docId);
+      }
+    }
+    for(var docId in docToDelete) {
+      deleteDocument(docId);
     }
 
     bool fastForward = newVersionHash == _currentVersion || newVersionHash == targetVersion;

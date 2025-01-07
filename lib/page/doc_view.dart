@@ -40,7 +40,7 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
     Widget? view;
     var titleBar = DocumentTitleBar(controller: controller);
     var actionBar = <Widget>[
-      MainMenu(controller: controller),
+      MainMenu(controller: controller, menuType: MenuType.editor),
     ];
     if(smallView) {
       view = Scaffold(
@@ -52,7 +52,7 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
             builder: (BuildContext context) {
               return CupertinoButton(
                 alignment: Alignment.centerLeft,
-                child: const Icon(CupertinoIcons.bars),
+                child: const Icon(Icons.arrow_back_ios),
                 onPressed: () {
                   if(jumpAction != null) {
                     jumpAction!();
