@@ -38,6 +38,9 @@ class DocumentManager {
   final Set<String> _allWaitingVersions = {};
   final Map<String, int> _retryCounter = {};
   final controller = Controller();
+  int countOfGoodObjects = 0;
+  int countOfBadObjects = 0;
+
 
   DocumentManager({
     required DbHelper db,
@@ -300,8 +303,7 @@ class DocumentManager {
   bool isBusy() => isGenerating() || isSyncing();
 
   void checkConsistency() {
-    _checkVersionIntegrity();
-    _checkObjectsIntegrity();
+    _checkVersionTreeIntegrity();
   }
 
   void markCurrentVersionAsSyncing() {
@@ -1041,13 +1043,14 @@ class DocumentManager {
   }
 
   /// Check all versions has object of corresponding version hash
-  void _checkVersionIntegrity() {
+  void _checkVersionTreeIntegrity() {
     var versions = _db.getAllVersions();
     int countOfProblem = 0;
     int countOfGood = 0;
     for(final version in versions) {
       final hash = version.versionHash;
-      if(!_db.hasObject(hash)) {
+      final versionObject = _db.getObject(hash);
+      if(versionObject == null) {
         if(version.status != Constants.statusWaiting || version.status != Constants.statusMissing) {
           // _db.updateVersionStatus(hash, Constants.statusWaiting);
         }
@@ -1055,17 +1058,77 @@ class DocumentManager {
         MyLogger.warn('Find data inconsistency for version ${HashUtil.formatHash(hash)}');
       } else {
         countOfGood++;
+        var (good, problem) = _checkVersionIntegrity(versionObject);
+        countOfGood += good;
+        countOfProblem += problem;
       }
     }
-    MyLogger.info('Find $countOfProblem inconsistency issue(s)');
+    MyLogger.info('Check version tree integrity: $countOfGood good, $countOfProblem bad');
     CallbackRegistry.showToast('Versions: $countOfGood good, $countOfProblem bad');
+    countOfGoodObjects = countOfGood;
+    countOfBadObjects = countOfProblem;
   }
-  void _checkObjectsIntegrity() {
-    // Not implemented yet
+
+
+
+  (int, int) _checkVersionIntegrity(ObjectDataModel object) {
+    int countOfGood = 0;
+    int countOfProblem = 0;
+    var versionContent = VersionContent.fromJson(jsonDecode(object.data));
+    var table = versionContent.table;
+    for(var item in table) {
+
+      var docId = item.docId;
+      var docHash = item.docHash;
+      final docContent = _db.getObject(docHash);
+      if(docContent == null) {
+        countOfProblem++;
+      } else {
+        countOfGood++;
+        var (good, problem) = _checkDocContentIntegrity(docContent);
+        countOfGood += good;
+        countOfProblem += problem;
+      }
+    }
+    return (countOfGood, countOfProblem);
   }
+  (int, int) _checkDocContentIntegrity(ObjectDataModel docContent) {
+    int countOfGood = 0;
+    int countOfProblem = 0;
+    var doc = DocContent.fromJson(jsonDecode(docContent.data));
+    var table = doc.contents;
+    for(var item in table) {
+      var blockId = item.blockId;
+      var blockHash = item.blockHash;
+      final blockContent = _db.getObject(blockHash);
+      if(blockContent == null) {
+        countOfProblem++;
+      } else {
+        countOfGood++;
+        var (good, problem) = _checkBlockContentIntegrity(blockContent);
+        countOfGood += good;
+        countOfProblem += problem;
+      }
+    }
+    return (countOfGood, countOfProblem);
+  }
+  (int, int) _checkBlockContentIntegrity(ObjectDataModel blockContent) {
+    // var block = BlockContent.fromJson(jsonDecode(blockContent.data));
+    // var text = block.text;
+    // for(var item in text) {
+    //   if(item.text == '') {
+    //     return false;
+    //   }
+
+    // }
+    return (0, 0);
+  }
+
+
   Set<String> _loadAllUnavailableNodes() {
     var versions = _db.getAllVersions();
     Set<String> result = {};
+
     for(final version in versions) {
       if(version.status == Constants.statusMissing) {// || version.status == Constants.statusWaiting) {
         result.add(version.versionHash);

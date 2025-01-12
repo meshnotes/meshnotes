@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
-import 'version_page_large_screen.dart';
+import 'version_page.dart';
 
 enum MenuType {
   navigator,
@@ -45,7 +45,7 @@ class MainMenu extends StatelessWidget {
             controller.tryToSaveAndSendVersionTree();
             break;
           case versionKey:
-            VersionPageLargeScreen.route(context);
+            VersionPage.route(context);
             break;
           case deleteKey:
             controller.deleteDocument();

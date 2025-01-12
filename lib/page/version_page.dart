@@ -15,25 +15,25 @@ const double nodeContainerYSpace = 20.0;
 const double selectedBorderWidth = 3.0;
 const double parentSelectedBorderWidth = 2.0;
 
-class VersionPageLargeScreen extends StatefulWidget {
-  const VersionPageLargeScreen({
+class VersionPage extends StatefulWidget {
+  const VersionPage({
     super.key,
   });
 
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return const VersionPageLargeScreen();
+        return const VersionPage();
       },
       fullscreenDialog: true,
     ));
   }
 
   @override
-  State<StatefulWidget> createState() => _VersionPageLargeScreenState();
+  State<StatefulWidget> createState() => _VersionPageState();
 }
 
-class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
+class _VersionPageState extends State<VersionPage> {
   bool showAll = false;
   final controller = Controller();
   late Map<String, Node> versionMap;
@@ -89,18 +89,34 @@ class _VersionPageLargeScreenState extends State<VersionPageLargeScreen> {
         ),
       ],
     );
+    final info = Row(
+      children: [
+        const Spacer(),
+        Text('Good version objects: ${controller.docManager.countOfGoodObjects}'),
+        const Spacer(),
+        Text('Bad version objects: ${controller.docManager.countOfBadObjects}'),
+        const Spacer(),
+
+      ],
+
+    );
     final body = Column(
       children: [
         buttons,
+        info,
         Expanded(
           child: Container(
             alignment: Alignment.center,
             child: container,
           ),
         ),
+
       ],
     );
+    final smallView = controller.environment.isSmallView(context);
+    final appBar = smallView ? AppBar(title: const Text('Version Map'),) : null;
     return Scaffold(
+      appBar: appBar,
       body: body,
     );
   }
