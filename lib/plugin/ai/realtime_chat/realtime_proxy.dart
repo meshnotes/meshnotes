@@ -9,7 +9,7 @@ import 'function_call.dart';
 import 'realtime_api.dart';
 import 'chat_messages.dart';
 
-enum _State {
+enum RealtimeConnectionState {
   idle,
   connecting,
   connected,
@@ -41,11 +41,12 @@ class RealtimeProxy {
   int errorRetryCount = 0;
   Function(String)? showToastCallback;
   Function()? onErrorShutdown;
+  Function(RealtimeConnectionState)? onStateChanged;
   Timer? resetRetryCountTimer;
   Function? startVisualizerAnimation;
   Function? stopVisualizerAnimation;
   Timer? _animationTimer;
-  _State _state = _State.idle;
+  RealtimeConnectionState _state = RealtimeConnectionState.idle;
   Function(ChatMessages)? onChatMessagesUpdated;
   AiTools? tools;
   // ignore: constant_identifier_names
@@ -65,16 +66,17 @@ class RealtimeProxy {
     this.startVisualizerAnimation,
     this.stopVisualizerAnimation,
     this.onChatMessagesUpdated,
+    this.onStateChanged,
   });
 
   /// 1. Connect to Realtime API
   /// 2. Open record
   /// 3. Open audio player
   Future<bool> connect() async {
-    if(_state != _State.idle) {
+    if(_state != RealtimeConnectionState.idle) {
       return false;
     }
-    _state = _State.connecting;
+    _state = RealtimeConnectionState.connecting;
     if(usingNativeAudio) {
       await _openNativeRecorder();
       _openNativeAudioPlayer();
@@ -100,9 +102,8 @@ class RealtimeProxy {
     }
     if(connected) {
       MyLogger.info('Connected to Realtime API');
-    }
-    if(connected) {
-      _state = _State.connected;
+      _state = RealtimeConnectionState.connected;
+      onStateChanged?.call(_state);
     }
     if(_popSoundAudioBase64 != null) { // Play a pop sound when connected
       MyLogger.debug('Play pop sound, $_popSoundAudioBase64');
@@ -126,16 +127,17 @@ class RealtimeProxy {
   }
 
   void shutdown() {
-    if(_state != _State.connected) {
+    if(_state != RealtimeConnectionState.connected) {
       return;
     }
-    _state = _State.shuttingDown;
+    _state = RealtimeConnectionState.shuttingDown;
     shouldStop = true;
     client.shutdown();
     audioPlayerProxy.shutdown();
     audioRecorderProxy.stop();
     _animationTimer?.cancel();
-    _state = _State.idle;
+    _state = RealtimeConnectionState.idle;
+    onStateChanged?.call(_state);
   }
 
   void setPopSoundAudioBase64(String base64) {
@@ -203,12 +205,14 @@ class RealtimeProxy {
   }
 
   void _onWsError(Object error, StackTrace stackTrace) {
-    _state = _State.error;
+    _state = RealtimeConnectionState.error;
+    onStateChanged?.call(_state);
     _tryToReconnect();
   }
 
   void _onWsClose() {
-    _state = _State.error;
+    _state = RealtimeConnectionState.error;
+    onStateChanged?.call(_state);
     _tryToReconnect();
   }
   Future<void> _tryToReconnect() async {
@@ -216,16 +220,17 @@ class RealtimeProxy {
       return;
     }
     if(errorRetryCount >= MAX_ERROR_RETRY_COUNT) {
-      _state = _State.shuttingDown;
+      _state = RealtimeConnectionState.shuttingDown;
       forceStop = true;
       showToastCallback?.call('Realtime API failed too many times');
       onErrorShutdown?.call();
-      _state = _State.idle;
+      _state = RealtimeConnectionState.idle;
       return;
     }
     errorRetryCount++;
     MyLogger.info('Reconnecting for the $errorRetryCount-th time...');
-    _state = _State.connecting;
+    _state = RealtimeConnectionState.connecting;
+    onStateChanged?.call(_state);
     bool connected = await client.connect(userContents: _buildUserContents(), history: _buildHistory());
     if(connected) {
       // After connected, reset the retry count if it's stable running for 10 seconds
@@ -234,7 +239,8 @@ class RealtimeProxy {
         errorRetryCount = 0;
       });
     }
-    _state = _State.connected;
+    _state = RealtimeConnectionState.connected;
+    onStateChanged?.call(_state);
   }
 
   bool _isNotSilent(Uint8List data) {

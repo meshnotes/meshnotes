@@ -194,7 +194,6 @@
     }
 
     function testMicAudioBuffer() {
-      console.log('efantest: testMicAudioBuffer', audioContext.state);
       isMuted = true;
       
       for(const buffer of micAudioBuffer) {
@@ -206,7 +205,6 @@
     }
 
     function testMicAudioBuffer2() {
-      console.log('efantest: testMicAudioBuffer', audioContext.state);
       isMuted = true;
       
       // 计算总长度
@@ -214,7 +212,6 @@
       micAudioBuffer.forEach(buffer => {
         totalLength += buffer.length;
       });
-      console.log('efantest: totalLength', totalLength);
 
       // 创建合并后的Float32Array
       const mergedBuffer = new Float32Array(totalLength);
@@ -225,22 +222,18 @@
         mergedBuffer.set(buffer, offset);
         offset += buffer.length;
       });
-      console.log('efantest: mergedBuffer.length', mergedBuffer.length);
 
       // 创建AudioBuffer并播放
       const audioBufferObj = audioContext.createBuffer(1, mergedBuffer.length, audioContext.sampleRate);
       audioBufferObj.copyToChannel(mergedBuffer, 0);
-      console.log('efantest: audioContext.sampleRate', audioContext.sampleRate);
 
       const source = audioContext.createBufferSource();
       source.buffer = audioBufferObj;
       source.connect(audioContext.destination);
 
       source.onended = () => {
-        console.log('efantest: source.onended');
       }
       source.start();
-      console.log('efantest: source.start');
 
       // 清空缓冲区
       micAudioBuffer = [];

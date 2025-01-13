@@ -95,3 +95,11 @@ class Constants {
 
   static const String resourceKeyVersionTree = 'version_tree';
 }
+
+class UiConstants {
+  static const double menuItemIconSize = 16;
+  static const double menuItemTextSize = 14;
+  static const double menuItemPadding = 8;
+  static const double menuItemBorderRadius = 8;
+  static const double menuItemHeight = 36;
+}

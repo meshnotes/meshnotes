@@ -340,6 +340,20 @@ class DbHelper {
     return docId;
   }
 
+  void deleteDocument(String docId) {
+    // Remove from doc list
+    const sqlDocList = 'DELETE FROM doc_list WHERE doc_id=?';
+    _database.execute(sqlDocList, [docId]);
+
+    // Remove from blocks
+    const sqlBlocks = 'DELETE FROM blocks WHERE doc_id=?';
+    _database.execute(sqlBlocks, [docId]);
+
+    // Remove from doc contents
+    const sqlContents = 'DELETE FROM doc_contents WHERE doc_id=?';
+    _database.execute(sqlContents, [docId]);
+  }
+
   void insertOrUpdateDoc(String docId, String docHash, int timestamp) {
     const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?) '
         'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at';

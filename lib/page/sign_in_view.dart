@@ -1,8 +1,7 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
-import 'package:mesh_note/util/ui_widgets.dart';
+import 'package:mesh_note/page/widget_templates.dart';
 import '../mindeditor/setting/constants.dart';
 import '../util/util.dart';
 
@@ -98,7 +97,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
           style: titleStyle,
         ),
         const Spacer(flex: 3,),
-        WidgetTemplate.buildDefaultButton(Icons.note_add_outlined, 'Create a new key', _gotoCreate),
+        WidgetTemplate.buildDefaultButton(context, Icons.note_add_outlined, 'Create a new key', _gotoCreate),
         WidgetTemplate.buildNormalButton(Icons.upload_file_outlined, 'Load an exist key', _gotoLoad),
         WidgetTemplate.buildInsignificantButton(Icons.person_off_outlined, 'No, I just want to have a try', _justTry),
         const Spacer(flex: 1,),

@@ -7,54 +7,126 @@ import '../../controller/callback_registry.dart';
 import '../../controller/editor_controller.dart';
 import 'base/movable_button.dart';
 
-class EditorPopupToolbar extends StatelessWidget {
+class EditorPopupToolbar extends StatefulWidget {
   final Controller controller;
   final double toolBarHeight;
-  final double maxWidth;
-  final List<Widget> children;
   final AppearanceSetting appearance;
 
   const EditorPopupToolbar({
     Key? key,
     required this.controller,
     this.toolBarHeight = 36,
-    required this.children,
     required this.appearance,
-    required this.maxWidth,
   }): super(key: key);
 
   factory EditorPopupToolbar.basic({
     Key? key,
     required Controller controller,
     required BuildContext context,
-    required double maxWidth,
   }) {
     AppearanceSetting defaultAppearance = _buildDefaultAppearance(context);
+    
+    return EditorPopupToolbar(
+      key: key,
+      controller: controller,
+      appearance: defaultAppearance,
+    );
+  }
+
+  static AppearanceSetting _buildDefaultAppearance(BuildContext context) {
+    const padding = EdgeInsets.fromLTRB(16, 4, 16, 4);
+    double iconSize = 18;
+    double size = 36;
+    if(Controller().environment.isMobile()) {
+      iconSize = 28;
+      size = 32;
+    }
+    return AppearanceSetting(
+      iconSize: iconSize,
+      size: size,
+      fillColor: Theme.of(context).canvasColor,
+      hoverColor: Theme.of(context).colorScheme.background,
+      disabledColor: Theme.of(context).disabledColor,
+      padding: padding,
+    );
+  }
+
+  @override
+  State<StatefulWidget> createState() {
+    return _EditorPopupToolbarState();
+  }
+}
+
+class _EditorPopupToolbarState extends State<EditorPopupToolbar> {
+  @override
+  Widget build(BuildContext context) {
+    final children = _buildButtons();
+    Widget toolbar = Row(
+      children: children,
+    );
+    if(widget.controller.isDebugMode) {
+      toolbar = Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Colors.green,
+            width: 2,
+          ),
+        ),
+        child: toolbar,
+      );
+    }
+    Widget scroll = _buildScrollable(toolbar);
+    final container = Container(
+      height: widget.toolBarHeight,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 15,
+            spreadRadius: 2,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: scroll,
+    );
+    return container;
+  }
+
+  List<Widget> _buildButtons() {
+    final controller = widget.controller;
+    final appearance = widget.appearance;
     var buttons = <Widget>[
       IconAndTextButton(
-        appearance: defaultAppearance,
+        appearance: appearance,
         controller: controller,
         text: 'All',
         tip: 'Select all content',
         onPressed: () {
           MyLogger.info('popup menu Select All');
           EditorController.selectAll();
+          // Don't clear popup menu when select all, because user may want to copy or do other operations, refresh toolbar instead
+          // controller.selectionController.clearPopupMenu();
+          setState(() {});
         },
       ),
       IconAndTextButton(
-        appearance: defaultAppearance,
+        appearance: appearance,
         controller: controller,
         text: 'Paste',
         tip: 'Paste content',
         onPressed: () async {
           MyLogger.info('popup menu Paste');
           await EditorController.pasteToBlock();
+          // controller.selectionController.clearPopupMenu();
         },
       ),
     ];
     if(!controller.selectionController.isCollapsed()) {
       buttons.add(IconAndTextButton(
-        appearance: defaultAppearance,
+        appearance: appearance,
         controller: controller,
         text: 'Copy',
         tip: 'Copy content',
@@ -62,10 +134,11 @@ class EditorPopupToolbar extends StatelessWidget {
           MyLogger.info('popup menu Copy');
           await EditorController.copySelectedContentToClipboard();
           CallbackRegistry.requestFocus();
+          // controller.selectionController.clearPopupMenu();
         },
       ));
       buttons.add(IconAndTextButton(
-        appearance: defaultAppearance,
+        appearance: appearance,
         controller: controller,
         text: 'Cut',
         tip: 'Cut content',
@@ -73,17 +146,12 @@ class EditorPopupToolbar extends StatelessWidget {
           MyLogger.info('popup menu Cut');
           await EditorController.cutToClipboard();
           CallbackRegistry.requestFocus();
+          // controller.selectionController.clearPopupMenu();
         },
       ));
     }
     final children = _addDivider(buttons);
-    return EditorPopupToolbar(
-      key: key,
-      controller: controller,
-      children: children,
-      appearance: defaultAppearance,
-      maxWidth: maxWidth,
-    );
+    return children;
   }
 
   static List<Widget> _addDivider(List<Widget> buttons) {
@@ -106,64 +174,10 @@ class EditorPopupToolbar extends StatelessWidget {
     return result;
   }
 
-  static AppearanceSetting _buildDefaultAppearance(BuildContext context) {
-    const padding = EdgeInsets.fromLTRB(16, 4, 16, 4);
-    double iconSize = 18;
-    double size = 36;
-    if(Controller().environment.isMobile()) {
-      iconSize = 28;
-      size = 32;
-    }
-    return AppearanceSetting(
-      iconSize: iconSize,
-      size: size,
-      fillColor: Theme.of(context).canvasColor,
-      hoverColor: Theme.of(context).colorScheme.background,
-      disabledColor: Theme.of(context).disabledColor,
-      padding: padding,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Widget toolbar = Row(
-      children: children,
-    );
-    if(controller.isDebugMode) {
-      toolbar = Container(
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Colors.green,
-            width: 2,
-          ),
-        ),
-        child: toolbar,
-      );
-    }
-    Widget scroll = _buildScrollable(toolbar);
-    final container = Container(
-      height: toolBarHeight,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 15,
-            spreadRadius: 2,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: scroll,
-    );
-    return container;
-  }
-
   Widget _buildScrollable(Widget toolbar) {
     // Mobile could use SingleChildScrollView to drag and scroll, but desktop not. So add left and right buttons in desktop environment
-    if(controller.environment.isDesktop()) {
-      return MovableToolbar(child: toolbar, height: toolBarHeight, appearance: appearance,);
+    if(widget.controller.environment.isDesktop()) {
+      return MovableToolbar(child: toolbar, height: widget.toolBarHeight, appearance: widget.appearance,);
     } else {
       Widget scroll = SingleChildScrollView(
         child: toolbar,

@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:my_log/my_log.dart';
 
+enum SettingType {
+  string,
+  number,
+  bool,
+}
 class SettingData {
   final String name;
   String? displayName;
   String? value;
   String? comment;
-  final bool isNumber;
+  SettingType type;
   String defaultValue;
 
 
@@ -17,7 +22,7 @@ class SettingData {
     this.displayName,
     this.value,
     this.comment,
-    this.isNumber = false,
+    this.type = SettingType.string,
     this.defaultValue = '',
   }) {
     if(value == '') {
@@ -25,7 +30,7 @@ class SettingData {
     }
   }
   SettingData clone() {
-    return SettingData(name: name, displayName: displayName, value: value, comment: comment, isNumber: isNumber, defaultValue: defaultValue);
+    return SettingData(name: name, displayName: displayName, value: value, comment: comment, type: type, defaultValue: defaultValue);
   }
 }
 
@@ -75,7 +80,7 @@ class Setting {
       name: Constants.settingKeyLocalPort,
       displayName: Constants.settingNameLocalPort,
       comment: Constants.settingCommentLocalPort,
-      isNumber: true,
+      type: SettingType.number,
       defaultValue: Constants.settingDefaultLocalPort,
     ),
     SettingData(
@@ -88,6 +93,7 @@ class Setting {
       displayName: Constants.settingNameAllowSendingNotesToPlugins,
       comment: Constants.settingCommentAllowSendingNotesToPlugins,
       defaultValue: Constants.settingDefaultAllowSendingNotesToPlugins,
+      type: SettingType.bool,
     ),
   ];
 

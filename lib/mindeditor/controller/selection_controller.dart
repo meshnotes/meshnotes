@@ -291,8 +291,8 @@ class SelectionController {
     var localPosition = floatingViewManager?.convertGlobalOffsetToPopupMenuLayer(globalPosition) ?? globalPosition;
     final widget = LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final popupMenu = EditorPopupToolbar.basic(controller: Controller(), context: context, maxWidth: width);
+        // final width = constraints.maxWidth;
+        final popupMenu = EditorPopupToolbar.basic(controller: Controller(), context: context);
         final container = Container(
           alignment: Alignment.topCenter,
           child: popupMenu,
@@ -469,6 +469,7 @@ class SelectionController {
     // Update handles' offsets. Should run in post frame, because getCursorOffsetOfPos needs layout
     Util.runInPostFrame(() {
       Offset? baseCursorOffset, extentCursorOffset;
+      //FIXME baseRender and extentRender may be null when the block is not in the viewport. Should use a more stable way to mark the handles
       if(baseRender != null) {
         baseCursorOffset = baseRender.getCursorOffsetOfPos(lastBaseBlockPos);
       }

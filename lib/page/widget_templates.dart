@@ -4,23 +4,56 @@ import 'package:flutter/material.dart';
 typedef ActionFunction = void Function();
 
 class WidgetTemplate {
-  static Widget buildDefaultButton(IconData icon, String label, ActionFunction? action) {
+  static Widget buildDefaultButton(BuildContext context, IconData icon, String label, ActionFunction? action) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textColor = colorScheme.onPrimary;
+    final backgroundColor = colorScheme.primary;
+    final borderColor = colorScheme.secondary;
     return CupertinoButton(
       padding: EdgeInsets.zero,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
-          color: Colors.blueGrey[100],
+          color: backgroundColor,
           borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-          border: Border.all(color: Colors.blueGrey[200]!, width: 1.0),
+          border: Border.all(color: borderColor, width: 1.0),
         ),
         margin: const EdgeInsets.all(4.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon),
-            Text(label),
+            Icon(icon, color: textColor,),
+            Text(label, style: TextStyle(color: textColor,),),
+          ],
+        ),
+      ),
+      onPressed: action,
+    );
+  }
+
+  static Widget buildSmallIconButton(BuildContext context, IconData icon, String label, ActionFunction? action) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textColor = colorScheme.onPrimary;
+    final backgroundColor = colorScheme.primary;
+    final borderColor = colorScheme.secondary;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(8.0),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+          // border: Border.all(color: borderColor, width: 1.0),
+        ),
+        margin: const EdgeInsets.all(2.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: textColor, size: 16.0,),
+            const SizedBox(width: 8.0,),
+            Text(label, style: TextStyle(color: textColor, fontSize: 16.0),),
           ],
         ),
       ),
