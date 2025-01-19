@@ -40,7 +40,8 @@ class DocumentManager {
   final controller = Controller();
   int countOfGoodObjects = 0;
   int countOfBadObjects = 0;
-
+  int _lastTimeStampOfCheckConsistency = 0;
+  Set<String> _badVersionSet = {};
 
   DocumentManager({
     required DbHelper db,
@@ -48,9 +49,14 @@ class DocumentManager {
     _allWaitingVersions.addAll(_loadAllUnavailableNodes());
     _initRetryCounter(_allWaitingVersions);
     MyLogger.info('DocumentManager: loaded missing versions: $_allWaitingVersions');
-    controller.evenTasksManager.addAfterInitTask(() {
+    controller.eventTasksManager.addAfterInitTask(() {
       Future(() {
-        checkConsistency();
+        checkConsistencyIfNeeded();
+      });
+    });
+    controller.eventTasksManager.addIdleTask(() {
+      Future(() {
+        checkConsistencyIfNeeded();
       });
     });
     // Periodically send newest version to peers
@@ -302,8 +308,17 @@ class DocumentManager {
   }
   bool isBusy() => isGenerating() || isSyncing();
 
-  void checkConsistency() {
+  void checkConsistencyIfNeeded() {
+    final now = Util.getTimeStamp();
+    if(now - _lastTimeStampOfCheckConsistency < Constants.timeoutOfCheckConsistency) {
+      return;
+    }
     _checkVersionTreeIntegrity();
+    _lastTimeStampOfCheckConsistency = now;
+  }
+
+  bool isBadVersion(String versionHash) {
+    return _badVersionSet.contains(versionHash);
   }
 
   void markCurrentVersionAsSyncing() {
@@ -539,7 +554,7 @@ class DocumentManager {
   void setIdle() {
     _idleTimer?.cancel();
     _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfSyncIdle), () {
-      controller.evenTasksManager.triggerIdle();
+      controller.eventTasksManager.triggerIdle();
       controller.tryToSaveAndSendVersionTree();
       _idleTimer = null;
     });
@@ -1047,6 +1062,7 @@ class DocumentManager {
     var versions = _db.getAllVersions();
     int countOfProblem = 0;
     int countOfGood = 0;
+    List<String> badVersions = [];
     for(final version in versions) {
       final hash = version.versionHash;
       final versionObject = _db.getObject(hash);
@@ -1055,6 +1071,7 @@ class DocumentManager {
           // _db.updateVersionStatus(hash, Constants.statusWaiting);
         }
         countOfProblem++;
+        badVersions.add(hash);
         MyLogger.warn('Find data inconsistency for version ${HashUtil.formatHash(hash)}');
       } else {
         countOfGood++;
@@ -1067,9 +1084,9 @@ class DocumentManager {
     CallbackRegistry.showToast('Versions: $countOfGood good, $countOfProblem bad');
     countOfGoodObjects = countOfGood;
     countOfBadObjects = countOfProblem;
+    _badVersionSet.clear();
+    _badVersionSet.addAll(badVersions);
   }
-
-
 
   (int, int) _checkVersionIntegrity(ObjectDataModel object) {
     int countOfGood = 0;
@@ -1123,7 +1140,6 @@ class DocumentManager {
     // }
     return (0, 0);
   }
-
 
   Set<String> _loadAllUnavailableNodes() {
     var versions = _db.getAllVersions();

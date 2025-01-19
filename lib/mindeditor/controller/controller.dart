@@ -43,7 +43,7 @@ class Controller {
   String simpleDeviceId = '';
   UserPrivateInfo? userPrivateInfo;
   late final PluginManager _pluginManager;
-  final EvenTasksManager evenTasksManager = EvenTasksManager();
+  final EvenTasksManager eventTasksManager = EvenTasksManager();
   final UIEventManager uiEventManager = UIEventManager();
   double? _toolbarHeight;
 
@@ -101,7 +101,7 @@ class Controller {
     setting.load();
 
     MyLogger.info('initAll: finish initialization');
-    evenTasksManager.triggerAfterInit();
+    eventTasksManager.triggerAfterInit();
     return true;
   }
 
