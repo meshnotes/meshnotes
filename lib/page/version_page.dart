@@ -96,9 +96,7 @@ class _VersionPageState extends State<VersionPage> {
         const Spacer(),
         Text('Bad version objects: ${controller.docManager.countOfBadObjects}'),
         const Spacer(),
-
       ],
-
     );
     final body = Column(
       children: [
@@ -113,8 +111,8 @@ class _VersionPageState extends State<VersionPage> {
 
       ],
     );
-    final smallView = controller.environment.isSmallView(context);
-    final appBar = smallView ? AppBar(title: const Text('Version Map'),) : null;
+    final isMobile = controller.environment.isMobile();
+    final appBar = isMobile ? AppBar(title: const Text('Version Map'),) : null;
     return Scaffold(
       appBar: appBar,
       body: body,

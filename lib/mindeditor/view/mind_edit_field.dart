@@ -80,11 +80,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(_hasFocus && !_hideKeyboard) {
       _focusAttachment!.reparent();
     }
-    Widget lowestLayer = _buildLowestLayer();
+    Widget editingLayer = _buildEditingLayer();
     var stack = Stack(
       children: [
-        lowestLayer,
-        ..._floatingViewManager.getWidgetsForEditor(),
+        editingLayer,
+        ..._floatingViewManager.getFloatingLayersForEditor(),
       ],
     );
     var expanded = Expanded(
@@ -93,7 +93,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     return expanded;
   }
 
-  GestureDetector _buildLowestLayer() {
+  GestureDetector _buildEditingLayer() {
     Widget listView = _buildBlockList();
     Widget container = Container(
       padding: const EdgeInsets.fromLTRB(10.0, 0.0, 10.0, 0.0),
@@ -325,9 +325,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         if(index < widget.document.paragraphs.length) {
           return _constructBlock(widget.document.paragraphs[index]);
         }
-        // Here is a block placeholder
-        return const SizedBox(
-          height: 200,
+        final size = MediaQuery.sizeOf(context);
+        // Here is a block placeholder. Make it large enough, so when the soft-keyboard is popped up, it can be scrolled to be not covered
+        return SizedBox(
+          height: size.height * 0.9,
         );
       },
     );
