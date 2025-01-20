@@ -8,6 +8,7 @@ import 'package:mesh_note/mindeditor/controller/key_control.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/view/floating_view.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
+import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 
 import '../document/paragraph_desc.dart';
@@ -727,7 +728,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   void _onScroll() {
     MyLogger.debug('_onScroll: height=${_currentSize?.height}, min=${_scrollController.position.pixels}, extent=${_scrollController.position.viewportDimension}');
     _updateHandles();
-    _updateActiveBlocks();
+    Util.runInPostFrame(() { // Run in the post frame, to make sure the render object is updated
+      _updateActiveBlocks();
+    });
   }
   void _updateActiveBlocks() {
     var paras = widget.controller.document?.paragraphs;
