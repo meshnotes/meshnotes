@@ -319,6 +319,14 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   Widget _buildBlockList() {
+    final blockCount = widget.document.paragraphs.length;
+    // If more than 1000 blocks, use sliver ListView, otherwise use column
+    if(blockCount > 1000) {
+      return _buildBlockListView();
+    }
+    return _buildBlockListColumn();
+  }
+  Widget _buildBlockListView() {
     var builder = ListView.builder(
       controller: _scrollController,
       itemCount: widget.document.paragraphs.length + 1,
@@ -326,14 +334,38 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         if(index < widget.document.paragraphs.length) {
           return _constructBlock(widget.document.paragraphs[index]);
         }
-        final size = MediaQuery.sizeOf(context);
-        // Here is a block placeholder. Make it large enough, so when the soft-keyboard is popped up, it can be scrolled to be not covered
-        return SizedBox(
-          height: size.height * 0.9,
-        );
+        return _buildBlockListPlaceholder(context);
       },
     );
     return builder;
+  }
+  Widget _buildBlockListColumn() {
+    List<Widget> blockWidgets = [];
+    for(var para in widget.document.paragraphs) {
+      blockWidgets.add(_constructBlock(para));
+    }
+    final column = Column(
+      children: [
+        ...blockWidgets,
+        _buildBlockListPlaceholder(context),
+      ],
+    );
+    final scrollView = SingleChildScrollView(
+      controller: _scrollController,
+      child: column,
+    );
+    return scrollView;
+  }
+  Widget _buildBlockListPlaceholder(BuildContext context) {
+    // Make the place holder large enough, so when the soft-keyboard is popped up, it can be scrolled to be not covered
+    final size = MediaQuery.sizeOf(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.text,
+      child: SizedBox(
+        height: size.height * 0.9,
+        width: size.width,
+      ),
+    );
   }
 
   Widget _constructBlock(ParagraphDesc para, {bool readOnly = false}) {
