@@ -12,6 +12,12 @@ class EvenTasksManager {
       task.call();
     }
   }
+  
+  void addIdleTask(Function() task) {
+    if(!_idleTasks.contains(task)) {
+      _idleTasks.add(task);
+    }
+  }
   void triggerIdle() {
     for(final task in _idleTasks) {
       task.call();

@@ -18,7 +18,7 @@ class FloatingViewManager {
     _pluginDialogLayer = _buildPluginDialogLayer();
   }
 
-  List<Widget> getWidgetsForEditor() {
+  List<Widget> getFloatingLayersForEditor() {
     return [
       _selectionLayer,
       _popupMenuLayer,

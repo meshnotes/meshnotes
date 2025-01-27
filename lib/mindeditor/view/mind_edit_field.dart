@@ -8,6 +8,7 @@ import 'package:mesh_note/mindeditor/controller/key_control.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/view/floating_view.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
+import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 
 import '../document/paragraph_desc.dart';
@@ -80,11 +81,11 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(_hasFocus && !_hideKeyboard) {
       _focusAttachment!.reparent();
     }
-    Widget lowestLayer = _buildLowestLayer();
+    Widget editingLayer = _buildEditingLayer();
     var stack = Stack(
       children: [
-        lowestLayer,
-        ..._floatingViewManager.getWidgetsForEditor(),
+        editingLayer,
+        ..._floatingViewManager.getFloatingLayersForEditor(),
       ],
     );
     var expanded = Expanded(
@@ -93,7 +94,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     return expanded;
   }
 
-  GestureDetector _buildLowestLayer() {
+  GestureDetector _buildEditingLayer() {
     Widget listView = _buildBlockList();
     Widget container = Container(
       padding: const EdgeInsets.fromLTRB(10.0, 0.0, 10.0, 0.0),
@@ -318,6 +319,14 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   Widget _buildBlockList() {
+    final blockCount = widget.document.paragraphs.length;
+    // If more than 1000 blocks, use sliver ListView, otherwise use column
+    if(blockCount > 1000) {
+      return _buildBlockListView();
+    }
+    return _buildBlockListColumn();
+  }
+  Widget _buildBlockListView() {
     var builder = ListView.builder(
       controller: _scrollController,
       itemCount: widget.document.paragraphs.length + 1,
@@ -325,13 +334,38 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         if(index < widget.document.paragraphs.length) {
           return _constructBlock(widget.document.paragraphs[index]);
         }
-        // Here is a block placeholder
-        return const SizedBox(
-          height: 200,
-        );
+        return _buildBlockListPlaceholder(context);
       },
     );
     return builder;
+  }
+  Widget _buildBlockListColumn() {
+    List<Widget> blockWidgets = [];
+    for(var para in widget.document.paragraphs) {
+      blockWidgets.add(_constructBlock(para));
+    }
+    final column = Column(
+      children: [
+        ...blockWidgets,
+        _buildBlockListPlaceholder(context),
+      ],
+    );
+    final scrollView = SingleChildScrollView(
+      controller: _scrollController,
+      child: column,
+    );
+    return scrollView;
+  }
+  Widget _buildBlockListPlaceholder(BuildContext context) {
+    // Make the place holder large enough, so when the soft-keyboard is popped up, it can be scrolled to be not covered
+    final size = MediaQuery.sizeOf(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.text,
+      child: SizedBox(
+        height: size.height * 0.9,
+        width: size.width,
+      ),
+    );
   }
 
   Widget _constructBlock(ParagraphDesc para, {bool readOnly = false}) {
@@ -726,7 +760,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   void _onScroll() {
     MyLogger.debug('_onScroll: height=${_currentSize?.height}, min=${_scrollController.position.pixels}, extent=${_scrollController.position.viewportDimension}');
     _updateHandles();
-    _updateActiveBlocks();
+    Util.runInPostFrame(() { // Run in the post frame, to make sure the render object is updated
+      _updateActiveBlocks();
+    });
   }
   void _updateActiveBlocks() {
     var paras = widget.controller.document?.paragraphs;

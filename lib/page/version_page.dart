@@ -96,9 +96,7 @@ class _VersionPageState extends State<VersionPage> {
         const Spacer(),
         Text('Bad version objects: ${controller.docManager.countOfBadObjects}'),
         const Spacer(),
-
       ],
-
     );
     final body = Column(
       children: [
@@ -113,8 +111,8 @@ class _VersionPageState extends State<VersionPage> {
 
       ],
     );
-    final smallView = controller.environment.isSmallView(context);
-    final appBar = smallView ? AppBar(title: const Text('Version Map'),) : null;
+    final isMobile = controller.environment.isMobile();
+    final appBar = isMobile ? AppBar(title: const Text('Version Map'),) : null;
     return Scaffold(
       appBar: appBar,
       body: body,
@@ -188,10 +186,22 @@ class _VersionPageState extends State<VersionPage> {
       for(final node in column) {
         final isSelected = node.name == selectedVersion;
         final isChildSelected = node.children.any((child) => child.name == selectedVersion);
-
+        final isBadVersion = controller.docManager.isBadVersion(node.name);
+        final nodeTitle = HashUtil.formatHash(node.name);
         final color = node.name == currentVersion ? currentVersionColor : node.status == Constants.statusAvailable ? validColor : invalidColor;
         final textDecoration = node.status == Constants.statusDeprecated ? deprecatedTextDecoration : defaultTextDecoration;
         final border = isSelected ? selectedBorder : isChildSelected ? childSelectedBorder : node.status == Constants.statusAvailable ? validBorder : invalidBorder;
+        final nodeTitleTextSpan = Text(
+          nodeTitle,
+          style: TextStyle(
+            color: const Color(0xFF424242),
+            decoration: textDecoration,
+          ),
+        );
+        final nodeTitlePrefix = isBadVersion ?
+            const Icon(Icons.error, color: Colors.red, size: 14,)
+            :
+            const Icon(Icons.check, color: Colors.green, size: 14);
         final container = Container(
           padding: const EdgeInsets.fromLTRB(5, 2, 5, 2),
           decoration: BoxDecoration(
@@ -206,12 +216,11 @@ class _VersionPageState extends State<VersionPage> {
               Expanded(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(
-                    HashUtil.formatHash(node.name),
-                    style: TextStyle(
-                      color: const Color(0xFF424242),
-                      decoration: textDecoration,
-                    ),
+                  child: Row(
+                    children: [
+                      nodeTitlePrefix,
+                      nodeTitleTextSpan,
+                    ],
                   ),
                 ),
               ),
