@@ -135,7 +135,7 @@ class DocumentManager {
     var block = _genDefaultTitleBlock(title);
     _db.storeDocBlock(docId, blockId, jsonEncode(block), now);
     var docContent = _genDocContentWithTitle(docId, blockId, block);
-    _db.storeDocContent(docId, jsonEncode(docContent), now);
+    _db.updateDocContent(docId, jsonEncode(docContent), now);
     _docTitles.add(DocDataModel(docId: docId, title: title, hash: '', timestamp: now));
     return docId;
   }
@@ -482,7 +482,7 @@ class DocumentManager {
       _db.storeDocBlock(docId, blockId, blockStr, found.timestamp);
     }
     // Update doc content
-    _db.storeDocContent(docId, docContentStr, found.timestamp);
+    _db.updateDocContent(docId, docContentStr, found.timestamp);
 
     // If document was loaded, update it
     var openingDocument = _documents[docId];
@@ -686,7 +686,7 @@ class DocumentManager {
       var newHash = newHashes[docId];
       if(newHash != null) {
         docData.hash = newHash;
-        _db.storeDocHash(docId, newHash, now);
+        _db.updateDocHash(docId, newHash, now);
       }
     }
   }

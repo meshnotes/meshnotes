@@ -355,7 +355,7 @@ class Document {
     final now = Util.getTimeStamp();
     var docContent = _generateDocContent();
     final jsonStr = jsonEncode(docContent);
-    _db?.storeDocContent(id, jsonStr, now);
+    _db?.updateDocContent(id, jsonStr, now);
   }
 
   DocContent _generateDocContent() {

@@ -116,15 +116,14 @@ class DbHelper {
     _database.execute(sqlParagraph, [level, docId, id]);
   }
 
-  void storeDocHash(String docId, String hash, int timestamp) {
-    const sql = 'UPDATE doc_list SET doc_hash=?, updated_at=? WHERE doc_id=?';
+  void updateDocHash(String docId, String hash, int timestamp) {
+    const sql = 'UPDATE documents SET doc_hash=?, updated_at=? WHERE doc_id=?';
     _database.execute(sql, [hash, timestamp, docId]);
   }
 
-  void storeDocContent(String docId, String docContent, int timestamp) {
-    const sql = 'INSERT INTO doc_contents(doc_id, doc_content, updated_at) VALUES(?, ?, ?) '
-        'ON CONFLICT(doc_id) DO UPDATE SET doc_content=excluded.doc_content, updated_at=excluded.updated_at';
-    _database.execute(sql, [docId, docContent, timestamp]);
+  void updateDocContent(String docId, String docContent, int timestamp) {
+    const sql = 'UPDATE documents SET doc_content=?, updated_at=? WHERE doc_id=?';
+    _database.execute(sql, [docContent, timestamp, docId]);
   }
 
   void storeDocBlock(String docId, String blockId, String data, int timestamp) {
@@ -144,13 +143,18 @@ class DbHelper {
   }
 
   DocContentDataModel? getDoc(String docId) {
-    const sql = 'SELECT doc_content, updated_at FROM doc_contents WHERE doc_id=?';
+    const sql = 'SELECT doc_content, doc_hash, is_private, updated_at FROM documents WHERE doc_id=?';
     var resultSet = _database.select(sql, [docId]);
     MyLogger.debug('getDoc: result=$resultSet');
 
     if(resultSet.isEmpty) return null;
     final row = resultSet.first;
-    return DocContentDataModel(docId: docId, docContent: row['doc_content'], timestamp: row['updated_at']);
+    final docContent = row['doc_content'];
+    final docHash = row['doc_hash'];
+    final isPrivate = row['is_private'];
+    final timestamp = row['updated_at'];
+    return DocContentDataModel(docId: docId, docContent: docContent, docHash: docHash, isPrivate: isPrivate, timestamp: timestamp);
+
   }
 
   Map<String, BlockDataModel> getBlockMapOfDoc(String docId) {
@@ -249,7 +253,7 @@ class DbHelper {
     return result;
   }
   List<DocDataModel> getAllDocuments() {
-    const sql = 'SELECT doc_id, doc_hash, updated_at FROM doc_list';
+    const sql = 'SELECT doc_id, doc_hash, updated_at, is_private FROM documents';
     final resultSet = _database.select(sql, []);
     MyLogger.debug('getAllDocuments: result=$resultSet');
     var result = <DocDataModel>[];
@@ -257,8 +261,9 @@ class DbHelper {
       MyLogger.verbose('getAllDocuments: row=$row');
       String docId = row['doc_id'];
       String docHash = row['doc_hash'];
+      int isPrivate = row['is_private'];
       int updatedAt = row['updated_at'];
-      result.add(DocDataModel(docId: docId, title: '', hash: docHash, timestamp: updatedAt));
+      result.add(DocDataModel(docId: docId, title: '', hash: docHash, isPrivate: isPrivate, timestamp: updatedAt));
     }
     return result;
   }
@@ -334,30 +339,27 @@ class DbHelper {
 
   String newDocument(int timestamp) {
     var docId = IdGen.getUid();
-    const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?)';
-    _database.execute(sql, [docId, '', timestamp]);
+    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at) VALUES(?, ?, ?, ?, ?)';
+    _database.execute(sql, [docId, '', '', ModelConstants.isPrivateNo, timestamp]);
 
     return docId;
   }
 
   void deleteDocument(String docId) {
-    // Remove from doc list
-    const sqlDocList = 'DELETE FROM doc_list WHERE doc_id=?';
-    _database.execute(sqlDocList, [docId]);
-
     // Remove from blocks
     const sqlBlocks = 'DELETE FROM blocks WHERE doc_id=?';
     _database.execute(sqlBlocks, [docId]);
 
     // Remove from doc contents
-    const sqlContents = 'DELETE FROM doc_contents WHERE doc_id=?';
+    const sqlContents = 'DELETE FROM documents WHERE doc_id=?';
     _database.execute(sqlContents, [docId]);
   }
 
   void insertOrUpdateDoc(String docId, String docHash, int timestamp) {
-    const sql = 'INSERT INTO doc_list(doc_id, doc_hash, updated_at) VALUES(?, ?, ?) '
+    // When insert, set doc_content to empty string, is_private to 0. But when update, don't set doc_content and is_private
+    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at) VALUES(?, ?, ?, ?, ?) '
         'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at';
-    _database.execute(sql, [docId, docHash, timestamp]);
+    _database.execute(sql, [docId, docHash, '', ModelConstants.isPrivateNo, timestamp]);
   }
 
   List<(String, String)> getAllBlocks() {

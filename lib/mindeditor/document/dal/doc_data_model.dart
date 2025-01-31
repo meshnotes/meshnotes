@@ -16,12 +16,14 @@ class DocDataModel {
   String docId;
   String title;
   String hash;
+  int isPrivate;
   int timestamp;
 
   DocDataModel({
     required this.docId,
     required this.title,
     required this.hash,
+    this.isPrivate = ModelConstants.isPrivateNo,
     required this.timestamp,
   });
 }
@@ -29,11 +31,15 @@ class DocDataModel {
 class DocContentDataModel {
   String docId;
   String docContent;
+  String docHash;
+  int isPrivate;
   int timestamp;
 
   DocContentDataModel({
     required this.docId,
     required this.docContent,
+    required this.docHash,
+    required this.isPrivate,
     required this.timestamp,
   });
 }
@@ -72,4 +78,9 @@ class ObjectDataModel {
     required this.createdFrom,
     required this.status,
   });
+}
+
+class ModelConstants {
+  static const int isPrivateNo = 0;
+  static const int isPrivateYes = 1;
 }
