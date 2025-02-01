@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Search local devices to sync notes</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_village-v0._udp</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Use microphone to chat with AI</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
