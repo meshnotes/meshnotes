@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:bonsoir/bonsoir.dart';
 import 'package:libp2p/network/incomplete_pool.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
@@ -19,6 +20,8 @@ class SOTPNetworkLayer {
   static const multicastGroup = '224.0.0.179'; // Only 224.0.0.0/8 could be received by windows devices, by test result
   static const multicastGroup2 = '239.0.179.74'; // Try to send to other multicast address
   static const logPrefix = '[Network]';
+  static const _bonjourName = 'VillageProtocol';
+  static const _bonjourType = '_village-v0._udp';
   final connectionPool = ConnectionPool();
   final incompletePool = IncompletePool();
   late Timer timer;
@@ -33,6 +36,9 @@ class SOTPNetworkLayer {
   int maxTimeout = 3000;
   NetworkEnvSimulator? _networkCondition;
   bool useMulticast;
+  bool useBonjour;
+  BonsoirBroadcast? _bonjourBroadcast;
+  BonsoirDiscovery? _bonjourDiscovery;
   String _deviceId;
   int _lastSentMulticast = 0;
   static const _maxMulticastInterval = 20 * 1000; // 1 minute in milliseconds
@@ -62,6 +68,7 @@ class SOTPNetworkLayer {
     this.onDetected,
     NetworkEnvSimulator? networkCondition,
     this.useMulticast = false,
+    this.useBonjour = false, // Ignore bonjour, because it could not be used in background isolates
     required String deviceId,
   }) : _networkCondition = networkCondition, _deviceId = deviceId;
 
@@ -108,7 +115,7 @@ class SOTPNetworkLayer {
             _onAnnounce(packet as PacketAnnounce, peerIp, port);
             break;
           case PacketType.announceAck:
-            if(!useMulticast) break; // Ignore announce_ack if not supporting multicast
+            if(!useMulticast && !useBonjour) break; // Ignore announce_ack if not supporting multicast or bonjour
             if(peerIp == localIp && port == servicePort) break; // Ignore packet from itself
             _onAnnounceAck(packet as PacketAnnounce, peerIp, port);
             break;
@@ -120,10 +127,13 @@ class SOTPNetworkLayer {
         }
       }
     });
-    if (useMulticast) {
+    if(useMulticast) {
       _udp?.joinMulticast(InternetAddress(multicastGroup));
       _udp?.joinMulticast(InternetAddress(multicastGroup2));
       _startBroadcast(); // Bind every interface with random port, to send multicast message
+    }
+    if(useBonjour) {
+      _startBonjour();
     }
     timer = Timer.periodic(Duration(milliseconds: 1000), _networkTimerHandler);
     startedCallback?.call();
@@ -139,6 +149,10 @@ class SOTPNetworkLayer {
     timer.cancel();
     _traverseAndClose(connectionPool.getAllConnections());
     _traverseAndClose(incompletePool.getAllConnections());
+    if(useBonjour) {
+      _bonjourBroadcast?.stop();
+      _bonjourDiscovery?.stop();
+    }
     udp.close();
     _status = NetworkStatus.invalid;
   }
@@ -296,6 +310,65 @@ class SOTPNetworkLayer {
         }
       }
     }
+  }
+  Future<void> _startBonjour() async {
+    _startBonjourBroadcast();
+    _startBonjourDiscovery();
+  }
+  Future<void> _startBonjourBroadcast() async {
+    BonsoirService service = BonsoirService(
+      name: _bonjourName,
+
+      type: _bonjourType,
+      port: servicePort, // Put your service port here.
+      attributes: {
+        'device': _deviceId,
+      },
+    );
+
+    // And now we can broadcast it :
+    BonsoirBroadcast broadcast = BonsoirBroadcast(service: service);
+    await broadcast.ready;
+    await broadcast.start();
+    _bonjourBroadcast = broadcast;
+  }
+  Future<void> _startBonjourDiscovery() async {
+    BonsoirDiscovery discovery = BonsoirDiscovery(type: _bonjourType);
+    await discovery.ready;
+
+    /// Cannot listen to the discovery event in background isolates
+    /// Or an exception will be thrown:
+    ///   Unsupported operation: Background isolates do not support setMessageHandler(). Messages from the host platform always go to the root isolate.
+    discovery.eventStream!.listen((event) {
+      // `eventStream` is not null as the discovery instance is "ready" !
+      if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
+        MyLogger.debug('${logPrefix} Service found : ${event.service?.toJson()}');
+        event.service!.resolve(discovery.serviceResolver); // Should be called when the user wants to connect to this service.
+      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved) {
+        MyLogger.info('${logPrefix} Service resolved : ${event.service?.toJson()}');
+        final service = event.service as ResolvedBonsoirService?;
+        if(service == null) return;
+
+        final host = service.host; // May be the host name, should be resolved to ip address
+        final port = service.port;
+        if(host == null) return;
+        InternetAddress.lookup(host).then((values) {
+          for(var ip in values) {
+            if(ip.isLoopback) continue; // Ignore loopback address
+            if(ip.type == InternetAddressType.IPv4) {
+              _sendAnnounce(udp, ip, port, localIp.rawAddress, servicePort);
+              break;
+            }
+          }
+        });
+      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceLost) {
+        MyLogger.debug('${logPrefix} Service lost : ${event.service?.toJson()}');
+      }
+    });
+    // Start the discovery **after** listening to discovery events :
+    await discovery.start();
+
+    _bonjourDiscovery = discovery;
   }
 
   int _generateId() {

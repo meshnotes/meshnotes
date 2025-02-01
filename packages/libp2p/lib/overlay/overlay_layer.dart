@@ -19,6 +19,7 @@ class VillageOverlay implements ApplicationController {
   // List<String> sponsors;
   String _deviceId = '';
   int _localPort;
+  final bool useMulticast;
   UserPublicInfo userInfo;
   SOTPNetworkLayer? __network;
   SOTPNetworkLayer get _network => __network!;
@@ -38,6 +39,7 @@ class VillageOverlay implements ApplicationController {
     required this.onNodeChanged,
     String deviceId = '',
     int port = 0,
+    this.useMulticast = false,
   }): _localPort = port, _deviceId = deviceId {
     registerApplication(_appName, this); // Make overlay itself as the first application
 
@@ -70,7 +72,7 @@ class VillageOverlay implements ApplicationController {
       newConnectCallback: _onNewConnect,
       onDetected: _onDetected,
       deviceId: _deviceId,
-      useMulticast: true,
+      useMulticast: useMulticast,
     );
     await _network.start();
     // Connect to upper nodes immediately
@@ -126,6 +128,22 @@ class VillageOverlay implements ApplicationController {
         _handleHelloMessage(node, data);
         break;
     }
+  }
+
+  void newNodeDiscovered(String host, int port, String deviceId) {
+    MyLogger.info('${logPrefix} New node detected: $host:$port, deviceId=$deviceId');
+    InternetAddress.lookup(host).then((values) {
+      for(var ip in values) {
+        if(ip.isLoopback) {
+          MyLogger.info('${logPrefix} Ignore loopback address: $ip');
+          continue; // Ignore loopback address
+        }
+        if(ip.type == InternetAddressType.IPv4) { // Only IPv4 is supported
+          _onDetected(deviceId, ip, port);
+          break;
+        }
+      }
+    });
   }
 
   void findTracker() {

@@ -361,7 +361,7 @@ class Peer {
     } else if(_status != ConnectionStatus.invalid) {
       int retryCount = controlQueue.getConnectRetryCount();
       if(retryCount >= maxRetryCount) {
-        MyLogger.info('${logPrefix} Connection failed due to exceed max retry count');
+        MyLogger.info('${logPrefix} Connection failed due to exceed max retry count: $ip:$port');
         controlQueue.clearAll();
         _connectFailed();
       } else {

@@ -15,7 +15,6 @@ class Village implements ApplicationController {
   static const _appName = 'village';
   VillageOverlay _overlay;
   VillageMode _mode;
-  int localPort;
   String upperAppName;
   VillageMessageHandler messageHandler;
   VillageDbHelper _db;
@@ -27,7 +26,6 @@ class Village implements ApplicationController {
   Village({
     // required String userId,
     required List<String> sponsors,
-    this.localPort = 0,
     required this.messageHandler,
     VillageMode mode = VillageMode.loneWolf,
     required VillageOverlay overlay,
@@ -75,6 +73,10 @@ class Village implements ApplicationController {
           _onDefaultPublish(data);
         }
     }
+  }
+
+  void newNodeDiscovered(String host, int port, String deviceId) { // Called if using bonjour and discover new nodes
+    _overlay.newNodeDiscovered(host, port, deviceId);
   }
 
   void sendPublish(String msgJson) {
