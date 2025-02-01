@@ -14,7 +14,15 @@ runServer() {
   MyLogger.info('Run as server');
 }
 
-Future<Village> startVillage(String localPort, String serverList, String deviceId, UserPublicInfo userInfo, Function(VillagerNode) connectedCallback, VillageMessageHandler messageHandler) async {
+Future<Village> startVillage({
+  required String localPort,
+  required String serverList,
+  required String deviceId,
+  required UserPublicInfo userInfo,
+  required Function(VillagerNode) connectedCallback,
+  required VillageMessageHandler messageHandler,
+  bool useMulticast = false,
+}) async {
   VillageDbHelper db = VillageDbHelper();
   db.init();
 
@@ -26,9 +34,9 @@ Future<Village> startVillage(String localPort, String serverList, String deviceI
     port: _localPort,
     deviceId: deviceId,
     onNodeChanged: connectedCallback,
+    useMulticast: useMulticast,
   );
   final village = Village(
-    localPort: _localPort,
     sponsors: sponsors,
     overlay: _overlay,
     messageHandler: messageHandler,

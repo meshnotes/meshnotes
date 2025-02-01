@@ -5,6 +5,7 @@ enum Command {
   terminate,
   terminateOk,
   startVillage,
+  newNodeDiscovered,
   networkStatus,
   nodeStatus,
   sendBroadcast,
@@ -34,12 +35,26 @@ class StartVillageParameter {
   String serverList;
   String deviceId;
   UserPrivateInfo userInfo;
+  bool useMulticast;
 
   StartVillageParameter({
     required this.localPort,
     required this.serverList,
     required this.deviceId,
     required this.userInfo,
+    required this.useMulticast,
+  });
+}
+
+class NewNodeDiscoveredParameter {
+  String host;
+  int port;
+  String deviceId;
+
+  NewNodeDiscoveredParameter({
+    required this.host,
+    required this.port,
+    required this.deviceId,
   });
 }
 

@@ -96,14 +96,19 @@ class VersionChainVillager {
           ..handlePublish = _handlePublish
         ;
         _village = await startVillage(
-          parameter.localPort,
-          parameter.serverList,
-          parameter.deviceId,
-          UserPublicInfo(publicKey: userPrivateInfo!.publicKey, userName: userPrivateInfo!.userName, timestamp: userPrivateInfo!.timestamp),
-          _nodeChanged,
-          handler,
+          localPort: parameter.localPort,
+          serverList: parameter.serverList,
+          deviceId: parameter.deviceId,
+          userInfo: UserPublicInfo(publicKey: userPrivateInfo!.publicKey, userName: userPrivateInfo!.userName, timestamp: userPrivateInfo!.timestamp),
+          connectedCallback: _nodeChanged,
+          messageHandler: handler,
+          useMulticast: parameter.useMulticast,
         );
         _sendPort.send(Message(cmd: Command.networkStatus, parameter: NetworkStatus.running,));
+        break;
+      case Command.newNodeDiscovered:
+        final param = msg.parameter as NewNodeDiscoveredParameter;
+        _onNewNodeDiscovered(param.host, param.port, param.deviceId);
         break;
       case Command.terminateOk:
       case Command.networkStatus:
@@ -252,6 +257,11 @@ class VersionChainVillager {
       cmd: Command.receiveBroadcast,
       parameter: brdMsg,
     ));
+  }
+
+  void _onNewNodeDiscovered(String host, int port, String deviceId) {
+    MyLogger.info('New node detected: $host:$port, deviceId=$deviceId');
+    _village?.newNodeDiscovered(host, port, deviceId);
   }
 
   void _onSendBroadcast(BroadcastMessages msg) {

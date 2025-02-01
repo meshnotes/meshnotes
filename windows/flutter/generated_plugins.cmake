@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  bonsoir_windows
   flutter_inappwebview_windows
   flutter_window_close
   irondash_engine_context

@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:isolate';
+import 'package:bonsoir/bonsoir.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
@@ -15,12 +16,18 @@ import 'status.dart';
 import 'version_chain_api.dart';
 
 class NetworkController {
+  static const _bonjourName = 'VillageProtocol';
+  static const _bonjourType = '_village-v0._udp';
+  BonsoirBroadcast? _bonjourBroadcast;
+  BonsoirDiscovery? _bonjourDiscovery;
   final Isolate _isolate;
   final ReceivePort _receivePort;
   SendPort? _sendPort;
   NetworkStatus _networkStatus = NetworkStatus.unknown;
   final Map<String, NodeInfo> _nodes = {};
   Completer<bool>? finished;
+  late int _servicePort;
+  late String _deviceId;
 
   NetworkController(Isolate isolate, ReceivePort port): _isolate = isolate, _receivePort = port;
 
@@ -31,18 +38,25 @@ class NetworkController {
     final rawServerList = settings.getSetting(Constants.settingKeyServerList)?? Constants.settingDefaultServerList;
     final cleanedServerList = rawServerList.replaceAll('，', ',').replaceAll('：', ':');
     final localPort = settings.getSetting(Constants.settingKeyLocalPort)?? Constants.settingDefaultLocalPort;
+    _servicePort = int.parse(localPort);
+    _deviceId = deviceId;
     _networkStatus = NetworkStatus.starting;
+    bool useBonjour = true;
+    final useMulticast = !useBonjour;
     _receivePort.listen((data) {
       if(data is SendPort) {
-        MyLogger.info('Get SendPort from network isolate, start village protocol');
+        MyLogger.info('Get SendPort from network isolate, start village protocol, using Bonjour=$useBonjour');
         _sendPort = data;
-        _gracefulStartVillage(localPort, cleanedServerList, deviceId, userPrivateInfo);
+        _gracefulStartVillage(localPort, cleanedServerList, deviceId, userPrivateInfo, useMulticast);
       } else if(data is Message) {
         if(_sendPort != null) {
           _onMessage(data);
         }
       }
     });
+    if(useBonjour) {
+      _startBonjour();
+    }
   }
 
   void sendVersionBroadcast(String latestVersion) {
@@ -107,6 +121,9 @@ class NetworkController {
   
   Completer<bool>? gracefulTerminate() {
     if(!isStarted()) return null;
+
+    _bonjourBroadcast?.stop();
+    _bonjourDiscovery?.stop();
     finished = Completer();
     _sendPort?.send(Message(cmd: Command.terminate, parameter: null));
     return finished!;
@@ -138,6 +155,7 @@ class NetworkController {
     switch(msg.cmd) {
       case Command.terminate:
       case Command.startVillage:
+      case Command.newNodeDiscovered:
       case Command.sendBroadcast:
       case Command.sendVersionTree:
       case Command.sendRequireVersions:
@@ -185,7 +203,7 @@ class NetworkController {
     }
   }
 
-  void _gracefulStartVillage(String localPort, String serverList, String deviceId, UserPrivateInfo userPrivateInfo) {
+  void _gracefulStartVillage(String localPort, String serverList, String deviceId, UserPrivateInfo userPrivateInfo, bool useMulticast) {
     _sendPort?.send(Message(
       cmd: Command.startVillage,
       parameter: StartVillageParameter(
@@ -193,6 +211,7 @@ class NetworkController {
         serverList: serverList,
         deviceId: deviceId,
         userInfo: userPrivateInfo,
+        useMulticast: useMulticast,
       ),
     ));
   }
@@ -207,5 +226,70 @@ class NetworkController {
       result.add(node);
     }
     return result;
+  }
+
+  Future<void> _startBonjour() async {
+    _startBonjourBroadcast();
+    _startBonjourDiscovery();
+  }
+  Future<void> _startBonjourBroadcast() async {
+    BonsoirService service = BonsoirService(
+      name: _bonjourName,
+
+      type: _bonjourType,
+      port: _servicePort, // Put your service port here.
+      attributes: {
+        'device': _deviceId,
+      },
+    );
+
+    // And now we can broadcast it :
+    BonsoirBroadcast broadcast = BonsoirBroadcast(service: service);
+    await broadcast.ready;
+    await broadcast.start();
+    _bonjourBroadcast = broadcast;
+  }
+  Future<void> _startBonjourDiscovery() async {
+    BonsoirDiscovery discovery = BonsoirDiscovery(type: _bonjourType);
+    await discovery.ready;
+
+    discovery.eventStream!.listen((event) {
+      // `eventStream` is not null as the discovery instance is "ready" !
+      if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
+        MyLogger.debug('Bonjour service found : ${event.service?.toJson()}');
+        event.service!.resolve(discovery.serviceResolver); // Should be called when the user wants to connect to this service.
+      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved) {
+        MyLogger.info('Bonjour service resolved : ${event.service?.toJson()}');
+        final service = event.service as ResolvedBonsoirService?;
+        if(service == null) return;
+
+        final host = service.host; // May be the host name, should be resolved to ip address
+        final port = service.port;
+        final attributes = service.attributes;
+        final deviceId = attributes['device'];
+        if(host == null || deviceId == null) return;
+        MyLogger.info('Bonjour node resolved: $host:$port, deviceId=$deviceId, current deviceId=$_deviceId');
+        if(deviceId == _deviceId) return; // Ignore self
+
+        _onDiscoverNewNode(host, port, deviceId);
+      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceLost) {
+        MyLogger.debug('Bonjour service lost : ${event.service?.toJson()}');
+      }
+    });
+    // Start the discovery **after** listening to discovery events :
+    await discovery.start();
+    _bonjourDiscovery = discovery;
+  }
+
+  void _onDiscoverNewNode(String host, int port, String deviceId) {
+    MyLogger.info('Bonjour node discovered: $host:$port, deviceId=$deviceId');
+    _sendPort?.send(Message(
+      cmd: Command.newNodeDiscovered,
+      parameter: NewNodeDiscoveredParameter(
+        host: host,
+        port: port,
+        deviceId: deviceId,
+      ),
+    ));
   }
 }

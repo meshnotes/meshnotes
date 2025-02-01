@@ -13,6 +13,7 @@ dependencies:
   path_provider: ^2.0.1
   my_log:
     path: ../my_log
+  bonsoir: ^5.1.10
 
 dev_dependencies:
   lints: ^2.0.0
