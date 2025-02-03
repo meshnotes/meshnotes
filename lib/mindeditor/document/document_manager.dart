@@ -13,6 +13,7 @@ import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
+import 'doc_utils.dart';
 import 'version_tree_status.dart';
 import 'package:mesh_note/mindeditor/document/text_desc.dart';
 import 'package:my_log/my_log.dart';
@@ -222,10 +223,17 @@ class DocumentManager {
     return (versions, _currentVersionTimestamp);
   }
 
+  void mergeVersionTree() {
+    _setSyncing();
+    Map<String, DagNode> localDagMap = _genVersionMapFromDb();
+    _tryToMergeVersionTree2(localDagMap);
+    _clearSyncing();
+  }
   /// Generate new version tree by merging local and remote version tree.
   /// If missing any version, require it from remote nodes.
   /// If no missing version, merge versions.
   /// Once assembling, set syncing status to stop other nodes sending version_tree concurrently.
+  /// TODO: should generate local version before merging, and stop editing
   void assembleVersionTree(List<VersionNode> versionDag) {
     _setSyncing();
     _storeVersionsFromPeer(versionDag);
@@ -235,6 +243,7 @@ class DocumentManager {
     _tryToMergeVersionTree(localDagMap);
   }
 
+  //TODO: should move to merge_task
   List<SendVersions> assembleRequireVersions(List<String> requiredVersions) {
     List<SendVersions> result = [];
     for(var versionHash in requiredVersions) {
@@ -250,7 +259,7 @@ class DocumentManager {
       }
       final json = object.data;
       final versionContent = VersionContent.fromJson(jsonDecode(json));
-      Map<String, RelatedObject> requiredObjects = _genRequiredObjects(versionContent);
+      Map<String, RelatedObject> requiredObjects = DocUtils.genRequiredObjects(versionContent, _db);
 
       var node = SendVersions(
           versionHash: versionHash,
@@ -276,11 +285,11 @@ class DocumentManager {
       int timestamp = res.timestamp;
       String content = res.data;
       if(!_db.hasObject(key)) {
-        _db.storeObject(key, content, timestamp, Constants.createdFromPeer, Constants.statusAvailable);
+        _db.storeObject(key, content, timestamp, Constants.createdFromPeer, ModelConstants.statusAvailable);
       }
       if(_allWaitingVersions.contains(key)) {
         _allWaitingVersions.remove(key);
-        _db.updateVersionStatus(key, Constants.statusAvailable);
+        _db.updateVersionStatus(key, ModelConstants.statusAvailable);
       }
     }
     var _versionMap = _genVersionMapFromDb();
@@ -328,6 +337,18 @@ class DocumentManager {
     _db.updateVersionSyncStatus(_currentVersion, Constants.syncStatusSyncing);
   }
 
+  void _tryToMergeVersionTree2(Map<String, DagNode> newMap) {
+    var leafNodes = _findAvailableLeafNodesInDag(newMap); // Find available leaf nodes before removing unavailable nodes
+    leafNodes.remove(_currentVersion);
+    if(leafNodes.isEmpty) {
+      MyLogger.info('Try to merge, but no leaf nodes available');
+      return;
+    }
+    removeMissingVersions(newMap);
+    removeDeprecatedVersions(newMap);
+    MyLogger.info('Try to merge $_currentVersion with $leafNodes');
+    _mergeVersions(newMap, leafNodes);
+  }
   /// Try to merge entire version tree, called after receiving new version_tree or receiving missing versions.
   /// 1. If some versions are still waiting for detail data, send require_versions request to other peers
   /// 2. If some versions are missing, but no waiting versions, ignore missing versions and try to merge
@@ -375,7 +396,7 @@ class DocumentManager {
   Set<String> _findAvailableLeafNodesInDag(Map<String, DagNode> map) {
     Set<String> result = map.keys.toSet();
     for(var e in map.values) {
-      if(e.status != Constants.statusAvailable) {
+      if(e.status != ModelConstants.statusAvailable) {
         result.remove(e.versionHash);
         continue;
       }
@@ -553,7 +574,7 @@ class DocumentManager {
 
   void setIdle() {
     _idleTimer?.cancel();
-    _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfSyncIdle), () {
+    _idleTimer = Timer(const Duration(seconds: Constants.timeoutOfEditIdle), () {
       controller.eventTasksManager.triggerIdle();
       controller.tryToSaveAndSendVersionTree();
       _idleTimer = null;
@@ -574,30 +595,26 @@ class DocumentManager {
     final hash = version.getHash();
     if(fastForward) {
       MyLogger.info('Fast forward to version($hash)');
-      _db.setFlag(Constants.flagNameCurrentVersion, hash);
-      _currentVersionTimestamp = now;
-      _currentVersion = hash;
     } else {
       final jsonStr = jsonEncode(version);
       // Save version object, version tree, current_version flag, and current_version_timestamp flag
-      _db.storeObject(hash, jsonStr, now, Constants.createdFromLocal, Constants.statusAvailable);
-      _db.storeVersion(hash, parents.join(','), now, Constants.createdFromLocal, Constants.statusAvailable);
-      _db.setFlag(Constants.flagNameCurrentVersion, hash);
-      _db.setFlag(Constants.flagNameCurrentVersionTimestamp, now.toString());
-
+      _db.storeObject(hash, jsonStr, now, Constants.createdFromLocal, ModelConstants.statusAvailable);
+      _db.storeVersion(hash, parents.join(','), now, Constants.createdFromLocal, ModelConstants.statusAvailable);
       MyLogger.info('Save new version($hash), parent=$parents');
-      _currentVersionTimestamp = now;
-      _currentVersion = hash;
     }
+    _db.setFlag(Constants.flagNameCurrentVersion, hash);
+    _db.setFlag(Constants.flagNameCurrentVersionTimestamp, now.toString());
+    _currentVersionTimestamp = now;
+    _currentVersion = hash;
   }
   void _storeVersionsFromPeer(List<VersionNode> versionDag) {
     for(var node in versionDag) {
       String versionHash = node.versionHash;
-      String parents = _buildParents(node.parents);
+      String parents = DocUtils.buildParents(node.parents);
       int timestamp = node.createdAt;
       var localVersion = _db.getVersionData(versionHash);
       if(localVersion == null) { // If the version is not exists, create one and set it as from_peer/waiting
-        _db.storeVersion(versionHash, parents, timestamp, Constants.createdFromPeer, Constants.statusWaiting);
+        _db.storeVersion(versionHash, parents, timestamp, Constants.createdFromPeer, ModelConstants.statusWaiting);
       }
     }
   }
@@ -610,37 +627,6 @@ class DocumentManager {
     var version = VersionContent(table: docTable, timestamp: now, parentsHash: parents);
     _clearModified(modifiedDocuments);
     return version;
-  }
-
-  Map<String, RelatedObject> _genRequiredObjects(VersionContent versionContent) {
-    Map<String, RelatedObject> result = {};
-
-    for(var item in versionContent.table) {
-      var docId = item.docId;
-      var docHash = item.docHash;
-      var docObject = _db.getObject(docHash);
-      if(docObject == null) continue;
-      MyLogger.info('_genRequiredObjects: docId=$docId, docHash=$docHash, docStr=$docObject');
-      result[docHash] = RelatedObject(objHash: docHash, objContent: docObject.data, createdAt: docObject.timestamp);
-
-      //TODO should load history document by docHash
-      var docContent = DocContent.fromJson(jsonDecode(docObject.data));
-      for(var block in docContent.contents) {
-        _recursiveAddToMap(block, result);
-      }
-    }
-    return result;
-  }
-  void _recursiveAddToMap(DocContentItem block, Map<String, RelatedObject> map) {
-    var blockHash = block.blockHash;
-    if(!map.containsKey(blockHash)) {
-      var blockObject = _db.getObject(blockHash);
-      if(blockObject == null) return;
-      map[blockHash] = RelatedObject(objHash: blockHash, objContent: blockObject.data, createdAt: blockObject.timestamp);
-    }
-    for(var item in block.children) {
-      _recursiveAddToMap(item, map);
-    }
   }
 
   static List<VersionContentItem> _genDocTreeNodeList(List<DocDataModel> list) {
@@ -753,17 +739,6 @@ class DocumentManager {
   //   }
   //   return result;
   // }
-  String _buildParents(List<String> parents) {
-    String result = '';
-    for(var p in parents) {
-      if(result.isEmpty) {
-        result = p;
-      } else {
-        result += ',' + p;
-      }
-    }
-    return result;
-  }
   // Map<String, DagNode> _mergeLocalAndRemoteMap(Map<String, DagNode> localMap, Map<String, DagNode> remoteMap) {
   //   for(var e in remoteMap.entries) {
   //     var key = e.key;
@@ -813,7 +788,7 @@ class DocumentManager {
   /// If some nodes are in waiting status, then we should wait for them.
   bool _checkForceMergeOrNot(Set<DagNode> nodes) {
     for(var node in nodes) {
-      if(node.status == Constants.statusWaiting) {
+      if(node.status == ModelConstants.statusWaiting) {
         return false;
       }
     }
@@ -830,7 +805,7 @@ class DocumentManager {
       if(!_db.hasObject(versionHash)) {
         missing.add(e.value);
       }
-      if(node.status == Constants.statusWaiting) {// || node.status == Constants.statusMissing) {
+      if(node.status == ModelConstants.statusWaiting) {// || node.status == Constants.statusMissing) {
         missing.add(e.value);
       }
     }
@@ -845,7 +820,7 @@ class DocumentManager {
     final unavailableNodes = <DagNode>{};
     // Step 1
     for(final node in map.values) {
-      if(node.status == Constants.statusWaiting || node.status == Constants.statusMissing) {
+      if(node.status == ModelConstants.statusWaiting || node.status == ModelConstants.statusMissing) {
         unavailableNodes.add(node);
       }
     }
@@ -873,7 +848,7 @@ class DocumentManager {
     // Step 1
     Set<DagNode> deprecatedNodes = {};
     for(final node in map.values) {
-      if(node.status == Constants.statusDeprecated) {
+      if(node.status == ModelConstants.statusDeprecated) {
         deprecatedNodes.add(node);
       }
     }
@@ -1031,7 +1006,7 @@ class DocumentManager {
       var now = Util.getTimeStamp();
       var newDocHash = newDoc.getHash();
       if(!_db.hasObject(newDocHash)) { // Create a local merged document if not exists
-        _db.storeObject(newDocHash, jsonEncode(newDoc), now, Constants.createdFromLocal, Constants.statusAvailable);
+        _db.storeObject(newDocHash, jsonEncode(newDoc), now, Constants.createdFromLocal, ModelConstants.statusAvailable);
       }
       var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: newDocHash, timestamp: now);
       MyLogger.info('Solve conflict of document($docHash1) and document($docHash2) based on document($baseHash), generate new document($newDocHash)');
@@ -1067,7 +1042,7 @@ class DocumentManager {
       final hash = version.versionHash;
       final versionObject = _db.getObject(hash);
       if(versionObject == null) {
-        if(version.status != Constants.statusWaiting || version.status != Constants.statusMissing) {
+        if(version.status != ModelConstants.statusWaiting || version.status != ModelConstants.statusMissing) {
           // _db.updateVersionStatus(hash, Constants.statusWaiting);
         }
         countOfProblem++;
@@ -1146,7 +1121,7 @@ class DocumentManager {
     Set<String> result = {};
 
     for(final version in versions) {
-      if(version.status == Constants.statusMissing) {// || version.status == Constants.statusWaiting) {
+      if(version.status == ModelConstants.statusMissing) {// || version.status == Constants.statusWaiting) {
         result.add(version.versionHash);
       }
     }
@@ -1177,8 +1152,8 @@ class DocumentManager {
     if(_allWaitingVersions.isNotEmpty) {
       for(var hash in _allWaitingVersions) {
         var node = _db.getVersionData(hash);
-        if(node?.status == Constants.statusWaiting) {
-          _db.updateVersionStatus(hash, Constants.statusMissing);
+        if(node?.status == ModelConstants.statusWaiting) {
+          _db.updateVersionStatus(hash, ModelConstants.statusMissing);
         }
       }
       _allWaitingVersions.clear();
@@ -1209,12 +1184,12 @@ class DocumentManager {
     }
     for(final version in versionsExceedMaxRetryCount) {
       MyLogger.info('_increaseRetryCounterAndFilter: version($version) exceed max retry count, remove it from waiting list');
-      _db.updateVersionStatus(version, Constants.statusMissing);
+      _db.updateVersionStatus(version, ModelConstants.statusMissing);
       retriedVersions.remove(version);
     }
   }
 
   void _deprecateVersion(String versionHash) {
-    _db.updateVersionStatus(versionHash, Constants.statusDeprecated);
+    _db.updateVersionStatus(versionHash, ModelConstants.statusDeprecated);
   }
 }

@@ -291,7 +291,7 @@ class Document {
     }
     var docContent = _generateDocContent();
     String docHash = docContent.getHash();
-    _db?.storeObject(docHash, jsonEncode(docContent), now, Constants.createdFromLocal, Constants.statusAvailable);
+    _db?.storeObject(docHash, jsonEncode(docContent), now, Constants.createdFromLocal, ModelConstants.statusAvailable);
     return docHash;
   }
 

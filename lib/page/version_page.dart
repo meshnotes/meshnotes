@@ -188,9 +188,9 @@ class _VersionPageState extends State<VersionPage> {
         final isChildSelected = node.children.any((child) => child.name == selectedVersion);
         final isBadVersion = controller.docManager.isBadVersion(node.name);
         final nodeTitle = HashUtil.formatHash(node.name);
-        final color = node.name == currentVersion ? currentVersionColor : node.status == Constants.statusAvailable ? validColor : invalidColor;
-        final textDecoration = node.status == Constants.statusDeprecated ? deprecatedTextDecoration : defaultTextDecoration;
-        final border = isSelected ? selectedBorder : isChildSelected ? childSelectedBorder : node.status == Constants.statusAvailable ? validBorder : invalidBorder;
+        final color = node.name == currentVersion ? currentVersionColor : node.status == ModelConstants.statusAvailable ? validColor : invalidColor;
+        final textDecoration = node.status == ModelConstants.statusDeprecated ? deprecatedTextDecoration : defaultTextDecoration;
+        final border = isSelected ? selectedBorder : isChildSelected ? childSelectedBorder : node.status == ModelConstants.statusAvailable ? validBorder : invalidBorder;
         final nodeTitleTextSpan = Text(
           nodeTitle,
           style: TextStyle(
