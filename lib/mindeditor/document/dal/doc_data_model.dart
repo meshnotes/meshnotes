@@ -22,7 +22,7 @@ class DocDataModel {
   DocDataModel({
     required this.docId,
     required this.title,
-    required this.hash,
+    this.hash = ModelConstants.hashEmpty,
     this.isPrivate = ModelConstants.isPrivateNo,
     required this.timestamp,
   });
@@ -81,6 +81,9 @@ class ObjectDataModel {
 }
 
 class ModelConstants {
+  // Place holder for empty hash
+  static const String hashEmpty = '';
+
   // private field for documents table
   static const int isPrivateNo = 0;
   static const int isPrivateYes = 1;

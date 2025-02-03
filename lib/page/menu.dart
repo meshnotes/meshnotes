@@ -14,6 +14,7 @@ class MainMenu extends StatelessWidget {
   static const syncKey = 'sync';
   static const versionKey = 'version';
   static const deleteKey = 'delete';
+  static const clearHistoryKey = 'clear_history';
   final Controller controller;
   final MenuType menuType;
 
@@ -50,6 +51,9 @@ class MainMenu extends StatelessWidget {
           case deleteKey:
             controller.deleteDocument();
             break;
+          case clearHistoryKey:
+            controller.clearHistoryVersions();
+            break;
         }
       },
       itemBuilder: (BuildContext ctx) {
@@ -59,6 +63,7 @@ class MainMenu extends StatelessWidget {
           _buildPopupMenu(syncKey, Icons.sync_outlined, 'Sync'),
           if (menuType == MenuType.editor) _buildPopupMenu(deleteKey, Icons.delete_forever_outlined, 'Delete'),
           _buildPopupMenu(versionKey, Icons.history_outlined, 'Version Map'),
+          _buildPopupMenu(clearHistoryKey, Icons.warning_amber_outlined, 'Clear History'),
         ];
       },
     );

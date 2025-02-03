@@ -343,6 +343,48 @@ class DbHelper {
     _database.execute(sqlObjects);
   }
 
+  List<String> findUnavailableSyncingVersions() {
+    const sql = 'SELECT version_hash FROM sync_versions WHERE status<>${ModelConstants.statusAvailable}';
+    final resultSet = _database.select(sql);
+    List<String> result = [];
+    for(final row in resultSet) {
+      String versionHash = row['version_hash'];
+      result.add(versionHash);
+    }
+    return result;
+  }
+
+  Set<String> getAllDocIdsUpdatedAfter(int timestamp) {
+    const sqlDocuments = 'SELECT doc_id FROM documents WHERE updated_at>?';
+    final resultSetDocuments = _database.select(sqlDocuments, [timestamp]);
+    Set<String> result = {};
+    for(final row in resultSetDocuments) {
+      String docId = row['doc_id'];
+      result.add(docId);
+    }
+
+    const sqlBlocks = 'SELECT DISTINCT doc_id FROM blocks WHERE updated_at>?';
+    final resultSetBlocks = _database.select(sqlBlocks, [timestamp]);
+    for(final row in resultSetBlocks) {
+      String docId = row['doc_id'];
+      result.add(docId);
+    }
+    return result;
+  }
+
+  void clearAllVersions() {
+    const sql = 'DELETE FROM versions';
+    _database.execute(sql);
+  }
+  void clearAllObjects() {
+    const sql = 'DELETE FROM objects';
+    _database.execute(sql);
+  }
+  void clearAllDocumentHashes() {
+    const sql = 'UPDATE documents SET doc_hash=?';
+    _database.execute(sql, [ModelConstants.hashEmpty]);
+  }
+
   void clearSyncingTables() {
     const sqlVersions = 'DELETE FROM sync_versions';
     _database.execute(sqlVersions);
@@ -363,11 +405,15 @@ class DbHelper {
     const sql = 'INSERT INTO flags(name, value) VALUES(?, ?) ON CONFLICT(name) DO UPDATE SET value=excluded.value';
     _database.execute(sql, [name, value]);
   }
+  void removeFlag(String name) {
+    const sql = 'DELETE FROM flags WHERE name=?';
+    _database.execute(sql, [name]);
+  }
 
   String newDocument(int timestamp) {
     var docId = IdGen.getUid();
     const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at) VALUES(?, ?, ?, ?, ?)';
-    _database.execute(sql, [docId, '', '', ModelConstants.isPrivateNo, timestamp]);
+    _database.execute(sql, [docId, ModelConstants.hashEmpty, '', ModelConstants.isPrivateNo, timestamp]);
 
     return docId;
   }

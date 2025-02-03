@@ -287,6 +287,9 @@ class Controller {
       return _sendCurrentVersionTree();
     }
   }
+  void clearHistoryVersions() {
+    docManager.clearHistoryVersions();
+  }
   bool _sendCurrentVersionTree() {
     var (versionData, timestamp) = docManager.genCurrentVersionTree();
     if(versionData.isEmpty || timestamp == 0) {

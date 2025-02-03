@@ -47,7 +47,7 @@ class DocumentManager {
   DocumentManager({
     required DbHelper db,
   }): _db = db {
-    _allWaitingVersions.addAll(_loadAllUnavailableNodes());
+    // _allWaitingVersions.addAll(_loadAllUnavailableNodes());
     _initRetryCounter(_allWaitingVersions);
     MyLogger.info('DocumentManager: loaded missing versions: $_allWaitingVersions');
     controller.eventTasksManager.addAfterInitTask(() {
@@ -63,7 +63,7 @@ class DocumentManager {
     // Periodically send newest version to peers
     Timer.periodic(const Duration(seconds: Constants.timeoutOfPeriodSync), (timer) {
       final now = Util.getTimeStamp();
-      _checkSyncingStatus(now);
+      // _checkSyncingStatus(now);
       _checkIfSendVersionBroadcast(now);
     });
   }
@@ -137,7 +137,7 @@ class DocumentManager {
     _db.storeDocBlock(docId, blockId, jsonEncode(block), now);
     var docContent = _genDocContentWithTitle(docId, blockId, block);
     _db.updateDocContent(docId, jsonEncode(docContent), now);
-    _docTitles.add(DocDataModel(docId: docId, title: title, hash: '', timestamp: now));
+    _docTitles.add(DocDataModel(docId: docId, title: title, timestamp: now));
     return docId;
   }
 
@@ -159,7 +159,7 @@ class DocumentManager {
     final docId = _db.newDocument(now);
     final doc = Document.createDocument(_db, docId, title, content, this, now);
     _documents[docId] = doc;
-    _docTitles.add(DocDataModel(docId: docId, title: title, hash: '', timestamp: now));
+    _docTitles.add(DocDataModel(docId: docId, title: title, timestamp: now));
     return docId.isNotEmpty;
   }
 
@@ -224,23 +224,11 @@ class DocumentManager {
   }
 
   void mergeVersionTree() {
+    genNewVersionTree();
     _setSyncing();
     Map<String, DagNode> localDagMap = _genVersionMapFromDb();
     _tryToMergeVersionTree2(localDagMap);
     _clearSyncing();
-  }
-  /// Generate new version tree by merging local and remote version tree.
-  /// If missing any version, require it from remote nodes.
-  /// If no missing version, merge versions.
-  /// Once assembling, set syncing status to stop other nodes sending version_tree concurrently.
-  /// TODO: should generate local version before merging, and stop editing
-  void assembleVersionTree(List<VersionNode> versionDag) {
-    _setSyncing();
-    _storeVersionsFromPeer(versionDag);
-    // Map<String, DagNode> remoteDagMap = _buildRemoteVersionTreeMap(versionDag);
-    Map<String, DagNode> localDagMap = _genVersionMapFromDb();
-    // Map<String, DagNode> newMap = _mergeLocalAndRemoteMap(localDagMap, remoteDagMap);
-    _tryToMergeVersionTree(localDagMap);
   }
 
   //TODO: should move to merge_task
@@ -460,24 +448,21 @@ class DocumentManager {
         break;
       }
     }
-    /// 1. If found and identical, ignore it
-    /// 2. If not found, insert it
-    /// 3. If found and not identical, update it, and restore doc content
-    if(found != null && found.hash == node.docHash && found.timestamp == node.updatedAt) return;
+    /// 1. If not found, insert it
+    /// 2. If found, update it, and restore doc content
 
     if(found == null) {
       found = DocDataModel(docId: docId, title: '', hash: node.docHash, timestamp: node.updatedAt);
       _docTitles.add(found);
     } else {
-      found..hash = node.docHash
-        ..timestamp = node.updatedAt;
+      found.timestamp = node.updatedAt;
     }
     // Restore doc list
-    _db.insertOrUpdateDoc(docId, found.hash, found.timestamp);
+    _db.insertOrUpdateDoc(docId, node.docHash, found.timestamp);
 
     // Store doc content into objects
     // var docContentStr = objects[found.hash]!;
-    var docObject = _db.getObject(found.hash);
+    var docObject = _db.getObject(node.docHash);
     var docContentStr = docObject!.data;
     MyLogger.info('_updateDoc: docContent=$docContentStr');
     var docContent = DocContent.fromJson(jsonDecode(docContentStr));
@@ -556,6 +541,18 @@ class DocumentManager {
     return (ver?? '', timestamp?? 0);
   }
 
+  void clearHistoryVersions() {
+    _currentVersion = '';
+    _currentVersionTimestamp = 0;
+    _db.removeFlag(Constants.flagNameCurrentVersion);
+    _db.removeFlag(Constants.flagNameCurrentVersionTimestamp);
+    _db.clearAllVersions();
+    _db.clearAllObjects();
+    _db.clearAllDocumentHashes();
+    _docTitles.clear();
+    getAllDocuments(); // Update docTitles
+  }
+
   void updateDocTitle(String docId, String title, int timestamp) {
     for(var node in _docTitles) {
       if(node.docId == docId) {
@@ -567,9 +564,14 @@ class DocumentManager {
   void setModified() {
     _hasModified = true;
   }
-
   bool hasModified() {
     return _hasModified;
+  }
+  void _clearModified(List<Document> documents) {
+    for(var doc in documents) {
+      doc.clearModified();
+    }
+    _hasModified = false;
   }
 
   void setIdle() {
@@ -620,7 +622,7 @@ class DocumentManager {
   }
 
   VersionContent _genVersionAndClearModified(int now, List<String> parents) {
-    List<Document> modifiedDocuments = _findModifiedDocuments();
+    List<Document> modifiedDocuments = _findDocumentsNeedToUpdate();
     Map<String, String> newHashes = _genAndSaveDocuments(modifiedDocuments);
     _updateDocumentHashes(newHashes, now);
     var docTable = _genDocTreeNodeList(_docTitles);
@@ -645,12 +647,18 @@ class DocumentManager {
     return Document.loadByNode(_db, docNode, this);
   }
 
-  List<Document> _findModifiedDocuments() {
-    // TODO Load all documents whose timestamp greater than current_version_timestamp
+  List<Document> _findDocumentsNeedToUpdate() {
+    // Load all documents whose timestamp is greater than current_version_timestamp, or any document that doesn't has doc_hash yet
+    final modifiedDocIds = _db.getAllDocIdsUpdatedAfter(_currentVersionTimestamp);
+    for(var docTitle in _docTitles) {
+      if(docTitle.hash == ModelConstants.hashEmpty) {
+        modifiedDocIds.add(docTitle.docId);
+      }
+    }
     List<Document> result = [];
-    for(var e in _documents.entries) {
-      final doc = e.value;
-      if(doc.getModified()) {
+    for(var docId in modifiedDocIds) {
+      final doc = getDocument(docId);
+      if(doc != null) {
         result.add(doc);
       }
     }
@@ -675,13 +683,6 @@ class DocumentManager {
         _db.updateDocHash(docId, newHash, now);
       }
     }
-  }
-
-  void _clearModified(List<Document> documents) {
-    for(var doc in documents) {
-      doc.clearModified();
-    }
-    _hasModified = false;
   }
 
   String _getCommonAncestor(String version1, String version2, Map<String, DagNode> _versionMap) {
@@ -1116,17 +1117,17 @@ class DocumentManager {
     return (0, 0);
   }
 
-  Set<String> _loadAllUnavailableNodes() {
-    var versions = _db.getAllVersions();
-    Set<String> result = {};
+  // Set<String> _loadAllUnavailableNodes() {
+  //   var versions = _db.getAllVersions();
+  //   Set<String> result = {};
 
-    for(final version in versions) {
-      if(version.status == ModelConstants.statusMissing) {// || version.status == Constants.statusWaiting) {
-        result.add(version.versionHash);
-      }
-    }
-    return result;
-  }
+  //   for(final version in versions) {
+  //     if(version.status == ModelConstants.statusMissing) {// || version.status == Constants.statusWaiting) {
+  //       result.add(version.versionHash);
+  //     }
+  //   }
+  //   return result;
+  // }
 
   static BlockContent _genDefaultTitleBlock(String title) {
     var blockContent = BlockContent(

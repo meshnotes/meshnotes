@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:libp2p/application/application_api.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:mesh_note/net/version_chain_api.dart';
@@ -52,10 +53,16 @@ class MergeTask {
     MyLogger.info('_tryToMerge: start to merge');
     Map<String, DagNode> localDagMap = _genVersionMapFromSyncingDb();
     Set<DagNode> missingVersions = _findWaitingOrMissingVersions(localDagMap);
-    if(missingVersions.isNotEmpty) { //TODO: Ignore some missing versions after too many retries
+    if(missingVersions.isNotEmpty) { //TODO: Ignore some missing versions after too many retries, unless it's the leaf version
       MyLogger.info('_tryToMerge: missing versions: $missingVersions');
       controller.sendRequireVersions(missingVersions.map((node) => node.versionHash).toList());
     } else {
+      final badVersions = _db.findUnavailableSyncingVersions();
+      if(badVersions.isNotEmpty) { // Impossible
+        MyLogger.warn('_tryToMerge: bad versions: $badVersions');
+        CallbackRegistry.showToast('Find bad versions, could not merge');
+        return;
+      }
       MyLogger.info('_tryToMerge: store syncing versions to db');
       _storeSyncingVersionsToDb(localDagMap);
       MyLogger.info('_tryToMerge: try to merge versions');
@@ -124,7 +131,8 @@ class MergeTask {
       final versionObject = localObject ?? syncingObject;
       if(_hasMissingObject(versionObject)) { // Check whether any object in version is missing
         missing.add(node);
-      } else {
+      } else { // If no missing object, set the status of version to be available
+        node.status = ModelConstants.statusAvailable;
         _db.updateSyncingVersionStatus(versionHash, ModelConstants.statusAvailable);
       }
     }
@@ -136,9 +144,9 @@ class MergeTask {
     
     final json = versionObject.data;
     final versionContent = VersionContent.fromJson(jsonDecode(json));
-    final requiredObjects = DocUtils.genRequiredObjects(versionContent, _db, findSyncingObject: true);
+    final dependingObjects = DocUtils.genDependingObjects(versionContent, _db, findSyncingObject: true);
 
-    for(final e in requiredObjects.entries) {
+    for(final e in dependingObjects.entries) {
       final objHash = e.key;
       final obj = _db.getObject(objHash)?? _db.getSyncingObject(objHash);
       if(obj == null) return true;
