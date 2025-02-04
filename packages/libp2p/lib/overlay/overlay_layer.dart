@@ -132,17 +132,21 @@ class VillageOverlay implements ApplicationController {
 
   void newNodeDiscovered(String host, int port, String deviceId) {
     MyLogger.info('${logPrefix} New node detected: $host:$port, deviceId=$deviceId');
-    InternetAddress.lookup(host).then((values) {
+    InternetAddress.lookup(host, type: InternetAddressType.IPv4) // Only IPv4 is supported
+    .timeout(Duration(seconds: 30)) // Some xxx.local domain name may take a long time to resolve
+    .then((values) {
       for(var ip in values) {
         if(ip.isLoopback) {
           MyLogger.info('${logPrefix} Ignore loopback address: $ip');
           continue; // Ignore loopback address
         }
-        if(ip.type == InternetAddressType.IPv4) { // Only IPv4 is supported
+        if(ip.type == InternetAddressType.IPv4) { 
           _onDetected(deviceId, ip, port);
           break;
         }
       }
+    }).onError((error, stackTrace) {
+      MyLogger.err('${logPrefix} Failed to resolve host($host): $error');
     });
   }
 
