@@ -1,71 +1,89 @@
 PODS:
+  - bonsoir_darwin (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - device_info_plus (0.0.1):
     - Flutter
   - Flutter (1.0.0)
+  - flutter_inappwebview_ios (0.0.1):
+    - Flutter
+    - flutter_inappwebview_ios/Core (= 0.0.1)
+    - OrderedSet (~> 6.0.3)
+  - flutter_inappwebview_ios/Core (0.0.1):
+    - Flutter
+    - OrderedSet (~> 6.0.3)
+  - flutter_native_splash (2.4.3):
+    - Flutter
   - irondash_engine_context (0.0.1):
     - Flutter
+  - mp_audio_stream (0.0.3):
+    - Flutter
+  - OrderedSet (6.0.3)
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
   - "permission_handler (5.1.0+2)":
     - Flutter
-  - sqlite3 (3.44.0):
-    - sqlite3/common (= 3.44.0)
-  - sqlite3/common (3.44.0)
-  - sqlite3/fts5 (3.44.0):
-    - sqlite3/common
-  - sqlite3/perf-threadsafe (3.44.0):
-    - sqlite3/common
-  - sqlite3/rtree (3.44.0):
-    - sqlite3/common
-  - sqlite3_flutter_libs (0.0.1):
+  - record_darwin (1.0.0):
     - Flutter
-    - sqlite3 (~> 3.44.0)
-    - sqlite3/fts5
-    - sqlite3/perf-threadsafe
-    - sqlite3/rtree
   - super_native_extensions (0.0.1):
     - Flutter
 
 DEPENDENCIES:
+  - bonsoir_darwin (from `.symlinks/plugins/bonsoir_darwin/darwin`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - Flutter (from `Flutter`)
+  - flutter_inappwebview_ios (from `.symlinks/plugins/flutter_inappwebview_ios/ios`)
+  - flutter_native_splash (from `.symlinks/plugins/flutter_native_splash/ios`)
   - irondash_engine_context (from `.symlinks/plugins/irondash_engine_context/ios`)
+  - mp_audio_stream (from `.symlinks/plugins/mp_audio_stream/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - permission_handler (from `.symlinks/plugins/permission_handler/ios`)
-  - sqlite3_flutter_libs (from `.symlinks/plugins/sqlite3_flutter_libs/ios`)
+  - record_darwin (from `.symlinks/plugins/record_darwin/ios`)
   - super_native_extensions (from `.symlinks/plugins/super_native_extensions/ios`)
 
 SPEC REPOS:
   trunk:
-    - sqlite3
+    - OrderedSet
 
 EXTERNAL SOURCES:
+  bonsoir_darwin:
+    :path: ".symlinks/plugins/bonsoir_darwin/darwin"
   device_info_plus:
     :path: ".symlinks/plugins/device_info_plus/ios"
   Flutter:
     :path: Flutter
+  flutter_inappwebview_ios:
+    :path: ".symlinks/plugins/flutter_inappwebview_ios/ios"
+  flutter_native_splash:
+    :path: ".symlinks/plugins/flutter_native_splash/ios"
   irondash_engine_context:
     :path: ".symlinks/plugins/irondash_engine_context/ios"
+  mp_audio_stream:
+    :path: ".symlinks/plugins/mp_audio_stream/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
   permission_handler:
     :path: ".symlinks/plugins/permission_handler/ios"
-  sqlite3_flutter_libs:
-    :path: ".symlinks/plugins/sqlite3_flutter_libs/ios"
+  record_darwin:
+    :path: ".symlinks/plugins/record_darwin/ios"
   super_native_extensions:
     :path: ".symlinks/plugins/super_native_extensions/ios"
 
 SPEC CHECKSUMS:
+  bonsoir_darwin: e3b8526c42ca46a885142df84229131dfabea842
   device_info_plus: c6fb39579d0f423935b0c9ce7ee2f44b71b9fce6
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
+  flutter_inappwebview_ios: 6f63631e2c62a7c350263b13fa5427aedefe81d4
+  flutter_native_splash: f71420956eb811e6d310720fee915f1d42852e7a
   irondash_engine_context: 3458bf979b90d616ffb8ae03a150bafe2e860cc9
-  path_provider_foundation: 29f094ae23ebbca9d3d0cec13889cd9060c0e943
+  mp_audio_stream: ed519e6221a8a4e6fd4ce2edd6cf04841d0da6b6
+  OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94
+  path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
   permission_handler: ccb20a9fad0ee9b1314a52b70b76b473c5f8dab0
-  sqlite3: 6e2d4a4879854d0ec86b476bf3c3e30870bac273
-  sqlite3_flutter_libs: eb769059df0356dc52ddda040f09cacc9391a7cf
+  record_darwin: 3b1a8e7d5c0cbf45ad6165b4d83a6ca643d929c3
   super_native_extensions: 4916b3c627a9c7fffdc48a23a9eca0b1ac228fa7
 
-PODFILE CHECKSUM: 819463e6a0290f5a72f145ba7cde16e8b6ef0796
+PODFILE CHECKSUM: 0f57c43fac69f1574d9e8a5738c6d8e4a97519cb
 
 COCOAPODS: 1.14.3

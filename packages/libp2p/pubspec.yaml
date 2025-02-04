@@ -9,7 +9,7 @@ environment:
 
 dependencies:
   sqlite3: ^1.10.1
-  sqlite3_flutter_libs: ^0.5.13
+  # sqlite3_flutter_libs: ^0.5.13
   path_provider: ^2.0.1
   my_log:
     path: ../my_log
