@@ -77,7 +77,7 @@ class MergeTask {
       String versionHash = node.versionHash;
       String parents = DocUtils.buildParents(node.parents);
       int timestamp = node.createdAt;
-      if(_db.getSyncingVersionData(versionHash) == null) {
+      if(_db.getVersionData(versionHash) == null && _db.getSyncingVersionData(versionHash) == null) {
         _db.storeSyncingVersion(versionHash, parents, timestamp, Constants.createdFromPeer, ModelConstants.statusWaiting);
       }
     }

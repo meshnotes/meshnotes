@@ -55,24 +55,17 @@ class Document {
     if(blocks.isEmpty) {
       ParagraphDesc title = ParagraphDesc.fromTitle(docNode.title);
       paragraphs.add(title);
-      doc.insertEmptyLineAfterTitle();
-      doc.setModified();
+      title.setDocument(doc);
+      title.flushDb();
+      doc.insertEmptyLineAfterTitle(); // Will flush content and set modified
     } else if(blocks.length == 1 && blocks[0].isTitle()) {
-      doc.insertEmptyLineAfterTitle();
-      doc.setModified();
-    }
-    for(var block in blocks) {
-      final blockUpdatedTime = block.getLastUpdated();
-      if(blockUpdatedTime > doc._lastUpdate) {
-        doc.setModified();
-        doc._lastUpdate = blockUpdatedTime;
-        docNode.timestamp = blockUpdatedTime;
-      }
+      doc.insertEmptyLineAfterTitle(); // Will flush content and set modified
     }
     return doc;
   }
 
-  factory Document.createDocument(DbHelper db, String docId, String title, String content, DocumentManager parent, int now) {
+  factory Document.createDocument(DbHelper db, String title, String content, DocumentManager parent, int now) {
+    final docId = db.newDocument(now);
     final titlePara = ParagraphDesc.fromTitle(title);
     List<ParagraphDesc> paragraphs = [titlePara];
     for(var line in content.split('\n')) {
@@ -167,7 +160,6 @@ class Document {
     paragraphs.insert(idx + 1, newItem);
     _mapOfParagraphs[newItem.getBlockId()] = newItem;
     _flushDocStructure();
-    return;
   }
   //TODO merge with the previous function
   void insertNewParagraphsAfterId(String _id, List<ParagraphDesc> newItems) {
@@ -363,6 +355,7 @@ class Document {
     final jsonStr = jsonEncode(docContent);
     _db?.updateDocContent(id, jsonStr, now);
     _lastUpdate = now;
+    setModified();
   }
 
   DocContent _generateDocContent() {

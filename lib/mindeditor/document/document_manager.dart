@@ -82,6 +82,11 @@ class DocumentManager {
     _currentVersion = _version;
     _currentVersionTimestamp = _time;
     _docTitles = data;
+    for(var docTitle in _docTitles) {
+      if(docTitle.timestamp > _currentVersionTimestamp) {
+        setModified();
+      }
+    }
     return _docTitles;
   }
 
@@ -97,15 +102,9 @@ class DocumentManager {
       controller.tryToSaveAndSendVersionTree();
     }
 
-    // If the document was not open, load it from db
-    if(!_documents.containsKey(docId)) {
-      var document = _getDocFromDb(docId);
-      if(document != null) {
-        _documents[docId] = document;
-      } else { // Load failed
-        //TODO Show error message here
-        return;
-      }
+    if(getDocument(docId) == null) {
+      CallbackRegistry.showToast('Document $docId failed to open');
+      return;
     }
     currentDocId = docId;
   }
@@ -119,24 +118,28 @@ class DocumentManager {
     currentDocId = null;
   }
 
-  Document? getDocument(String docId) {
+  Document? getDocument(String docId, {bool getDirectly = false}) {
+    if(getDirectly) {
+      return _getDocFromDb(docId);
+    }
+
     if(_documents.containsKey(docId)) return _documents[docId]!;
+
     final document = _getDocFromDb(docId);
     if(document == null) return null;
     _documents[docId] = document;
+    if(document.getLastUpdateTime() > _currentVersionTimestamp) {
+      document.setModified();
+    }
     return document;
   }
 
   String newDocument() {
     var title = Constants.newDocumentTitle;
     var now = Util.getTimeStamp();
-    var docId = _db.newDocument(now);
+    final doc = Document.createDocument(_db, title, '', this, now);
+    var docId = doc.id;
 
-    const blockId = Constants.keyTitleId;
-    var block = _genDefaultTitleBlock(title);
-    _db.storeDocBlock(docId, blockId, jsonEncode(block), now);
-    var docContent = _genDocContentWithTitle(docId, blockId, block);
-    _db.updateDocContent(docId, jsonEncode(docContent), now);
     _docTitles.add(DocDataModel(docId: docId, title: title, timestamp: now));
     return docId;
   }
@@ -156,10 +159,10 @@ class DocumentManager {
 
   bool createDocument(String title, String content) {
     final now = Util.getTimeStamp();
-    final docId = _db.newDocument(now);
-    final doc = Document.createDocument(_db, docId, title, content, this, now);
+    final doc = Document.createDocument(_db, title, content, this, now);
+    final docId = doc.id;
     _documents[docId] = doc;
-    _docTitles.add(DocDataModel(docId: docId, title: title, timestamp: now));
+    _docTitles.add(DocDataModel(docId: docId, title: doc.getTitle().getPlainText(), timestamp: now));
     return docId.isNotEmpty;
   }
 
@@ -493,7 +496,7 @@ class DocumentManager {
     // If document was loaded, update it
     var openingDocument = _documents[docId];
     if(openingDocument != null) {
-      var newDocument = _getDocFromDb(docId);
+      var newDocument = getDocument(docId, getDirectly: true);
       if(newDocument != null) {
         openingDocument.updateBlocks(newDocument);
       }
@@ -550,7 +553,7 @@ class DocumentManager {
     _db.clearAllObjects();
     _db.clearAllDocumentHashes();
     _docTitles.clear();
-    getAllDocuments(); // Update docTitles
+    controller.refreshDocNavigator(); // Update docTitles
   }
 
   void updateDocTitle(String docId, String title, int timestamp) {
@@ -649,9 +652,19 @@ class DocumentManager {
 
   List<Document> _findDocumentsNeedToUpdate() {
     // Load all documents whose timestamp is greater than current_version_timestamp, or any document that doesn't has doc_hash yet
-    final modifiedDocIds = _db.getAllDocIdsUpdatedAfter(_currentVersionTimestamp);
+    // final modifiedDocIds = _db.getAllDocIdsUpdatedAfter(_currentVersionTimestamp);
+    Set<String> modifiedDocIds = {};
+    for(var doc in _documents.values) {
+      if(doc.getModified()) {
+        modifiedDocIds.add(doc.id);
+      }
+    }
     for(var docTitle in _docTitles) {
       if(docTitle.hash == ModelConstants.hashEmpty) {
+        modifiedDocIds.add(docTitle.docId);
+        continue;
+      }
+      if(docTitle.timestamp > _currentVersionTimestamp) {
         modifiedDocIds.add(docTitle.docId);
       }
     }

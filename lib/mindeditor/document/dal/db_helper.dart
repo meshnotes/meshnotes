@@ -101,17 +101,17 @@ class DbHelper {
     }
   }
 
-  Future<void> updateParagraphType(String docId, String id, String type) async {
+  void updateParagraphType(String docId, String id, String type) {
     const sqlParagraph = 'UPDATE blocks SET type=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [type, docId, id]);
   }
 
-  Future<void> updateParagraphListing(String docId, String id, String listing) async {
+  void updateParagraphListing(String docId, String id, String listing) {
     const sqlParagraph = 'UPDATE blocks SET listing=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [listing, docId, id]);
   }
 
-  Future<void> updateParagraphLevel(String docId, String id, int level) async {
+  void updateParagraphLevel(String docId, String id, int level) {
     const sqlParagraph = 'UPDATE blocks SET level=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [level, docId, id]);
   }
@@ -179,9 +179,9 @@ class DbHelper {
     return result;
   }
 
-  Future<void> updateDoc(String docId, int timestamp) async {
-    const sqlUpdateDoc = 'UPDATE docs SET updated_at=? WHERE id=?';
-    _database.execute(sqlUpdateDoc, [timestamp, docId]);
+  void updateDocTimestamp(String docId, int timestamp) {
+    const sqlUpdateDoc = 'UPDATE documents SET updated_at=? WHERE doc_id=? AND updated_at<?';
+    _database.execute(sqlUpdateDoc, [timestamp, docId, timestamp]);
   }
 
   VersionDataModel? getVersionData(String versionHash) {
@@ -334,7 +334,7 @@ class DbHelper {
   }
 
   void storeFromSyncingTables() {
-    const sqlVersions = 'INSERT OR REPLACE INTO versions(version_hash, parents, created_at, created_from, status) '
+    const sqlVersions = 'INSERT OR IGNORE INTO versions(version_hash, parents, created_at, created_from, status) '
         'SELECT version_hash, parents, created_at, created_from, status FROM sync_versions';
     _database.execute(sqlVersions);
 

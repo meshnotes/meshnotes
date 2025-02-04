@@ -494,7 +494,7 @@ class ParagraphDesc {
     var block = _convertToBlockContent();
     _lastUpdate = Util.getTimeStamp();
     _db?.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
-    // dbHelper.updateDoc(parent.doc.id, Util.getTimeStamp());
+    _db?.updateDocTimestamp(parent.id, _lastUpdate);
     parent.setModified();
   }
   // Save extra to database
