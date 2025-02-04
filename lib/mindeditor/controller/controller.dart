@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:android_id/android_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/environment.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/merge_task.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/document_manager.dart';
@@ -30,6 +32,7 @@ class Controller {
   bool isUnitTest = false;
   bool isDebugMode = false;
   DocumentManager? _docManager;
+  MergeTask? _mergeTaskRunner;
   late DbHelper dbHelper;
   final FocusNode globalFocusNode = FocusNode();
   final Environment environment = Environment();
@@ -78,6 +81,7 @@ class Controller {
     MyLogger.debug('initAll: init db');
     await dbHelper.init();
     _docManager = DocumentManager(db: dbHelper);
+    _mergeTaskRunner = MergeTask(db: dbHelper);
 
     // Load user information from setting
     userPrivateInfo = _loadUserInfo(setting);
@@ -283,6 +287,9 @@ class Controller {
       return _sendCurrentVersionTree();
     }
   }
+  void clearHistoryVersions() {
+    docManager.clearHistoryVersions();
+  }
   bool _sendCurrentVersionTree() {
     var (versionData, timestamp) = docManager.genCurrentVersionTree();
     if(versionData.isEmpty || timestamp == 0) {
@@ -306,11 +313,11 @@ class Controller {
     /// 2. If not, send require version tree
     /// 3. If there is the version, but no object, send require version
     MyLogger.info('receive version broadcast, latestVersion=$latestVersion');
-    if(docManager.isBusy()) {
-      MyLogger.info('receiveVersionBroadcast: too busy to handle version broadcast: $latestVersion');
-      //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
-      return;
-    }
+    // if(docManager.isBusy()) {
+    //   MyLogger.info('receiveVersionBroadcast: too busy to handle version broadcast: $latestVersion');
+    //   //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
+    //   return;
+    // }
     final version = dbHelper.getVersionData(latestVersion);
     if(version == null) {
       MyLogger.info('receiveVersionBroadcast: need entire version tree for tree node $latestVersion');
@@ -324,13 +331,21 @@ class Controller {
     }
   }
   void receiveVersionTree(List<VersionNode> dag) {
+    _mergeTaskRunner?.addVersionTree(dag);
+    // if(docManager.isBusy()) {
+    //   MyLogger.info('receiveVersionTree: too busy to handle version tree: $dag');
+    //   //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
+    //   return;
+    // }
+    // MyLogger.info('receiveVersionTree: receive version tree: $dag');
+    // docManager.assembleVersionTree(dag);
+  }
+  void mergeVersionTree() {
     if(docManager.isBusy()) {
-      MyLogger.info('receiveVersionTree: too busy to handle version tree: $dag');
-      //TODO should add a task queue to delay assembling version tree, instead of simply drop the tree
+      MyLogger.info('mergeVersionTree: too busy to merging');
       return;
     }
-    MyLogger.info('receiveVersionTree: receive version tree: $dag');
-    docManager.assembleVersionTree(dag);
+    docManager.mergeVersionTree();
   }
   void receiveRequireVersions(List<String> requiredVersions) {
     MyLogger.info('receiveRequireVersions: receive require versions message: $requiredVersions');
@@ -352,7 +367,8 @@ class Controller {
     List<UnsignedResource> nonChainResources = [];
     for(var res in resources) {
       final key = res.key;
-      // Gather version_tree resources together and solve it in the end
+      // Gather version_tree resources together and solve it in the end.
+      // This scenario is caused by receiving version broadcast, and then require entire version tree
       if(key == Constants.resourceKeyVersionTree) {
         var versionChain = VersionChain.fromJson(jsonDecode(res.data));
         versionChains.add(versionChain);
@@ -361,7 +377,8 @@ class Controller {
       }
     }
     if(nonChainResources.isNotEmpty) {
-      docManager.assembleResources(nonChainResources);
+      _mergeTaskRunner?.addResources(nonChainResources);
+      // docManager.assembleResources(nonChainResources);
     }
 
     for(var chain in versionChains) {

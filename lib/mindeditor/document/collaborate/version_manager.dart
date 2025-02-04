@@ -1,6 +1,5 @@
 import 'package:my_log/my_log.dart';
-
-import '../../setting/constants.dart';
+import '../dal/doc_data_model.dart';
 
 class VersionManager {
   static const String _tags = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -113,7 +112,7 @@ class DagNode {
   DagNode({
     required this.versionHash,
     required this.createdAt,
-    this.status = Constants.statusAvailable,
+    this.status = ModelConstants.statusAvailable,
     required this.parents,
   });
 
@@ -141,7 +140,7 @@ class DagNode {
   }
 
   bool isAvailable() {
-    return status == Constants.statusAvailable;
+    return status == ModelConstants.statusAvailable;
   }
 
   @override

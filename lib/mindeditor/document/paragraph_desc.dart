@@ -10,6 +10,7 @@ import '../controller/controller.dart';
 import '../setting/constants.dart';
 import '../../util/idgen.dart';
 import 'dal/db_helper.dart';
+import 'dal/doc_data_model.dart';
 import 'document.dart';
 
 enum _BlockType {
@@ -260,7 +261,7 @@ class ParagraphDesc {
     var block = getBlockContent();
     var hash = block.getHash();
     if(!_db!.hasObject(hash)) {
-      _db!.storeObject(hash, jsonEncode(block), timestamp, Constants.createdFromLocal, Constants.statusAvailable);
+      _db!.storeObject(hash, jsonEncode(block), timestamp, Constants.createdFromLocal, ModelConstants.statusAvailable);
     }
   }
 
@@ -493,7 +494,7 @@ class ParagraphDesc {
     var block = _convertToBlockContent();
     _lastUpdate = Util.getTimeStamp();
     _db?.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
-    // dbHelper.updateDoc(parent.doc.id, Util.getTimeStamp());
+    _db?.updateDocTimestamp(parent.id, _lastUpdate);
     parent.setModified();
   }
   // Save extra to database

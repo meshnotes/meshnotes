@@ -153,3 +153,5 @@ flutter:
     - assets/pop_sound_pcm24k.pcm
     - assets/webview/
     - assets/splash.png
+    - assets/splash_960x960.png
+    - assets/branding_5_2.png

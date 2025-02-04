@@ -69,7 +69,7 @@ class DbHelper {
   static void _setVersion(Database db, int version) async {
     db.select('PRAGMA user_version=$version');
   }
-  static int? _getVersion(Database db) {
+  static int? _getDbVersion(Database db) {
     const versionKey = 'user_version';
     final result = db.select('PRAGMA $versionKey');
     MyLogger.verbose('MeshNotesDB: PRAGMA user_version=$result');
@@ -84,7 +84,7 @@ class DbHelper {
   void _upgradeDbIfNecessary(Database db) {
     var version = dbScript.version;
     MyLogger.debug('MeshNotesDB: checking for db upgrade...');
-    final oldVersion = _getVersion(db);
+    final oldVersion = _getDbVersion(db);
     MyLogger.debug('MeshNotesDB: oldVersion=$oldVersion, targetVersion=$version');
     if(oldVersion != null && oldVersion > 0 && oldVersion < version) {
       for(int ver = oldVersion; ver < version;) {
@@ -101,17 +101,17 @@ class DbHelper {
     }
   }
 
-  Future<void> updateParagraphType(String docId, String id, String type) async {
+  void updateParagraphType(String docId, String id, String type) {
     const sqlParagraph = 'UPDATE blocks SET type=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [type, docId, id]);
   }
 
-  Future<void> updateParagraphListing(String docId, String id, String listing) async {
+  void updateParagraphListing(String docId, String id, String listing) {
     const sqlParagraph = 'UPDATE blocks SET listing=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [listing, docId, id]);
   }
 
-  Future<void> updateParagraphLevel(String docId, String id, int level) async {
+  void updateParagraphLevel(String docId, String id, int level) {
     const sqlParagraph = 'UPDATE blocks SET level=? WHERE doc_id=? AND id=?';
     _database.execute(sqlParagraph, [level, docId, id]);
   }
@@ -179,56 +179,41 @@ class DbHelper {
     return result;
   }
 
-  Future<void> updateDoc(String docId, int timestamp) async {
-    const sqlUpdateDoc = 'UPDATE docs SET updated_at=? WHERE id=?';
-    _database.execute(sqlUpdateDoc, [timestamp, docId]);
+  void updateDocTimestamp(String docId, int timestamp) {
+    const sqlUpdateDoc = 'UPDATE documents SET updated_at=? WHERE doc_id=? AND updated_at<?';
+    _database.execute(sqlUpdateDoc, [timestamp, docId, timestamp]);
   }
 
   VersionDataModel? getVersionData(String versionHash) {
-    const sql = 'SELECT parents, created_at, created_from, status, sync_status FROM versions WHERE version_hash=?';
+    const sql = 'SELECT version_hash, parents, created_at, created_from, status, sync_status FROM versions WHERE version_hash=?';
     final resultSet = _database.select(sql, [versionHash]);
     if(resultSet.isEmpty) {
       return null;
     }
     final row = resultSet.first;
-    String parents = row['parents'];
-    int createdAt = row['created_at'];
-    int? createdFrom = row['created_from'];
-    int? dataStatus = row['status'];
-    int? syncStatus = row['sync_status'];
-    return VersionDataModel(
-      versionHash: versionHash,
-      parents: parents,
-      createdAt: createdAt,
-      createdFrom: createdFrom?? Constants.createdFromPeer,
-      status: dataStatus?? Constants.statusWaiting,
-      syncStatus: syncStatus?? Constants.syncStatusNew,
-    );
+    return _packSingleVersionDataModel(row);
+  }
+  VersionDataModel? getSyncingVersionData(String versionHash) {
+    const sql = 'SELECT version_hash, parents, created_at, created_from, status FROM sync_versions WHERE version_hash=?';
+    final resultSet = _database.select(sql, [versionHash]);
+    if(resultSet.isEmpty) {
+      return null;
+    }
+    final row = resultSet.first;
+    return _packSingleVersionDataModel(row);
   }
 
   List<VersionDataModel> getAllVersions() {
     const sql = 'SELECT version_hash, parents, created_at, created_from, status, sync_status FROM versions';
     final resultSet = _database.select(sql);
-    List<VersionDataModel> result = [];
-    for(final row in resultSet) {
-      MyLogger.verbose('getAllVersions: row=$row');
-      String versionHash = row['version_hash'];
-      String parents = row['parents'];
-      int timestamp = row['created_at'];
-      int? createdFrom = row['created_from'];
-      int? dataStatus = row['status'];
-      int? syncStatus = row['sync_status'];
-      result.add(VersionDataModel(
-        versionHash: versionHash,
-        parents: parents,
-        createdAt: timestamp,
-        createdFrom: createdFrom?? Constants.createdFromPeer,
-        status: dataStatus?? Constants.statusWaiting,
-        syncStatus: syncStatus?? Constants.syncStatusNew,
-      ));
-    }
-    return result;
+    return _packVersionDataModels(resultSet);
   }
+  List<VersionDataModel> getAllSyncingVersions() {
+    const sql = 'SELECT version_hash, parents, created_at, created_from, status FROM sync_versions';
+    final resultSet = _database.select(sql);
+    return _packVersionDataModels(resultSet);
+  }
+
   List<String> getAllValidVersionHashes() {
     const sql = 'SELECT version_hash FROM versions';
     final resultSet = _database.select(sql);
@@ -281,22 +266,7 @@ class DbHelper {
   ObjectDataModel? getObject(String hash) {
     const sql = 'SELECT obj_hash, data, updated_at FROM objects WHERE obj_hash=?';
     final resultSet = _database.select(sql, [hash]);
-    if(resultSet.isEmpty) {
-      return null;
-    }
-    final row = resultSet.first;
-    var key = row['obj_hash'];
-    var data = row['data'];
-    var timestamp = row['updated_at'];
-    var createdFrom = row['created_from'];
-    var dataStatus = row['status'];
-    return ObjectDataModel(
-      key: key,
-      data: data,
-      timestamp: timestamp,
-      createdFrom: createdFrom?? Constants.createdFromPeer,
-      status: dataStatus?? Constants.statusWaiting,
-    );
+    return _packObjectDataModel(resultSet);
   }
   void storeObject(String hash, String data, int updatedAt, int createdFrom, int status) {
     //TODO Log an error while conflict
@@ -309,9 +279,43 @@ class DbHelper {
     _database.execute(sql, [hash, data, updatedAt, createdFrom, status]);
   }
 
+  bool hasSyncingObject(String hash) {
+    const sql = 'SELECT COUNT(*) FROM sync_objects WHERE obj_hash=?';
+    final resultSet = _database.select(sql, [hash]);
+    if(resultSet.isEmpty) {
+      return false;
+    }
+    final row = resultSet.first;
+    int count = row[0];
+    return count > 0;
+  }
+  ObjectDataModel? getSyncingObject(String hash) {
+    const sql = 'SELECT obj_hash, data, updated_at FROM sync_objects WHERE obj_hash=?';
+    final resultSet = _database.select(sql, [hash]);
+    return _packObjectDataModel(resultSet);
+  }
+  void storeSyncingObject(String hash, String data, int updatedAt, int createdFrom) {
+    const sql = 'INSERT INTO sync_objects(obj_hash, data, updated_at, created_from) VALUES(?, ?, ?, ?)';
+    _database.execute(sql, [hash, data, updatedAt, createdFrom]);
+  }
+  bool hasSyncingVersion() {
+    const sql = 'SELECT COUNT(*) FROM sync_versions';
+    final resultSet = _database.select(sql);
+    if(resultSet.isEmpty) {
+      return false;
+    }
+    final row = resultSet.first;
+    int count = row[0];
+    return count > 0;
+  }
+
   void storeVersion(String hash, String parents, int timestamp, int createdFrom, int status) {
     //TODO Log an error while conflict
     const sql = 'INSERT INTO versions(version_hash, parents, created_at, created_from, status) VALUES(?, ?, ?, ?, ?)';
+    _database.execute(sql, [hash, parents, timestamp, createdFrom, status]);
+  }
+  void storeSyncingVersion(String hash, String parents, int timestamp, int createdFrom, int status) {
+    const sql = 'INSERT OR IGNORE INTO sync_versions(version_hash, parents, created_at, created_from, status) VALUES(?, ?, ?, ?, ?)';
     _database.execute(sql, [hash, parents, timestamp, createdFrom, status]);
   }
 
@@ -322,6 +326,71 @@ class DbHelper {
   void updateVersionSyncStatus(String hash, int syncStatus) {
     const sql = 'UPDATE versions SET sync_status=? WHERE version_hash=?';
     _database.execute(sql, [syncStatus, hash]);
+  }
+
+  void updateSyncingVersionStatus(String hash, int status) {
+    const sql = 'UPDATE sync_versions SET status=? WHERE version_hash=?';
+    _database.execute(sql, [status, hash]);
+  }
+
+  void storeFromSyncingTables() {
+    const sqlVersions = 'INSERT OR IGNORE INTO versions(version_hash, parents, created_at, created_from, status) '
+        'SELECT version_hash, parents, created_at, created_from, status FROM sync_versions';
+    _database.execute(sqlVersions);
+
+    const sqlObjects = 'INSERT OR REPLACE INTO objects(obj_hash, data, updated_at, created_from, status) '
+        'SELECT obj_hash, data, updated_at, created_from, ${ModelConstants.statusAvailable} FROM sync_objects';
+    _database.execute(sqlObjects);
+  }
+
+  List<String> findUnavailableSyncingVersions() {
+    const sql = 'SELECT version_hash FROM sync_versions WHERE status<>${ModelConstants.statusAvailable}';
+    final resultSet = _database.select(sql);
+    List<String> result = [];
+    for(final row in resultSet) {
+      String versionHash = row['version_hash'];
+      result.add(versionHash);
+    }
+    return result;
+  }
+
+  Set<String> getAllDocIdsUpdatedAfter(int timestamp) {
+    const sqlDocuments = 'SELECT doc_id FROM documents WHERE updated_at>?';
+    final resultSetDocuments = _database.select(sqlDocuments, [timestamp]);
+    Set<String> result = {};
+    for(final row in resultSetDocuments) {
+      String docId = row['doc_id'];
+      result.add(docId);
+    }
+
+    const sqlBlocks = 'SELECT DISTINCT doc_id FROM blocks WHERE updated_at>?';
+    final resultSetBlocks = _database.select(sqlBlocks, [timestamp]);
+    for(final row in resultSetBlocks) {
+      String docId = row['doc_id'];
+      result.add(docId);
+    }
+    return result;
+  }
+
+  void clearAllVersions() {
+    const sql = 'DELETE FROM versions';
+    _database.execute(sql);
+  }
+  void clearAllObjects() {
+    const sql = 'DELETE FROM objects';
+    _database.execute(sql);
+  }
+  void clearAllDocumentHashes() {
+    const sql = 'UPDATE documents SET doc_hash=?';
+    _database.execute(sql, [ModelConstants.hashEmpty]);
+  }
+
+  void clearSyncingTables() {
+    const sqlVersions = 'DELETE FROM sync_versions';
+    _database.execute(sqlVersions);
+
+    const sqlObjects = 'DELETE FROM sync_objects';
+    _database.execute(sqlObjects);
   }
 
   String? getFlag(String name) {
@@ -336,11 +405,15 @@ class DbHelper {
     const sql = 'INSERT INTO flags(name, value) VALUES(?, ?) ON CONFLICT(name) DO UPDATE SET value=excluded.value';
     _database.execute(sql, [name, value]);
   }
+  void removeFlag(String name) {
+    const sql = 'DELETE FROM flags WHERE name=?';
+    _database.execute(sql, [name]);
+  }
 
   String newDocument(int timestamp) {
     var docId = IdGen.getUid();
     const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at) VALUES(?, ?, ?, ?, ?)';
-    _database.execute(sql, [docId, '', '', ModelConstants.isPrivateNo, timestamp]);
+    _database.execute(sql, [docId, ModelConstants.hashEmpty, '', ModelConstants.isPrivateNo, timestamp]);
 
     return docId;
   }
@@ -424,5 +497,49 @@ class DbHelper {
     MyLogger.debug('saveSettings: execute sql: "$sql" with values: $values');
     _database.execute(sql, values);
     return false;
+  }
+  
+  List<VersionDataModel> _packVersionDataModels(ResultSet resultSet) {
+    List<VersionDataModel> result = [];
+    for(final row in resultSet) {
+      MyLogger.verbose('getAllVersions: row=$row');
+      result.add(_packSingleVersionDataModel(row));
+    }
+    return result;
+  }
+  VersionDataModel _packSingleVersionDataModel(Row row) {
+    String versionHash = row['version_hash'];
+    String parents = row['parents'];
+    int timestamp = row['created_at'];
+    int? createdFrom = row['created_from'];
+    int? dataStatus = row['status'];
+    int? syncStatus = row['sync_status'];
+    return VersionDataModel(
+      versionHash: versionHash,
+      parents: parents,
+      createdAt: timestamp,
+      createdFrom: createdFrom?? Constants.createdFromPeer,
+      status: dataStatus?? ModelConstants.statusWaiting,
+      syncStatus: syncStatus?? Constants.syncStatusNew,
+    );
+  }
+
+  ObjectDataModel? _packObjectDataModel(ResultSet resultSet) {
+    if(resultSet.isEmpty) {
+      return null;
+    }
+    final row = resultSet.first;
+    var key = row['obj_hash'];
+    var data = row['data'];
+    var timestamp = row['updated_at'];
+    var createdFrom = row['created_from'];
+    var dataStatus = row['status'];
+    return ObjectDataModel(
+      key: key,
+      data: data,
+      timestamp: timestamp,
+      createdFrom: createdFrom?? Constants.createdFromPeer,
+      status: dataStatus?? ModelConstants.statusWaiting,
+    );
   }
 }

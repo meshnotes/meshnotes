@@ -34,6 +34,9 @@ class DbVersion1 extends DbScript {
     'Create blocks': 'CREATE TABLE IF NOT EXISTS blocks(doc_id TEXT, block_id TEXT, data TEXT, updated_at INTEGER, extra TEXT, CONSTRAINT blocks_pk PRIMARY KEY(doc_id, block_id))',
     'Create versions': 'CREATE TABLE IF NOT EXISTS versions(version_hash TEXT PRIMARY KEY, parents TEXT, created_at INTEGER, created_from INTEGER, status INTEGER, sync_status INTEGER)',
     'Create flags': 'CREATE TABLE IF NOT EXISTS flags(name TEXT PRIMARY KEY, value TEXT)',
+    // Temporary tables when syncing
+    'Create sync_objects': 'CREATE TABLE IF NOT EXISTS sync_objects(obj_hash TEXT PRIMARY KEY, data TEXT, updated_at INTEGER, created_from INTEGER, status INTEGER)', // No status in tmp table
+    'Create sync_versions': 'CREATE TABLE IF NOT EXISTS sync_versions(version_hash TEXT PRIMARY KEY, parents TEXT, created_at INTEGER, created_from INTEGER, status INTEGER)', // No sync_status in tmp table
   };
   DbVersion1(): super(version: ver, createSql: sql);
 }

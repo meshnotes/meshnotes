@@ -22,7 +22,7 @@ class DocDataModel {
   DocDataModel({
     required this.docId,
     required this.title,
-    required this.hash,
+    this.hash = ModelConstants.hashEmpty,
     this.isPrivate = ModelConstants.isPrivateNo,
     required this.timestamp,
   });
@@ -81,6 +81,16 @@ class ObjectDataModel {
 }
 
 class ModelConstants {
+  // Place holder for empty hash
+  static const String hashEmpty = '';
+
+  // private field for documents table
   static const int isPrivateNo = 0;
   static const int isPrivateYes = 1;
+
+  // Status in objects table and versions table(including sync_objects and sync_versions)
+  static const int statusAvailable = 0; // data is available, created from local or already sync from peer
+  static const int statusWaiting = -1; // meta data is sync from peer in a short time, but waiting detail data
+  static const int statusDeprecated = -2; // data is deprecated from local or peer, all its parents will be deprecated
+  static const int statusMissing = -3; // data sync failed for several times, so it is considered to be missing, will try later
 }

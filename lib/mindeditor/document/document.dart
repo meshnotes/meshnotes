@@ -55,15 +55,17 @@ class Document {
     if(blocks.isEmpty) {
       ParagraphDesc title = ParagraphDesc.fromTitle(docNode.title);
       paragraphs.add(title);
-      doc.insertEmptyLineAfterTitle();
-      doc.setModified();
+      title.setDocument(doc);
+      title.flushDb();
+      doc.insertEmptyLineAfterTitle(); // Will flush content and set modified
     } else if(blocks.length == 1 && blocks[0].isTitle()) {
-      doc.insertEmptyLineAfterTitle();
+      doc.insertEmptyLineAfterTitle(); // Will flush content and set modified
     }
     return doc;
   }
 
-  factory Document.createDocument(DbHelper db, String docId, String title, String content, DocumentManager parent, int now) {
+  factory Document.createDocument(DbHelper db, String title, String content, DocumentManager parent, int now) {
+    final docId = db.newDocument(now);
     final titlePara = ParagraphDesc.fromTitle(title);
     List<ParagraphDesc> paragraphs = [titlePara];
     for(var line in content.split('\n')) {
@@ -78,7 +80,7 @@ class Document {
       db: db,
     );
     for(var p in paragraphs) {
-      p.flushDb();
+      p.flushDb(); // Here will set modified
     }
     doc._flushDocStructure();
     return doc;
@@ -158,8 +160,6 @@ class Document {
     paragraphs.insert(idx + 1, newItem);
     _mapOfParagraphs[newItem.getBlockId()] = newItem;
     _flushDocStructure();
-    _lastUpdate = Util.getTimeStamp();
-    return;
   }
   //TODO merge with the previous function
   void insertNewParagraphsAfterId(String _id, List<ParagraphDesc> newItems) {
@@ -185,7 +185,6 @@ class Document {
       idx++;
     }
     _flushDocStructure();
-    _lastUpdate = Util.getTimeStamp();
   }
 
   void removeParagraph(String _id) {
@@ -200,7 +199,6 @@ class Document {
     para.drop();
     paragraphs.remove(para);
     _mapOfParagraphs.remove(_id);
-    _lastUpdate = Util.getTimeStamp();
     _flushDocStructure();
   }
 
@@ -291,7 +289,7 @@ class Document {
     }
     var docContent = _generateDocContent();
     String docHash = docContent.getHash();
-    _db?.storeObject(docHash, jsonEncode(docContent), now, Constants.createdFromLocal, Constants.statusAvailable);
+    _db?.storeObject(docHash, jsonEncode(docContent), now, Constants.createdFromLocal, ModelConstants.statusAvailable);
     return docHash;
   }
 
@@ -356,6 +354,8 @@ class Document {
     var docContent = _generateDocContent();
     final jsonStr = jsonEncode(docContent);
     _db?.updateDocContent(id, jsonStr, now);
+    _lastUpdate = now;
+    setModified();
   }
 
   DocContent _generateDocContent() {
