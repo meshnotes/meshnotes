@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_window_close
   irondash_engine_context
   record_windows
+  sqlite3_flutter_libs
   super_native_extensions
 )
 

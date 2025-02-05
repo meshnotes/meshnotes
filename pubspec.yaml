@@ -45,7 +45,7 @@ dependencies:
 #  file_picker: ^3.0.2+2
 #  sqflite: ^2.0.2
   sqlite3: ^1.10.1
-  # sqlite3_flutter_libs: 0.5.27
+  sqlite3_flutter_libs: 0.5.27
   path_provider: ^2.0.1
   nanoid:
   flutter_spinkit: ^5.1.0
@@ -83,12 +83,14 @@ dependencies:
 flutter_app_name:
   name: 'MeshNote'
 
-flutter_icons:
+flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/appicon2.png"
+  remove_alpha_ios: true
+  image_path: "assets/applogo.png"
   min_sdk_android: 21
   windows:
+    image_path: "assets/applogo_win.png"
     generate: true
   macos:
     generate: true
@@ -147,9 +149,6 @@ flutter:
   # see https://flutter.dev/custom-fonts/#from-packages
 
   assets:
-    - assets/appicon.png
-    - assets/appicon_48.png
-    - assets/icon.png
     - assets/pop_sound_pcm24k.pcm
     - assets/webview/
     - assets/splash.png
