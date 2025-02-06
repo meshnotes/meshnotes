@@ -26,6 +26,25 @@ PODS:
     - Flutter
   - record_darwin (1.0.0):
     - Flutter
+  - sqlite3 (3.47.2):
+    - sqlite3/common (= 3.47.2)
+  - sqlite3/common (3.47.2)
+  - sqlite3/dbstatvtab (3.47.2):
+    - sqlite3/common
+  - sqlite3/fts5 (3.47.2):
+    - sqlite3/common
+  - sqlite3/perf-threadsafe (3.47.2):
+    - sqlite3/common
+  - sqlite3/rtree (3.47.2):
+    - sqlite3/common
+  - sqlite3_flutter_libs (0.0.1):
+    - Flutter
+    - FlutterMacOS
+    - sqlite3 (~> 3.47.1)
+    - sqlite3/dbstatvtab
+    - sqlite3/fts5
+    - sqlite3/perf-threadsafe
+    - sqlite3/rtree
   - super_native_extensions (0.0.1):
     - Flutter
 
@@ -40,11 +59,13 @@ DEPENDENCIES:
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - permission_handler (from `.symlinks/plugins/permission_handler/ios`)
   - record_darwin (from `.symlinks/plugins/record_darwin/ios`)
+  - sqlite3_flutter_libs (from `.symlinks/plugins/sqlite3_flutter_libs/darwin`)
   - super_native_extensions (from `.symlinks/plugins/super_native_extensions/ios`)
 
 SPEC REPOS:
   trunk:
     - OrderedSet
+    - sqlite3
 
 EXTERNAL SOURCES:
   bonsoir_darwin:
@@ -67,6 +88,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/permission_handler/ios"
   record_darwin:
     :path: ".symlinks/plugins/record_darwin/ios"
+  sqlite3_flutter_libs:
+    :path: ".symlinks/plugins/sqlite3_flutter_libs/darwin"
   super_native_extensions:
     :path: ".symlinks/plugins/super_native_extensions/ios"
 
@@ -82,8 +105,10 @@ SPEC CHECKSUMS:
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
   permission_handler: ccb20a9fad0ee9b1314a52b70b76b473c5f8dab0
   record_darwin: 3b1a8e7d5c0cbf45ad6165b4d83a6ca643d929c3
+  sqlite3: 7559e33dae4c78538df563795af3a86fc887ee71
+  sqlite3_flutter_libs: 1b4e98da20ebd4e9b1240269b78cdcf492dbe9f3
   super_native_extensions: 4916b3c627a9c7fffdc48a23a9eca0b1ac228fa7
 
-PODFILE CHECKSUM: 0f57c43fac69f1574d9e8a5738c6d8e4a97519cb
+PODFILE CHECKSUM: 71544633e203658dc482a56db70a8a2a63b277c9
 
 COCOAPODS: 1.14.3
