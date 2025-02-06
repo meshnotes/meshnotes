@@ -60,7 +60,13 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                   key: const ValueKey('splash'),
                   backgroundColor: Colors.white,
                   body: Center(
-                    child: Image.asset('assets/splash.png'),
+                    child: SizedBox(
+                      width: 256,
+                      child: Image.asset(
+                        'assets/splash_page.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ),
                 ),
         );
