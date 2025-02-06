@@ -1,0 +1,45 @@
+{
+  "name": "super_native_extensions",
+  "version": "0.0.1",
+  "summary": "A new Flutter plugin project.",
+  "description": "A new Flutter plugin project.",
+  "homepage": "http://example.com",
+  "license": {
+    "file": "../LICENSE"
+  },
+  "authors": {
+    "Your Company": "email@example.com"
+  },
+  "source": {
+    "path": "."
+  },
+  "source_files": "Classes/**/*",
+  "dependencies": {
+    "FlutterMacOS": [
+
+    ]
+  },
+  "frameworks": "Carbon",
+  "platforms": {
+    "osx": "10.11"
+  },
+  "pod_target_xcconfig": {
+    "DEFINES_MODULE": "YES",
+    "OTHER_LDFLAGS": "-force_load ${BUILT_PRODUCTS_DIR}/libsuper_native_extensions.a",
+    "DEAD_CODE_STRIPPING": "YES",
+    "STRIP_INSTALLED_PRODUCT[config=Release][sdk=*][arch=*]": "YES",
+    "STRIP_STYLE[config=Release][sdk=*][arch=*]": "non-global",
+    "DEPLOYMENT_POSTPROCESSING[config=Release][sdk=*][arch=*]": "YES"
+  },
+  "script_phases": {
+    "name": "Build SuperNativeExtensions Rust library",
+    "script": "sh \"$PODS_TARGET_SRCROOT/../cargokit/build_pod.sh\" ../rust super_native_extensions",
+    "execution_position": "before_compile",
+    "input_files": [
+      "${BUILT_PRODUCTS_DIR}/cargokit_phony"
+    ],
+    "output_files": [
+      "${BUILT_PRODUCTS_DIR}/libsuper_native_extensions.a"
+    ]
+  }
+}

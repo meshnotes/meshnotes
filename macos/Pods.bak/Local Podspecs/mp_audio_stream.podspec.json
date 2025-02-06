@@ -1,0 +1,30 @@
+{
+  "name": "mp_audio_stream",
+  "version": "0.0.3",
+  "summary": "A simple multi-platform audio stream player for raw audio data streams",
+  "description": "A Flutter plug-in for multi platform simple audio stream playback with real-time generated audio data streams",
+  "homepage": "https://github.com/reki2000/mp-audio-stream",
+  "license": {
+    "file": "../LICENSE"
+  },
+  "authors": {
+    "reki2000": "2533597+reki2000@users.noreply.github.com"
+  },
+  "source": {
+    "path": "."
+  },
+  "source_files": "Classes/**/*",
+  "dependencies": {
+    "FlutterMacOS": [
+
+    ]
+  },
+  "platforms": {
+    "osx": "10.11"
+  },
+  "pod_target_xcconfig": {
+    "DEFINES_MODULE": "YES"
+  },
+  "swift_versions": "5.0",
+  "swift_version": "5.0"
+}
