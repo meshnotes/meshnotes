@@ -84,8 +84,10 @@ flutter_app_name:
   name: 'MeshNote'
 
 flutter_launcher_icons:
-  android: "launcher_icon"
+  android: true
   ios: true
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/applogo_432x432.png"
   remove_alpha_ios: true
   image_path: "assets/applogo.png"
   min_sdk_android: 21
@@ -151,6 +153,3 @@ flutter:
   assets:
     - assets/pop_sound_pcm24k.pcm
     - assets/webview/
-    - assets/splash.png
-    - assets/splash_960x960.png
-    - assets/branding_5_2.png
