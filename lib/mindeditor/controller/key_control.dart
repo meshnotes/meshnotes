@@ -44,6 +44,7 @@ class KeyboardControl {
 
   static bool handleKeyDown(LogicalKeyboardKey _key, bool alt, bool ctrl, bool meta, bool shift) {
     var funcKeys = FunctionKeys(alt, ctrl, meta, shift);
+    Controller().eventTasksManager.triggerUserInputEvent();
     if(_moveKeys.contains(_key)) {
       return _handleMoveKeys(_key, funcKeys);
     }

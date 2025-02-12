@@ -60,6 +60,7 @@ class GestureHandler {
     // Should close IME to clear the composing texts
     CallbackRegistry.rudelyCloseIME();
     controller.selectionController.requestCursorAtGlobalOffset(globalOffset);
+    controller.eventTasksManager.triggerUserClickEvent();
   }
 
   void onPanStart(DragStartDetails details) {

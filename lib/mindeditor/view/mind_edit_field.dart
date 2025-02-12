@@ -474,6 +474,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   void updateEditingValue(TextEditingValue value) {
     // Hide selection handle when editing
     controller.selectionController.setShouldShowSelectionHandle(false);
+    controller.eventTasksManager.triggerUserInputEvent();
 
     // Check following situations first:
     // 1. In iOS environment, using _initialTextValue to detect deletion in soft keyboard

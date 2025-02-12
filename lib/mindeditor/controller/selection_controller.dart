@@ -12,6 +12,7 @@ import 'callback_registry.dart';
 import 'controller.dart';
 
 class SelectionController {
+  final Controller _controller;
   bool _shouldShowSelectionHandle = false;
   int lastBaseBlockIndex = -1;
   int lastExtentBlockIndex = -1;
@@ -22,8 +23,14 @@ class SelectionController {
   Offset extentHandleOffset = Offset.zero;
   final SelectionHandleLayer _selectionHandleLayer = SelectionHandleLayer();
 
-  SelectionController() {
-    // Controller().evenTasksManager.registerEditingTask();
+  SelectionController(this._controller) {
+    // Clear popup menu when user clicks or inputs
+    _controller.eventTasksManager.addUserClickTask(() {
+      clearPopupMenu();
+    });
+    _controller.eventTasksManager.addUserInputTask(() {
+      clearPopupMenu();
+    });
   }
 
   void dispose() {

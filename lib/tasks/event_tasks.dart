@@ -4,6 +4,8 @@ import 'package:mesh_note/util/util.dart';
 class EvenTasksManager {
   final List<Function()> _afterInitTasks = [];
   final List<Function()> _idleTasks = [];
+  final List<Function()> _userClickTasks = [];
+  final List<Function()> _userInputTasks = [];
   final Map<String, _TimerTask> _timerTaskMap = {};
   Timer? _timer;
 
@@ -44,6 +46,28 @@ class EvenTasksManager {
         task.task.call();
         task.lastTriggerTimeMillis = now;
       }
+    }
+  }
+
+  void addUserClickTask(Function() task) {
+    if(!_userClickTasks.contains(task)) {
+      _userClickTasks.add(task);
+    }
+  }
+  void triggerUserClickEvent() {
+    for(final task in _userClickTasks) {
+      task.call();
+    }
+  }
+
+  void addUserInputTask(Function() task) {
+    if(!_userInputTasks.contains(task)) {
+      _userInputTasks.add(task);
+    }
+  }
+  void triggerUserInputEvent() {
+    for(final task in _userInputTasks) {
+      task.call();
     }
   }
 }

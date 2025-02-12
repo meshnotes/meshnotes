@@ -96,7 +96,7 @@ class Controller {
       MyLogger.info('initAll: try starting network failed');
     }
 
-    selectionController = SelectionController();
+    selectionController = SelectionController(this);
 
     _pluginManager = PluginManager();
     _pluginManager.initPluginManager();
