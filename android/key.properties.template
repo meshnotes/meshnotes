@@ -1,0 +1,4 @@
+storePassword=<password-from-previous-step>
+keyPassword=<password-from-previous-step>
+keyAlias=upload
+storeFile=<keystore-file-location>
