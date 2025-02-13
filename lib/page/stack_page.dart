@@ -171,6 +171,7 @@ class _StackPageViewState extends State<StackPageView> {
     });
   }
   void _switchToNavigatorView() {
+    controller.eventTasksManager.triggerUserSwitchToNavigatorEvent();
     setState(() {
       position = 0;
       canPop = true;

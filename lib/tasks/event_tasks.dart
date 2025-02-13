@@ -4,8 +4,9 @@ import 'package:mesh_note/util/util.dart';
 class EvenTasksManager {
   final List<Function()> _afterInitTasks = [];
   final List<Function()> _idleTasks = [];
-  final List<Function()> _userClickTasks = [];
-  final List<Function()> _userInputTasks = [];
+  final List<Function()> _userClickTasks = []; // Tasks when user clicks in the editor area
+  final List<Function()> _userInputTasks = []; // Tasks when user input using keyboard or soft keyboard
+  final List<Function()> _userSwitchToNavigator = []; // Tasks when user switches to navigator(in small screen mode)
   final Map<String, _TimerTask> _timerTaskMap = {};
   Timer? _timer;
 
@@ -67,6 +68,17 @@ class EvenTasksManager {
   }
   void triggerUserInputEvent() {
     for(final task in _userInputTasks) {
+      task.call();
+    }
+  }
+
+  void addUserSwitchToNavigatorTask(Function() task) {
+    if(!_userSwitchToNavigator.contains(task)) {
+      _userSwitchToNavigator.add(task);
+    }
+  }
+  void triggerUserSwitchToNavigatorEvent() {
+    for(final task in _userSwitchToNavigator) {
       task.call();
     }
   }

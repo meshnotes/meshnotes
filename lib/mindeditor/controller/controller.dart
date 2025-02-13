@@ -104,9 +104,17 @@ class Controller {
     setting.addAdditionalSettings(_pluginManager.getPluginSupportedSettings());
     setting.load();
 
+    _initGlobalEventTasks();
+
     MyLogger.info('initAll: finish initialization');
     eventTasksManager.triggerAfterInit();
     return true;
+  }
+
+  void _initGlobalEventTasks() {
+    eventTasksManager.addUserSwitchToNavigatorTask(() {
+      CallbackRegistry.hideKeyboard();
+    });
   }
 
   /// Network could be starting only when the user information is ready
