@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.meshnotes">
+    package="xyz.meshnotes.meshnotes">
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -47,7 +47,7 @@
         </activity>
        <provider
            android:name="com.superlist.super_native_extensions.DataProvider"
-           android:authorities="com.meshnotes.SuperClipboardDataProvider"
+           android:authorities="xyz.meshnotes.meshnotes.SuperClipboardDataProvider"
            android:exported="true"
            android:grantUriPermissions="true" >
        </provider>
