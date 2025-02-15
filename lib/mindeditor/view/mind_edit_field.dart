@@ -81,7 +81,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(_hasFocus && !_hideKeyboard) {
       _focusAttachment!.reparent();
     }
-    Widget editingLayer = _buildEditingLayer();
+    Widget editingLayer = _buildEditingLayer(context);
     var stack = Stack(
       children: [
         editingLayer,
@@ -94,10 +94,13 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     return expanded;
   }
 
-  GestureDetector _buildEditingLayer() {
+  GestureDetector _buildEditingLayer(BuildContext context) {
+    bool isMobile = controller.environment.isMobile();
+    // Mobile has no scroll bar, so need padding to make it looks more comfortable
+    final padding = isMobile? const EdgeInsets.fromLTRB(10.0, 0.0, 1.0, 0.0): const EdgeInsets.fromLTRB(10.0, 0.0, 0.0, 0.0);
     Widget listView = _buildBlockList();
     Widget container = Container(
-      padding: const EdgeInsets.fromLTRB(10.0, 0.0, 10.0, 0.0),
+      padding: padding,
       child: listView,
     );
     if(controller.isDebugMode) {
@@ -112,7 +115,6 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       );
     }
 
-    bool hidePan = controller.environment.isMobile();
     var gesture = GestureDetector(
       child: container,
       onTapDown: (TapDownDetails details) {
@@ -127,24 +129,24 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
         MyLogger.debug('MindEditFieldState: on tap cancel, id=${widget.key}');
         widget.controller.gestureHandler.onTapCancel();
       },
-      onPanStart: hidePan? null: (DragStartDetails details) {
+      onPanStart: isMobile? null: (DragStartDetails details) {
         MyLogger.info('MindEditFieldState: on pan start, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
 
         widget.controller.gestureHandler.onPanStart(details);
       },
-      onPanUpdate: hidePan? null: (DragUpdateDetails details) {
+      onPanUpdate: isMobile? null: (DragUpdateDetails details) {
         MyLogger.info('MindEditFieldState: on pan update, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onPanUpdate(details);
       },
-      onPanDown: hidePan? null: (DragDownDetails details) {
+      onPanDown: isMobile? null: (DragDownDetails details) {
         MyLogger.info('MindEditFieldState: on pan down, id=${widget.key}, local_offset=${details.localPosition}, global_offset=${details.globalPosition}');
         widget.controller.gestureHandler.onPanDown(details);
       },
-      onPanCancel: hidePan? null: () {
+      onPanCancel: isMobile? null: () {
         MyLogger.info('MindEditFieldState: on pan cancel, id=${widget.key}');
         // widget.controller.gestureHandler.onPanCancel(widget.texts.getBlockId());
       },
-      onPanEnd: hidePan? null: (DragEndDetails details) {
+      onPanEnd: isMobile? null: (DragEndDetails details) {
         MyLogger.info('MindEditFieldState: on pan end');
       },
     );

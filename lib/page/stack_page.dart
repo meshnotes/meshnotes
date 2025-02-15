@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
@@ -62,9 +63,7 @@ class _StackPageViewState extends State<StackPageView> {
         }
       },
     );
-
     return popScope;
-
   }
 
 
@@ -105,41 +104,50 @@ class _StackPageViewState extends State<StackPageView> {
   }
 
   Widget _buildForSmallView(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    savedScreenWidth = screenWidth;
-    var stack = Stack(
-      children: [
-        Positioned(
-          top: 0,
-          left: position * screenWidth,
-          width: screenWidth,
-          height: screenHeight,
-          child: DocumentNavigator(
-            key: navigationViewKey,
-            smallView: true,
-            jumpAction: _switchToDocumentView,
-          ),
-          // duration: Duration(milliseconds: animationDuration),
-        ),
-        Positioned(
-          top: 0,
-          left: (position + 1) * screenWidth,
-          width: screenWidth,
-          height: screenHeight,
-          child: DocumentView(
-            key: documentViewKey,
-            smallView: true,
-            jumpAction: _switchToNavigatorView,
-          ),
-          // duration: Duration(milliseconds: animationDuration),
-        ),
-      ],
+    var layout = LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        final screenHeight = constraints.maxHeight;
+        savedScreenWidth = screenWidth;
+        var stack = Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: position * screenWidth,
+              width: screenWidth,
+              height: screenHeight,
+              child: DocumentNavigator(
+                key: navigationViewKey,
+                smallView: true,
+                jumpAction: _switchToDocumentView,
+              ),
+              // duration: Duration(milliseconds: animationDuration),
+            ),
+            Positioned(
+              top: 0,
+              left: (position + 1) * screenWidth,
+              width: screenWidth,
+              height: screenHeight,
+              child: DocumentView(
+                key: documentViewKey,
+                smallView: true,
+                jumpAction: _switchToNavigatorView,
+              ),
+              // duration: Duration(milliseconds: animationDuration),
+            ),
+          ],
+        );
+        return stack;
+      }
     );
-    return stack;
+    final scaffold = Scaffold(
+      appBar: _buildAppBar(),
+      body: layout,
+    );
+    return scaffold;
   }
   Widget _buildForLargeView(BuildContext context) {
-    return Row(
+    final row = Row(
       children: [
         SizedBox(
           width: 240,
@@ -161,6 +169,21 @@ class _StackPageViewState extends State<StackPageView> {
           ),
         )
       ],
+    );
+    final scaffold = Scaffold(
+      appBar: _buildAppBar(),
+      body: row,
+    );
+    return scaffold;
+  }
+
+  AppBar? _buildAppBar() {
+    // On large view, there is a divider between navigator and document view, so need a overall app bar to show the status on top
+    return AppBar(
+      systemOverlayStyle: SystemUiOverlayStyle.dark,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      toolbarHeight: 0,
     );
   }
 

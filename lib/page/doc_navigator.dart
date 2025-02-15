@@ -106,22 +106,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       );
     }
     var systemButtons = _buildSystemButtons(context);
-    AppBar? appBar;
-    if(widget.smallView) {
-      appBar = AppBar(
-        title: const Center(
-          child: Text('Document list'),
-        ),
-        titleSpacing: 0,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          MainMenu(controller: controller, menuType: MenuType.navigator),
-        ],
-      );
-    }
     return Scaffold(
-      appBar: appBar,
+      appBar: _buildAppBar(),
       body: SizedBox(
         width: double.infinity,
         child: Column(
@@ -132,6 +118,25 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
           ],
         ),
       ),
+    );
+  }
+
+  AppBar _buildAppBar() {
+    List<Widget>? actions;
+    if(widget.smallView) {
+      actions = [
+        MainMenu(controller: controller, menuType: MenuType.navigator),
+      ];
+    }
+    final userName = controller.userPrivateInfo?.userName ?? 'Unknown User';
+    return AppBar(
+      title: Center(
+        child: Text(userName),
+      ),
+      titleSpacing: 0,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      actions: actions,
     );
   }
 

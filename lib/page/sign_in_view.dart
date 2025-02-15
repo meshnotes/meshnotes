@@ -75,9 +75,9 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     if (userPrivateInfo == null) {
       switch(_stage) {
         case _SignInStage.createKey:
-          return _buildCreateKey(context);
+          return _buildCreateKeyPage(context);
         case _SignInStage.loadKey:
-          return _buildLoadKey(context);
+          return _buildLoadKeyPage(context);
         default:
           return _buildMainDialog(context);
       }
@@ -93,7 +93,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         const Icon(Icons.outlined_flag, size: _iconSize, color: Colors.black54,),
         const Spacer(flex: 1,),
         const Text(
-          'You have to create your personal key, or load an exist one',
+          'You need a personal key, or load an exist one. This key is used to encrypt your data, and identify you to synchronize data between your own devices.',
           style: titleStyle,
         ),
         const Spacer(flex: 3,),
@@ -104,14 +104,21 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       ],
     );
     return Scaffold(
+      appBar: _buildAppBar('Welcome'),
       body: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(16),
         child: column,
       ),
     );
   }
 
-  Widget _buildCreateKey(BuildContext context) {
+  AppBar _buildAppBar(String title) {
+    return AppBar(
+      title: Text(title),
+    );
+  }
+
+  Widget _buildCreateKeyPage(BuildContext context) {
     var column = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -141,6 +148,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       child: column,
     );
     return Scaffold(
+      appBar: _buildAppBar('Create your key'),
       body: Align(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: _maxWidth),
@@ -153,7 +161,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildLoadKey(BuildContext context) {
+  Widget _buildLoadKeyPage(BuildContext context) {
     var column = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -183,6 +191,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       child: column,
     );
     return Scaffold(
+      appBar: _buildAppBar('Load your key'),
       body: Align(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: _maxWidth),
