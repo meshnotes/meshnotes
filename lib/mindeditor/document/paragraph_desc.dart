@@ -486,15 +486,15 @@ class ParagraphDesc {
 
   // Save text to database immediately
   void _storeBlock() {
-    if(isTitle()) {
-      MyLogger.verbose('Save to title');
-      parent.updateTitle(getPlainText());
-    }
     MyLogger.verbose('Save to blocks: id=${getBlockId()}');
     var block = _convertToBlockContent();
     _lastUpdate = Util.getTimeStamp();
     _db?.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
     _db?.updateDocTimestamp(parent.id, _lastUpdate);
+    if(isTitle()) {
+      MyLogger.verbose('Save to title');
+      parent.updateTitle(getPlainText());
+    }
     parent.setModified();
   }
   // Save extra to database

@@ -140,7 +140,7 @@ class DocumentManager {
     final doc = Document.createDocument(_db, title, '', this, now);
     var docId = doc.id;
 
-    _docTitles.add(DocDataModel(docId: docId, title: title, timestamp: now));
+    _updateDocTitles(DocDataModel(docId: docId, title: title, timestamp: now));
     return docId;
   }
 
@@ -162,8 +162,19 @@ class DocumentManager {
     final doc = Document.createDocument(_db, title, content, this, now);
     final docId = doc.id;
     _documents[docId] = doc;
-    _docTitles.add(DocDataModel(docId: docId, title: doc.getTitle().getPlainText(), timestamp: now));
+    _updateDocTitles(DocDataModel(docId: docId, title: doc.getTitle().getPlainText(), timestamp: now));
     return docId.isNotEmpty;
+  }
+
+  void _updateDocTitles(DocDataModel docData) {
+    for(var item in _docTitles) {
+      if(item.docId == docData.docId) {
+        item.title = docData.title;
+        item.timestamp = docData.timestamp;
+        return;
+      }
+    }
+    _docTitles.add(docData);
   }
 
   List<VersionDataModel> getCurrentRawVersionTree() {
