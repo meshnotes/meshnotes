@@ -41,7 +41,7 @@ class WidgetTemplate {
       padding: EdgeInsets.zero,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: const BorderRadius.all(Radius.circular(4.0)),
@@ -131,5 +131,12 @@ class WidgetTemplate {
       },
     );
     return layoutBuilder;
+  }
+
+  static AppBar buildSimpleAppBar(String title) {
+    return AppBar(
+      title: Center(child: Text(title)),
+      backgroundColor: Colors.white,
+    );
   }
 }

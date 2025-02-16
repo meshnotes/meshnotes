@@ -26,6 +26,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   late AnimationController _animationController;
   bool hasName = false;
   bool hasKey = false;
+  bool _canPop = true;
   static const titleStyle = TextStyle(
     fontSize: 22.0,
     color: Colors.black54,
@@ -103,19 +104,35 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         const Spacer(flex: 1,),
       ],
     );
-    return Scaffold(
-      appBar: _buildAppBar('Welcome'),
-      body: Container(
-        padding: const EdgeInsets.all(16),
+    final scrollView = SingleChildScrollView(
+      child: IntrinsicHeight(
         child: column,
+      ),
+    );
+    return Scaffold(
+      appBar: WidgetTemplate.buildSimpleAppBar('Welcome'),
+      body: Align(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: _maxWidth),
+          padding: const EdgeInsets.all(10),
+          child: scrollView,
+        ),
       ),
     );
   }
 
-  AppBar _buildAppBar(String title) {
-    return AppBar(
-      title: Text(title),
+  Widget _buildPopScope(BuildContext context, Widget child) {
+    final popScope = PopScope(
+      child: child,
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if(!_canPop) {
+          _gotoMain();
+          return;
+        }
+      },
     );
+    return popScope;
   }
 
   Widget _buildCreateKeyPage(BuildContext context) {
@@ -137,6 +154,11 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         const Spacer(flex: 1,),
       ],
     );
+    final scrollView = SingleChildScrollView(
+      child: IntrinsicHeight(
+        child: column,
+      ),
+    );
     var animated = AnimatedBuilder(
       animation: _animationController,
       builder: (BuildContext context, Widget? child) {
@@ -145,19 +167,21 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
           child: child,
         );
       },
-      child: column,
+      child: scrollView,
     );
-    return Scaffold(
-      appBar: _buildAppBar('Create your key'),
-      body: Align(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _maxWidth),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            child: animated,
-          ),
+    var align = Align(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxWidth),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          child: animated,
         ),
       ),
+    );
+    var popScope = _buildPopScope(context, align);
+    return Scaffold(
+      appBar: WidgetTemplate.buildSimpleAppBar('Create your key'),
+      body: popScope,
     );
   }
 
@@ -180,6 +204,11 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         const Spacer(flex: 1,),
       ],
     );
+    final scrollView = SingleChildScrollView(
+      child: IntrinsicHeight(
+        child: column,
+      ),
+    );
     var animated = AnimatedBuilder(
       animation: _animationController,
       builder: (BuildContext context, Widget? child) {
@@ -188,19 +217,21 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
           child: child,
         );
       },
-      child: column,
+      child: scrollView,
     );
-    return Scaffold(
-      appBar: _buildAppBar('Load your key'),
-      body: Align(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _maxWidth),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            child: animated,
-          ),
+    var align = Align(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxWidth),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          child: animated,
         ),
       ),
+    );
+    var popScope = _buildPopScope(context, align);
+    return Scaffold(
+      appBar: WidgetTemplate.buildSimpleAppBar('Load your key'),
+      body: popScope,
     );
   }
   
@@ -269,6 +300,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   void _gotoMain() {
     setState(() {
       _stage = _SignInStage.mainMenu;
+      _canPop = true;
     });
   }
   void _gotoCreate() {
@@ -276,6 +308,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       _animationController.reset();
       _animationController.forward();
       _stage = _SignInStage.createKey;
+      _canPop = false;
     });
   }
   void _gotoLoad() {
@@ -283,6 +316,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       _animationController.reset();
       _animationController.forward();
       _stage = _SignInStage.loadKey;
+      _canPop = false;
     });
   }
   void _onCreateNewKey() {

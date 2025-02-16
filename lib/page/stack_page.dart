@@ -52,8 +52,24 @@ class _StackPageViewState extends State<StackPageView> {
         toastLayer,
       ],
     );
+    return stack;
+  }
+
+
+  Widget _buildMainView(BuildContext context) {
+    final smallView = controller.environment.isSmallView(context);
+    var userInfo = controller.userPrivateInfo;
+    if(userInfo == null) {
+      return _buildSignInView(context);
+    }
+    Widget view;
+    if(smallView) {
+      view = _buildForSmallView(context);
+    } else {
+      view = _buildForLargeView(context);
+    }
     final popScope = PopScope(
-      child: stack,
+      child: view,
       canPop: canPop,
       onPopInvokedWithResult: (didPop, result) {
         MyLogger.info('StackPageView: pop, didPop=$didPop');
@@ -64,20 +80,6 @@ class _StackPageViewState extends State<StackPageView> {
       },
     );
     return popScope;
-  }
-
-
-  Widget _buildMainView(BuildContext context) {
-    final smallView = controller.environment.isSmallView(context);
-    var userInfo = controller.userPrivateInfo;
-    if(userInfo == null) {
-      return _buildSignInView(context);
-    }
-    if(smallView) {
-      return _buildForSmallView(context);
-    } else {
-      return _buildForLargeView(context);
-    }
   }
 
   void _updateUserInfo(UserPrivateInfo userInfo) {
