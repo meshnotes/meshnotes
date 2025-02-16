@@ -187,6 +187,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   void scrollDown(double delta) {
+    if(_scrollController.offset == 0 && delta < 0) return; // Avoid screen joggles whenuser drag the handle in the title line
     _scrollController.jumpTo(_scrollController.offset + delta);
   }
 

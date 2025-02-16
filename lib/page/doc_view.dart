@@ -48,6 +48,7 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
           titleSpacing: 0,
           backgroundColor: Colors.white,
           elevation: 0,
+          toolbarHeight: 48,
           leading: Builder(
             builder: (BuildContext context) {
               return CupertinoButton(
@@ -65,6 +66,13 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
           ),
           title: titleBar,
           actions: actionBar,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1.0),
+            child: Container(
+              color: Colors.grey.withOpacity(0.2),
+              height: 1.0,
+            )
+          ),
         ),
         body: editor,
       );
@@ -76,6 +84,13 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
           toolbarHeight: 48,
           title: titleBar,
           actions: actionBar,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1.0),
+            child: Container(
+              color: Colors.grey.withOpacity(0.2),
+              height: 1.0,
+            )
+          ),
         ),
         body: editor,
       );

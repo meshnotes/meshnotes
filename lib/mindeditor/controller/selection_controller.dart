@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
@@ -10,6 +11,7 @@ import '../view/edit_cursor.dart';
 import '../view/selection_handle_layer.dart';
 import 'callback_registry.dart';
 import 'controller.dart';
+import '../view/measure_size.dart';
 
 class SelectionController {
   final Controller _controller;
@@ -295,25 +297,35 @@ class SelectionController {
   void showPopupMenu({required Offset globalPosition}) {
     final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     floatingViewManager?.clearPopupMenu();
-    var localPosition = floatingViewManager?.convertGlobalOffsetToPopupMenuLayer(globalPosition) ?? globalPosition;
-    final widget = LayoutBuilder(
-      builder: (context, constraints) {
-        // final width = constraints.maxWidth;
-        final popupMenu = EditorPopupToolbar.basic(controller: Controller(), context: context);
-        final container = Container(
-          alignment: Alignment.topCenter,
-          child: popupMenu,
-        );
-        final column = Column(
-          children: [
-            SizedBox(width: 10, height: localPosition.dy + 15,),
-            container,
-          ],
-        );
-        return column;
-      },
+    const id = 'context_menu';
+    final popupMenu = EditorPopupToolbar.basic(
+      controller: Controller(), 
     );
-    floatingViewManager?.addPopupMenu(widget);
+    var localPosition = floatingViewManager?.convertGlobalOffsetToPopupMenuLayer(globalPosition) ?? globalPosition;
+
+    final measureSize = MeasureSize(
+      onChange: (Size menuSize) {
+        final popupMenuLayerSize = floatingViewManager?.getPopupMenuSize();
+        if(popupMenuLayerSize == null) return;
+        final bottomSpace = popupMenuLayerSize.height - localPosition.dy;
+        final showAbove = bottomSpace < menuSize.height + 16;
+        final topPosition = showAbove 
+            ? localPosition.dy - menuSize.height - 16 
+            : localPosition.dy + 16;
+        final rightSpace = popupMenuLayerSize.width - localPosition.dx;
+        final needAdjustLeft = rightSpace < menuSize.width + 16;
+        final leftPosition = needAdjustLeft
+            ? popupMenuLayerSize.width - menuSize.width - 16
+            : localPosition.dx;
+
+        CallbackRegistry.getFloatingViewManager()?.updatePopupMenuPosition(id, Offset(leftPosition, topPosition));
+      },
+      child: popupMenu,
+    );
+    final wrap = Wrap(
+      children: [measureSize],
+    );
+    floatingViewManager?.addPopupMenu(id, Offset(localPosition.dx, localPosition.dy + 16), wrap);
   }
   void clearPopupMenu() {
     CallbackRegistry.getFloatingViewManager()?.clearPopupMenu();

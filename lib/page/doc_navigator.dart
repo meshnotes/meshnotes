@@ -134,9 +134,17 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         child: Text(userName),
       ),
       titleSpacing: 0,
+      toolbarHeight: 48,
       backgroundColor: Colors.white,
       elevation: 0,
       actions: actions,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1.0),
+        child: Container(
+          color: Colors.grey.withOpacity(0.2),
+          height: 1.0,
+        )
+      ),
     );
   }
 
@@ -166,7 +174,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   Widget _buildSearchIcon() {
     return CupertinoButton(
       // padding: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 0),
-      child: const Icon(CupertinoIcons.search),
+      child: const Icon(CupertinoIcons.search, color: Colors.black),
       onPressed: () {},
     );
   }
@@ -174,7 +182,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   Widget _buildCardIcon(BuildContext context) {
     return CupertinoButton(
       // padding: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 0),
-      child: const Icon(CupertinoIcons.lightbulb),
+      child: const Icon(CupertinoIcons.lightbulb, color: Colors.black),
       onPressed: () {
         showDialog(
           context: context,
@@ -188,7 +196,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   Widget _buildSettingIcon(BuildContext context) {
     return CupertinoButton(
       // padding: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 0),
-      child: const Icon(CupertinoIcons.gear),
+      child: const Icon(CupertinoIcons.gear, color: Colors.black),
       onPressed: () {
         if(controller.environment.isSmallView(context)) {
           SmallScreenSettingPage.route(context);
@@ -282,11 +290,13 @@ class NetworkStatusIcon extends StatelessWidget {
         return const Icon(
           CupertinoIcons.wifi,
           size: size,
+          color: Colors.black,
         );
       case _NetworkStatus.lost:
         return const Icon(
           CupertinoIcons.wifi_slash,
           size: size,
+          color: Colors.grey,
         );
     }
   }

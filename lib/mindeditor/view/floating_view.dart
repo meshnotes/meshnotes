@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'floating_stack_layer.dart';
+import 'floating_stack_reposition_layer.dart';
 
 class FloatingViewManager {
   late Widget _selectionLayer;
@@ -8,8 +9,9 @@ class FloatingViewManager {
   late Widget _pluginDialogLayer;
   final _selectionKey = GlobalKey<FloatingStackViewState>();
   final _pluginTipsKey = GlobalKey<FloatingStackViewState>();
-  final _popupMenuKey = GlobalKey<FloatingStackViewState>();
+  final _popupMenuKey = GlobalKey<FloatingStackRepositionViewState>();
   final _pluginDialogKey = GlobalKey<FloatingStackViewState>();
+  Size _popupMenuSize = Size(0, 0);
 
   FloatingViewManager() {
     _selectionLayer = _buildSelectionLayer();
@@ -64,14 +66,24 @@ class FloatingViewManager {
     return render?.globalToLocal(global);
   }
 
-  void addPopupMenu(Widget menu) {
-    _popupMenuKey.currentState?.addLayer(menu);
+  void addPopupMenu(String id, Offset position, Widget menu) {
+    _popupMenuKey.currentState?.addLayer(id, position, menu);
   }
-  void removePopupMenu(Widget menu) {
-    _popupMenuKey.currentState?.removeLayer(menu);
+  void updatePopupMenuPosition(String id, Offset position) {
+    _popupMenuKey.currentState?.updatePosition(id, position);
+  }
+  void removePopupMenu(String id) {
+    _popupMenuKey.currentState?.removeLayer(id);
   }
   void clearPopupMenu() {
     _popupMenuKey.currentState?.clearLayer();
+  }
+
+  void updatePopupMenuSize(double width, double height) {
+    _popupMenuSize = Size(width, height);
+  }
+  Size getPopupMenuSize() {
+    return Size(_popupMenuSize.width, _popupMenuSize.height);
   }
 
   void showPluginDialog(Widget dialog) {
@@ -92,7 +104,7 @@ class FloatingViewManager {
     );
   }
   Widget _buildPopupMenuLayer() {
-    return FloatingStackView(
+    return FloatingStackRepositionView(
       key: _popupMenuKey,
     );
   }

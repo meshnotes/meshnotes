@@ -1,5 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:my_log/my_log.dart';
 
 typedef ActionFunction = void Function();
 
@@ -113,19 +118,27 @@ class WidgetTemplate {
     final layoutBuilder = LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         var metrics = MediaQuery.of(context);
-        final width = metrics.size.width;
-        final height = metrics.size.height;
+        var width = metrics.size.width;
+        var height = metrics.size.height;
         final padding = EdgeInsets.fromLTRB(
           metrics.viewInsets.left + metrics.padding.left,
           metrics.viewInsets.top + metrics.padding.top,
           metrics.viewInsets.right + metrics.padding.right,
           metrics.viewInsets.bottom + metrics.padding.bottom,
         );
+        width = min(width, constraints.maxWidth);
+        height = min(height, constraints.maxHeight);
+        width -= padding.horizontal;
+        height -= padding.vertical;
+        constraints = BoxConstraints(
+          maxWidth: width,
+          maxHeight: height,
+        );
+        CallbackRegistry.getFloatingViewManager()?.updatePopupMenuSize(width, height);
 
-        return Container(
+        return SizedBox(
           width: width,
           height: height,
-          padding: padding,
           child: child,
         );
       },

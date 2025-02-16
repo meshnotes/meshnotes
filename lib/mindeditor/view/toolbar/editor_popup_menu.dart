@@ -22,9 +22,8 @@ class EditorPopupToolbar extends StatefulWidget {
   factory EditorPopupToolbar.basic({
     Key? key,
     required Controller controller,
-    required BuildContext context,
   }) {
-    AppearanceSetting defaultAppearance = _buildDefaultAppearance(context);
+    AppearanceSetting defaultAppearance = _buildDefaultAppearance();
     
     return EditorPopupToolbar(
       key: key,
@@ -33,7 +32,7 @@ class EditorPopupToolbar extends StatefulWidget {
     );
   }
 
-  static AppearanceSetting _buildDefaultAppearance(BuildContext context) {
+  static AppearanceSetting _buildDefaultAppearance() {
     const padding = EdgeInsets.fromLTRB(16, 4, 16, 4);
     double iconSize = 18;
     double size = 36;
@@ -44,9 +43,9 @@ class EditorPopupToolbar extends StatefulWidget {
     return AppearanceSetting(
       iconSize: iconSize,
       size: size,
-      fillColor: Theme.of(context).canvasColor,
-      hoverColor: Theme.of(context).colorScheme.background,
-      disabledColor: Theme.of(context).disabledColor,
+      fillColor: Colors.transparent,
+      hoverColor: Colors.transparent,
+      disabledColor: Colors.transparent,
       padding: padding,
     );
   }
