@@ -3,7 +3,6 @@ import 'package:mesh_note/mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 
 /// This Button's icon will be changed according to the current selection.
@@ -79,7 +78,7 @@ class ClipboardChangedButton extends StatefulWidget {
   final Widget icon;
   final String tip;
   final String buttonKey;
-  final bool Function(ClipboardReader) showOrNot;
+  final bool Function(String) showOrNot;
   final Function() onPressed;
 
   const ClipboardChangedButton({
@@ -103,8 +102,8 @@ class _ClipboardChangedButtonState extends State<ClipboardChangedButton> {
   @override
   void initState() {
     super.initState();
-    CallbackRegistry.registerClipboardDataWatcher(widget.buttonKey, (reader) {
-      _setOn(widget.showOrNot(reader));
+    CallbackRegistry.registerClipboardDataWatcher(widget.buttonKey, (data) {
+      _setOn(widget.showOrNot(data));
     });
   }
   @override

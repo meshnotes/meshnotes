@@ -9,8 +9,8 @@
     <!-- <uses-permission android:name="android.webkit.resource.AUDIO_CAPTURE" /> -->
     <!-- Use bluetooth telephony device like headset/earbuds -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-   <application
-        android:label="MeshNote"
+    <application
+        android:label="MeshNotes"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
@@ -45,12 +45,12 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-       <provider
-           android:name="com.superlist.super_native_extensions.DataProvider"
-           android:authorities="xyz.meshnotes.meshnotes.SuperClipboardDataProvider"
-           android:exported="true"
-           android:grantUriPermissions="true" >
-       </provider>
+        <!-- <provider
+            android:name="com.superlist.super_native_extensions.DataProvider"
+            android:authorities="xyz.meshnotes.meshnotes.SuperClipboardDataProvider"
+            android:exported="true"
+            android:grantUriPermissions="true" >
+        </provider> -->
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

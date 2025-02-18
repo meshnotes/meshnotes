@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/editor_controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/text_selection_changed_switch_button.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'base/appearance_setting.dart';
@@ -82,8 +81,8 @@ class PasteButton extends StatelessWidget {
       controller: controller,
       tip: 'Paste',
       buttonKey: 'paste',
-      showOrNot: (ClipboardReader reader) {
-        return reader.canProvide(Formats.plainText) || reader.canProvide(Formats.png) || reader.canProvide(Formats.jpeg);
+      showOrNot: (String data) {
+        return data.isNotEmpty;
       },
       onPressed: () {
         EditorController.pasteToBlock();

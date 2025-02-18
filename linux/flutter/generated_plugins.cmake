@@ -4,10 +4,8 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   flutter_window_close
-  irondash_engine_context
   record_linux
   sqlite3_flutter_libs
-  super_native_extensions
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

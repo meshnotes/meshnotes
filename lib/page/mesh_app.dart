@@ -49,7 +49,7 @@ class _AppLifecyclePageState extends State<MeshApp> {
 
   Widget buildStackPage(BuildContext context) {
     return MaterialApp(
-      title: 'MeshNote',
+      title: 'MeshNotes',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -79,7 +79,7 @@ class _AppLifecyclePageState extends State<MeshApp> {
       Constants.documentRouteName: (context) => DocumentView(smallView: true,),
     };
     return MaterialApp(
-      title: 'MeshNote',
+      title: 'MeshNotes',
       theme: ThemeData(
         // This is the theme of your application.
         //

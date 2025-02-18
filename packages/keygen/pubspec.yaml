@@ -1,5 +1,5 @@
 name: keygen
-description: RSA key generator library for MeshNote
+description: RSA key generator library for MeshNotes
 version: 1.0.0
 publish_to: none
 # repository: https://github.com/my_org/my_repo

@@ -15,7 +15,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 0.0.1-alpha+1
+version: 0.0.2-alpha+4
 
 environment:
   sdk: ">=3.4.0"
@@ -60,7 +60,6 @@ dependencies:
 #  image_gallery_saver: ^1.7.1
   device_info_plus: ^9.1.1
   android_id: ^0.3.6
-  super_clipboard: ^0.8.5
   dart_openai: ^4.0.0
   loading_animation_widget: ^1.2.2
   mp_audio_stream: ^0.2.0
@@ -81,7 +80,7 @@ dependencies:
   bonsoir: ^5.1.10
 
 flutter_app_name:
-  name: 'MeshNote'
+  name: 'MeshNotes'
 
 flutter_launcher_icons:
   android: true

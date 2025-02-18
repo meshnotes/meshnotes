@@ -39,38 +39,23 @@ class DocumentTitleBarState extends State<DocumentTitleBar> {
     if(texts == null || texts.isEmpty) {
       return Container();
     }
-    var widgets = <Widget>[];
-    for(var str in texts) {
-      var child = TextButton(
-        child: Text(
-          str,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.black,
-            fontStyle: FontStyle.normal,
-            decoration: TextDecoration.none,
-            fontWeight: FontWeight.normal,
-            // fontFamily: 'Yuanti SC',
-          ),
+    
+    final expanded = Expanded(
+      child: Text(
+        texts.last,
+        style: const TextStyle(
+          fontSize: 14,
+          color: Colors.black,
+          fontStyle: FontStyle.normal,
+          decoration: TextDecoration.none,
+          fontWeight: FontWeight.normal,
+          // fontFamily: 'Yuanti SC',
         ),
-        onPressed: () {},
-        style: TextButton.styleFrom(
-          padding: widget.controller.setting.titleTextPadding,
-          minimumSize: const Size(0, 0),
-        ),
-      );
-      widgets.add(child);
-      var slash = Text(
-        '/',
-        style: TextStyle(
-          color: widget.controller.setting.titleSlashColor,
-        ),
-      );
-      widgets.add(slash);
-    }
-    widgets.removeLast();
-    return Row(
-      children: widgets,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+    return Container(
+      child: expanded,
     );
   }
 

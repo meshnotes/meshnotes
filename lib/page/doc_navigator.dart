@@ -113,7 +113,10 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         child: Column(
           children: [
             titleListView,
-            createButton,
+            Container(
+              color: Colors.white, // To eliminate the transparent background of the padding of button
+              child: createButton,
+            ),
             systemButtons,
           ],
         ),
@@ -155,7 +158,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   }
 
   Widget _buildSystemButtons(BuildContext context) {
-    return SizedBox(
+    return Container(
+      color: Colors.white,
       width: double.infinity,
       child: Row(
         children: [

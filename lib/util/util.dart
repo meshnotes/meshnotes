@@ -1,7 +1,6 @@
 import 'dart:math';
-
 import 'package:flutter/widgets.dart';
-import 'package:super_clipboard/super_clipboard.dart';
+import 'package:flutter/services.dart';
 
 class Util {
   static int getTimeStamp() {
@@ -20,12 +19,6 @@ class Util {
 
 class ClipboardUtil {
   static Future<void> writeToClipboard(String content) async {
-    final clipboard = SystemClipboard.instance;
-    if (clipboard == null) {
-      return;
-    }
-    final item = DataWriterItem();
-    item.add(Formats.plainText(content));
-    await clipboard.write([item]);
+    await Clipboard.setData(ClipboardData(text: content));
   }
 }

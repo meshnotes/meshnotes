@@ -3,7 +3,6 @@ import 'package:mesh_note/net/status.dart';
 import 'package:mesh_note/page/title_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 import '../document/paragraph_desc.dart';
 import '../mind_editor.dart';
 import '../view/floating_view.dart';
@@ -17,7 +16,7 @@ class CallbackRegistry {
   static GlobalKey<State<ScaffoldMessenger>>? _messengerKey;
   static final Map<String, Function(TextSpansStyle?)> _selectionStyleWatcher = {};
   static final Map<String, Function(TextSelection?)> _selectionChangedWatcher = {};
-  static final Map<String, Function(ClipboardReader)> _clipboardDataWatcher = {};
+  static final Map<String, Function(String)> _clipboardDataWatcher = {};
   static final Map<String, Function()> _documentChangedWatcher = {};
   static final Map<String, Function(String?, String?, int?)> _editingBlockFormatWatcher = {};
   static Function()? _screenShotHandler;
@@ -138,15 +137,15 @@ class CallbackRegistry {
     }
   }
 
-  static void registerClipboardDataWatcher(String key, Function(ClipboardReader) watcher) {
+  static void registerClipboardDataWatcher(String key, Function(String) watcher) {
     _clipboardDataWatcher[key] = watcher;
   }
   static void unregisterClipboardDataWatcher(String key) {
     _clipboardDataWatcher.remove(key);
   }
-  static void triggerClipboardDataEvent(ClipboardReader reader) {
+  static void triggerClipboardDataEvent(String data) {
     for(var item in _clipboardDataWatcher.values) {
-      item(reader);
+      item(data);
     }
   }
 
