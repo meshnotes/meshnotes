@@ -26,6 +26,7 @@ class MainMenu extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    final showDebug = controller.setting.getSetting(Constants.settingKeyShowDebugMenu)?.toLowerCase() == 'true';
     final popUpMenuButton = PopupMenuButton(
       icon: const Icon(Icons.menu),
       elevation: 4,
@@ -61,9 +62,11 @@ class MainMenu extends StatelessWidget {
           _buildPopupMenu(screenShotKey, Icons.camera_alt_outlined, 'Screenshot'),
           _buildPopupMenu(searchKey, Icons.manage_search_outlined, 'Search'),
           _buildPopupMenu(syncKey, Icons.sync_outlined, 'Sync'),
+          // Only show delete in editor mode
           if (menuType == MenuType.editor) _buildPopupMenu(deleteKey, Icons.delete_forever_outlined, 'Delete'),
           _buildPopupMenu(versionKey, Icons.history_outlined, 'Version Map'),
-          _buildPopupMenu(clearHistoryKey, Icons.warning_amber_outlined, 'Clear History'),
+          // Only show clear history in debug mode
+          if(showDebug) _buildPopupMenu(clearHistoryKey, Icons.warning_amber_outlined, 'Clear History'),
         ];
       },
     );

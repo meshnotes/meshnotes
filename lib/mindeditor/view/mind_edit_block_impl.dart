@@ -264,6 +264,7 @@ class MindBlockImplRenderObject extends RenderBox {
     }
   }
   void _drawComposing(Canvas canvas, Offset offset, double height) {
+    // Use selection to find the composing box(may not be in the same line), and draw the underline
     final editingValue = CallbackRegistry.getLastEditingValue();
     if(editingValue == null || !editingValue.composing.isValid) {
       return;
@@ -271,11 +272,17 @@ class MindBlockImplRenderObject extends RenderBox {
     final composing = editingValue.composing;
     final leadingPos = Controller().selectionController.lastExtentBlockPos - editingValue.selection.extentOffset;
     final paint = Paint()..color = Colors.black..style = PaintingStyle.stroke;
-    Offset startPos = _convertOffsetFromPosition(TextPosition(offset: composing.start + leadingPos));
-    Offset endPos = _convertOffsetFromPosition(TextPosition(offset: composing.end + leadingPos));
-    Offset from = startPos.translate(0, height) + offset;
-    Offset to = endPos.translate(0, height) + offset;
-    canvas.drawLine(from, to, paint);
+    final fakeSelection = TextSelection(
+      baseOffset: composing.start + leadingPos,
+      extentOffset: composing.end + leadingPos,
+    );
+    var boxes = paragraph.getBoxesForSelection(fakeSelection);
+    for(final box in boxes) {
+      final rect = Rect.fromLTRB(box.left, box.top, box.right, box.bottom);
+      Offset from = Offset(rect.left, rect.bottom) + offset;
+      Offset to = Offset(rect.right, rect.bottom) + offset;
+      canvas.drawLine(from, to, paint);
+    }
   }
 
   Rect _getCurrentRenderGlobalRect() {

@@ -81,6 +81,10 @@ class Constants {
   static const String settingNameUserInfo = 'User private key';
   static const String settingCommentUserInfo = 'User name and private key information(formatted in base64)';
   static const String settingKeyPluginPrefix = 'plugin';
+  static const String settingKeyShowDebugMenu = 'show_debug_menu';
+  static const String settingNameShowDebugMenu = 'Debug menu';
+  static const String settingCommentShowDebugMenu = 'Show debug functions in the menu';
+  static const String settingDefaultShowDebugMenu = 'false';
 
   static const String settingKeyAllowSendingNotesToPlugins = 'allow_sending_notes_to_plugins';
   static const String settingNameAllowSendingNotesToPlugins = 'Allow sending notes to plugins';

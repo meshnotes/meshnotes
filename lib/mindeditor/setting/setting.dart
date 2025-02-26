@@ -95,6 +95,13 @@ class Setting {
       defaultValue: Constants.settingDefaultAllowSendingNotesToPlugins,
       type: SettingType.bool,
     ),
+    SettingData(
+      name: Constants.settingKeyShowDebugMenu,
+      displayName: Constants.settingNameShowDebugMenu,
+      comment: Constants.settingCommentShowDebugMenu,
+      defaultValue: Constants.settingDefaultShowDebugMenu,
+      type: SettingType.bool,
+    ),
   ];
 
   void load() {
