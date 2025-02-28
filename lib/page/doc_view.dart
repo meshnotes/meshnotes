@@ -37,69 +37,15 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
     //   key: messengerKey,
     //   child: editor,
     // );
-    Widget? view;
-    var titleBar = DocumentTitleBar(controller: controller);
-    var actionBar = <Widget>[
-      MainMenu(controller: controller, menuType: MenuType.editor),
-    ];
-    if(smallView) {
-      view = Scaffold(
-        appBar: AppBar(
-          titleSpacing: 0,
-          backgroundColor: Colors.white,
-          elevation: 0,
-          toolbarHeight: 48,
-          leading: Builder(
-            builder: (BuildContext context) {
-              return CupertinoButton(
-                alignment: Alignment.centerLeft,
-                child: const Icon(Icons.arrow_back_ios),
-                onPressed: () {
-                  if(jumpAction != null) {
-                    jumpAction!();
-                  } else {
-                    Navigator.of(context).pop();
-                  }
-                },
-              );
-            },
-          ),
-          title: titleBar,
-          actions: actionBar,
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1.0),
-            child: Container(
-              color: Colors.grey.withOpacity(0.2),
-              height: 1.0,
-            )
-          ),
-        ),
-        body: editor,
-      );
-    } else {
-      view = Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          toolbarHeight: 48,
-          title: titleBar,
-          actions: actionBar,
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1.0),
-            child: Container(
-              color: Colors.grey.withOpacity(0.2),
-              height: 1.0,
-            )
-          ),
-        ),
-        body: editor,
-      );
-    }
-    if(lastSmallView != smallView) { // 如果窗口大小刚刚发生了变化，那么与文档相关的UI都要刷新一遍
-      // if (controller.document != null) {
-      //   controller.openDocumentForUi();
-      // }
-    }
+    final view = Scaffold(
+      appBar: _buildAppBar(context, smallView),
+      body: editor,
+    );
+    // if(lastSmallView != smallView) { // Refresh UI if window size changed
+    //   // if (controller.document != null) {
+    //   //   controller.openDocumentForUi();
+    //   // }
+    // }
     lastSmallView = smallView;
     return view;
   }
@@ -107,6 +53,45 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
   Widget getMindEditor() {
     return const Center(
       child: MindEditor(),
+    );
+  }
+
+  AppBar _buildAppBar(BuildContext context, bool smallView) {
+    var titleBar = DocumentTitleBar(controller: controller);
+    var actionBar = <Widget>[
+      MainMenu(controller: controller, menuType: MenuType.editor),
+    ];
+    final leading = smallView? Center(
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        alignment: Alignment.center,
+        child: const Icon(Icons.arrow_back_ios),
+        onPressed: () {
+          if(jumpAction != null) {
+            jumpAction!();
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
+      ),
+    ) : null;
+    final titleSpacing = smallView? 0.0 : null; // On small view, there will be an icon on the left, so spacing is not necessary
+    
+    return AppBar(
+      titleSpacing: titleSpacing,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      toolbarHeight: 48,
+      leading: leading, 
+      title: titleBar,
+      actions: actionBar,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1.0),
+        child: Container(
+          color: Colors.grey.withOpacity(0.2),
+          height: 1.0,
+        )
+      ),
     );
   }
 }

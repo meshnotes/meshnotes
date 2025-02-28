@@ -50,6 +50,25 @@ The first way may not work, since some WIFI router may disable the local multica
 Not supported yet, but this feature is in the plan.
 In the previous two ways, your data is saved on your own devices
 
+# Features
+## Available features
+- [x] Basic note editor
+- [x] Synchronizing data between devices in LAN
+- [x] Basic AI assistant plugin
+
+## Coming features
+- [ ] Launch on AppStore and GooglePlay
+- [ ] Multi-language support(Chinese and English)
+- [ ] Realtime chat UI in whole app
+- [ ] Optimize AI assistant
+- [ ] Shortcut keys
+
+## Features in plan
+- [ ] Markdown support
+- [ ] Register server
+- [ ] P2P synchronizing with server
+- [ ] More plugins
+
 # Source code structure
 There are 5 parts of code:
 1. mesh notes, main code in this project, in lib/ directory.

@@ -40,22 +40,26 @@ class DocumentTitleBarState extends State<DocumentTitleBar> {
       return Container();
     }
     
-    final expanded = Expanded(
-      child: Text(
-        texts.last,
-        style: const TextStyle(
-          fontSize: 14,
-          color: Colors.black,
-          fontStyle: FontStyle.normal,
-          decoration: TextDecoration.none,
-          fontWeight: FontWeight.normal,
-          // fontFamily: 'Yuanti SC',
-        ),
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
     return Container(
-      child: expanded,
+      color: Colors.white,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              texts.last,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black,
+                fontStyle: FontStyle.normal,
+                decoration: TextDecoration.none,
+                fontWeight: FontWeight.normal,
+                // fontFamily: 'Yuanti SC',
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
