@@ -27,10 +27,6 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   bool hasName = false;
   bool hasKey = false;
   bool _canPop = true;
-  static const titleStyle = TextStyle(
-    fontSize: 22.0,
-    color: Colors.black54,
-  );
   late _SignInStage _stage;
 
   @override
@@ -86,41 +82,63 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     return _buildComplete(context);
   }
   
+  /// Builds the main welcome dialog with options to create or load an account
+  /// This is the initial screen users see when opening the app
   Widget _buildMainDialog(BuildContext context) {
-    var column = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+    final topIcon = ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Image.asset(
+        'assets/applogo.png',
+        width: _iconSize,
+        height: _iconSize,
+        fit: BoxFit.contain,
+      ),
+    );
+    
+    final cardContent = [
+      _buildPrimaryButton(
+        icon: Icons.note_add_outlined,
+        label: 'Create new account',
+        onPressed: _gotoCreate,
+      ),
+      const SizedBox(height: 16),
+      _buildSecondaryButton(
+        icon: Icons.upload_file_outlined,
+        label: 'Load existing account',
+        onPressed: _gotoLoad,
+      ),
+    ];
+    
+    final card = _buildCard(
+      title: 'Welcome to MeshNotes',
+      description: 'Create a new account if you are a first-time user. To access your data from other devices, import your existing account.',
+      children: cardContent,
+    );
+    
+    final exploreButton = _buildTextButton(
+      icon: Icons.rocket_launch_outlined,
+      label: 'Just explore without signing in',
+      onPressed: _justTry,
+    );
+    
+    final content = _buildPageContent(
+      topIcon: topIcon,
       children: [
-        const Spacer(flex: 5,),
-        const Icon(Icons.outlined_flag, size: _iconSize, color: Colors.black54,),
-        const Spacer(flex: 1,),
-        const Text(
-          'You need a personal key, or load an exist one. This key is used to encrypt your data, and identify you to synchronize data between your own devices.',
-          style: titleStyle,
-        ),
-        const Spacer(flex: 3,),
-        WidgetTemplate.buildDefaultButton(context, Icons.note_add_outlined, 'Create a new key', _gotoCreate),
-        WidgetTemplate.buildNormalButton(Icons.upload_file_outlined, 'Load an exist key', _gotoLoad),
-        WidgetTemplate.buildInsignificantButton(Icons.person_off_outlined, 'No, I just want to have a try', _justTry),
-        const Spacer(flex: 1,),
+        card,
+        const SizedBox(height: 24),
+        exploreButton,
       ],
     );
-    final scrollView = SingleChildScrollView(
-      child: IntrinsicHeight(
-        child: column,
-      ),
-    );
-    return Scaffold(
-      appBar: WidgetTemplate.buildSimpleAppBar('Welcome'),
-      body: Align(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: _maxWidth),
-          padding: const EdgeInsets.all(10),
-          child: scrollView,
-        ),
-      ),
+    
+    return _buildPageScaffold(
+      context: context,
+      title: 'Welcome',
+      content: content,
     );
   }
 
+  /// Creates a PopScope wrapper to handle back navigation
+  /// Prevents accidental app exits and manages navigation flow
   Widget _buildPopScope(BuildContext context, Widget child) {
     final popScope = PopScope(
       child: child,
@@ -135,174 +153,230 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     return popScope;
   }
 
+  /// Builds the account creation page where users enter their name
+  /// Generates a new private key based on the provided name
   Widget _buildCreateKeyPage(BuildContext context) {
-    var column = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Spacer(flex: 5,),
-        const Icon(Icons.person_add_alt_outlined, size: _iconSize, color: Colors.black54,),
-        const Spacer(flex: 1,),
-        const Text(
-          'Please enter your name to generate a new key, and keep it as a secret',
-          style: titleStyle,
+    const topIcon = Icon(
+      Icons.person_add_alt_outlined, 
+      size: _iconSize, 
+      color: Colors.black54,
+    );
+    
+    final inputField = Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: TextField(
+        controller: userNameController,
+        decoration: const InputDecoration(
+          hintText: 'Your name',
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: InputBorder.none,
         ),
-        const Spacer(flex: 3,),
-        WidgetTemplate.buildNormalInputField('your name', userNameController),
-        WidgetTemplate.buildNormalButton(Icons.note_add_outlined, 'Create new key', hasName? _onCreateNewKey: null),
-        const Spacer(flex: 1,),
-        WidgetTemplate.buildInsignificantButton(Icons.arrow_back, 'Back', _gotoMain),
-        const Spacer(flex: 1,),
+      ),
+    );
+    
+    final cardContent = [
+      inputField,
+      const SizedBox(height: 24),
+      _buildPrimaryButton(
+        icon: Icons.note_add_outlined,
+        label: 'Create new key',
+        onPressed: hasName ? _onCreateNewKey : null,
+      ),
+    ];
+    
+    final card = _buildCard(
+      title: 'Create Your Account',
+      description: 'Please enter your name to generate a new key. Make sure to save your key in a secure location.',
+      children: cardContent,
+    );
+    
+    final backButton = _buildTextButton(
+      icon: Icons.arrow_back,
+      label: 'Back to main menu',
+      onPressed: _gotoMain,
+    );
+    
+    final content = _buildPageContent(
+      topIcon: topIcon,
+      children: [
+        card,
+        const SizedBox(height: 24),
+        backButton,
       ],
     );
-    final scrollView = SingleChildScrollView(
-      child: IntrinsicHeight(
-        child: column,
-      ),
-    );
-    var animated = AnimatedBuilder(
-      animation: _animationController,
-      builder: (BuildContext context, Widget? child) {
-        return ScaleTransition(
-          scale: _animationController,
-          child: child,
-        );
-      },
-      child: scrollView,
-    );
-    var align = Align(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: _maxWidth),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          child: animated,
-        ),
-      ),
-    );
-    var popScope = _buildPopScope(context, align);
-    return Scaffold(
-      appBar: WidgetTemplate.buildSimpleAppBar('Create your key'),
-      body: popScope,
+    
+    return _buildPageScaffold(
+      context: context,
+      title: 'Create new account',
+      content: content,
+      withAnimation: true,
+      withPopScope: true,
     );
   }
 
+  /// Builds the account import page where users can paste their existing key
+  /// Allows users to access their account from another device
   Widget _buildLoadKeyPage(BuildContext context) {
-    var column = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Spacer(flex: 5,),
-        const Icon(Icons.person_add_alt_outlined, size: _iconSize, color: Colors.black54,),
-        const Spacer(flex: 1,),
-        const Text(
-          'Paste your existing key here to load',
-          style: titleStyle,
+    const topIcon = Icon(
+      Icons.upload_file_outlined, 
+      size: _iconSize, 
+      color: Colors.black54,
+    );
+    
+    final inputField = Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: TextField(
+        controller: privateKeyController,
+        decoration: const InputDecoration(
+          hintText: 'Your existing key',
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: InputBorder.none,
         ),
-        const Spacer(flex: 3,),
-        WidgetTemplate.buildNormalInputField('Your old key', privateKeyController),
-        WidgetTemplate.buildNormalButton(Icons.upload_file_outlined, 'Load exist key', hasKey? _onLoadKey: null,),
-        const Spacer(flex: 1,),
-        WidgetTemplate.buildInsignificantButton(Icons.arrow_back, 'Back', _gotoMain),
-        const Spacer(flex: 1,),
+        maxLines: 3,
+      ),
+    );
+    
+    final cardContent = [
+      inputField,
+      const SizedBox(height: 24),
+      _buildPrimaryButton(
+        icon: Icons.upload_file_outlined,
+        label: 'Load existing key',
+        onPressed: hasKey ? _onLoadKey : null,
+      ),
+    ];
+    
+    final card = _buildCard(
+      title: 'Import Your Account',
+      description: 'Paste your existing key below to access your account and data from another device.',
+      children: cardContent,
+    );
+    
+    final backButton = _buildTextButton(
+      icon: Icons.arrow_back,
+      label: 'Back to main menu',
+      onPressed: _gotoMain,
+    );
+    
+    final content = _buildPageContent(
+      topIcon: topIcon,
+      children: [
+        card,
+        const SizedBox(height: 24),
+        backButton,
       ],
     );
-    final scrollView = SingleChildScrollView(
-      child: IntrinsicHeight(
-        child: column,
-      ),
-    );
-    var animated = AnimatedBuilder(
-      animation: _animationController,
-      builder: (BuildContext context, Widget? child) {
-        return ScaleTransition(
-          scale: _animationController,
-          child: child,
-        );
-      },
-      child: scrollView,
-    );
-    var align = Align(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: _maxWidth),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          child: animated,
-        ),
-      ),
-    );
-    var popScope = _buildPopScope(context, align);
-    return Scaffold(
-      appBar: WidgetTemplate.buildSimpleAppBar('Load your key'),
-      body: popScope,
+    
+    return _buildPageScaffold(
+      context: context,
+      title: 'Load account',
+      content: content,
+      withAnimation: true,
+      withPopScope: true,
     );
   }
   
+  /// Builds the success page shown after account creation or import
+  /// Displays the user's key information and allows them to start using the app
   Widget _buildComplete(BuildContext context) {
-    var icon = const Icon(Icons.check_circle, size: _iconSize, color: Colors.green,);
-    var column = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Spacer(flex: 2,),
-        icon,
-        const Spacer(flex: 1,),
-        const Text(
-          'Finish setting your private key, please click copy icon on the right and save it',
-          style: titleStyle,
-        ),
-        Container(
-          alignment: Alignment.centerLeft,
-          child: Text('Your name: ${userPrivateInfo!.userName}'),
-        ),
-        Row(
-          // mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Text('Your key info: ${userPrivateInfo!.toBase64().substring(0, 16)}...'),
+    const topIcon = Icon(
+      Icons.check_circle, 
+      size: _iconSize, 
+      color: Colors.green,
+    );
+    
+    final keyInfoContainer = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Your name: ${userPrivateInfo!.userName}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
             ),
-            IconButton(
-              icon: const Icon(Icons.copy),
-              onPressed: _onCopyKey,
-            ),
-          ],
-        ),
-        TextButton.icon(
-          icon: const Icon(Icons.done),
-          onPressed: _onComplete,
-          label: const Text('OK, I have already saved my key'),
-        ),
-        const Spacer(flex: 2,),
-      ],
-    );
-    var container = Container(
-      padding: const EdgeInsets.all(10),
-      alignment: Alignment.center,
-      child: column,
-    );
-    var animated = AnimatedBuilder(
-      animation: _animationController,
-      builder: (BuildContext context, Widget? child) {
-        return ScaleTransition(
-          scale: _animationController,
-          child: child,
-        );
-      },
-      child: container,
-    );
-    return Scaffold(
-      body: Align(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _maxWidth),
-          child: animated,
-        ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Your key: ${userPrivateInfo!.toBase64().substring(0, 16)}...',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy, color: Colors.black54),
+                onPressed: _onCopyKey,
+                tooltip: 'Copy key',
+              ),
+            ],
+          ),
+        ],
       ),
     );
-    // return AnimatedBuilder(animation: animation, builder: builder)
+    
+    final cardContent = [
+      keyInfoContainer,
+      const SizedBox(height: 24),
+      _buildPrimaryButton(
+        icon: Icons.done,
+        label: 'Let\'s start',
+        onPressed: _onComplete,
+      ),
+    ];
+    
+    final card = _buildCard(
+      title: 'Ready to go!',
+      description: 'Your account has been set up. Please copy and save your key in a secure location.',
+      children: cardContent,
+    );
+    
+    final content = _buildPageContent(
+      topIcon: topIcon,
+      children: [
+        card,
+      ],
+    );
+    
+    return _buildPageScaffold(
+      context: context,
+      title: 'Account Created',
+      content: content,
+      withAnimation: true,
+      withPopScope: true,
+    );
   }
 
+  /// Navigates back to the main menu
+  /// Resets the navigation state to allow normal back button behavior
   void _gotoMain() {
     setState(() {
       _stage = _SignInStage.mainMenu;
       _canPop = true;
     });
   }
+  /// Navigates to the account creation page
+  /// Starts the animation and disables normal back navigation
   void _gotoCreate() {
     setState(() {
       _animationController.reset();
@@ -311,6 +385,8 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       _canPop = false;
     });
   }
+  /// Navigates to the account import page
+  /// Starts the animation and disables normal back navigation
   void _gotoLoad() {
     setState(() {
       _animationController.reset();
@@ -319,6 +395,8 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       _canPop = false;
     });
   }
+  /// Creates a new key based on the user's name
+  /// Generates cryptographic keys and stores user information
   void _onCreateNewKey() {
     final signing = SigningWrapper.random();
     String publicKey = signing.getCompressedPublicKey();
@@ -329,6 +407,8 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     // print('key=$privateKey');
   }
 
+  /// Loads an existing key from base64 string
+  /// Parses the key and sets up the user information
   void _onLoadKey() {
     final base64Str = privateKeyController.value.text;
     var userInfo = UserPrivateInfo.fromBase64(base64Str);
@@ -336,12 +416,16 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     // print('key=$privateKey');
   }
 
+  /// Allows users to try the app without creating an account
+  /// Creates a guest account with predefined credentials
   void _justTry() {
     const guest = Constants.userNameAndKeyOfGuest;
     userPrivateInfo = UserPrivateInfo(publicKey: guest, userName: guest, privateKey: guest, timestamp: 0);
     _onComplete();
   }
 
+  /// Updates the user information and navigates to the success page
+  /// Starts the animation for the transition
   void _setUserInfo(UserPrivateInfo userInfo) {
     setState(() {
       userPrivateInfo = userInfo;
@@ -351,21 +435,267 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     });
   }
 
+  /// Copies the user's private key to the clipboard
+  /// Allows users to save their key for future use
   void _onCopyKey() {
     var value = userPrivateInfo?.toBase64();
     if(value == null) {
       return;
     }
     ClipboardUtil.writeToClipboard(value);
-    //TODO send a toast
+    //TODO: Implement toast notification for key copy confirmation
   }
 
+  /// Completes the sign-in process and starts the main application
+  /// Passes the user information to the parent widget
   void _onComplete() {
     if(userPrivateInfo == null) return;
     widget.update(userPrivateInfo!);
   }
+
+  /// Builds a scaffold with standardized layout for all pages
+  /// Handles animations and back navigation consistently
+  /// 
+  /// Parameters:
+  /// - context: The build context
+  /// - title: The page title shown in the app bar
+  /// - content: The main content widget
+  /// - withAnimation: Whether to apply scale animation
+  /// - withPopScope: Whether to handle back navigation
+  Widget _buildPageScaffold({
+    required BuildContext context,
+    required String title,
+    required Widget content,
+    bool withAnimation = false,
+    bool withPopScope = false,
+  }) {
+    Widget body = content;
+    
+    /// Apply animation if requested
+    if (withAnimation) {
+      body = AnimatedBuilder(
+        animation: _animationController,
+        builder: (BuildContext context, Widget? child) {
+          return ScaleTransition(
+            scale: _animationController,
+            child: child,
+          );
+        },
+        child: body,
+      );
+    }
+    
+    /// Add back navigation handling if requested
+    if (withPopScope) {
+      body = _buildPopScope(context, body);
+    }
+    
+    return Scaffold(
+      appBar: WidgetTemplate.buildSimpleAppBar(title),
+      body: body,
+    );
+  }
+
+  /// Creates a standardized page content container
+  /// Handles layout, scrolling, and spacing consistently
+  /// 
+  /// Parameters:
+  /// - children: The list of widgets to display in the page
+  /// - topIcon: Optional icon to display at the top of the page
+  Widget _buildPageContent({
+    required List<Widget> children,
+    Widget? topIcon,
+  }) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+      ),
+      child: Align(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: _maxWidth),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 40),
+                if (topIcon != null) Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: topIcon,
+                ),
+                if (topIcon != null) const SizedBox(height: 32),
+                ...children,
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Creates a standardized card container for content
+  /// Provides consistent styling for all information cards
+  /// 
+  /// Parameters:
+  /// - title: The card's main title
+  /// - description: The card's descriptive text
+  /// - children: Widgets to display in the card (buttons, fields, etc.)
+  Widget _buildCard({
+    required String title,
+    required String description,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            description,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.black54,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  /// Creates a primary action button with consistent styling
+  /// Used for the main actions on each page
+  /// 
+  /// Parameters:
+  /// - icon: The icon to display in the button
+  /// - label: The button text
+  /// - onPressed: The callback when button is pressed
+  Widget _buildPrimaryButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onPressed,
+  }) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.black87,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: Colors.grey.withOpacity(0.3),
+        disabledForegroundColor: Colors.white70,
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        minimumSize: const Size(double.infinity, 54),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Creates a secondary action button with consistent styling
+  /// Used for alternative actions on pages
+  /// 
+  /// Parameters:
+  /// - icon: The icon to display in the button
+  /// - label: The button text
+  /// - onPressed: The callback when button is pressed
+  Widget _buildSecondaryButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onPressed,
+  }) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.black87,
+        side: const BorderSide(color: Colors.black54),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        minimumSize: const Size(double.infinity, 54),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Creates a text button with consistent styling
+  /// Used for tertiary actions like "Back" or "Skip"
+  /// 
+  /// Parameters:
+  /// - icon: The icon to display in the button
+  /// - label: The button text
+  /// - onPressed: The callback when button is pressed
+  /// - mainAxisSize: Controls the button's horizontal size
+  Widget _buildTextButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onPressed,
+    MainAxisSize mainAxisSize = MainAxisSize.min,
+  }) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: Colors.black54,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: mainAxisSize,
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 15),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
+/// Enum representing the different stages of the sign-in process
+/// Controls which view is displayed to the user
 enum _SignInStage {
   mainMenu,
   createKey,
