@@ -23,15 +23,20 @@ Both these two ways you need to run mesh notes on both devices. But by the third
 ## Building and testing environment
 Build and test in Flutter 3.24.0, with Dart 3.5.0.
 For mac: Xcode 16.1
-For windows: Visual Studio 2022 + Rust 1.76.0, Need to install Nuget package(dependency of flutter_inappwebview).
+For windows: Visual Studio 2022, Need to install Nuget package(dependency of flutter_inappwebview).
 IDE: Cursor
 
 ## How to setup environment and run it
-1. Install rust, the super_clipboard package needs it. Please refer to [package super_clipboard](https://pub.dev/packages/super_clipboard)
-2. Run the `pre_build.sh` first, to create icons
-3. Run flutter `run -d <your device>` to run and debug
-4. Run flutter `run -d <your device> --release` to run it in release mode
-5. Run flutter `build <macos/windows> --release` to build it in release mode
+1. Run `flutter pub get` to get or update packages
+2. Run `flutter run -d <your device>` to run and debug
+3. Run `flutter run -d <your device> --release` to run it in release mode
+4. Run `flutter build <macos/windows> --release` to build it in release mode
+
+## How to change icon or splash
+This project use flutter_launcher_icons to change icon and flutter_native_splash to change splash.
+1. Put icons into assets directory
+2. Modify pubspec.yaml and flutter_native_splash.yaml
+3. Run scripts in build_icons.sh
 
 # Using Mesh Notes
 Mesh Notes is a note application, I use it to write down light-weight text contents, like my reading notes, my memo, my idea about anything.

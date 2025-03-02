@@ -59,11 +59,11 @@ class MainMenu extends StatelessWidget {
       },
       itemBuilder: (BuildContext ctx) {
         return [
-          _buildPopupMenu(screenShotKey, Icons.camera_alt_outlined, 'Screenshot'),
-          _buildPopupMenu(searchKey, Icons.manage_search_outlined, 'Search'),
+          if(showDebug) _buildPopupMenu(screenShotKey, Icons.camera_alt_outlined, 'Screenshot'),
+          if(showDebug) _buildPopupMenu(searchKey, Icons.manage_search_outlined, 'Search'),
           _buildPopupMenu(syncKey, Icons.sync_outlined, 'Sync'),
           // Only show delete in editor mode
-          if (menuType == MenuType.editor) _buildPopupMenu(deleteKey, Icons.delete_forever_outlined, 'Delete'),
+          if(menuType == MenuType.editor) _buildPopupMenu(deleteKey, Icons.delete_forever_outlined, 'Delete'),
           _buildPopupMenu(versionKey, Icons.history_outlined, 'Version Map'),
           // Only show clear history in debug mode
           if(showDebug) _buildPopupMenu(clearHistoryKey, Icons.warning_amber_outlined, 'Clear History'),

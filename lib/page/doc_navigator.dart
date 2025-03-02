@@ -158,18 +158,21 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   }
 
   Widget _buildSystemButtons(BuildContext context) {
+    final showDebug = controller.setting.getSetting(Constants.settingKeyShowDebugMenu)?.toLowerCase() == 'true';
     return Container(
       color: Colors.white,
       width: double.infinity,
       child: Row(
         children: [
-          _buildSearchIcon(),
           const Spacer(),
-          _buildCardIcon(context),
-          const Spacer(),
+          if(showDebug) _buildSearchIcon(),
+          if(showDebug) const Spacer(),
+          if(showDebug) _buildCardIcon(context),
+          if(showDebug) const Spacer(),
           _buildSettingIcon(context),
           const Spacer(),
           _buildNetworkIcon(context),
+          const Spacer(),
         ],
       ),
     );
