@@ -1,3 +1,4 @@
+import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
 import 'package:mesh_note/mindeditor/document/document_manager.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:my_log/my_log.dart';
@@ -128,7 +129,7 @@ Map<String, DagNode> _genDagWithMissingNodes() {
   var root = DagNode(versionHash: 'root', createdAt: 0, parents: []);
   var r1 = DagNode(versionHash: 'r1', createdAt: 0, parents: [root]);
   var common = DagNode(versionHash: _commonTag, createdAt: 0, parents: [r1]);
-  var missing1 = DagNode(versionHash: 'missing1', createdAt: 0, status: Constants.statusMissing, parents: [common]);
+  var missing1 = DagNode(versionHash: 'missing1', createdAt: 0, status: ModelConstants.statusMissing, parents: [common]);
   var n1 = DagNode(versionHash: _versionTag1, createdAt: 0, parents: [missing1]);
   var r2 = DagNode(versionHash: 'r2', createdAt: 0, parents: [missing1]);
   var n2 = DagNode(versionHash: _versionTag2, createdAt: 0, parents: [r2]);
@@ -141,10 +142,10 @@ Map<String, DagNode> _genDagWithDeprecatedNodes() {
   var root = DagNode(versionHash: 'root', createdAt: 0, parents: []);
   var r1 = DagNode(versionHash: 'r1', createdAt: 0, parents: [root]);
   var common = DagNode(versionHash: _commonTag, createdAt: 0, parents: [r1]);
-  var missing1 = DagNode(versionHash: 'missing1', createdAt: 0, status: Constants.statusMissing, parents: [common]);
+  var missing1 = DagNode(versionHash: 'missing1', createdAt: 0, status: ModelConstants.statusMissing, parents: [common]);
   var n1 = DagNode(versionHash: _versionTag1, createdAt: 0, parents: [missing1]);
   var r2 = DagNode(versionHash: 'r2', createdAt: 0, parents: [common]);
-  var deprecated1 = DagNode(versionHash: 'deprecated', createdAt: 0, status: Constants.statusDeprecated, parents: [r2]);
+  var deprecated1 = DagNode(versionHash: 'deprecated', createdAt: 0, status: ModelConstants.statusDeprecated, parents: [r2]);
   var n2 = DagNode(versionHash: _versionTag2, createdAt: 0, parents: [deprecated1]);
   return buildDagByNodes([root, r1, common, missing1, n1, r2, deprecated1, n2]);
 }
@@ -156,10 +157,10 @@ Map<String, DagNode> _genDagWithThreeLeaves() {
   var root = DagNode(versionHash: 'root', createdAt: 0, parents: []);
   var r1 = DagNode(versionHash: 'r1', createdAt: 0, parents: [root]);
   var common = DagNode(versionHash: _commonTag, createdAt: 0, parents: [r1]);
-  var missing1 = DagNode(versionHash: 'missing1', createdAt: 0, status: Constants.statusMissing, parents: [common]);
+  var missing1 = DagNode(versionHash: 'missing1', createdAt: 0, status: ModelConstants.statusMissing, parents: [common]);
   var n1 = DagNode(versionHash: _versionTag1, createdAt: 0, parents: [missing1]);
   var r2 = DagNode(versionHash: 'r2', createdAt: 0, parents: [common]);
-  var deprecated1 = DagNode(versionHash: 'deprecated1', createdAt: 0, status: Constants.statusDeprecated, parents: [r2]);
+  var deprecated1 = DagNode(versionHash: 'deprecated1', createdAt: 0, status: ModelConstants.statusDeprecated, parents: [r2]);
   var n2 = DagNode(versionHash: _versionTag2, createdAt: 0, parents: [deprecated1]);
   var r3 = DagNode(versionHash: 'r3', createdAt: 0, parents: [missing1]);
   var n3 = DagNode(versionHash: _versionTag3, createdAt: 0, parents: [r3]);
