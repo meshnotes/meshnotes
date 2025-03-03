@@ -411,9 +411,25 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   /// Parses the key and sets up the user information
   void _onLoadKey() {
     final base64Str = privateKeyController.value.text;
-    var userInfo = UserPrivateInfo.fromBase64(base64Str);
-    _setUserInfo(userInfo);
-    // print('key=$privateKey');
+    try {
+      var userInfo = UserPrivateInfo.fromBase64(base64Str);
+      _setUserInfo(userInfo);
+    } catch (e) {
+      // Show error dialog when key parsing fails
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Invalid Key'),
+          content: const Text('The key you entered is not valid. Please check and try again.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   /// Allows users to try the app without creating an account
