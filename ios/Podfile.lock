@@ -14,8 +14,6 @@ PODS:
     - OrderedSet (~> 6.0.3)
   - flutter_native_splash (2.4.3):
     - Flutter
-  - irondash_engine_context (0.0.1):
-    - Flutter
   - mp_audio_stream (0.0.3):
     - Flutter
   - OrderedSet (6.0.3)
@@ -45,8 +43,6 @@ PODS:
     - sqlite3/fts5
     - sqlite3/perf-threadsafe
     - sqlite3/rtree
-  - super_native_extensions (0.0.1):
-    - Flutter
 
 DEPENDENCIES:
   - bonsoir_darwin (from `.symlinks/plugins/bonsoir_darwin/darwin`)
@@ -54,13 +50,11 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - flutter_inappwebview_ios (from `.symlinks/plugins/flutter_inappwebview_ios/ios`)
   - flutter_native_splash (from `.symlinks/plugins/flutter_native_splash/ios`)
-  - irondash_engine_context (from `.symlinks/plugins/irondash_engine_context/ios`)
   - mp_audio_stream (from `.symlinks/plugins/mp_audio_stream/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - permission_handler (from `.symlinks/plugins/permission_handler/ios`)
   - record_darwin (from `.symlinks/plugins/record_darwin/ios`)
   - sqlite3_flutter_libs (from `.symlinks/plugins/sqlite3_flutter_libs/darwin`)
-  - super_native_extensions (from `.symlinks/plugins/super_native_extensions/ios`)
 
 SPEC REPOS:
   trunk:
@@ -78,8 +72,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_inappwebview_ios/ios"
   flutter_native_splash:
     :path: ".symlinks/plugins/flutter_native_splash/ios"
-  irondash_engine_context:
-    :path: ".symlinks/plugins/irondash_engine_context/ios"
   mp_audio_stream:
     :path: ".symlinks/plugins/mp_audio_stream/ios"
   path_provider_foundation:
@@ -90,8 +82,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/record_darwin/ios"
   sqlite3_flutter_libs:
     :path: ".symlinks/plugins/sqlite3_flutter_libs/darwin"
-  super_native_extensions:
-    :path: ".symlinks/plugins/super_native_extensions/ios"
 
 SPEC CHECKSUMS:
   bonsoir_darwin: e3b8526c42ca46a885142df84229131dfabea842
@@ -99,7 +89,6 @@ SPEC CHECKSUMS:
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_inappwebview_ios: 6f63631e2c62a7c350263b13fa5427aedefe81d4
   flutter_native_splash: f71420956eb811e6d310720fee915f1d42852e7a
-  irondash_engine_context: 3458bf979b90d616ffb8ae03a150bafe2e860cc9
   mp_audio_stream: ed519e6221a8a4e6fd4ce2edd6cf04841d0da6b6
   OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
@@ -107,7 +96,6 @@ SPEC CHECKSUMS:
   record_darwin: 3b1a8e7d5c0cbf45ad6165b4d83a6ca643d929c3
   sqlite3: 7559e33dae4c78538df563795af3a86fc887ee71
   sqlite3_flutter_libs: 1b4e98da20ebd4e9b1240269b78cdcf492dbe9f3
-  super_native_extensions: 4916b3c627a9c7fffdc48a23a9eca0b1ac228fa7
 
 PODFILE CHECKSUM: 71544633e203658dc482a56db70a8a2a63b277c9
 
