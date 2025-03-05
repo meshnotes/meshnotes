@@ -125,9 +125,9 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       topIcon: topIcon,
       children: [
         card,
-        const SizedBox(height: 24),
-        exploreButton,
+        // const SizedBox(height: 24),
       ],
+      bottom: exploreButton,
     );
     
     return _buildPageScaffold(
@@ -204,9 +204,9 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       topIcon: topIcon,
       children: [
         card,
-        const SizedBox(height: 24),
-        backButton,
+        // const SizedBox(height: 24),
       ],
+      bottom: backButton,
     );
     
     return _buildPageScaffold(
@@ -270,9 +270,9 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       topIcon: topIcon,
       children: [
         card,
-        const SizedBox(height: 24),
-        backButton,
+        // const SizedBox(height: 24),
       ],
+      bottom: backButton,
     );
     
     return _buildPageScaffold(
@@ -521,30 +521,31 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   Widget _buildPageContent({
     required List<Widget> children,
     Widget? topIcon,
+    Widget? bottom,
   }) {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
       ),
       child: Align(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: _maxWidth),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: SingleChildScrollView(
+        alignment: Alignment.bottomCenter,
+        child: SingleChildScrollView(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: _maxWidth),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 40),
+                // const SizedBox(height: 16),
                 if (topIcon != null) Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                  padding: const EdgeInsets.all(8),
                   child: topIcon,
                 ),
-                if (topIcon != null) const SizedBox(height: 32),
+                if (topIcon != null) const SizedBox(height: 8),
                 ...children,
-                const SizedBox(height: 40),
+                // const SizedBox(height: 16),
+                if (bottom != null) bottom,
+                const SizedBox(height: 16),
               ],
             ),
           ),
