@@ -309,7 +309,11 @@ class MindBlockImplRenderObject extends RenderBox {
     return compactedBoxes;
   }
   bool _intersect(TextBox box1, TextBox box2) {
-    return box1.bottom > box2.top && box1.top < box2.bottom;
+    // Don't use this, sometimes a next line's top may be upper than the previous line's bottom
+    // return box1.bottom > box2.top && box1.top < box2.bottom;
+
+    // Use this, two bottom should be close to each other, two top should be close to each other in case of superscript
+    return (box1.bottom - box2.bottom).abs() < fontSize * 0.5 || (box1.top - box2.top).abs() < fontSize * 0.5;
   }
   TextBox _mergeBoxes(TextBox box1, TextBox box2) {
     return TextBox.fromLTRBD(
