@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/rendering.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
@@ -254,10 +255,11 @@ class MindBlockImplRenderObject extends RenderBox {
   }
   void _drawSelectionBoxes(Canvas canvas, Offset offset, TextSelection textSelection, double height) {
     var boxes = paragraph.getBoxesForSelection(textSelection);
-    if(boxes.isNotEmpty) {
+    final compactedBoxes = _compactBoxes(boxes);
+    if(compactedBoxes.isNotEmpty) {
       final paint = Paint()
         ..color = Colors.blue[100]!; //.withOpacity(0.5);
-      for (final box in boxes) {
+      for (final box in compactedBoxes) {
         Rect rect = Rect.fromLTRB(box.left, box.top, box.right, box.bottom);
         canvas.drawRect(rect.shift(offset), paint);
       }
@@ -277,13 +279,48 @@ class MindBlockImplRenderObject extends RenderBox {
       extentOffset: composing.end + leadingPos,
     );
     var boxes = paragraph.getBoxesForSelection(fakeSelection);
-    for(final box in boxes) {
+    final compactedBoxes = _compactBoxes(boxes);
+    for(final box in compactedBoxes) {
       final rect = Rect.fromLTRB(box.left, box.top, box.right, box.bottom);
       Offset from = Offset(rect.left, rect.bottom) + offset;
       Offset to = Offset(rect.right, rect.bottom) + offset;
       canvas.drawLine(from, to, paint);
     }
   }
+  /// Merge selection boxes if their heights intersect
+  List<TextBox> _compactBoxes(List<TextBox> boxes) {
+    final compactedBoxes = <TextBox>[];
+    TextBox? lastBox;
+    for(final box in boxes) {
+      if(lastBox == null) {
+        lastBox = box;
+        continue;
+      }
+      if(_intersect(lastBox, box)) {
+        lastBox = _mergeBoxes(lastBox, box);
+      } else {
+        compactedBoxes.add(lastBox);
+        lastBox = box;
+      }
+    }
+    if(lastBox != null) {
+      compactedBoxes.add(lastBox);
+    }
+    return compactedBoxes;
+  }
+  bool _intersect(TextBox box1, TextBox box2) {
+    return box1.bottom > box2.top && box1.top < box2.bottom;
+  }
+  TextBox _mergeBoxes(TextBox box1, TextBox box2) {
+    return TextBox.fromLTRBD(
+      math.min(box1.left, box2.left),
+      math.min(box1.top, box2.top),
+      math.max(box1.right, box2.right),
+      math.max(box1.bottom, box2.bottom),
+      box1.direction,
+    );
+  }
+
 
   Rect _getCurrentRenderGlobalRect() {
     final _firstPoint = localToGlobal(Offset.zero);
