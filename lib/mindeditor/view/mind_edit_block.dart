@@ -418,17 +418,30 @@ class MindEditBlockState extends State<MindEditBlock> {
       _getRender()?.updateParagraph();
       _getRender()?.markNeedsLayout();
       CallbackRegistry.refreshTextEditingValue();
-    } else { // Should be merge into previous block
-      var previousBlock = widget.texts.getPrevious();
-      if(previousBlock == null) { // Do nothing if it is the first block
-        return;
-      } else {
-        var previousBlockState = previousBlock.getEditState();
-        // Get the text length of previous block, at which the cursor should be located
-        var length = previousBlock.getTotalLength();
-        previousBlockState!.mergeParagraph(widget.texts.getBlockId());
-        CallbackRegistry.rudelyCloseIME();
-        CallbackRegistry.refreshDoc(activeBlockId: previousBlock.getBlockId(), position: length);
+    } else {
+      // Already at the start of a block, may need to decrease level, 
+      // or clear style, or merge to previous block
+      final level = widget.texts.getBlockLevel();
+      final listing = widget.texts.getBlockListing();
+      final isTitle = widget.texts.isTitle();
+      if(!isTitle && level > 0) { // Need to decrease level
+        setBlockLevel(level - 1);
+        CallbackRegistry.refreshDoc(activeBlockId: widget.texts.getBlockId(), position: 0);
+      } else if(!isTitle && listing != Constants.blockListTypeNone) { // Need to clear style
+        setBlockListing(Constants.blockListTypeNone);
+        CallbackRegistry.refreshDoc(activeBlockId: widget.texts.getBlockId(), position: 0);
+      } else { // Should be merge into previous block
+        var previousBlock = widget.texts.getPrevious();
+        if(previousBlock == null) { // Do nothing if it is the first block
+          return;
+        } else {
+          var previousBlockState = previousBlock.getEditState();
+          // Get the text length of previous block, at which the cursor should be located
+          var length = previousBlock.getTotalLength();
+          previousBlockState!.mergeParagraph(widget.texts.getBlockId());
+          CallbackRegistry.rudelyCloseIME();
+          CallbackRegistry.refreshDoc(activeBlockId: previousBlock.getBlockId(), position: length);
+        }
       }
     }
     _updateNavigatorViewIfNeeded();
