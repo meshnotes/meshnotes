@@ -552,6 +552,10 @@ class SelectionController {
     return lastPara?.getEditState(); // Case 2.1 or 2.2
   }
 
+  void hideSelectionHandles() {
+    _shouldShowSelectionHandle = false;
+    _selectionHandleLayer.hide();
+  }
   void _showOrHideSelectionHandles(Offset? baseCursorOffset, Offset? extentCursorOffset) {
     if(_shouldShowSelectionHandle) {
       if(isCollapsed()) {

@@ -50,13 +50,14 @@ class Setting {
   double blockExtraTipsSize = 18.0; // Size of extra tips icon
 
   // block
-  double blockNormalFontSize = 16.0; // 普通文本的字体大小
-  double blockTitleFontSize = 32.0; // 标题文本的字体大小
-  double blockHeadline1FontSize = 24; // headline1的字体大小
-  double blockHeadline2FontSize = 20; // headline2的字体大小
-  double blockHeadline3FontSize = 18; // headline3的字体大小
-  double blockNormalLineHeight = 21.0; // 普通文本的行高
-  int blockMaxCharacterLength = 1000; // 每个block最大字符数量
+  double blockNormalFontSize = 16.0; // Font size of normal text
+  double blockTitleFontSize = 32.0; // Font size of style title
+  double blockHeadline1FontSize = 24; // Font size of style headline1
+  double blockHeadline2FontSize = 20; // Font size of style headline2
+  double blockHeadline3FontSize = 18; // Font size of style headline3
+  double blockNormalLineHeight = 21.0; // Default line height of normal text
+  int blockMaxCharacterLength = 1000; // Maximum number of characters in a block
+  int blockMaxLevel = 6; // Maximum level of block
 
   // editor title
   EdgeInsets titleTextPadding = const EdgeInsets.fromLTRB(5, 15, 5, 15);

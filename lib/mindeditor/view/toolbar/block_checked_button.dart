@@ -44,16 +44,7 @@ class BlockCheckedButton extends StatelessWidget {
           newListing = Constants.blockListTypeNone;
         }
         MyLogger.debug('Setting block(id=${blockState.getBlockId()}\'s listing to: $newListing');
-        var ok = blockState.setBlockListing(newListing);
-        if(ok) {
-          var block = blockState.widget.texts;
-          var blockId = block.getBlockId();
-          var pos = 0;
-          if(block.getTextSelection() != null) {
-            pos = block.getTextSelection()!.extentOffset;
-          }
-          CallbackRegistry.refreshDoc(activeBlockId: blockId, position: pos);
-        }
+        blockState.setBlockListing(newListing);
       },
       buttonKey: listing,
     );

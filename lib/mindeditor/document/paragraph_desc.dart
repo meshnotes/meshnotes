@@ -437,6 +437,9 @@ class ParagraphDesc {
     return _level;
   }
   bool setBlockLevel(int level) {
+    if(level < 0 || level > Controller().setting.blockMaxLevel) {
+      return false;
+    }
     _updateBlockLevel(level);
     return true;
   }

@@ -13,6 +13,7 @@ const _backspaceKey = LogicalKeyboardKey.backspace;
 const _deleteKey    = LogicalKeyboardKey.delete;
 const _newLineKey   = LogicalKeyboardKey.enter;
 const _cancelKey    = LogicalKeyboardKey.escape;
+const _tabKey       = LogicalKeyboardKey.tab;
 
 class FunctionKeys {
   bool altPressed;
@@ -41,6 +42,9 @@ class KeyboardControl {
   static final _delKeys = <LogicalKeyboardKey> {
     _backspaceKey, _deleteKey,
   };
+  static final _tabKeys = <LogicalKeyboardKey> {
+    _tabKey,
+  };
 
   static bool handleKeyDown(LogicalKeyboardKey _key, bool alt, bool ctrl, bool meta, bool shift) {
     var funcKeys = FunctionKeys(alt, ctrl, meta, shift);
@@ -57,6 +61,9 @@ class KeyboardControl {
     if(_cancelKey == _key) {
       MyLogger.info('ESC pressed');
       return false;
+    }
+    if(_tabKeys.contains(_key)) {
+      return _handleTabKeys(_key, funcKeys);
     }
     return false;
   }
@@ -110,6 +117,21 @@ class KeyboardControl {
       return false;
     }
     editingState.spawnNewLine();
+    return true;
+  }
+
+  static bool _handleTabKeys(LogicalKeyboardKey _key, FunctionKeys funcKeys) {
+    final controller = Controller();
+    // controller.selectionController.setShouldShowSelectionHandle(false);
+    controller.selectionController.hideSelectionHandles();
+    if(funcKeys.shiftPressed) {
+      // Shift + Tab, decrease block level
+      controller.getEditingBlockState()?.decreaseBlockLevel();
+    } else {
+      // Tab, increase block level
+      controller.getEditingBlockState()?.increaseBlockLevel();
+    }
+    controller.selectionController.setShouldShowSelectionHandle(false);
     return true;
   }
 

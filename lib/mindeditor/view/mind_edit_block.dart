@@ -425,11 +425,11 @@ class MindEditBlockState extends State<MindEditBlock> {
       final listing = widget.texts.getBlockListing();
       final isTitle = widget.texts.isTitle();
       if(!isTitle && level > 0) { // Need to decrease level
-        setBlockLevel(level - 1);
-        CallbackRegistry.refreshDoc(activeBlockId: widget.texts.getBlockId(), position: 0);
+        decreaseBlockLevel();
       } else if(!isTitle && listing != Constants.blockListTypeNone) { // Need to clear style
         setBlockListing(Constants.blockListTypeNone);
-        CallbackRegistry.refreshDoc(activeBlockId: widget.texts.getBlockId(), position: 0);
+        setState(() {
+        });
       } else { // Should be merge into previous block
         var previousBlock = widget.texts.getPrevious();
         if(previousBlock == null) { // Do nothing if it is the first block
@@ -635,7 +635,13 @@ class MindEditBlockState extends State<MindEditBlock> {
     if(widget.texts.isTitle()) { // Cannot set listing type in title block
       return false;
     }
-    return _setBlockListing(l);
+    final result = _setBlockListing(l);
+    if(result) {
+      controller.selectionController.hideSelectionHandles();
+      setState(() {
+      });
+    }
+    return result;
   }
   bool _setBlockListing(String l) {
     var paragraph = widget.texts;
@@ -656,7 +662,21 @@ class MindEditBlockState extends State<MindEditBlock> {
     if(widget.texts.isTitle()) { // Cannot set level in title block
       return false;
     }
-    return _setBlockLevel(level);
+    final result = _setBlockLevel(level);
+    if(result) {
+      controller.selectionController.hideSelectionHandles();
+      setState(() {
+      });
+    }
+    return result;
+  }
+  bool increaseBlockLevel() {
+    final level = widget.texts.getBlockLevel();
+    return setBlockLevel(level + 1);
+  }
+  bool decreaseBlockLevel() {
+    final level = widget.texts.getBlockLevel();
+    return setBlockLevel(level - 1);
   }
   bool _setBlockLevel(int newLevel) {
     var paragraph = widget.texts;

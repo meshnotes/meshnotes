@@ -10,7 +10,6 @@ class BlockIndentIncreaseButton extends StatelessWidget {
   final AppearanceSetting appearance;
   final IconData icon;
   final String tips;
-  static const int maxLevel = 5;
 
   const BlockIndentIncreaseButton({
     Key? key,
@@ -28,7 +27,7 @@ class BlockIndentIncreaseButton extends StatelessWidget {
       iconData: icon,
       tip: tips,
       availableOrNot: (String? _type, String? _listing, int? _level) { // Available only when level is less than maxLevel
-        return _level == null || _level < maxLevel; // null means level 0
+        return _level == null || _level < controller.setting.blockMaxLevel; // null means level 0
       },
       onPressed: () {
         var blockState = controller.getEditingBlockState();
@@ -38,20 +37,11 @@ class BlockIndentIncreaseButton extends StatelessWidget {
         }
         var currentLevel = blockState.getBlockLevel();
         var newLevel = currentLevel + 1;
-        if(newLevel >= maxLevel) {
-          newLevel = maxLevel;
+        if(newLevel > controller.setting.blockMaxLevel) {
+          return;
         }
         MyLogger.debug('Setting block(id=${blockState.getBlockId()}\'s level to: $newLevel');
-        var ok = blockState.setBlockLevel(newLevel);
-        if(ok) {
-          var block = blockState.widget.texts;
-          var blockId = block.getBlockId();
-          var pos = 0;
-          if(block.getTextSelection() != null) {
-            pos = block.getTextSelection()!.extentOffset;
-          }
-          CallbackRegistry.refreshDoc(activeBlockId: blockId, position: pos);
-        }
+        blockState.setBlockLevel(newLevel);
       },
       buttonKey: 'increase_indent',
     );
@@ -91,20 +81,11 @@ class BlockIndentDecreaseButton extends StatelessWidget {
         }
         var currentLevel = blockState.getBlockLevel();
         var newLevel = currentLevel - 1;
-        if(newLevel <= 0) {
-          newLevel = 0;
+        if(newLevel < 0) {
+          return;
         }
         MyLogger.debug('Setting block(id=${blockState.getBlockId()}\'s level to: $newLevel');
-        var ok = blockState.setBlockLevel(newLevel);
-        if(ok) {
-          var block = blockState.widget.texts;
-          var blockId = block.getBlockId();
-          var pos = 0;
-          if(block.getTextSelection() != null) {
-            pos = block.getTextSelection()!.extentOffset;
-          }
-          CallbackRegistry.refreshDoc(activeBlockId: blockId, position: pos);
-        }
+        blockState.setBlockLevel(newLevel);
       },
       buttonKey: 'decrease_indent',
     );
