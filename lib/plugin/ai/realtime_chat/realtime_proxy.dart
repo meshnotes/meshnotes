@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
 import 'package:my_log/my_log.dart';
-import 'audio_player_proxy.dart';
-import 'audio_recorder_proxy.dart';
 import 'function_call.dart';
-import 'realtime_api.dart';
 import 'chat_messages.dart';
+import 'realtime_api_webrtc.dart';
 
 enum RealtimeConnectionState {
   idle,
@@ -19,10 +17,8 @@ enum RealtimeConnectionState {
 
 class RealtimeProxy {
   final String apiKey;
-  late RealtimeApi client;
-  late AudioPlayerProxy audioPlayerProxy;
-  late AudioRecorderProxy audioRecorderProxy;
-  String? _popSoundAudioBase64;
+  late RealtimeApiWebRtc clientWebRtc;
+  final bool playPopSoundAfterConnected;
   bool shouldStop = false; // stop by user
   bool forceStop = false; // stop by too many errors
   // Just for chat history test
@@ -54,11 +50,9 @@ class RealtimeProxy {
   static const int sampleRate = 24000;
   static const int numChannels = 1;
   static const int sampleSize = 16;
-  final bool usingNativeAudio;
 
   RealtimeProxy({
     required this.apiKey,
-    required this.usingNativeAudio,
     this.userNotes,
     this.tools,
     this.showToastCallback,
@@ -67,6 +61,7 @@ class RealtimeProxy {
     this.stopVisualizerAnimation,
     this.onChatMessagesUpdated,
     this.onStateChanged,
+    this.playPopSoundAfterConnected = true,
   });
 
   /// 1. Connect to Realtime API
@@ -77,53 +72,32 @@ class RealtimeProxy {
       return false;
     }
     _state = RealtimeConnectionState.connecting;
-    if(usingNativeAudio) {
-      await _openNativeRecorder();
-      _openNativeAudioPlayer();
-    }
-    client = RealtimeApi(
+    bool connected = false;
+    clientWebRtc = RealtimeApiWebRtc(
       apiKey: apiKey,
       toolsDescription: tools?.getDescription(),
-      onAiAudioDelta: _onAudioDelta,
-      onInterrupt: _onInterrupt,
       onAiTranscriptDelta: _onAiTranscriptDelta,
       onAiTranscriptDone: _onAiTranscriptDone,
       onUserTranscriptDone: _onUserTranscriptDone,
-      onWsError: _onWsError,
-      onWsClose: _onWsClose,
+      onFailed: _onFailed,
+      onClose: _onClose,
       onFunctionCall: _onFunctionCall,
     );
-    // Connect to Realtime API
-    bool connected = false;
     if(chatMessages.isEmpty()) {
-      connected = await client.connect(userContents: _buildUserContents());
+      connected = await clientWebRtc.connectWebRtc(userContents: _buildUserContents());
     } else {
-      connected = await client.connect(userContents: _buildUserContents(), history: _buildHistory());
+      connected = await clientWebRtc.connectWebRtc(userContents: _buildUserContents(), history: _buildHistory());
     }
     if(connected) {
       MyLogger.info('Connected to Realtime API');
       _state = RealtimeConnectionState.connected;
       onStateChanged?.call(_state);
     }
-    if(_popSoundAudioBase64 != null) { // Play a pop sound when connected
-      MyLogger.debug('Play pop sound, $_popSoundAudioBase64');
-      // Timer(const Duration(milliseconds: 1000), () {
-      //   audioPlayerProxy.play(_popSoundAudioBase64!, 'pop_sound', 0);
-      // });
-      await Future.delayed(const Duration(milliseconds: 1000)); // Had to wait for 1s, or no sound on Android. I don't know why.
-      audioPlayerProxy.play(_popSoundAudioBase64!, 'pop_sound', 0);
+    if(playPopSoundAfterConnected) { // Play a pop sound when connected
+      await Future.delayed(const Duration(milliseconds: 1000));
+      AudioPlayer().play(AssetSource('sound/pop.mp3'), volume: 1.2);
     }
     return connected;
-  }
-
-  void setAudioProxies(AudioPlayerProxy player, AudioRecorderProxy recorder) {
-    audioPlayerProxy = player;
-    audioRecorderProxy = recorder;
-    recorder.setOnAudioData(appendInputAudio);
-  }
-
-  void appendInputAudio(String base64Data) {
-    client.appendInputAudio(base64Data);
   }
 
   void shutdown() {
@@ -132,41 +106,10 @@ class RealtimeProxy {
     }
     _state = RealtimeConnectionState.shuttingDown;
     shouldStop = true;
-    client.shutdown();
-    audioPlayerProxy.shutdown();
-    audioRecorderProxy.stop();
+    clientWebRtc.shutdown();
     _animationTimer?.cancel();
     _state = RealtimeConnectionState.idle;
     onStateChanged?.call(_state);
-  }
-
-  void setPopSoundAudioBase64(String base64) {
-    _popSoundAudioBase64 = base64;
-  }
-
-  Future<void> _openNativeRecorder() async {
-    audioRecorderProxy = NativeAudioRecorderProxy(
-      sampleRate: sampleRate,
-      numChannels: numChannels,
-    );
-    audioRecorderProxy.setOnAudioData(appendInputAudio);
-    audioRecorderProxy.start();
-  }
-  void _openNativeAudioPlayer() {
-    audioPlayerProxy = NativeAudioPlayerProxyImpl(onPlaying: _onAudioActive); // play animation when playing audio
-  }
-
-  void _onAudioDelta(String base64Data, String itemId, int contentIndex) {
-    audioPlayerProxy.play(base64Data, itemId, contentIndex);
-  }
-
-  void _onInterrupt() {
-    MyLogger.info('Interrupted');
-    final truncateInfo = audioPlayerProxy.stop();
-    if(truncateInfo != null) {
-      MyLogger.info('Interrupt, truncate info: ${truncateInfo.itemId} ${truncateInfo.contentIndex} ${truncateInfo.audioEndMs}');
-      client.truncate(truncateInfo);
-    }
   }
 
   void _onAiTranscriptDelta(String text) {
@@ -204,13 +147,13 @@ class RealtimeProxy {
     return prompt + '\n' + messageHistory;
   }
 
-  void _onWsError(Object error, StackTrace stackTrace) {
+  void _onFailed() {
     _state = RealtimeConnectionState.error;
     onStateChanged?.call(_state);
     _tryToReconnect();
   }
 
-  void _onWsClose() {
+  void _onClose() {
     _state = RealtimeConnectionState.error;
     onStateChanged?.call(_state);
     _tryToReconnect();
@@ -231,7 +174,7 @@ class RealtimeProxy {
     MyLogger.info('Reconnecting for the $errorRetryCount-th time...');
     _state = RealtimeConnectionState.connecting;
     onStateChanged?.call(_state);
-    bool connected = await client.connect(userContents: _buildUserContents(), history: _buildHistory());
+    bool connected = await clientWebRtc.connectWebRtc(userContents: _buildUserContents(), history: _buildHistory());
     if(connected) {
       // After connected, reset the retry count if it's stable running for 10 seconds
       resetRetryCountTimer?.cancel();
@@ -241,15 +184,6 @@ class RealtimeProxy {
     }
     _state = RealtimeConnectionState.connected;
     onStateChanged?.call(_state);
-  }
-
-  bool _isNotSilent(Uint8List data) {
-    int sum = 0;
-    for(final byte in data) {
-      sum += byte;
-    }
-    double avg = sum / data.length;
-    return avg > 10.0;
   }
 
   void _onAudioActive(int duration) {
@@ -275,10 +209,17 @@ class RealtimeProxy {
     if(result == null) {
       MyLogger.warn('Function not found: name=$name');
     } else {
-      client.sendFunctionResult(callId, jsonEncode(result));
+      clientWebRtc.sendFunctionResult(callId, jsonEncode(result));
       if(result.shouldInformUser) {
-        client.informUserToolResult(callId);
+        clientWebRtc.informUserToolResult(callId);
       }
     }
+  }
+
+  void mute() {
+    clientWebRtc.toggleMute(true);
+  }
+  void unmute() {
+    clientWebRtc.toggleMute(false);
   }
 }

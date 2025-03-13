@@ -64,8 +64,21 @@ class PluginManager {
       displayName: setting.settingName,
       comment: setting.settingComment,
       defaultValue: setting.settingDefaultValue,
+      type: _convertSettingType(setting.type),
     );
     _pluginSupportedSettings.add(settingData);
+  }
+  SettingType _convertSettingType(PluginSettingType type) {
+    switch(type) {
+      case PluginSettingType.string:
+        return SettingType.string;
+      case PluginSettingType.number:
+        return SettingType.number;
+      case PluginSettingType.bool:
+        return SettingType.bool;
+      default:
+        return SettingType.string;
+    }
   }
 
   List<Widget> buildButtons({

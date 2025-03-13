@@ -73,6 +73,7 @@ class PluginAI implements PluginInstance {
         settingName: settingNameUseAiForExtra,
         settingComment: settingCommentUseAiForExtra,
         settingDefaultValue: settingDefaultUseAiForExtra,
+        type: PluginSettingType.bool,
       ),
     ];
     return result;

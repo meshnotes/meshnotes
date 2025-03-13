@@ -3,6 +3,8 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  audioplayers_linux
+  flutter_webrtc
   flutter_window_close
   record_linux
   sqlite3_flutter_libs

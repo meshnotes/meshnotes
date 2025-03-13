@@ -63,17 +63,24 @@ class ToolbarInformation {
   });
 }
 
+enum PluginSettingType {
+  string,
+  number,
+  bool,
+}
 class PluginSetting {
   String settingKey;
   String settingName;
   String settingComment;
   String settingDefaultValue;
+  PluginSettingType type;
 
   PluginSetting({
     required this.settingKey,
     required this.settingName,
     required this.settingComment,
     this.settingDefaultValue = '',
+    this.type = PluginSettingType.string,
   });
 }
 

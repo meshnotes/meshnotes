@@ -69,6 +69,7 @@ dependencies:
   # flutter_switch: ^0.3.2
   intl: ^0.18.0
   flutter_inappwebview: 6.1.5
+  http: ^1.3.0
   libp2p:
     path: packages/libp2p
   my_log:
@@ -78,6 +79,8 @@ dependencies:
   win32: ^5.9.0
   flutter_native_splash: ^2.4.4
   bonsoir: ^5.1.10
+  flutter_webrtc: ^0.12.12
+  audioplayers: ^6.4.0
 
 flutter_app_name:
   name: 'MeshNotes'
@@ -94,6 +97,7 @@ flutter_launcher_icons:
     image_path: "assets/applogo_win.png"
     generate: true
   macos:
+    image_path: "assets/applogo_mac.png"
     generate: true
 
 dev_dependencies:
@@ -150,7 +154,6 @@ flutter:
   # see https://flutter.dev/custom-fonts/#from-packages
 
   assets:
-    - assets/pop_sound_pcm24k.pcm
-    - assets/webview/
     - assets/splash_page.png
     - assets/applogo.png
+    - assets/sound/pop.mp3

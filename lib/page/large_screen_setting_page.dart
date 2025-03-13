@@ -131,7 +131,6 @@ class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
   }
 
   Widget _buildBoolSetting(SettingData settingItem, int index) {
-    MyLogger.info('efantest: value=${newValue[index]}');
     var row = Row(
       key: ValueKey(settingItem.name),
       children: [

@@ -3,8 +3,10 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  audioplayers_windows
   bonsoir_windows
   flutter_inappwebview_windows
+  flutter_webrtc
   flutter_window_close
   record_windows
   sqlite3_flutter_libs

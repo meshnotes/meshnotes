@@ -1,11 +1,8 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:my_log/my_log.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'aec_audio_web_view.dart';
 import 'ai_tools_manager.dart';
 import 'audio_visualizer_widget.dart';
 import 'chat_messages.dart';
@@ -51,10 +48,8 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     _isError = false;
     _toolsManager = AiToolsManager(pluginProxy: widget.proxy);
     final userNotes = widget.proxy.getUserNotes();
-    final useNativeAudioProxy = _useNativeAudioProxy();
 
     realtime = RealtimeProxy(
-      usingNativeAudio: useNativeAudioProxy,
       apiKey: widget.apiKey,
       userNotes: userNotes,
       tools: _toolsManager.buildTools(),
@@ -84,14 +79,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       stopVisualizerAnimation: _stopVisualizerAnimation,
       onChatMessagesUpdated: _onChatMessagesUpdated,
     );
-    rootBundle.load('assets/pop_sound_pcm24k.pcm').then((value) {
-      realtime.setPopSoundAudioBase64(base64Encode(value.buffer.asUint8List()));
-    }).whenComplete(() {
-      if(useNativeAudioProxy) {
-        _startRealtimeChat();
-      }
-    });
-    permissionFuture = requestPermissions();
+    permissionFuture = _startRealtimeChat();
   }
 
   @override
@@ -156,9 +144,9 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                         setState(() {
                           _isMuted = !_isMuted;
                           if(_isMuted) {
-                            realtime.audioRecorderProxy.mute();
+                            realtime.mute();
                           } else {
-                            realtime.audioRecorderProxy.unmute();
+                            realtime.unmute();
                           }
                         });
                       },
@@ -239,7 +227,6 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
               size: 24,
             );
           } else {
-            final webViewAudio = _buildWebViewAudio();
             if(_isLoading) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -253,7 +240,6 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  webViewAudio?? const SizedBox.shrink(),
                   Text(
                     'Loading...',
                     style: TextStyle(
@@ -276,7 +262,6 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
               );
               return Column(
                 children: [
-                  webViewAudio?? const SizedBox.shrink(),
                   audioVisualizer,
                 ],
               );
@@ -314,33 +299,6 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     return futureBuilder;
   }
 
-  bool _useNativeAudioProxy() {
-    final platform = widget.proxy.getPlatform();
-    return !(platform.isWindows() || platform.isMacOS() || platform.isAndroid() || platform.isIOS());
-  }
-
-  Widget? _buildWebViewAudio() {
-    if(_useNativeAudioProxy()) {
-      return null;
-    }
-    final aecAudioWebView = AecAudioWebView(
-      key: aecAudioWebViewKey,
-      sampleRate: RealtimeProxy.sampleRate,
-      numChannels: RealtimeProxy.numChannels,
-      sampleSize: RealtimeProxy.sampleSize,
-      onAudioProxyReady: (audioPlayerProxy, audioRecorderProxy) {
-        realtime.setAudioProxies(audioPlayerProxy, audioRecorderProxy);
-        _startRealtimeChat();
-      },
-    );
-    final sizedBox = SizedBox(
-      width: 1,
-      height: 1,
-      child: aecAudioWebView,
-    );
-    return sizedBox;
-  }
-
   Future<bool> requestPermissions() async {
     if(widget.proxy.getPlatform().isMobile()) {
       final statusMicrophone = await Permission.microphone.request();
@@ -352,8 +310,9 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     }
     return true;
   }
-  void _startRealtimeChat() {
-    requestPermissions().then((granted) {
+  Future<bool> _startRealtimeChat() async {
+    final granted = requestPermissions();
+    granted.then((granted) {
       if(granted) {
         realtime.connect().then((connected) {
           if(connected) {
@@ -375,6 +334,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
         });
       }
     });
+    return granted;
   }
 
   void _onClose() {
