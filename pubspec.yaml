@@ -79,8 +79,8 @@ dependencies:
   win32: ^5.9.0
   flutter_native_splash: ^2.4.4
   bonsoir: ^5.1.10
-  flutter_webrtc: ^0.12.12
-  audioplayers: ^6.4.0
+  flutter_webrtc: 0.12.10
+  audioplayers: ^5.0.0
 
 flutter_app_name:
   name: 'MeshNotes'

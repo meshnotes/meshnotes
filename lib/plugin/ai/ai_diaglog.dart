@@ -1,11 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:mesh_note/plugin/ai/plugin_ai.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:my_log/my_log.dart';
 import 'abstract_agent.dart';
-import 'realtime_chat/realtime_chat_dialog.dart';
 
 class AIDialog extends StatefulWidget {
   final PluginProxy proxy;
@@ -123,23 +121,6 @@ class _AIDialogState extends State<AIDialog> {
                 // ),
               ),
             ),
-            CupertinoButton(
-              padding: const EdgeInsets.all(8.0),
-              minSize: 32.0,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey[800],
-                ),
-                padding: const EdgeInsets.all(8.0),
-                child: const Icon(
-                  CupertinoIcons.mic,
-                  color: Colors.white70,
-                  size: 20.0,
-                ),
-              ),
-              onPressed: _switchToVoiceChat,
-            ),
           ],
         ),
       ],
@@ -164,23 +145,6 @@ class _AIDialogState extends State<AIDialog> {
         _showSelection = show;
       });
     }
-  }
-  void _switchToVoiceChat() async {
-    var _apiKey = widget.proxy.getSettingValue(PluginAI.settingKeyPluginOpenAiApiKey);
-    if(_apiKey == null || _apiKey.isEmpty) {
-      widget.proxy.showToast('Please set the OpenAI API key first');
-      return;
-    }
-    widget.proxy.closeDialog();
-    widget.proxy.showGlobalDialog(
-      '',
-      RealtimeChatDialog(
-        closeCallback: widget.proxy.closeGlobalDialog,
-        apiKey: _apiKey,
-        proxy: widget.proxy,
-      ),
-    );
-    return;
   }
   void _triggerVoiceChatLayer(bool show) {
     if(show != _showVoiceChat) {
