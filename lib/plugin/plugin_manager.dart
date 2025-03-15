@@ -10,6 +10,7 @@ import 'package:my_log/my_log.dart';
 import '../mindeditor/controller/controller.dart';
 import '../mindeditor/setting/constants.dart';
 import '../mindeditor/view/toolbar/base/appearance_setting.dart';
+import 'global_plugin_buttons_manager.dart';
 import 'plugin_api.dart';
 import 'user_notes_for_plugin.dart';
 
@@ -18,10 +19,14 @@ List<PluginInstance> _plugins = [
 ];
 
 class PluginManager {
-  List<ToolbarInformation> toolbarInfo = [];
+  final List<ToolbarInformation> _editorToolbarInfo = [];
+  final List<GlobalToolbarInformation> _globalToolbarInfo = [];
   final List<SettingData> _pluginSupportedSettings = [];
-  final Map<PluginProxy, PluginRegisterInformation> _pluginInstances = {};
+  final Map<PluginProxy, EditorPluginRegisterInformation> _editorPluginInstances = {};
+  final Map<PluginProxy, GlobalPluginRegisterInformation> _globalPluginInstances = {};
   final controller = Controller();
+  final _globalPluginButtonsManagerKey = GlobalKey<GlobalPluginButtonsManagerState>();
+  GlobalPluginButtonsManager? _globalPluginButtonsManager;
 
   void initPluginManager() {
     for(var plugin in _plugins) {
@@ -33,21 +38,31 @@ class PluginManager {
     for(var plugin in _plugins) {
       plugin.start();
     }
+    _setupGlobalPluginButtonsManager();
   }
 
   /// Register plugin
   /// 1. Add plugin toolbar
   /// 2. Add plugin settings
-  void registerPlugin(PluginProxyImpl proxy, PluginRegisterInformation pluginInfo) {
-    if(_pluginInstances.containsKey(proxy)) return; // Duplicated
+  void registerEditorPlugin(PluginProxyImpl proxy, EditorPluginRegisterInformation pluginInfo) {
+    if(_editorPluginInstances.containsKey(proxy)) return; // Duplicated
 
-    _pluginInstances[proxy] = pluginInfo;
-    toolbarInfo.add(pluginInfo.toolbarInformation);
+    _editorPluginInstances[proxy] = pluginInfo;
+    _editorToolbarInfo.add(pluginInfo.toolbarInformation);
     for(var setting in pluginInfo.settingsInformation) {
       _addToSupportedSetting(pluginInfo.pluginName, setting);
     }
     if(pluginInfo.onBlockChanged != null) {
       registerBlockContentChangeEventListener(pluginInfo.onBlockChanged!);
+    }
+  }
+  void registerGlobalPlugin(PluginProxyImpl proxy, GlobalPluginRegisterInformation pluginInfo) {
+    if(_globalPluginInstances.containsKey(proxy)) return; // Duplicated
+
+    _globalPluginInstances[proxy] = pluginInfo;
+    _globalToolbarInfo.add(pluginInfo.toolbarInformation);
+    for(var setting in pluginInfo.settingsInformation) {
+      _addToSupportedSetting(pluginInfo.pluginName, setting);
     }
   }
   void _addToSupportedSetting(String pluginName, PluginSetting setting) {
@@ -80,13 +95,20 @@ class PluginManager {
         return SettingType.string;
     }
   }
+  void _setupGlobalPluginButtonsManager() {
+    final tools = _globalToolbarInfo.toList();
+    _globalPluginButtonsManager = GlobalPluginButtonsManager(
+      key: _globalPluginButtonsManagerKey,
+      tools: tools,
+    );
+  }
 
   List<Widget> buildButtons({
     required AppearanceSetting appearance,
     required Controller controller,
   }) {
     var result = <Widget>[];
-    for(var item in toolbarInfo) {
+    for(var item in _editorToolbarInfo) {
       var button = ToolbarButton(
         icon: Icon(item.buttonIcon, size: appearance.iconSize),
         appearance: appearance,
@@ -98,6 +120,11 @@ class PluginManager {
     }
     return result;
   }
+  Widget? buildGlobalButtons({
+    required Controller controller,
+  }) {
+    return _globalPluginButtonsManager;
+  }
 
   String getSelectedOrFocusedContent() {
     var content = controller.selectionController.getSelectedContent();
@@ -107,9 +134,9 @@ class PluginManager {
     return content;
   }
   String? getSettingValue(PluginProxyImpl proxy, String pluginKey) {
-    if(!_pluginInstances.containsKey(proxy)) return null; // Check
+    final pluginName = _editorPluginInstances[proxy]?.pluginName?? _globalPluginInstances[proxy]?.pluginName;
+    if(pluginName == null) return null; // Check
 
-    String pluginName = _pluginInstances[proxy]!.pluginName;
     String key = '${Constants.settingKeyPluginPrefix}/$pluginName/$pluginKey';
     return controller.setting.getSetting(key);
   }
@@ -140,15 +167,12 @@ class PluginManager {
     final widget = _createDialog(title, subChild, closeDialog);
     CallbackRegistry.getFloatingViewManager()?.showPluginDialog(widget);
   }
-  
 
   void closeGlobalDialog() {
-    CallbackRegistry.clearGlobalDialog();
+    _globalPluginButtonsManagerKey.currentState?.hideButtons();
   }
   void showGlobalDialog(String title, Widget widget) {
-    closeGlobalDialog();
-    // final widget = _createDialog(title, child, closeGlobalDialog);
-    CallbackRegistry.showGlobalDialog(title, widget);
+    _globalPluginButtonsManagerKey.currentState?.hideButtons();
   }
 
   void showToast(String message) {
@@ -160,7 +184,7 @@ class PluginManager {
   }
 
   void addExtra(PluginProxyImpl proxy, String blockId, String content) {
-    var pluginInfo = _pluginInstances[proxy];
+    var pluginInfo = _editorPluginInstances[proxy];
     if(pluginInfo == null) return;
     var blockState = controller.getBlockState(blockId);
     //TODO should check if document is still opening here
@@ -170,7 +194,7 @@ class PluginManager {
     blockState.addExtra(key, content);
   }
   void clearExtra(PluginProxyImpl proxy, String blockId) {
-    var pluginInfo = _pluginInstances[proxy];
+    var pluginInfo = _editorPluginInstances[proxy];
     if(pluginInfo == null) return;
     var blockState = controller.getBlockState(blockId);
     //TODO should check if document is still opening here
@@ -325,8 +349,13 @@ class PluginProxyImpl implements PluginProxy {
   void init(PluginInstance instance) => _instance = instance;
 
   @override
-  void registerPlugin(PluginRegisterInformation pluginRegisterInfo) {
-    _manager.registerPlugin(this, pluginRegisterInfo);
+  void registerEditorPlugin(EditorPluginRegisterInformation pluginRegisterInfo) {
+    _manager.registerEditorPlugin(this, pluginRegisterInfo);
+  }
+
+  @override
+  void registerGlobalPlugin(GlobalPluginRegisterInformation pluginRegisterInfo) {
+    _manager.registerGlobalPlugin(this, pluginRegisterInfo);
   }
 
   @override
@@ -336,15 +365,6 @@ class PluginProxyImpl implements PluginProxy {
   @override
   void closeDialog() {
     _manager.closeDialog();
-  }
-
-  @override
-  void showGlobalDialog(String title, Widget child) {
-    _manager.showGlobalDialog(title, child);
-  }
-  @override
-  void closeGlobalDialog() {
-    _manager.closeGlobalDialog();
   }
 
   @override

@@ -1,5 +1,4 @@
 import 'package:my_log/my_log.dart';
-import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/appearance_setting.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/block_format_button.dart';
 import 'package:flutter/material.dart';

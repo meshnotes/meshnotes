@@ -3,14 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:my_log/my_log.dart';
 import '../mindeditor/setting/constants.dart';
 import '../mindeditor/setting/setting.dart';
 
-class LargeScreenSettingPage extends StatefulWidget {
+class SettingPageLargeScreen extends StatefulWidget {
   final List<SettingData> settings;
 
-  const LargeScreenSettingPage({
+  const SettingPageLargeScreen({
     super.key,
     required this.settings,
   });
@@ -18,17 +17,17 @@ class LargeScreenSettingPage extends StatefulWidget {
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return LargeScreenSettingPage(settings: Controller().setting.getSettings());
+        return SettingPageLargeScreen(settings: Controller().setting.getSettings());
       },
       fullscreenDialog: true,
     ));
   }
 
   @override
-  State<StatefulWidget> createState() => _LargeScreenSettingPageState();
+  State<StatefulWidget> createState() => _SettingPageLargeScreenState();
 }
 
-class _LargeScreenSettingPageState extends State<LargeScreenSettingPage> {
+class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
   List<String> newValue = [];
   List<bool> hasChanged = [];
   final List<TextEditingController> _controllers = [];

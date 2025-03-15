@@ -6,9 +6,9 @@ import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/net/status.dart';
-import 'large_screen_setting_page.dart';
+import 'setting_page_large_screen.dart';
 import 'menu.dart';
-import 'small_screen_setting_page.dart';
+import 'setting_page_small_screen.dart';
 import 'inspired_page.dart';
 import 'resizable_view.dart';
 import '../mindeditor/document/dal/doc_data_model.dart';
@@ -206,9 +206,9 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       child: const Icon(CupertinoIcons.gear, color: Colors.black),
       onPressed: () {
         if(controller.environment.isSmallView(context)) {
-          SmallScreenSettingPage.route(context);
+          SettingPageSmallScreen.route(context);
         } else {
-          LargeScreenSettingPage.route(context);
+          SettingPageLargeScreen.route(context);
         }
       },
     );

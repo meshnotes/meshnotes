@@ -7,6 +7,7 @@ import 'ai_diaglog.dart';
 import 'kimi_agent.dart';
 import 'openai_agent.dart';
 import 'prompt.dart';
+import 'realtime_chat/realtime_chat_dialog.dart';
 
 class PluginAI implements PluginInstance {
   static const _dialogTitle = 'AI assistant';
@@ -34,20 +35,42 @@ class PluginAI implements PluginInstance {
   @override
   void initPlugin(PluginProxy proxy) {
     _proxy = proxy;
-    final toolbarInfo = ToolbarInformation(buttonIcon: Icons.wb_incandescent_outlined, action: _aiAction, tip: 'AI assistant');
+    _registerEditorPlugin(_proxy);
+    _registerGlobalPlugin(_proxy);
+  }
+
+  @override
+  void start() {
+    // Do nothing
+  }
+
+  void _registerEditorPlugin(PluginProxy proxy) {
+    final toolbarInfo = ToolbarInformation(
+      buttonIcon: Icons.wb_incandescent_outlined,
+      action: _aiAction,
+      tip: 'AI assistant',
+    );
     final settingInfo = _genPluginSettings();
-    final registerInfo = PluginRegisterInformation(
+    final editorPluginRegisterInfo = EditorPluginRegisterInformation(
       pluginName: _pluginName,
       toolbarInformation: toolbarInfo,
       settingsInformation: settingInfo,
       onBlockChanged: _blockChangedHandler,
     );
-    proxy.registerPlugin(registerInfo);
+    proxy.registerEditorPlugin(editorPluginRegisterInfo);
   }
-
-  @override
-  void start() {
-    // TODO: implement start
+  void _registerGlobalPlugin(PluginProxy proxy) {
+    final globalToolbarInfo = GlobalToolbarInformation(
+      buttonIcon: Icons.record_voice_over_outlined,
+      buildWidget: _realtimeAiAction,
+      tip: 'ChatUI',
+    );
+    final globalPluginRegisterInfo = GlobalPluginRegisterInformation(
+      pluginName: _pluginName,
+      toolbarInformation: globalToolbarInfo,
+      settingsInformation: [],
+    );
+    proxy.registerGlobalPlugin(globalPluginRegisterInfo);
   }
 
   List<PluginSetting> _genPluginSettings() {
@@ -90,6 +113,18 @@ class PluginAI implements PluginInstance {
       MyLogger.info('AI parameter is not ready yet!');
       _proxy.showToast('Please set api key first');
     }
+  }
+  Widget? _realtimeAiAction(void Function() onClose) {
+    var _apiKey = _proxy.getSettingValue(PluginAI.settingKeyPluginOpenAiApiKey);
+    if(_apiKey == null || _apiKey.isEmpty) {
+      _proxy.showToast('Please set the OpenAI API key first');
+      return null;
+    }
+    return RealtimeChatDialog(
+      closeCallback: onClose,
+      apiKey: _apiKey,
+      proxy: _proxy,
+    );
   }
 
   AiExecutor? _buildAiExecutor() {

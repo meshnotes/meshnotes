@@ -7,10 +7,10 @@ import '../mindeditor/setting/constants.dart';
 import '../mindeditor/setting/setting.dart';
 import 'widget_templates.dart';
 
-class SmallScreenSettingPage extends StatefulWidget {
+class SettingPageSmallScreen extends StatefulWidget {
   final List<SettingData> settings;
 
-  const SmallScreenSettingPage({
+  const SettingPageSmallScreen({
     super.key,
     required this.settings,
   });
@@ -18,19 +18,19 @@ class SmallScreenSettingPage extends StatefulWidget {
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return SmallScreenSettingPage(settings: Controller().setting.getSettings());
+        return SettingPageSmallScreen(settings: Controller().setting.getSettings());
       },
       fullscreenDialog: true,
     ));
   }
 
   @override
-  State<StatefulWidget> createState() => _SmallScreenSettingPageState();
+  State<StatefulWidget> createState() => _SettingPageSmallScreenState();
 }
 
 const _verticalPadding = 16.0;
 const _horizonPadding = 4.0;
-class _SmallScreenSettingPageState extends State<SmallScreenSettingPage> {
+class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
   List<String> newValue = [];
   List<bool> hasChanged = [];
   final List<TextEditingController> _controllers = [];

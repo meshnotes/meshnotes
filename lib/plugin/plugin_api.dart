@@ -5,17 +5,14 @@ import 'user_notes_for_plugin.dart';
 /// Used by PluginInstance. This is the only way for PluginInstance to interact with MeshNotes app
 abstract class PluginProxy {
   // Plugin register
-  void registerPlugin(PluginRegisterInformation registerInformation);
+  void registerEditorPlugin(EditorPluginRegisterInformation registerInformation);
+  void registerGlobalPlugin(GlobalPluginRegisterInformation registerInformation);
 
   // Followings are all interface for plugin to show UI
   // Plugin request to show a dialog
   void showDialog(String title, Widget child);
   // Plugin request to close (all) dialogs
   void closeDialog();
-  // Plugin request to show a global dialog
-  void showGlobalDialog(String title, Widget child);
-  // Plugin request to close a global dialog
-  void closeGlobalDialog();
 
   // Plugin request to show a toast
   void showToast(String message);
@@ -37,17 +34,29 @@ abstract class PluginInstance {
   void start();
 }
 
-class PluginRegisterInformation {
+class EditorPluginRegisterInformation {
   String pluginName;
   ToolbarInformation toolbarInformation;
   List<PluginSetting> settingsInformation;
   void Function(BlockChangedEventData)? onBlockChanged;
 
-  PluginRegisterInformation({
+  EditorPluginRegisterInformation({
     required this.pluginName,
     required this.toolbarInformation,
     required this.settingsInformation,
     this.onBlockChanged,
+  });
+}
+
+class GlobalPluginRegisterInformation {
+  String pluginName;
+  GlobalToolbarInformation toolbarInformation;
+  List<PluginSetting> settingsInformation;
+
+  GlobalPluginRegisterInformation({
+    required this.pluginName,
+    required this.toolbarInformation,
+    required this.settingsInformation,
   });
 }
 
@@ -59,6 +68,18 @@ class ToolbarInformation {
   ToolbarInformation({
     required this.buttonIcon,
     required this.action,
+    required this.tip,
+  });
+}
+
+class GlobalToolbarInformation {
+  IconData buttonIcon;
+  Widget? Function(void Function() onClose) buildWidget;
+  String tip;
+
+  GlobalToolbarInformation({
+    required this.buttonIcon,
+    required this.buildWidget,
     required this.tip,
   });
 }

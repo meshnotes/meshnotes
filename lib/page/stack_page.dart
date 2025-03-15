@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
-import 'package:mesh_note/mindeditor/view/floating_stack_layer.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 import 'package:my_log/my_log.dart';
 import 'sign_in_view.dart';
@@ -23,7 +22,6 @@ class StackPageView extends StatefulWidget {
 class _StackPageViewState extends State<StackPageView> {
   final navigationViewKey = GlobalKey();
   final documentViewKey = GlobalKey();
-  final _globalPluginLayerKey = GlobalKey<FloatingStackViewState>();
   final _toastLayerKey = GlobalKey<_FloatingToastViewState>();
   final animationDuration = 200;
   final controller = Controller();
@@ -35,20 +33,18 @@ class _StackPageViewState extends State<StackPageView> {
   void initState() {
     super.initState();
     CallbackRegistry.registerShowToast(_showMainToast);
-    CallbackRegistry.registerShowGlobalDialog(_showGlobalDialog);
-    CallbackRegistry.registerClearGlobalDialog(_clearGlobalDialog);
   }
 
   @override
   Widget build(BuildContext context) {
     MyLogger.debug('StackPageView: build page, width=${MediaQuery.of(context).size.width}, height=${MediaQuery.of(context).size.height}');
     Widget mainView = _buildMainView(context);
-    Widget globalPluginLayer = _buildGlobalPluginLayer(context);
+    Widget? globalPluginLayer = _buildGlobalPluginLayer(context);
     Widget toastLayer = _buildToastLayer(context);
     final stack = Stack(
       children: [
         mainView,
-        globalPluginLayer,
+        if(globalPluginLayer != null) globalPluginLayer,
         toastLayer,
       ],
     );
@@ -203,10 +199,8 @@ class _StackPageViewState extends State<StackPageView> {
     });
   }
 
-  Widget _buildGlobalPluginLayer(BuildContext context) {
-    return FloatingStackView(
-      key: _globalPluginLayerKey,
-    );
+  Widget? _buildGlobalPluginLayer(BuildContext context) {
+    return controller.pluginManager.buildGlobalButtons(controller: controller);
   }
   Widget _buildToastLayer(BuildContext context) {
     return _FloatingToastView(
@@ -217,12 +211,6 @@ class _StackPageViewState extends State<StackPageView> {
   void _showMainToast(String content) {
     MyLogger.info('showEditorToast: $content');
     _toastLayerKey.currentState?.addToast(content);
-  }
-  void _showGlobalDialog(String title, Widget child) {
-    _globalPluginLayerKey.currentState?.addLayer(child);
-  }
-  void _clearGlobalDialog() {
-    _globalPluginLayerKey.currentState?.clearLayer();
   }
 }
 
