@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:my_log/my_log.dart';
-
 import 'plugin_api.dart';
 
 class GlobalPluginButtonsManager extends StatefulWidget {
@@ -153,25 +151,23 @@ class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> 
                     children: [
                       const SizedBox(width: 8),
                       // Display all tool buttons
-                      ...widget.tools.map((tool) => Container(
-                        child: IconButton(
-                          icon: Icon(
-                            tool.buttonIcon,
-                            size: buttonIconSize,
-                          ),
-                          onPressed: () {
-                            final dialog = tool.buildWidget(hideDialog);
-                            if(dialog != null) {
-                              showDialog(dialog);
-                            }
-                          },
-                          tooltip: tool.tip,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                          padding: EdgeInsets.zero,
+                      ...widget.tools.map((tool) => IconButton(
+                        icon: Icon(
+                          tool.buttonIcon,
+                          size: buttonIconSize,
                         ),
+                        onPressed: () {
+                          final dialog = tool.buildWidget(hideDialog);
+                          if(dialog != null) {
+                            showDialog(dialog);
+                          }
+                        },
+                        tooltip: tool.tip,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                        padding: EdgeInsets.zero,
                       )).toList(),
                       const SizedBox(width: 4),
                       SizedBox(

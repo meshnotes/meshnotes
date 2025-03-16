@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:audioplayers/audioplayers.dart';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
+import 'package:mp_audio_stream/mp_audio_stream.dart';
 import 'package:my_log/my_log.dart';
 import 'function_call.dart';
 import 'chat_messages.dart';
@@ -16,6 +18,7 @@ enum RealtimeConnectionState {
 }
 
 class RealtimeProxy {
+  AudioStream? _audioStream;
   final String apiKey;
   late RealtimeApiWebRtc clientWebRtc;
   final bool playPopSoundAfterConnected;
@@ -94,10 +97,17 @@ class RealtimeProxy {
       onStateChanged?.call(_state);
     }
     if(playPopSoundAfterConnected) { // Play a pop sound when connected
-      await Future.delayed(const Duration(milliseconds: 1000));
-      AudioPlayer().play(AssetSource('sound/pop.mp3'), volume: 1.2);
+      await Future.delayed(const Duration(milliseconds: 800));
+      _playPopSound('assets/sound/pop_sound_pcm24k.pcm');
     }
     return connected;
+  }
+
+  void mute() {
+    clientWebRtc.toggleMute(true);
+  }
+  void unmute() {
+    clientWebRtc.toggleMute(false);
   }
 
   void shutdown() {
@@ -109,6 +119,8 @@ class RealtimeProxy {
     clientWebRtc.shutdown();
     _animationTimer?.cancel();
     _state = RealtimeConnectionState.idle;
+    _audioStream?.uninit();
+    _audioStream = null;
     onStateChanged?.call(_state);
   }
 
@@ -216,10 +228,19 @@ class RealtimeProxy {
     }
   }
 
-  void mute() {
-    clientWebRtc.toggleMute(true);
-  }
-  void unmute() {
-    clientWebRtc.toggleMute(false);
+  _playPopSound(String assetPath) async {
+    if(_audioStream == null) {
+      _audioStream = getAudioStream();
+      _audioStream!.init(channels: 2, sampleRate: 24000);
+    }
+    final data = await rootBundle.load(assetPath);
+    final len = data.lengthInBytes ~/ 2;
+    Float32List floatData = Float32List(len * 2);
+    for (int i = 0; i < len; i++) {
+      final pcm16 = data.getInt16(i * 2, Endian.little);
+      floatData[i * 2] = pcm16 / 32768.0; // Normalize to [-1.0, 1.0]
+      floatData[i * 2 + 1] = floatData[i * 2]; // Make it double channels
+    }
+    _audioStream!.push(floatData);
   }
 }

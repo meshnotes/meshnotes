@@ -3,13 +3,13 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  audioplayers_linux
   flutter_webrtc
   flutter_window_close
   sqlite3_flutter_libs
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  mp_audio_stream
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)

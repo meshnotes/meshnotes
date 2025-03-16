@@ -76,7 +76,7 @@ dependencies:
   flutter_native_splash: ^2.4.4
   bonsoir: ^5.1.10
   flutter_webrtc: 0.12.10
-  audioplayers: ^5.0.0
+  mp_audio_stream: 0.2.0
 
 flutter_app_name:
   name: 'MeshNotes'
@@ -153,3 +153,4 @@ flutter:
     - assets/splash_page.png
     - assets/applogo.png
     - assets/sound/pop.mp3
+    - assets/sound/pop_sound_pcm24k.pcm
