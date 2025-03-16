@@ -12,7 +12,6 @@ import flutter_inappwebview_macos
 import flutter_webrtc
 import flutter_window_close
 import path_provider_foundation
-import record_darwin
 import sqlite3_flutter_libs
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
@@ -23,6 +22,5 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FlutterWebRTCPlugin.register(with: registry.registrar(forPlugin: "FlutterWebRTCPlugin"))
   FlutterWindowClosePlugin.register(with: registry.registrar(forPlugin: "FlutterWindowClosePlugin"))
   PathProviderPlugin.register(with: registry.registrar(forPlugin: "PathProviderPlugin"))
-  RecordPlugin.register(with: registry.registrar(forPlugin: "RecordPlugin"))
   Sqlite3FlutterLibsPlugin.register(with: registry.registrar(forPlugin: "Sqlite3FlutterLibsPlugin"))
 }

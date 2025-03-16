@@ -29,7 +29,6 @@ class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> 
 
   @override
   Widget build(BuildContext context) {
-    MyLogger.info('tools count: ${widget.tools.length}');
     final buttonTop = _calculateButtonTop();
     switch (_rightButtonState) {
       case _ButtonState.folded:

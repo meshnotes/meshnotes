@@ -8,12 +8,10 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_inappwebview_windows
   flutter_webrtc
   flutter_window_close
-  record_windows
   sqlite3_flutter_libs
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
-  mp_audio_stream
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)
