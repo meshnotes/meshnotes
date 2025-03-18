@@ -9,7 +9,8 @@ environment:
 
 # Add regular dependencies here.
 dependencies:
-  logging: ^1.1.1
+  # logging: ^1.1.1
+  logger: 2.5.0
 
 dev_dependencies:
   lints: ^2.0.0

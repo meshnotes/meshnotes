@@ -1,33 +1,37 @@
-import 'dart:developer';
-import 'package:logging/logging.dart';
+import 'dart:io';
+
+import 'package:logger/logger.dart';
 
 class MyLogger {
   static Logger? logger;
   static String? prefix;
-  static const _defaultLogLevel = Level.INFO;
+  static const _defaultLogLevel = Level.info;
+  static String logName = '';
 
   static void init({bool usePrint=false, bool debug=false, bool verbose=false, required String name}) {
-    logger?.clearListeners();
+    if(logger != null) return;
 
-    prefix = name;
-    Logger.root.level = _defaultLogLevel;
+    var loggerLevel = _defaultLogLevel;
     if(debug) {
-      Logger.root.level = Level.FINE;
+      loggerLevel = Level.debug;
     }
     if(verbose) {
-      Logger.root.level = Level.ALL;
+      loggerLevel = Level.trace;
     }
 
-    if(usePrint) {
-      Logger.root.onRecord.listen((record) {
-        print('${record.level.name}: ${record.time}: [$prefix] ${record.message}');
-      });
-    } else {
-      Logger.root.onRecord.listen((record) {
-        log('${record.level.name}: ${record.time}: [$prefix] ${record.message}', level: record.level.value);
-      });
-    }
-    logger = Logger(name);
+    logName = '[$name]';
+
+    final isProduct = bool.fromEnvironment('dart.vm.product');
+    final needsColor = !isProduct;
+    logger ??= Logger(
+      printer: SimplePrinter(printTime: true, colors: needsColor),
+      level: loggerLevel,
+      output: isProduct ? AdvancedFileOutput.new(
+        path: 'log',
+        maxRotatedFilesCount: 10,
+      ): ConsoleOutput(),
+      filter: ProductionFilter(),
+    );
   }
 
   static void initForTest({bool debug=true, required String name}) {
@@ -39,31 +43,31 @@ class MyLogger {
   }
 
   static void shutdown() {
-    logger?.clearListeners();
+    logger?.close();
     logger = null;
   }
 
   static void verbose(String msg) {
-    logger!.finer(msg);
+    logger!.t('$logName: $msg');
   }
 
   static void debug(String msg) {
-    logger!.fine(msg);
+    logger!.d('$logName: $msg');
   }
 
   static void info(String msg) {
-    logger!.info(msg);
+    logger!.i('$logName: $msg');
   }
 
   static void warn(String msg) {
-    logger!.warning(msg);
+    logger!.w('$logName: $msg');
   }
 
   static void err(String msg) {
-    logger!.severe(msg);
+    logger!.e('$logName: $msg');
   }
 
   static void fatal(String msg) {
-    logger!.severe(msg);
+    logger!.f('$logName: $msg');
   }
 }
