@@ -4,7 +4,6 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   bonsoir_windows
-  flutter_inappwebview_windows
   flutter_webrtc
   flutter_window_close
   sqlite3_flutter_libs

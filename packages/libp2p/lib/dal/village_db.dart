@@ -1,9 +1,6 @@
-import 'dart:ffi';
-import 'dart:io';
 import 'package:my_log/my_log.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3/open.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'village_db_script.dart';
 
@@ -22,20 +19,20 @@ class VillageDbHelper {
     1: DbUpgradeInfo(2, VillageDbFake().upgradeDb),
   };
 
-  static DynamicLibrary _openOnLinux() {
-    final scriptDir = File(Platform.script.toFilePath()).parent;
-    final libraryNextToScript = File('${scriptDir.path}/libsqlite3-dev.so');
-    return DynamicLibrary.open(libraryNextToScript.path);
-  }
-  static DynamicLibrary _openOnWindows() {
-    final scriptDir = File(Platform.script.toFilePath()).parent;
-    final libraryNextToScript = File('${scriptDir.path}/sqlite3.dll');
-    return DynamicLibrary.open(libraryNextToScript.path);
-  }
+  // static DynamicLibrary _openOnLinux() {
+  //   final scriptDir = File(Platform.script.toFilePath()).parent;
+  //   final libraryNextToScript = File('${scriptDir.path}/libsqlite3-dev.so');
+  //   return DynamicLibrary.open(libraryNextToScript.path);
+  // }
+  // static DynamicLibrary _openOnWindows() {
+  //   final scriptDir = File(Platform.script.toFilePath()).parent;
+  //   final libraryNextToScript = File('${scriptDir.path}/sqlite3.dll');
+  //   return DynamicLibrary.open(libraryNextToScript.path);
+  // }
 
   Future<void> init() async {
-    open.overrideFor(OperatingSystem.linux, _openOnLinux);
-    open.overrideFor(OperatingSystem.windows, _openOnWindows);
+    // open.overrideFor(OperatingSystem.linux, _openOnLinux);
+    // open.overrideFor(OperatingSystem.windows, _openOnWindows);
     final directory = await getApplicationDocumentsDirectory();
     final dbFile = join(directory.path, dbFileName);
     MyLogger.debug('VillageDB: start opening db: $dbFile');

@@ -1,9 +1,7 @@
-import 'dart:ffi';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/dal_version/db_script.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:sqlite3/sqlite3.dart';
-import 'package:sqlite3/open.dart';
 import 'package:my_log/my_log.dart';
 import '../../../util/idgen.dart';
 import 'doc_data_model.dart';
@@ -23,32 +21,32 @@ class DbHelper {
     1: DbUpgradeInfo(2, DbFake().upgradeDb),
   };
 
-  static DynamicLibrary _openOnLinux() {
-    return _tryToLoadLibrary('libsqlite3-dev.so');
-  }
-  static DynamicLibrary _openOnWindows() {
-    return _tryToLoadLibrary('sqlite3.dll');
-  }
-  static DynamicLibrary _tryToLoadLibrary(String fileName) {
-    final List<String> lookupPath = Controller().environment.getLibraryPaths();
-    dynamic lastError;
-    for(var path in lookupPath) {
-      String fullPath = '$path/$fileName';
-      try {
-        var result = DynamicLibrary.open(fullPath);
-        MyLogger.info('Load library($fullPath) success');
-        return result;
-      } on Error catch(e) {
-        MyLogger.warn('Error loading library($fullPath): $e');
-        lastError = e;
-      }
-    }
-    throw lastError;
-  }
+  // static DynamicLibrary _openOnLinux() {
+  //   return _tryToLoadLibrary('libsqlite3-dev.so');
+  // }
+  // static DynamicLibrary _openOnWindows() {
+  //   return _tryToLoadLibrary('sqlite3.dll');
+  // }
+  // static DynamicLibrary _tryToLoadLibrary(String fileName) {
+  //   final List<String> lookupPath = Controller().environment.getLibraryPaths();
+  //   dynamic lastError;
+  //   for(var path in lookupPath) {
+  //     String fullPath = '$path/$fileName';
+  //     try {
+  //       var result = DynamicLibrary.open(fullPath);
+  //       MyLogger.info('Load library($fullPath) success');
+  //       return result;
+  //     } on Error catch(e) {
+  //       MyLogger.warn('Error loading library($fullPath): $e');
+  //       lastError = e;
+  //     }
+  //   }
+  //   throw lastError;
+  // }
 
   Future<void> init() async {
-    open.overrideFor(OperatingSystem.linux, _openOnLinux);
-    open.overrideFor(OperatingSystem.windows, _openOnWindows);
+    // open.overrideFor(OperatingSystem.linux, _openOnLinux);
+    // open.overrideFor(OperatingSystem.windows, _openOnWindows);
     final dbFile = await Controller().environment.getExistFileFromLibraryPathsByEnvironment(dbFileName);
     MyLogger.info('MeshNotesDB: start opening mesh_notes db: $dbFile');
     final db = sqlite3.open(dbFile);
