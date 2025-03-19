@@ -7,6 +7,7 @@ class EvenTasksManager {
   final List<Function()> _userClickTasks = []; // Tasks when user clicks in the editor area
   final List<Function()> _userInputTasks = []; // Tasks when user input using keyboard or soft keyboard
   final List<Function()> _userSwitchToNavigator = []; // Tasks when user switches to navigator(in small screen mode)
+  final List<Function()> _settingChangedTasks = []; // Tasks when user changes settings
   final Map<String, _TimerTask> _timerTaskMap = {};
   Timer? _timer;
 
@@ -79,6 +80,17 @@ class EvenTasksManager {
   }
   void triggerUserSwitchToNavigatorEvent() {
     for(final task in _userSwitchToNavigator) {
+      task.call();
+    }
+  }
+
+  void addSettingChangedTask(Function() task) {
+    if(!_settingChangedTasks.contains(task)) {
+      _settingChangedTasks.add(task);
+    }
+  }
+  void triggerSettingChanged() {
+    for(final task in _settingChangedTasks) {
       task.call();
     }
   }

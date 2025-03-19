@@ -38,13 +38,13 @@ class _StackPageViewState extends State<StackPageView> {
   @override
   Widget build(BuildContext context) {
     MyLogger.debug('StackPageView: build page, width=${MediaQuery.of(context).size.width}, height=${MediaQuery.of(context).size.height}');
-    Widget mainView = _buildMainView(context);
-    Widget? globalPluginLayer = _buildGlobalPluginLayer(context);
-    Widget toastLayer = _buildToastLayer(context);
+    final mainView = _buildMainView(context);
+    final globalPluginLayer = _buildGlobalPluginLayer(context);
+    final toastLayer = _buildToastLayer(context);
     final stack = Stack(
       children: [
         mainView,
-        if(globalPluginLayer != null) globalPluginLayer,
+        globalPluginLayer,
         toastLayer,
       ],
     );
@@ -56,8 +56,10 @@ class _StackPageViewState extends State<StackPageView> {
     final smallView = controller.environment.isSmallView(context);
     var userInfo = controller.userPrivateInfo;
     if(userInfo == null) {
+      controller.setLoggingInState();
       return _buildSignInView(context);
     }
+    controller.setRunningState();
     Widget view;
     if(smallView) {
       view = _buildForSmallView(context);
@@ -199,7 +201,7 @@ class _StackPageViewState extends State<StackPageView> {
     });
   }
 
-  Widget? _buildGlobalPluginLayer(BuildContext context) {
+  Widget _buildGlobalPluginLayer(BuildContext context) {
     return controller.pluginManager.buildGlobalButtons(controller: controller);
   }
   Widget _buildToastLayer(BuildContext context) {

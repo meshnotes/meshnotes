@@ -27,6 +27,12 @@ import '../setting/setting.dart';
 import 'device.dart';
 import 'gesture_handler.dart';
 
+
+enum ControllerState {
+  initializing,
+  loggingIn,
+  running,
+}
 class Controller {
   bool isUnitTest = false;
   bool isDebugMode = false;
@@ -48,6 +54,7 @@ class Controller {
   final EvenTasksManager eventTasksManager = EvenTasksManager();
   final UIEventManager uiEventManager = UIEventManager();
   double? _toolbarHeight;
+  ControllerState _state = ControllerState.initializing;
 
   // Getters
   DocumentManager get docManager => _docManager!;
@@ -108,6 +115,16 @@ class Controller {
     MyLogger.info('initAll: finish initialization');
     eventTasksManager.triggerAfterInit();
     return true;
+  }
+
+  void setLoggingInState() {
+    _state = ControllerState.loggingIn;
+  }
+  void setRunningState() {
+    _state = ControllerState.running;
+  }
+  bool isRunning() {
+    return _state == ControllerState.running;
   }
 
   void _initGlobalEventTasks() {

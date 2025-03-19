@@ -26,7 +26,7 @@ class PluginManager {
   final Map<PluginProxy, GlobalPluginRegisterInformation> _globalPluginInstances = {};
   final controller = Controller();
   final _globalPluginButtonsManagerKey = GlobalKey<GlobalPluginButtonsManagerState>();
-  GlobalPluginButtonsManager? _globalPluginButtonsManager;
+  late GlobalPluginButtonsManager _globalPluginButtonsManager;
 
   void initPluginManager() {
     for(var plugin in _plugins) {
@@ -120,7 +120,7 @@ class PluginManager {
     }
     return result;
   }
-  Widget? buildGlobalButtons({
+  Widget buildGlobalButtons({
     required Controller controller,
   }) {
     return _globalPluginButtonsManager;

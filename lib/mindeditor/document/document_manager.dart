@@ -42,7 +42,7 @@ class DocumentManager {
   int countOfGoodObjects = 0;
   int countOfBadObjects = 0;
   int _lastTimeStampOfCheckConsistency = 0;
-  Set<String> _badVersionSet = {};
+  final Set<String> _badVersionSet = {};
 
   DocumentManager({
     required DbHelper db,
@@ -1095,7 +1095,6 @@ class DocumentManager {
     var table = versionContent.table;
     for(var item in table) {
 
-      var docId = item.docId;
       var docHash = item.docHash;
       final docContent = _db.getObject(docHash);
       if(docContent == null) {
@@ -1115,7 +1114,6 @@ class DocumentManager {
     var doc = DocContent.fromJson(jsonDecode(docContent.data));
     var table = doc.contents;
     for(var item in table) {
-      var blockId = item.blockId;
       var blockHash = item.blockHash;
       final blockContent = _db.getObject(blockHash);
       if(blockContent == null) {

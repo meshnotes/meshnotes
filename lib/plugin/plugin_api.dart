@@ -76,11 +76,13 @@ class GlobalToolbarInformation {
   IconData buttonIcon;
   Widget? Function(void Function() onClose) buildWidget;
   String tip;
+  final bool Function() isAvailable;
 
   GlobalToolbarInformation({
     required this.buttonIcon,
     required this.buildWidget,
     required this.tip,
+    required this.isAvailable,
   });
 }
 

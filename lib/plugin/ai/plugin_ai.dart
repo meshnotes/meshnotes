@@ -64,6 +64,7 @@ class PluginAI implements PluginInstance {
       buttonIcon: Icons.record_voice_over_outlined,
       buildWidget: _realtimeAiAction,
       tip: 'ChatUI',
+      isAvailable: () => _proxy.getSettingValue(settingKeyPluginOpenAiApiKey) != null && _proxy.getSettingValue(settingKeyPluginOpenAiApiKey)!.isNotEmpty,
     );
     final globalPluginRegisterInfo = GlobalPluginRegisterInformation(
       pluginName: _pluginName,

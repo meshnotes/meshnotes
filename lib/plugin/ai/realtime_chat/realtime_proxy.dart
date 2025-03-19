@@ -231,7 +231,7 @@ class RealtimeProxy {
   _playPopSound(String assetPath) async {
     if(_audioStream == null) {
       _audioStream = getAudioStream();
-      _audioStream!.init(channels: 2, sampleRate: 24000);
+      _audioStream!.init(channels: 2, sampleRate: 24000); // If set channel to 1, only one earphone will play
     }
     final data = await rootBundle.load(assetPath);
     final len = data.lengthInBytes ~/ 2;
@@ -239,7 +239,7 @@ class RealtimeProxy {
     for (int i = 0; i < len; i++) {
       final pcm16 = data.getInt16(i * 2, Endian.little);
       floatData[i * 2] = pcm16 / 32768.0; // Normalize to [-1.0, 1.0]
-      floatData[i * 2 + 1] = floatData[i * 2]; // Make it double channels
+      floatData[i * 2 + 1] = floatData[i * 2]; // Make two earphones play the same sound
     }
     _audioStream!.push(floatData);
   }

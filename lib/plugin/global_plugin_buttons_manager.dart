@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'plugin_api.dart';
 
 class GlobalPluginButtonsManager extends StatefulWidget {
@@ -26,7 +27,16 @@ class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> 
   Widget? _dialog;
 
   @override
+  void initState() {
+    super.initState();
+    Controller().eventTasksManager.addSettingChangedTask(_onSettingChanged);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if(!_hasAvailableTool()) { // Only show button when there is at least one available tool
+      return const SizedBox.shrink();
+    }
     final buttonTop = _calculateButtonTop();
     switch (_rightButtonState) {
       case _ButtonState.folded:
@@ -36,6 +46,22 @@ class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> 
       case _ButtonState.hidden:
         return _dialog ?? const SizedBox.shrink();
     }
+  }
+
+  bool _hasAvailableTool() {
+    if(Controller().isRunning()) {
+      for(var tool in widget.tools) {
+        if(tool.isAvailable()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  void _onSettingChanged() {
+    setState(() {
+    });
   }
   
   double _calculateButtonTop() {

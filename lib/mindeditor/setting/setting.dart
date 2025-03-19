@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:my_log/my_log.dart';
 
@@ -167,7 +168,7 @@ class Setting {
     return value?.trim();
   }
   bool saveSettings(List<SettingData> settings) {
-    var toBeSave = <String, String>{};
+    var toBeSave = <String, String>{}; //TODO Maybe not necessary
     for(var item in settings) {
       final key = item.name;
       final value = item.value;
@@ -177,6 +178,7 @@ class Setting {
     }
     String content = _genSettingLines(_settingMap);
     File(settingFileName).writeAsStringSync(content);
+    Controller().eventTasksManager.triggerSettingChanged();
     return true;
   }
   static String _genSettingLines(Map<String, SettingData> settings) {
