@@ -79,7 +79,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       startVisualizerAnimation: _startVisualizerAnimation,
       stopVisualizerAnimation: _stopVisualizerAnimation,
       onChatMessagesUpdated: _onChatMessagesUpdated,
-      playPopSoundAfterConnected: !widget.proxy.getPlatform().isIOS(), // Will failed to chat on iOS, I don't know why
+      playPopSoundAfterConnected: !widget.proxy.getPlatform().isMobile(), // Will failed to chat on iOS, I don't know why. And no use in Android
     );
     permissionFuture = _startRealtimeChat();
   }

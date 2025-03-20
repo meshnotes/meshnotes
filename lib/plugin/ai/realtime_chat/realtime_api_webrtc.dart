@@ -306,6 +306,7 @@ Chatting Instructions:
 class SimpleAudioRTC {
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
+  MediaStream? _remoteStream;
   RTCDataChannel? _dataChannel;
   final void Function(String)? onData;
   final void Function()? onClose;
@@ -345,6 +346,10 @@ class SimpleAudioRTC {
       _localStream!.getTracks().forEach((track) {
         _peerConnection!.addTrack(track, _localStream!);
       });
+
+      _peerConnection!.onAddStream = (MediaStream stream) {
+        _remoteStream = stream;
+      };
 
       final dataChannelInit = RTCDataChannelInit()
         ..ordered = true
@@ -422,17 +427,26 @@ class SimpleAudioRTC {
   Future<void> close() async {
     MyLogger.info('Realtime API: now close');
     try {
-      // Stop local stream
-      if (_localStream != null) {
-        _localStream!.getTracks().forEach((track) => track.stop());
-        _localStream?.getAudioTracks().forEach((track) => track.stop());
-        await _localStream!.dispose();
-        _localStream = null;
-      }
+      // Disable and then stop, to avoid blasting sound when close
+      _localStream?.getTracks().forEach((track) => track.enabled = false);
+      _localStream?.getAudioTracks().forEach((track) => track.enabled = false);
+      _remoteStream?.getTracks().forEach((track) => track.enabled = false);
+      _remoteStream?.getAudioTracks().forEach((track) => track.enabled = false);
       
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      _localStream?.getTracks().forEach((track) => track.stop());
+      _localStream?.getAudioTracks().forEach((track) => track.stop());
+      _remoteStream?.getTracks().forEach((track) => track.stop());
+      _remoteStream?.getAudioTracks().forEach((track) => track.stop());
+
+      _localStream = null;
+      _remoteStream = null;
+
       // Close peer connection
       if (_peerConnection != null) {
         await _peerConnection!.close();
+        await _peerConnection!.dispose();
         _peerConnection = null;
       }
     } catch (e) {
