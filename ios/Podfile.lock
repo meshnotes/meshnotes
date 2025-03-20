@@ -12,7 +12,7 @@ PODS:
     - WebRTC-SDK (= 125.6422.06)
   - mp_audio_stream (0.0.3):
     - Flutter
-  - path_provider (0.0.1):
+  - path_provider_ios (0.0.1):
     - Flutter
   - "permission_handler (5.1.0+2)":
     - Flutter
@@ -44,7 +44,7 @@ DEPENDENCIES:
   - flutter_native_splash (from `.symlinks/plugins/flutter_native_splash/ios`)
   - flutter_webrtc (from `.symlinks/plugins/flutter_webrtc/ios`)
   - mp_audio_stream (from `.symlinks/plugins/mp_audio_stream/ios`)
-  - path_provider (from `.symlinks/plugins/path_provider/ios`)
+  - path_provider_ios (from `.symlinks/plugins/path_provider_ios/ios`)
   - permission_handler (from `.symlinks/plugins/permission_handler/ios`)
   - sqlite3_flutter_libs (from `.symlinks/plugins/sqlite3_flutter_libs/darwin`)
 
@@ -66,8 +66,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_webrtc/ios"
   mp_audio_stream:
     :path: ".symlinks/plugins/mp_audio_stream/ios"
-  path_provider:
-    :path: ".symlinks/plugins/path_provider/ios"
+  path_provider_ios:
+    :path: ".symlinks/plugins/path_provider_ios/ios"
   permission_handler:
     :path: ".symlinks/plugins/permission_handler/ios"
   sqlite3_flutter_libs:
@@ -80,12 +80,12 @@ SPEC CHECKSUMS:
   flutter_native_splash: f71420956eb811e6d310720fee915f1d42852e7a
   flutter_webrtc: 90260f83024b1b96d239a575ea4e3708e79344d1
   mp_audio_stream: ed519e6221a8a4e6fd4ce2edd6cf04841d0da6b6
-  path_provider: abfe2b5c733d04e238b0d8691db0cfd63a27a93c
+  path_provider_ios: 14f3d2fd28c4fdb42f44e0f751d12861c43cee02
   permission_handler: ccb20a9fad0ee9b1314a52b70b76b473c5f8dab0
   sqlite3: 7559e33dae4c78538df563795af3a86fc887ee71
   sqlite3_flutter_libs: 1b4e98da20ebd4e9b1240269b78cdcf492dbe9f3
   WebRTC-SDK: 79942c006ea64f6fb48d7da8a4786dfc820bc1db
 
-PODFILE CHECKSUM: 71544633e203658dc482a56db70a8a2a63b277c9
+PODFILE CHECKSUM: 62f61b8345cafe1d1053eb2b93a6f7ada5a3a92d
 
 COCOAPODS: 1.14.3

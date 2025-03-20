@@ -224,7 +224,7 @@ Chatting Instructions:
       final errorMessage = errorBody['message'];
       _onApplicationError(errorType, errorCode, errorMessage);
     } else {
-      MyLogger.info('Realtime API: $json');
+      MyLogger.info('Realtime API other data: $json');
     }
 
     // Other events
@@ -232,7 +232,7 @@ Chatting Instructions:
   }
 
   void _onClose() {
-    MyLogger.info('Realtime API: close');
+    MyLogger.info('Realtime API: onClose');
     onClose?.call();
   }
   void _onFailed() {
@@ -420,7 +420,7 @@ class SimpleAudioRTC {
   }
   
   Future<void> close() async {
-    MyLogger.info('Realtime API: close');
+    MyLogger.info('Realtime API: now close');
     try {
       // Stop local stream
       if (_localStream != null) {

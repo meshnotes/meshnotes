@@ -60,6 +60,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
         widget.closeCallback?.call();
       },
       onStateChanged: (state) {
+        if(!mounted) return;
         if(state == RealtimeConnectionState.connected) {
           setState(() {
             _isLoading = false;
@@ -78,6 +79,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       startVisualizerAnimation: _startVisualizerAnimation,
       stopVisualizerAnimation: _stopVisualizerAnimation,
       onChatMessagesUpdated: _onChatMessagesUpdated,
+      playPopSoundAfterConnected: !widget.proxy.getPlatform().isIOS(), // Will failed to chat on iOS, I don't know why
     );
     permissionFuture = _startRealtimeChat();
   }
