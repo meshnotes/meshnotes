@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:mesh_note/plugin/ai/realtime_chat/native_ws_implement/native_ws_api.dart';
+import 'package:mesh_note/plugin/ai/realtime_chat/webview_ws_implement/webview_ws_api.dart';
 import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
 import 'package:my_log/my_log.dart';
 import 'function_call.dart';
@@ -97,7 +98,7 @@ class RealtimeProxy {
   }
 
   Widget? buildWebview() {
-    return null;
+    return client.buildWebview();
   }
 
   void mute() {
@@ -107,16 +108,17 @@ class RealtimeProxy {
     client.toggleMute(false);
   }
 
-  void shutdown() {
-    if(_state != RealtimeConnectionState.connected) {
+  void dispose() {
+    if(_state == RealtimeConnectionState.shuttingDown || _state == RealtimeConnectionState.idle) {
+      MyLogger.warn('RealtimeProxy: duplicate shutdown');
       return;
     }
+    MyLogger.info('RealtimeProxy: now try to shutdown');
     _state = RealtimeConnectionState.shuttingDown;
     shouldStop = true;
     client.shutdown();
     _animationTimer?.cancel();
     _state = RealtimeConnectionState.idle;
-    onStateChanged?.call(_state);
   }
 
   RealtimeApi _createRealtimeApiImplementation() {
@@ -128,11 +130,40 @@ class RealtimeProxy {
       onClose: _onClose,
       onPlaying: _onAudioActive,
     );
+    switch(implementationChoice) {
+      case RealtimeChoise.nativeWebSocketImplementation:
+        return _createNativeWebSocketImplementation(eventHandler);
+      case RealtimeChoise.webViewWebSocketImplementation:
+        return _createWebViewWebSocketImplementation(eventHandler);
+      case RealtimeChoise.webViewWebRtcImplementation:
+        return _createWebViewWebRtcImplementation(eventHandler);
+    }
+  }
+  RealtimeApi _createNativeWebSocketImplementation(RealtimeEventHandler eventHandler) {
     return RealtimeNativeWsApi(
       sampleRate: sampleRate,
       numChannels: numChannels,
+      sampleSize: sampleSize,
       apiKey: apiKey,
       toolsDescription: tools?.getDescription(),
+      eventHandler: eventHandler,
+    );
+  }
+  RealtimeApi _createWebViewWebSocketImplementation(RealtimeEventHandler eventHandler) {
+    return RealtimeWebViewApi(
+      apiKey: apiKey,
+      sampleRate: sampleRate,
+      numChannels: numChannels,
+      sampleSize: sampleSize,
+      eventHandler: eventHandler,
+    );
+  }
+  RealtimeApi _createWebViewWebRtcImplementation(RealtimeEventHandler eventHandler) {
+    return RealtimeWebViewApi(
+      apiKey: apiKey,
+      sampleRate: sampleRate,
+      numChannels: numChannels,
+      sampleSize: sampleSize,
       eventHandler: eventHandler,
     );
   }
@@ -255,15 +286,18 @@ class RealtimeProxy {
   }
   void _onSession(String type, String? eventId, String? itemId, Map<String, dynamic> json) {
     if(type == 'session.created') { // Update session after created
-      MyLogger.info('RealtimeProxy: Session created');
-      _updateSession();
-      _sendUserContents();
-      _sendHistory();
+      _onCreated();
     } else if(type == 'session.updated') {
-      MyLogger.info('RealtimeProxy: Session updated');
+      _onSessionUpdated();
       _state = RealtimeConnectionState.ready;
       onStateChanged?.call(_state);
     }
+  }
+  void _onCreated() {
+    MyLogger.info('RealtimeProxy: Session created');
+      _updateSession();
+      _sendUserContents();
+      _sendHistory();
   }
   void _sendUserContents() {
     final userContents = _buildUserContents();
@@ -279,9 +313,13 @@ class RealtimeProxy {
     }
     // client.sendEvent({'type': 'session.update', 'event_id': _generateEventId(), 'session': {'history': history}});
   }
+  void _onSessionUpdated() {
+    MyLogger.info('RealtimeProxy: Session updated');
+    client.playAudio(popSoundAudioBase64);
+  }
   void _onApplicationError(String? errorType, String? errorCode, String? errorMessage) {
-    MyLogger.err('Native WebSocket Realtime error: type=$errorType, code=$errorCode, message=$errorMessage');
-    _onFailed();
+    MyLogger.err('RealtimeProxy: receive error: type=$errorType, code=$errorCode, message=$errorMessage');
+    // _onFailed();
   }
 
 
@@ -290,11 +328,10 @@ class RealtimeProxy {
       return;
     }
     if(errorRetryCount >= MAX_ERROR_RETRY_COUNT) {
-      _state = RealtimeConnectionState.shuttingDown;
+      dispose();
       forceStop = true;
-      showToastCallback?.call('Realtime API failed too many times');
-      onErrorShutdown?.call();
-      _state = RealtimeConnectionState.idle;
+      showToastCallback?.call('RealtimeProxy: Failed too many times');
+      onStateChanged?.call(_state);
       return;
     }
     errorRetryCount++;

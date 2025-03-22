@@ -115,7 +115,7 @@ class PluginAI implements PluginInstance {
       _proxy.showToast('Please set api key first');
     }
   }
-  Widget? _realtimeAiAction(void Function() onClose) {
+  Widget? _realtimeAiAction({required void Function() onClose}) {
     var _apiKey = _proxy.getSettingValue(PluginAI.settingKeyPluginOpenAiApiKey);
     if(_apiKey == null || _apiKey.isEmpty) {
       _proxy.showToast('Please set the OpenAI API key first');

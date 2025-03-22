@@ -10,9 +10,9 @@ class GlobalPluginButtonsManager extends StatefulWidget {
 }
 
 enum _ButtonState {
-  folded, // Show an arrow icon, press to unfold
-  unfolded, // Show a button list, press to display dialog, and hide the button
-  hidden, // Hidden buttons and show dialog
+  foldButton, // Show an arrow icon, press to unfold
+  unfoldButton, // Show a button list, press to display dialog, and hide the button
+  showDialog, // Hidden buttons and show dialog
 }
 
 class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> {
@@ -23,7 +23,7 @@ class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> 
   static const foldIconSize = 24.0;
   static const buttonIconSize = 20.0;
   static const radiusSize = 20.0;
-  _ButtonState _rightButtonState = _ButtonState.folded;
+  _ButtonState _rightButtonState = _ButtonState.foldButton;
   Widget? _dialog;
 
   @override
@@ -39,11 +39,11 @@ class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> 
     }
     final buttonTop = _calculateButtonTop();
     switch (_rightButtonState) {
-      case _ButtonState.folded:
+      case _ButtonState.foldButton:
         return _buildFoldedMovableRightButton(buttonTop);
-      case _ButtonState.unfolded:
+      case _ButtonState.unfoldButton:
         return _buildUnfoldedButtons(buttonTop);
-      case _ButtonState.hidden:
+      case _ButtonState.showDialog:
         return _dialog ?? const SizedBox.shrink();
     }
   }
@@ -183,7 +183,9 @@ class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> 
                           size: buttonIconSize,
                         ),
                         onPressed: () {
-                          final dialog = tool.buildWidget(hideDialog);
+                          final dialog = tool.buildWidget(
+                            onClose: hideDialog
+                          );
                           if(dialog != null) {
                             showDialog(dialog);
                           }
@@ -226,33 +228,34 @@ class GlobalPluginButtonsManagerState extends State<GlobalPluginButtonsManager> 
   void showDialog(Widget dialog) {
     setState(() {
       _dialog = dialog;
-      _rightButtonState = _ButtonState.hidden;
+      _rightButtonState = _ButtonState.showDialog;
     });
   }
   void hideDialog() {
     setState(() {
-      _rightButtonState = _ButtonState.folded;
+      _dialog = null;
+      _rightButtonState = _ButtonState.foldButton;
     });
   }
   void hideButtons() {
     setState(() {
-      _rightButtonState = _ButtonState.hidden;
+      _rightButtonState = _ButtonState.showDialog;
     });
   }
   void showButtons() {
     setState(() {
-      _rightButtonState = _ButtonState.unfolded;
+      _rightButtonState = _ButtonState.unfoldButton;
     });
   }
   void foldButtons() {
     setState(() {
-      _rightButtonState = _ButtonState.folded;
+      _rightButtonState = _ButtonState.foldButton;
     });
   }
   
   // Right button click handler
   void _onRightButtonPressed() {
-    if (_rightButtonState == _ButtonState.folded) {
+    if (_rightButtonState == _ButtonState.foldButton) {
       showButtons();
     } else {
       foldButtons();

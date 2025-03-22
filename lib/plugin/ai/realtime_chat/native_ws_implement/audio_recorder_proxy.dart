@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:record/record.dart';
 
-import '../realtime_ws_helper.dart';
+import 'realtime_ws_helper.dart';
 
 class NativeAudioRecorderProxy extends AudioRecorderProxy {
   void Function(String base64Data)? _onAudioData;
@@ -35,9 +35,10 @@ class NativeAudioRecorderProxy extends AudioRecorderProxy {
   }
 
   @override
-  void stop() {
+  void shutdown() {
     shouldStop = true;
     record.stop();
+    record.dispose();
   }
 
   @override

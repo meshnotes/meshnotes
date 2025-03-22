@@ -6,7 +6,7 @@ class TruncateInfo {
 }
 
 abstract class AudioPlayerProxy {
-  void play(String base64Data, String itemId, int contentIndex);
+  void play(String base64Data, String itemId, int contentIndex, {double volume=1.0});
   void start();
   void shutdown();
   void resume();
@@ -15,7 +15,7 @@ abstract class AudioPlayerProxy {
 
 abstract class AudioRecorderProxy {
   void start();
-  void stop();
+  void shutdown();
   void mute();
   void unmute();
   void setOnAudioData(void Function(String base64Data) onAudioData);

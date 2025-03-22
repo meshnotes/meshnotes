@@ -3,18 +3,17 @@
 /// Currently only used in Linux mode. Because I didn't find a good way to implement webview in Linux
 import 'dart:io';
 import 'dart:convert';
+import 'package:flutter/widgets.dart';
 import 'package:my_log/my_log.dart';
 
 import '../realtime_api.dart';
-import '../realtime_ws_helper.dart';
+import 'realtime_ws_helper.dart';
 import 'audio_player_proxy.dart';
 import 'audio_recorder_proxy.dart';
 
 class RealtimeNativeWsApi extends RealtimeApi {
   late AudioRecorderProxy audioRecorderProxy;
   late AudioPlayerProxy audioPlayerProxy;
-  final int sampleRate;
-  final int numChannels;
   final String url = 'wss://api.openai.com/v1/realtime';
   final String model = 'gpt-4o-realtime-preview-2024-10-01';
   final String apiKey;
@@ -28,8 +27,9 @@ class RealtimeNativeWsApi extends RealtimeApi {
 
   RealtimeNativeWsApi({
     required this.apiKey,
-    required this.sampleRate,
-    required this.numChannels,
+    required super.sampleRate,
+    required super.numChannels,
+    required super.sampleSize,
     this.toolsDescription,
     this.onWsError,
     this.onWsClose,
@@ -44,6 +44,8 @@ class RealtimeNativeWsApi extends RealtimeApi {
   @override
   void shutdown() {
     ws?.close();
+    audioRecorderProxy.shutdown();
+    audioPlayerProxy.shutdown();
   }
 
   @override
@@ -53,7 +55,21 @@ class RealtimeNativeWsApi extends RealtimeApi {
  
   @override
   void toggleMute(bool mute) {
-    // TODO: implement toggleMute
+    if(mute) {
+      audioRecorderProxy.mute();
+    } else {
+      audioRecorderProxy.unmute();
+    }
+  }
+
+  @override
+  Widget? buildWebview() {
+    return null;
+  }
+
+  @override
+  void playAudio(String audioBase64) {
+    audioPlayerProxy.play(audioBase64, '', 0, volume: 1.0);
   }
 
   Future<void> _openNativeRecorder() async {
@@ -76,10 +92,10 @@ class RealtimeNativeWsApi extends RealtimeApi {
       }
       try {
         ws = await WebSocket.connect(
-        '$url?model=$model',
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'OpenAI-Beta': 'realtime=v1',
+          '$url?model=$model',
+          headers: {
+            'Authorization': 'Bearer $apiKey',
+            'OpenAI-Beta': 'realtime=v1',
           },
         );
         ws!.listen(_onData, onError: _onError, onDone: _onClose);

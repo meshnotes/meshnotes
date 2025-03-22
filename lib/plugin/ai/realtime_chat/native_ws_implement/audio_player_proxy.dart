@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'dart:collection';
 import 'package:mp_audio_stream/mp_audio_stream.dart';
 import 'package:my_log/my_log.dart';
-import '../realtime_ws_helper.dart';
+import 'realtime_ws_helper.dart';
 
 
 class AudioItem {
@@ -112,7 +112,7 @@ class NativeAudioPlayerProxyImpl extends AudioPlayerProxy {
   }
 
   @override
-  void play(String base64Data, String itemId, int contentIndex) {
+  void play(String base64Data, String itemId, int contentIndex, {double volume=1.0}) {
     if (!isPlaying) {
       playingBufferInfoManager.playEnded();
       currentPlayedMs = 0;
@@ -125,7 +125,7 @@ class NativeAudioPlayerProxyImpl extends AudioPlayerProxy {
     Float32List floatData = Float32List(len);
     for (int i = 0; i < len; i++) {
       final pcm16 = byteData.getInt16(i * 2, Endian.little);
-      floatData[i] = pcm16 / 32768.0; // Normalize to [-1.0, 1.0]
+      floatData[i] = pcm16 / 32768.0 * volume; // Normalize to [-1.0, 1.0] with volume scale
     }
 
     // Add floatData to queue instead of pushing directly

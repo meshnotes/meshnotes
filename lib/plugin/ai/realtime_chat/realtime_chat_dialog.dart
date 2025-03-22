@@ -36,7 +36,6 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   bool _isMuted = false;
   final visualizerKey = GlobalKey<AudioVisualizerWidgetState>();
   final subtitlesKey = GlobalKey<SubtitlesState>();
-  final aecAudioWebViewKey = GlobalKey();
   double _xPosition = -1;
   double _yPosition = -1;
   bool _isLoading = false;
@@ -57,7 +56,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   @override
   void dispose() {
     super.dispose();
-    realtime?.shutdown();
+    realtime?.dispose();
   }
 
   @override
@@ -199,6 +198,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
               size: 24,
             );
           } else {
+            final webview = _buildWebViewAudio();
             if(_isLoading) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -212,7 +212,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  realtime?.buildWebview()?? const SizedBox.shrink(),
+                  webview,
                   Text(
                     'Loading...',
                     style: TextStyle(
@@ -234,7 +234,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
               );
               return Column(
                 children: [
-                  realtime?.buildWebview()?? const SizedBox.shrink(),
+                  webview,
                   audioVisualizer,
                 ],
               );
@@ -273,7 +273,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   }
 
   Future<bool> _initRealtimeChat() async {
-    final permission = await requestMicrophonePermission();
+    final permission = await _requestMicrophonePermission();
     if(!permission) return false;
 
     final data = await rootBundle.load('assets/pop_sound_pcm24k.pcm');
@@ -318,7 +318,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     _startRealtimeChat(); // Run asynchronously
     return true;
   }
-  Future<bool> requestMicrophonePermission() async {
+  Future<bool> _requestMicrophonePermission() async {
     if(widget.proxy.getPlatform().isMobile()) {
       final statusMicrophone = await Permission.microphone.request();
       MyLogger.info('statusMicrophone: $statusMicrophone');
@@ -343,9 +343,24 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
       });
     }
   }
+  Widget _buildWebViewAudio() {
+    final webview = realtime?.buildWebview();
+    if(webview == null) {
+      return const SizedBox.shrink();
+    }
+    final sizedBox = SizedBox(
+      width: 1,
+      height: 1,
+      child: webview,
+    );
+    return sizedBox;
+  }
 
   RealtimeChoise _chooseImplementation() {
-    return RealtimeChoise.nativeWebSocketImplementation;
+    if(widget.proxy.getPlatform().isLinux()) {
+      return RealtimeChoise.nativeWebSocketImplementation;
+    }
+    return RealtimeChoise.webViewWebSocketImplementation;
   }
 
   UserNotes? _getUserNotes() {
