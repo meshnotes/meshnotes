@@ -122,4 +122,5 @@ abstract class Platform {
   bool isAndroid();
   bool isIOS();
   bool isMobile();
+  bool isLinux();
 }

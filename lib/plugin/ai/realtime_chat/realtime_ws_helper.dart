@@ -5,6 +5,23 @@ class TruncateInfo {
   TruncateInfo(this.itemId, this.contentIndex, this.audioEndMs);
 }
 
+abstract class AudioPlayerProxy {
+  void play(String base64Data, String itemId, int contentIndex);
+  void start();
+  void shutdown();
+  void resume();
+  TruncateInfo? stop();
+}
+
+abstract class AudioRecorderProxy {
+  void start();
+  void stop();
+  void mute();
+  void unmute();
+  void setOnAudioData(void Function(String base64Data) onAudioData);
+}
+
+
 class PlayingBufferInfoManager {
   _PlayingBufferInfo? _currentPlayingBufferInfo;
   int? _startTimeMsAtTheBeginning;
@@ -35,7 +52,6 @@ class PlayingBufferInfoManager {
     return result;
   }
 }
-
 
 class _PlayingBufferInfo {
   final String itemId;
