@@ -83,10 +83,6 @@ class RealtimeWebviewWsApi extends RealtimeApi {
   void _onData(String data) {
     MyLogger.info('RealtimeWebViewApi: _onData: $data');
     final json = jsonDecode(data);
-    String type = json['type']!;
-    if(type != 'response.audio.delta') { // Don't print the audio data
-      MyLogger.info('RealtimeWebViewApi: receive data: $data');
-    }
     eventHandler.onData(json);
   }
 }

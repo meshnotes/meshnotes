@@ -333,7 +333,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     final connected = await realtime!.connect();
     if(connected) {
       setState(() {
-        _isLoading = false;
+        _isLoading = true;
         _isError = false;
       });
     } else {

@@ -33,6 +33,7 @@ class RealtimeProxy {
   bool shouldStop = false; // stop by user
   bool forceStop = false; // stop by too many errors
   final RealtimeChoise implementationChoice;
+  bool neverReceiveSessionUpdatedYet = true;
   // Just for chat history test
   // ChatMessages chatMessages = ChatMessages(messages: [
   //   ChatMessage(role: ChatRole.assistant, content: 'Hi, what can I help you with?'),
@@ -192,7 +193,7 @@ class RealtimeProxy {
       return null;
     }
     final content = userNotes.getNotesContent();
-    String prompt = 'Here is the user\'s content. Refer to this only if user asks about it. Be caution, user doesn\'t care the id, only care the content. so it\'s not necessary to mention the id in your response.';
+    String prompt = 'Here is the user\'s notes.'; //. Refer to this only if user asks about it. Be caution, keep silent about the content, unless user asks about it.';
     return prompt + '\n' + content;
   }
   String? _buildHistory() {
@@ -283,6 +284,8 @@ class RealtimeProxy {
     if(type == 'conversation.item.input_audio_transcription.completed') {
       final text = json['transcript'];
       _onUserTranscriptDone(text);
+    } else {
+      MyLogger.info('RealtimeProxy: _onConversation: $type');
     }
   }
   void _onSession(String type, String? eventId, String? itemId, Map<String, dynamic> json) {
@@ -296,16 +299,32 @@ class RealtimeProxy {
   }
   void _onCreated() {
     MyLogger.info('RealtimeProxy: Session created');
-      _updateSession();
-      _sendUserContents();
-      _sendHistory();
+    // In webrtc case, the session will automatically updated after created
+    // Maybe the session is created when requiring the ephemeral token, and the connection of webrtc is an update action for this session
+    if(implementationChoice == RealtimeChoise.webViewWebRtcImplementation) return;
+    // In other implementation, the session need to be updated after created
+    _updateSession();
   }
   void _sendUserContents() {
     final userContents = _buildUserContents();
     if(userContents == null) {
       return;
     }
-    // client.sendEvent({'type': 'session.update', 'event_id': _generateEventId(), 'session': {'user_contents': userContents}});
+    final conversationObject = {
+      'type': 'conversation.item.create',
+      'item': {
+        'type': 'message',
+        'role': 'user',
+        'content': [
+          {
+            'type': 'input_text',
+            'text': userContents,
+          }
+        ]
+      }
+    };
+    MyLogger.info('RealtimeProxy: send user contents: $conversationObject');
+    client.sendEvent(conversationObject);
   }
   void _sendHistory() {
     final history = _buildHistory();
@@ -316,6 +335,15 @@ class RealtimeProxy {
   }
   void _onSessionUpdated() {
     MyLogger.info('RealtimeProxy: Session updated');
+    // For WebRtc implementation, send real session update after received first session.updated(sent by server)
+    if(implementationChoice == RealtimeChoise.webViewWebRtcImplementation && neverReceiveSessionUpdatedYet) {
+      neverReceiveSessionUpdatedYet = false;
+      _updateSession();
+      return;
+    }
+
+    _sendUserContents();
+    _sendHistory();
     client.playAudio(popSoundAudioBase64);
   }
   void _onApplicationError(String? errorType, String? errorCode, String? errorMessage) {

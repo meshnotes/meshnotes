@@ -84,7 +84,7 @@ class RealtimeWebViewWebRtcApi extends RealtimeApi {
     final json = jsonDecode(data);
     String type = json['type']!;
     if(type != 'response.audio.delta') { // Don't print the audio data
-      MyLogger.debug('RealtimeWebViewWebRtcApi: receive data: $data');
+      MyLogger.info('RealtimeWebViewWebRtcApi: receive data: $data');
     }
     eventHandler.onData(json);
   }
