@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:my_log/my_log.dart';
 
-class AecAudioWebView extends StatefulWidget {
+class WebSocketRealtimeWebView extends StatefulWidget {
   final int sampleRate;
   final int numChannels;
   final int sampleSize;
@@ -12,7 +12,7 @@ class AecAudioWebView extends StatefulWidget {
   final void Function(String base64Data) onData;
   final void Function(InAppWebViewController controller) registerController;
 
-  const AecAudioWebView({
+  const WebSocketRealtimeWebView({
     super.key,
     required this.onData,
     required this.registerController,
@@ -25,10 +25,10 @@ class AecAudioWebView extends StatefulWidget {
   });
 
   @override
-  State<AecAudioWebView> createState() => _AecAudioWebViewState();
+  State<WebSocketRealtimeWebView> createState() => _WebSocketRealtimeWebViewState();
 }
 
-class _AecAudioWebViewState extends State<AecAudioWebView> {
+class _WebSocketRealtimeWebViewState extends State<WebSocketRealtimeWebView> {
   @override
   Widget build(BuildContext context) {
     PlatformInAppWebViewController.debugLoggingSettings.enabled = false;

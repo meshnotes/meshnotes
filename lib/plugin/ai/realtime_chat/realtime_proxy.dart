@@ -150,7 +150,7 @@ class RealtimeProxy {
     );
   }
   RealtimeApi _createWebViewWebSocketImplementation(RealtimeEventHandler eventHandler) {
-    return RealtimeWebViewApi(
+    return RealtimeWebviewWsApi(
       apiKey: apiKey,
       sampleRate: sampleRate,
       numChannels: numChannels,
@@ -159,7 +159,7 @@ class RealtimeProxy {
     );
   }
   RealtimeApi _createWebViewWebRtcImplementation(RealtimeEventHandler eventHandler) {
-    return RealtimeWebViewApi(
+    return RealtimeWebviewWsApi(
       apiKey: apiKey,
       sampleRate: sampleRate,
       numChannels: numChannels,

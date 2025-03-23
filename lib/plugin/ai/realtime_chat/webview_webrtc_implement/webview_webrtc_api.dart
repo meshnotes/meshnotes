@@ -3,11 +3,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../realtime_api.dart';
-import 'websocket_web_view.dart';
+import 'webrtc_web_view.dart';
 import 'dart:convert';
 import 'package:my_log/my_log.dart';
 
-class RealtimeWebviewWsApi extends RealtimeApi {
+class RealtimeWebViewApi extends RealtimeApi {
   final aecAudioWebViewKey = GlobalKey();
   final String url = 'wss://api.openai.com/v1/realtime';
   final String model = 'gpt-4o-realtime-preview-2024-10-01';
@@ -20,7 +20,7 @@ class RealtimeWebviewWsApi extends RealtimeApi {
   // ignore: constant_identifier_names
   static const int MAX_RECONNECT_TIMES = 3;
 
-  RealtimeWebviewWsApi({
+  RealtimeWebViewApi({
     required this.apiKey,
     required super.sampleRate,
     required super.numChannels,
@@ -59,7 +59,7 @@ class RealtimeWebviewWsApi extends RealtimeApi {
 
   @override
   Widget? buildWebview() {
-    final aecAudioWebView = WebSocketRealtimeWebView(
+    final aecAudioWebView = WebRtcRealtimeWebView(
       key: aecAudioWebViewKey,
       baseUrl: url,
       model: model,
