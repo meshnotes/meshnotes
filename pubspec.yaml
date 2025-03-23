@@ -159,3 +159,4 @@ flutter:
     - assets/sound/pop_sound_pcm24k.pcm
     - assets/pop_sound_pcm24k.pcm
     - assets/webview/websocket_realtime_page.html
+    - assets/webview/webrtc_realtime_page.html

@@ -7,9 +7,9 @@ import 'webrtc_web_view.dart';
 import 'dart:convert';
 import 'package:my_log/my_log.dart';
 
-class RealtimeWebViewApi extends RealtimeApi {
+class RealtimeWebViewWebRtcApi extends RealtimeApi {
   final aecAudioWebViewKey = GlobalKey();
-  final String url = 'wss://api.openai.com/v1/realtime';
+  final String url = 'https://api.openai.com/v1/realtime';
   final String model = 'gpt-4o-realtime-preview-2024-10-01';
   final String apiKey;
   final List<Map<String, dynamic>>? toolsDescription;
@@ -20,7 +20,7 @@ class RealtimeWebViewApi extends RealtimeApi {
   // ignore: constant_identifier_names
   static const int MAX_RECONNECT_TIMES = 3;
 
-  RealtimeWebViewApi({
+  RealtimeWebViewWebRtcApi({
     required this.apiKey,
     required super.sampleRate,
     required super.numChannels,
@@ -38,7 +38,7 @@ class RealtimeWebViewApi extends RealtimeApi {
 
   @override
   void shutdown() {
-    webviewController?.evaluateJavascript(source: 'shutdownAll()');
+    // webviewController?.evaluateJavascript(source: 'shutdownAll()');
   }
 
   @override
@@ -77,15 +77,14 @@ class RealtimeWebViewApi extends RealtimeApi {
 
   @override
   void playAudio(String audioBase64) {
-    webviewController?.evaluateJavascript(source: 'playAudio("$audioBase64", "", 0)');
+    webviewController?.evaluateJavascript(source: 'playAudio("$audioBase64")');
   }
 
   void _onData(String data) {
-    MyLogger.info('RealtimeWebViewApi: _onData: $data');
     final json = jsonDecode(data);
     String type = json['type']!;
     if(type != 'response.audio.delta') { // Don't print the audio data
-      MyLogger.info('RealtimeWebViewApi: receive data: $data');
+      MyLogger.debug('RealtimeWebViewWebRtcApi: receive data: $data');
     }
     eventHandler.onData(json);
   }

@@ -360,7 +360,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     if(widget.proxy.getPlatform().isLinux()) {
       return RealtimeChoise.nativeWebSocketImplementation;
     }
-    return RealtimeChoise.webViewWebSocketImplementation;
+    return RealtimeChoise.webViewWebRtcImplementation;
   }
 
   UserNotes? _getUserNotes() {

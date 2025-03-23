@@ -9,6 +9,7 @@ import 'function_call.dart';
 import 'chat_messages.dart';
 import 'realtime_api.dart';
 import 'realtime_prompts.dart';
+import 'webview_webrtc_implement/webview_webrtc_api.dart';
 
 enum RealtimeConnectionState {
   idle,
@@ -159,7 +160,7 @@ class RealtimeProxy {
     );
   }
   RealtimeApi _createWebViewWebRtcImplementation(RealtimeEventHandler eventHandler) {
-    return RealtimeWebviewWsApi(
+    return RealtimeWebViewWebRtcApi(
       apiKey: apiKey,
       sampleRate: sampleRate,
       numChannels: numChannels,
