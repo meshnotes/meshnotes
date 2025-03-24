@@ -9,7 +9,7 @@ import bonsoir_darwin
 import device_info_plus
 import flutter_inappwebview_macos
 import flutter_window_close
-import path_provider_macos
+import path_provider_foundation
 import record_darwin
 import sqlite3_flutter_libs
 
