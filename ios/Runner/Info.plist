@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -33,7 +35,7 @@
 		<string>_village-v0._udp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>MeshNotes need camera to start webRTC to using realtime chat with AI(In fact, won't use camera)</string>
+	<string>MeshNotes need camera to start webRTC to using realtime chat with AI(In fact, won&apos;t use camera)</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Use microphone to chat with AI</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
