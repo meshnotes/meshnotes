@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
+import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
 import 'package:my_log/my_log.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'ai_tools_manager.dart';
@@ -29,11 +32,10 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
   static const double defaultDialogWidth = 400; // fixed width and height of dialog
   static const double defaultDialogHeight = 100;
   static const double paddingToScreenEdge = 5;
-  late RealtimeProxy realtime;
+  RealtimeProxy? realtime;
   bool _isMuted = false;
   final visualizerKey = GlobalKey<AudioVisualizerWidgetState>();
   final subtitlesKey = GlobalKey<SubtitlesState>();
-  final aecAudioWebViewKey = GlobalKey();
   double _xPosition = -1;
   double _yPosition = -1;
   bool _isLoading = false;
@@ -47,47 +49,14 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     _isLoading = true;
     _isError = false;
     _toolsManager = AiToolsManager(pluginProxy: widget.proxy);
-    final userNotes = widget.proxy.getUserNotes();
 
-    realtime = RealtimeProxy(
-      apiKey: widget.apiKey,
-      userNotes: userNotes,
-      tools: _toolsManager.buildTools(),
-      showToastCallback: (error) {
-        widget.proxy.showToast(error);
-      },
-      onErrorShutdown: () {
-        widget.closeCallback?.call();
-      },
-      onStateChanged: (state) {
-        if(!mounted) return;
-        if(state == RealtimeConnectionState.connected) {
-          setState(() {
-            _isLoading = false;
-          });
-        } else if(state == RealtimeConnectionState.connecting) {
-          setState(() {
-            _isLoading = true;
-          });
-        } else if(state == RealtimeConnectionState.error) {
-          setState(() {
-            _isLoading = false;
-            _isError = true;
-          });
-        }
-      },
-      startVisualizerAnimation: _startVisualizerAnimation,
-      stopVisualizerAnimation: _stopVisualizerAnimation,
-      onChatMessagesUpdated: _onChatMessagesUpdated,
-      playPopSoundAfterConnected: !widget.proxy.getPlatform().isIOS(), // Will failed to chat on iOS, I don't know why
-    );
-    permissionFuture = _startRealtimeChat();
+    permissionFuture = _initRealtimeChat();
   }
 
   @override
   void dispose() {
     super.dispose();
-    realtime.shutdown();
+    realtime?.dispose();
   }
 
   @override
@@ -121,7 +90,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
           Expanded(
             child: Subtitles(
               key: subtitlesKey,
-              messages: realtime.chatMessages,
+              messages: realtime?.chatMessages?? ChatMessages(messages: []),
               proxy: widget.proxy,
             ),
           ),
@@ -146,9 +115,9 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                         setState(() {
                           _isMuted = !_isMuted;
                           if(_isMuted) {
-                            realtime.mute();
+                            realtime?.mute();
                           } else {
-                            realtime.unmute();
+                            realtime?.unmute();
                           }
                         });
                       },
@@ -229,6 +198,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
               size: 24,
             );
           } else {
+            final webview = _buildWebViewAudio();
             if(_isLoading) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -242,6 +212,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                     ),
                   ),
                   const SizedBox(height: 4),
+                  webview,
                   Text(
                     'Loading...',
                     style: TextStyle(
@@ -256,7 +227,6 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
                 ],
               );
             } else {
-              MyLogger.info('build audio visualizer');
               final audioVisualizer = AudioVisualizerWidget(
                 key: visualizerKey,
                 isPlaying: false,
@@ -264,6 +234,7 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
               );
               return Column(
                 children: [
+                  webview,
                   audioVisualizer,
                 ],
               );
@@ -301,10 +272,55 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     return futureBuilder;
   }
 
-  Future<bool> requestPermissions() async {
+  Future<bool> _initRealtimeChat() async {
+    final permission = await _requestMicrophonePermission();
+    if(!permission) return false;
+
+    final data = await rootBundle.load('assets/pop_sound_pcm24k.pcm');
+    final base64Data = base64Encode(data.buffer.asUint8List());
+    realtime = RealtimeProxy(
+      apiKey: widget.apiKey,
+      getUserNotes: _getUserNotes,
+      tools: _toolsManager.buildTools(),
+      showToastCallback: (error) {
+        widget.proxy.showToast(error);
+      },
+      onErrorShutdown: () {
+        widget.closeCallback?.call();
+      },
+      onStateChanged: (state) {
+        if(!mounted) return;
+        if(state == RealtimeConnectionState.ready) {
+          setState(() {
+            _isLoading = false;
+            _isError = false;
+          });
+        } else if(state == RealtimeConnectionState.error) {
+          setState(() {
+            _isLoading = false;
+            _isError = true;
+          });
+        } else {
+          // state is RealtimeConnectionState.connecting || connected || idle || shuttingDown
+          setState(() {
+            _isLoading = true;
+            _isError = false;
+          });
+        }
+      },
+      startVisualizerAnimation: _startVisualizerAnimation,
+      stopVisualizerAnimation: _stopVisualizerAnimation,
+      onChatMessagesUpdated: _onChatMessagesUpdated,
+      popSoundAudioBase64: base64Data,
+      playPopSoundAfterConnected: !widget.proxy.getPlatform().isMobile(), // Will failed to chat on iOS, I don't know why. And no use in Android
+      implementationChoice: _chooseImplementation(),
+    );
+    _startRealtimeChat(); // Run asynchronously
+    return true;
+  }
+  Future<bool> _requestMicrophonePermission() async {
     if(widget.proxy.getPlatform().isMobile()) {
       final statusMicrophone = await Permission.microphone.request();
-      // final statusAudio = await Permission.audio.request();
       MyLogger.info('statusMicrophone: $statusMicrophone');
       if(statusMicrophone != PermissionStatus.granted) {
         return false;
@@ -312,31 +328,43 @@ class RealtimeChatDialogState extends State<RealtimeChatDialog> {
     }
     return true;
   }
-  Future<bool> _startRealtimeChat() async {
-    final granted = requestPermissions();
-    granted.then((granted) {
-      if(granted) {
-        realtime.connect().then((connected) {
-          if(connected) {
-            setState(() {
-              _isLoading = false;
-              _isError = false;
-            });
-          } else {
-            setState(() {
-              _isLoading = false;
-              _isError = true;
-            });
-          }
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _isError = true;
-        });
-      }
-    });
-    return granted;
+  Future<void> _startRealtimeChat() async {
+    if(realtime == null) return;
+    final connected = await realtime!.connect();
+    if(connected) {
+      setState(() {
+        _isLoading = true;
+        _isError = false;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+        _isError = true;
+      });
+    }
+  }
+  Widget _buildWebViewAudio() {
+    final webview = realtime?.buildWebview();
+    if(webview == null) {
+      return const SizedBox.shrink();
+    }
+    final sizedBox = SizedBox(
+      width: 1,
+      height: 1,
+      child: webview,
+    );
+    return sizedBox;
+  }
+
+  RealtimeChoise _chooseImplementation() {
+    if(widget.proxy.getPlatform().isLinux()) {
+      return RealtimeChoise.nativeWebSocketImplementation;
+    }
+    return RealtimeChoise.webViewWebRtcImplementation;
+  }
+
+  UserNotes? _getUserNotes() {
+    return widget.proxy.getUserNotes();
   }
 
   void _onClose() {

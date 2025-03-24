@@ -453,4 +453,9 @@ class PlatformImpl implements Platform {
   bool isMobile() {
     return _environment.isMobile();
   }
+  
+  @override
+  bool isLinux() {
+    return _environment.isLinux();
+  }
 }

@@ -3,8 +3,8 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  flutter_webrtc
   flutter_window_close
+  record_linux
   sqlite3_flutter_libs
 )
 

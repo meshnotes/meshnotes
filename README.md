@@ -23,7 +23,7 @@ Both these two ways you need to run mesh notes on both devices. But by the third
 ## Building and testing environment
 Build and test in Flutter 3.24.0, with Dart 3.5.0.
 For mac: Xcode 16.1
-For windows: Visual Studio 2022
+For windows: Visual Studio 2022, Need to install Nuget package(dependency of flutter_inappwebview).
 For Linux: Ubuntu 24.04, Android Studio 2023.1.1
 IDE: Cursor
 

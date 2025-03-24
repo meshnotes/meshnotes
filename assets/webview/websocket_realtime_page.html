@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Realtime Chat with WebSocket</title>
+  <style>
+    .button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .container {
+      text-align: center;
+      margin-top: 50px;
+    }
+  </style>
+</head>
+
+<body>
+  <script>
+    let audioContext;
+    let mediaStream;
+    let mediaStreamSource;
+    let scriptProcessor;
+    let isMuted = false;
+    let recorderReady = false;
+    let playerReady = false;
+    let latestPlayTime = null;
+    let sourceSequence = [];
+
+    console.log('WebView ws Realtime API: running websocket_realtime_page.html');
+
+    async function start(wsUrl, model, apiKey, sampleRate, numChannels, sampleSize) {
+      console.log('WebView ws Realtime API: start', wsUrl, model, apiKey, sampleRate, numChannels, sampleSize);
+      startRecording(sampleRate, numChannels, sampleSize);
+      startPlayer();
+      try {
+        console.log('WebView ws Realtime API: connect to socket ', wsUrl);
+        const socket = new WebSocket(
+          wsUrl + '?model=' + model, // url
+          [
+            "realtime",
+            // Auth
+            "openai-insecure-api-key." + apiKey, 
+            // Optional
+            // Beta protocol, required
+            "openai-beta.realtime-v1"
+          ]
+        );
+
+        console.log('WebView ws Realtime API: socket.onopen');
+        socket.onopen = function(event) {
+        };
+
+        // 接收消息的处理
+        socket.onmessage = function(event) {
+          const data = JSON.parse(event.data);
+          const type = data['type'];
+          if(type != 'response.audio.delta') { // Don't print the audio data
+            console.log('WebView ws Realtime API: receive data: ', data);
+          }
+          if(type == 'input_audio_buffer.speech_started') { // This means interrupt by user
+            console.log('WebView ws Realtime API: input_audio_buffer.speech_started, need interrupt');
+            _onInterrupt();
+          }
+          if(type == 'response.audio.delta') {
+            console.log('WebView ws Realtime API: response.audio.delta');
+            const itemId = data['item_id'];
+            const audioBase64 = data['delta'];
+            const contentIndex = data['content_index'];
+            playAudio(audioBase64, itemId?? '', contentIndex);
+          } else {
+            window.flutter_inappwebview.callHandler('onData', event.data);
+          }
+        };
+
+        socket.onerror = function(error) {
+          console.error('WebView ws Realtime API: onerror', error);
+        };
+
+        socket.onclose = function(event) {
+          console.log('WebView ws Realtime API: onclose:', event.code, event.reason);
+        };
+
+        window.webSocket = socket;
+      } catch (error) {
+        console.error('WebView ws Realtime API: failed to start', error);
+      }
+    }
+
+    async function startRecording(sampleRate, numChannels, sampleSize) {
+      console.log('WebView ws Realtime API: startRecording');
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: sampleRate,
+          latencyHint: 'interactive'
+        });
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: sampleRate,
+            channelCount: numChannels,
+            sampleSize: sampleSize,
+            // noiseSuppression: true,
+            echoCancellation: true,
+            // autoGainControl: true
+          } 
+        });
+
+        mediaStreamSource = audioContext.createMediaStreamSource(mediaStream);
+        scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        mediaStreamSource.connect(scriptProcessor);
+        scriptProcessor.connect(audioContext.destination);
+
+        console.log('WebView ws Realtime API: AudioContext.state before resume', audioContext.state);
+        audioContext.resume().then(() => {
+          console.log('WebView ws Realtime API: AudioContext.state after resume', audioContext.state);
+        });
+
+        scriptProcessor.onaudioprocess = function (e) {
+          if (!isMuted) {
+            const inputData = e.inputBuffer.getChannelData(0);
+            const uint8Data = new Uint8Array(inputData.length * 2);
+            for (let i = 0; i < inputData.length; i++) {
+              const sample = Math.round(inputData[i] * 0x7FFF);
+              uint8Data[i * 2] = sample & 0xFF;
+              uint8Data[i * 2 + 1] = (sample >> 8) & 0xFF;
+            }
+            const base64Data = btoa(String.fromCharCode.apply(null, uint8Data));
+            _appendInputAudio(base64Data);
+          }
+        };
+      } catch (err) {
+        console.log('WebView ws Realtime API: Error accessing microphone:', err);
+      }
+      recorderReady = true;
+      tryToReportAudioReady();
+    }
+
+    function playAudio(data, itemId, contentIndex, volume = 1.0) {
+      // console.log('WebView ws Realtime API: playAudio', data, itemId, contentIndex);
+      if(audioContext == null) {
+        console.warn('WebView ws Realtime API: audioContext is null');
+        return;
+      }
+      const binaryString = atob(data);
+      const uint8Data = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        uint8Data[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Convert Uint8Array to Int16Array
+      const int16Data = new Int16Array(uint8Data.buffer);
+      
+      // Convert Int16Array to Float32Array (normalize to -1 to 1)
+      const float32Data = new Float32Array(int16Data.length);
+      for (let i = 0; i < int16Data.length; i++) {
+        // Divide by 0x7FFF (32767) to normalize
+        float32Data[i] = int16Data[i] / 0x7FFF * volume;
+      }
+
+      const audioBufferObj = audioContext.createBuffer(1, float32Data.length, audioContext.sampleRate)
+      audioBufferObj.copyToChannel(float32Data, 0) // Copy PCM data to the buffer
+
+      // Create a BufferSource to play the audio
+      const source = audioContext.createBufferSource()
+      source.buffer = audioBufferObj
+      source.connect(audioContext.destination)
+
+      // If playing queue is empty, update latestPlayTime to current time
+      if(sourceSequence.length <= 0 || latestPlayTime == null) {
+        latestPlayTime = audioContext.currentTime;
+      }
+      let startTime = latestPlayTime;
+      const duration = float32Data.length / audioContext.sampleRate
+      const endTime = startTime + duration;
+
+      source.onended = () => {
+        // console.log('source.onended');
+        sourceSequence.shift();
+        if(sourceSequence.length > 0) {
+          let first = sourceSequence[0];
+          updatePlayingBufferInfo(first.itemId, first.contentIndex, first.startTime * 1000);
+        } else {
+          playEnded();
+        }
+      }
+
+      latestPlayTime = endTime;
+      source.start(startTime, 0, duration)
+
+      sourceSequence.push({
+        source,
+        startTime,
+        endTime,
+        itemId,
+        contentIndex,
+      })
+    }
+
+    function startPlayer() {
+      console.log('WebView ws Realtime API: startPlayer');
+    }
+
+    function stopRecording() {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream.getAudioTracks().forEach(track => track.stop());
+      }
+      if (scriptProcessor) {
+        scriptProcessor.disconnect();
+      }
+      if (mediaStreamSource) {
+        mediaStreamSource.disconnect();
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+    }
+
+    function clearPlayingBuffers() {
+      for(let i = 0; i < sourceSequence.length; i++) {
+        let source = sourceSequence[i].source;
+        source.stop();
+        source.disconnect();
+      }
+      sourceSequence = [];
+    }
+
+    function sendBase64Event(base64Data) {
+      _sendEvent(atob(base64Data));
+    }
+
+    function mute() {
+      console.log('WebView ws Realtime API: mute');
+      isMuted = true;
+    }
+
+    function unmute() {
+      console.log('WebView ws Realtime API: unmute');
+      isMuted = false;
+    }
+
+    function shutdownAll() {
+      console.log('WebView ws Realtime API: shutdownAll');
+      stopRecording();
+      clearPlayingBuffers();
+      window.webSocket.close();
+    }
+
+    function _sendEvent(data) {
+      window.webSocket.send(data);
+    }
+    function _sendJsonEvent(data) {
+      _sendEvent(JSON.stringify(data));
+    }
+    function _appendInputAudio(base64Data) {
+      // MyLogger.info('Native WebSocket Realtime API append input audio: $base64Data');
+      const appendInputAudioObject = {
+        'type': 'input_audio_buffer.append',
+        'audio': base64Data,
+      };
+      _sendJsonEvent(appendInputAudioObject);
+    }
+    function _onInterrupt() {
+      console.log('WebView ws Realtime API: onInterrupt');
+      clearPlayingBuffers();
+      // truncateInfo = audioPlayerProxy.stop();
+      const truncateInfo = getTruncateInfo();
+      if(truncateInfo != null) {
+        console.log('WebView ws Realtime API: Interrupt, truncate info: ', truncateInfo.itemId, truncateInfo.contentIndex, truncateInfo.audioEndMs);
+        _truncate(truncateInfo);
+      } else {
+        console.log('WebView ws Realtime API: no truncate info');
+      }
+    }
+    function _truncate(truncateInfo) {
+      const truncateObject = {
+        'type': 'conversation.item.truncate',
+        'item_id': truncateInfo.itemId,
+        'content_index': truncateInfo.contentIndex,
+        'audio_end_ms': truncateInfo.audioEndMs,
+      };
+      _sendJsonEvent(truncateObject);
+    }
+
+    class TruncateInfo {
+      constructor(itemId, contentIndex, audioEndMs) {
+        this.itemId = itemId;
+        this.contentIndex = contentIndex;
+        this.audioEndMs = audioEndMs;
+      }
+    }
+    class _PlayingBufferInfo {
+      constructor(itemId, contentIndex, startTimeMs) {
+        this.itemId = itemId;
+        this.contentIndex = contentIndex;
+        this.startTimeMs = startTimeMs;
+      }
+    }
+    var _currentPlayingBufferInfo = null;
+    var _startTimeMsAtTheBeginning = null;
+
+    function updatePlayingBufferInfo(itemId, contentIndex, startTimeMs) {
+      let oldItemId = _currentPlayingBufferInfo?.itemId;
+      if(oldItemId != itemId || _startTimeMsAtTheBeginning == null) {
+        _startTimeMsAtTheBeginning = startTimeMs;
+      }
+      _currentPlayingBufferInfo = _PlayingBufferInfo(itemId, contentIndex, startTimeMs);
+    }
+    function playEnded() {
+      _currentPlayingBufferInfo = null;
+      _startTimeMsAtTheBeginning = null;
+    }
+    function getTruncateInfo() {
+      if(_currentPlayingBufferInfo == null || _startTimeMsAtTheBeginning == null) {
+        return null;
+      }
+      const result = TruncateInfo(
+        _currentPlayingBufferInfo.itemId,
+        _currentPlayingBufferInfo.contentIndex,
+        _currentPlayingBufferInfo.startTimeMs - _startTimeMsAtTheBeginning,
+      );
+      playEnded();
+      return result;
+    }
+  </script>
+</body>
+
+</html>

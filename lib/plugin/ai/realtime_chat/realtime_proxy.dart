@@ -1,29 +1,39 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
-import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:mesh_note/plugin/ai/realtime_chat/native_ws_implement/native_ws_api.dart';
+import 'package:mesh_note/plugin/ai/realtime_chat/webview_ws_implement/webview_ws_api.dart';
 import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
-import 'package:mp_audio_stream/mp_audio_stream.dart';
 import 'package:my_log/my_log.dart';
 import 'function_call.dart';
 import 'chat_messages.dart';
-import 'realtime_api_webrtc.dart';
+import 'realtime_api.dart';
+import 'realtime_prompts.dart';
+import 'webview_webrtc_implement/webview_webrtc_api.dart';
 
 enum RealtimeConnectionState {
   idle,
   connecting,
   connected,
+  ready,
   error,
   shuttingDown,
 }
 
+enum RealtimeChoise {
+  nativeWebSocketImplementation,
+  webViewWebSocketImplementation,
+  webViewWebRtcImplementation,
+}
+
 class RealtimeProxy {
-  AudioStream? _audioStream;
   final String apiKey;
-  late RealtimeApiWebRtc clientWebRtc;
+  late RealtimeApi client;
   final bool playPopSoundAfterConnected;
   bool shouldStop = false; // stop by user
   bool forceStop = false; // stop by too many errors
+  final RealtimeChoise implementationChoice;
+  bool neverReceiveSessionUpdatedYet = true;
   // Just for chat history test
   // ChatMessages chatMessages = ChatMessages(messages: [
   //   ChatMessage(role: ChatRole.assistant, content: 'Hi, what can I help you with?'),
@@ -36,7 +46,6 @@ class RealtimeProxy {
   //   ChatMessage(role: ChatRole.user, content: '那他后来成功了吗？'),
   // ]);
   ChatMessages chatMessages = ChatMessages();
-  UserNotes? userNotes;
   int errorRetryCount = 0;
   Function(String)? showToastCallback;
   Function()? onErrorShutdown;
@@ -53,10 +62,12 @@ class RealtimeProxy {
   static const int sampleRate = 24000;
   static const int numChannels = 1;
   static const int sampleSize = 16;
+  final String popSoundAudioBase64;
+  final UserNotes? Function() getUserNotes;
 
   RealtimeProxy({
     required this.apiKey,
-    this.userNotes,
+    required this.implementationChoice,
     this.tools,
     this.showToastCallback,
     this.onErrorShutdown,
@@ -65,6 +76,8 @@ class RealtimeProxy {
     this.onChatMessagesUpdated,
     this.onStateChanged,
     this.playPopSoundAfterConnected = true,
+    required this.popSoundAudioBase64,
+    required this.getUserNotes,
   });
 
   /// 1. Connect to Realtime API
@@ -76,78 +89,111 @@ class RealtimeProxy {
     }
     _state = RealtimeConnectionState.connecting;
     bool connected = false;
-    clientWebRtc = RealtimeApiWebRtc(
-      apiKey: apiKey,
-      toolsDescription: tools?.getDescription(),
-      onAiTranscriptDelta: _onAiTranscriptDelta,
-      onAiTranscriptDone: _onAiTranscriptDone,
-      onUserTranscriptDone: _onUserTranscriptDone,
-      onFailed: _onFailed,
-      onClose: _onClose,
-      onFunctionCall: _onFunctionCall,
-    );
-    if(chatMessages.isEmpty()) {
-      connected = await clientWebRtc.connectWebRtc(userContents: _buildUserContents());
-    } else {
-      connected = await clientWebRtc.connectWebRtc(userContents: _buildUserContents(), history: _buildHistory());
-    }
+    client = _createRealtimeApiImplementation();
+    connected = await client.connect();
     if(connected) {
-      MyLogger.info('Connected to Realtime API');
+      MyLogger.info('RealtimeProxy: Connected to Realtime API');
       _state = RealtimeConnectionState.connected;
       onStateChanged?.call(_state);
-    }
-    if(playPopSoundAfterConnected) { // Play a pop sound when connected
-      await Future.delayed(const Duration(milliseconds: 800));
-      _playPopSound('assets/sound/pop_sound_pcm24k.pcm');
     }
     return connected;
   }
 
+  Widget? buildWebview() {
+    return client.buildWebview();
+  }
+
   void mute() {
-    clientWebRtc.toggleMute(true);
+    client.toggleMute(true);
   }
   void unmute() {
-    clientWebRtc.toggleMute(false);
+    client.toggleMute(false);
   }
 
-  void shutdown() {
-    if(_state != RealtimeConnectionState.connected) {
+  void dispose() {
+    if(_state == RealtimeConnectionState.shuttingDown || _state == RealtimeConnectionState.idle) {
+      MyLogger.warn('RealtimeProxy: duplicate shutdown');
       return;
     }
+    MyLogger.info('RealtimeProxy: now try to shutdown');
     _state = RealtimeConnectionState.shuttingDown;
     shouldStop = true;
-    clientWebRtc.shutdown();
+    client.shutdown();
     _animationTimer?.cancel();
     _state = RealtimeConnectionState.idle;
-    _audioStream?.uninit();
-    _audioStream = null;
-    onStateChanged?.call(_state);
   }
 
+  RealtimeApi _createRealtimeApiImplementation() {
+    final eventHandler = RealtimeEventHandler(
+      onData: _onData,
+      onError: (String error) {
+        _onFailed();
+      },
+      onClose: _onClose,
+      onPlaying: _onAudioActive,
+    );
+    switch(implementationChoice) {
+      case RealtimeChoise.nativeWebSocketImplementation:
+        return _createNativeWebSocketImplementation(eventHandler);
+      case RealtimeChoise.webViewWebSocketImplementation:
+        return _createWebViewWebSocketImplementation(eventHandler);
+      case RealtimeChoise.webViewWebRtcImplementation:
+        return _createWebViewWebRtcImplementation(eventHandler);
+    }
+  }
+  RealtimeApi _createNativeWebSocketImplementation(RealtimeEventHandler eventHandler) {
+    return RealtimeNativeWsApi(
+      sampleRate: sampleRate,
+      numChannels: numChannels,
+      sampleSize: sampleSize,
+      apiKey: apiKey,
+      toolsDescription: tools?.getDescription(),
+      eventHandler: eventHandler,
+    );
+  }
+  RealtimeApi _createWebViewWebSocketImplementation(RealtimeEventHandler eventHandler) {
+    return RealtimeWebviewWsApi(
+      apiKey: apiKey,
+      sampleRate: sampleRate,
+      numChannels: numChannels,
+      sampleSize: sampleSize,
+      eventHandler: eventHandler,
+    );
+  }
+  RealtimeApi _createWebViewWebRtcImplementation(RealtimeEventHandler eventHandler) {
+    return RealtimeWebViewWebRtcApi(
+      apiKey: apiKey,
+      sampleRate: sampleRate,
+      numChannels: numChannels,
+      sampleSize: sampleSize,
+      eventHandler: eventHandler,
+    );
+  }
   void _onAiTranscriptDelta(String text) {
-    MyLogger.debug('AI transcript delta: $text');
+    MyLogger.debug('RealtimeProxy: AI transcript delta: $text');
     chatMessages.updateAiTranscriptDelta(text);
     onChatMessagesUpdated?.call(chatMessages);
   }
 
   void _onAiTranscriptDone(String text) {
-    MyLogger.debug('AI transcript done: $text');
+    MyLogger.debug('RealtimeProxy: AI transcript done: $text');
     chatMessages.updateAiTranscriptDone(text);
     onChatMessagesUpdated?.call(chatMessages);
   }
 
   void _onUserTranscriptDone(String text) {
-    MyLogger.debug('User transcript done: $text');
+    MyLogger.debug('RealtimeProxy: User transcript done: $text');
     chatMessages.updateUserTranscriptDone(text);
     onChatMessagesUpdated?.call(chatMessages);
   }
 
   String? _buildUserContents() {
+    final userNotes = getUserNotes();
     if(userNotes == null) {
       return null;
     }
-    final content = userNotes!.getNotesContent();
-    String prompt = 'Here is the user\'s content. Refer to this only if user asks about it. Be caution, user doesn\'t care the id, only care the content. so it\'s not necessary to mention the id in your response.';
+    final content = userNotes.getNotesContent();
+    String prompt = 'Here is the user\'s notes.'; //. Refer to this only if user asks about it. Be caution, keep silent about the content, unless user asks about it.';
     return prompt + '\n' + content;
   }
   String? _buildHistory() {
@@ -164,29 +210,164 @@ class RealtimeProxy {
     onStateChanged?.call(_state);
     _tryToReconnect();
   }
-
   void _onClose() {
     _state = RealtimeConnectionState.error;
     onStateChanged?.call(_state);
     _tryToReconnect();
   }
+  void _onData(Map<String, dynamic> json) {
+    String type = json['type']!;
+    String? eventId = json['event_id'];
+    String? itemId = json['item_id'];
+    if(type.startsWith('response.')) {
+      _onResponse(type, eventId, itemId, json);
+    } else if(type.startsWith('input')) {
+      _onInput(type, eventId, itemId, json);
+    } else if(type.startsWith('conversation.')) {
+      _onConversation(type, eventId, itemId, json);
+    } else if(type.startsWith('session')) {
+      _onSession(type, eventId, itemId, json);
+    } else if(type == 'error') {
+      final errorBody = json['error'];
+      final errorType = errorBody['type'];
+      final errorCode = errorBody['code'];
+      final errorMessage = errorBody['message'];
+      _onApplicationError(errorType, errorCode, errorMessage);
+    } else {
+      MyLogger.info('Native WebSocket Realtime API: $json');
+    }
+    // Other events
+    // rate_limits.updated
+  }
+  /// response.created: with response id in json['response']['id']
+  /// response.output_item.added: with item id in json['item']['id']
+  /// response.audio.done: no any useful information
+  /// response.audio_transcript.delta: json['delta'], delta transcript text
+  /// response.audio_transcript.done: full audio transcript text
+  /// response.output_item.done: audio transcript
+  /// response.content_part.done: full audio transcript text
+  /// response.done: audio transcript, with usage information
+  /// *No response.audio.delta: json['delta'], audio base64 string, PCM16, mono channel, 24000 Hz, already handled by RealtimeApi implementation
+  ///                           No this event for WebRtc implementation
+  void _onResponse(String type, String? eventId, String? itemId, Map<String, dynamic> json) {
+    // String? responseId = json['response_id'];
+    if(type == 'response.audio_transcript.delta') {
+      final text = json['delta'] as String;
+      _onAiTranscriptDelta(text);
+    } else if(type == 'response.audio_transcript.done') {
+      final text = json['transcript'] as String;
+      _onAiTranscriptDone(text);
+    } else if(type == 'response.function_call_arguments.done') {
+      final callId = json['call_id'] as String;
+      final name = json['name'] as String;
+      final arguments = json['arguments'] as String;
+      _onFunctionCall(callId, name, arguments);
+    } else {
+      MyLogger.debug('RealtimeProxy onResponse: $json');
+    }
+  }
+  /// input_audio_buffer.speech_started: Already handled by RealtimeApi implementation
+  /// input_audio_buffer.speech_stopped
+  /// input_audio_buffer.committed
+  void _onInput(String type, String? eventId, String? itemId, Map<String, dynamic> json) {
+    if(type == 'input_audio_buffer.speech_started') {
+    } else if(type == 'input_audio_buffer.speech_stopped') {
+      // onSpeechStopped();
+    } else if(type == 'input_audio_buffer.committed') {
+      // onAudioCommitted();
+    }
+  }
+  /// conversation.item.created
+  /// conversation.item.input_audio_transcription.completed: user audio transcript
+  void _onConversation(String type, String? eventId, String? itemId, Map<String, dynamic> json) {
+    MyLogger.debug('Native WebSocket Realtime API: $json');
+    if(type == 'conversation.item.input_audio_transcription.completed') {
+      final text = json['transcript'];
+      _onUserTranscriptDone(text);
+    } else {
+      MyLogger.info('RealtimeProxy: _onConversation: $type');
+    }
+  }
+  void _onSession(String type, String? eventId, String? itemId, Map<String, dynamic> json) {
+    if(type == 'session.created') { // Update session after created
+      _onCreated();
+    } else if(type == 'session.updated') {
+      _onSessionUpdated();
+      _state = RealtimeConnectionState.ready;
+      onStateChanged?.call(_state);
+    }
+  }
+  void _onCreated() {
+    MyLogger.info('RealtimeProxy: Session created');
+    // In webrtc case, the session will automatically updated after created
+    // Maybe the session is created when requiring the ephemeral token, and the connection of webrtc is an update action for this session
+    if(implementationChoice == RealtimeChoise.webViewWebRtcImplementation) return;
+    // In other implementation, the session need to be updated after created
+    _updateSession();
+  }
+  void _sendUserContents() {
+    final userContents = _buildUserContents();
+    if(userContents == null) {
+      return;
+    }
+    final conversationObject = {
+      'type': 'conversation.item.create',
+      'item': {
+        'type': 'message',
+        'role': 'user',
+        'content': [
+          {
+            'type': 'input_text',
+            'text': userContents,
+          }
+        ]
+      }
+    };
+    MyLogger.info('RealtimeProxy: send user contents: $conversationObject');
+    client.sendEvent(conversationObject);
+  }
+  void _sendHistory() {
+    final history = _buildHistory();
+    if(history == null) {
+      return;
+    }
+    // client.sendEvent({'type': 'session.update', 'event_id': _generateEventId(), 'session': {'history': history}});
+  }
+  void _onSessionUpdated() {
+    MyLogger.info('RealtimeProxy: Session updated');
+    // For WebRtc implementation, send real session update after received first session.updated(sent by server)
+    if(implementationChoice == RealtimeChoise.webViewWebRtcImplementation && neverReceiveSessionUpdatedYet) {
+      neverReceiveSessionUpdatedYet = false;
+      _updateSession();
+      return;
+    }
+
+    _sendUserContents();
+    _sendHistory();
+    client.playAudio(popSoundAudioBase64);
+  }
+  void _onApplicationError(String? errorType, String? errorCode, String? errorMessage) {
+    MyLogger.err('RealtimeProxy: receive error: type=$errorType, code=$errorCode, message=$errorMessage');
+    // _onFailed();
+  }
+
+
   Future<void> _tryToReconnect() async {
     if(shouldStop) {
       return;
     }
     if(errorRetryCount >= MAX_ERROR_RETRY_COUNT) {
-      _state = RealtimeConnectionState.shuttingDown;
+      dispose();
       forceStop = true;
-      showToastCallback?.call('Realtime API failed too many times');
-      onErrorShutdown?.call();
-      _state = RealtimeConnectionState.idle;
+      showToastCallback?.call('RealtimeProxy: Failed too many times');
+      onStateChanged?.call(_state);
       return;
     }
     errorRetryCount++;
-    MyLogger.info('Reconnecting for the $errorRetryCount-th time...');
+    MyLogger.info('RealtimeProxy: Reconnecting for the $errorRetryCount-th time...');
     _state = RealtimeConnectionState.connecting;
     onStateChanged?.call(_state);
-    bool connected = await clientWebRtc.connectWebRtc(userContents: _buildUserContents(), history: _buildHistory());
+    bool connected = await client.connect();
     if(connected) {
       // After connected, reset the retry count if it's stable running for 10 seconds
       resetRetryCountTimer?.cancel();
@@ -196,6 +377,42 @@ class RealtimeProxy {
     }
     _state = RealtimeConnectionState.connected;
     onStateChanged?.call(_state);
+  }
+
+  void _updateSession({Map<String, dynamic>? modifications}) {
+    Map<String, dynamic> sessionObject = {
+      'modalities': ['text', 'audio'],
+      'instructions': RealtimePrompts.instructionsWithUserContent,
+      'voice': 'alloy',
+      'input_audio_format': 'pcm16',
+      'output_audio_format': 'pcm16',
+      'input_audio_transcription': {
+        'model': 'whisper-1',
+      },
+      'turn_detection': {
+        'type': 'server_vad',
+        'threshold': 0.5,
+        'prefix_padding_ms': 500,
+        'silence_duration_ms': 200,
+      },
+      'tools': tools?.getDescription()?? [],
+      'tool_choice': 'auto',
+      'temperature': 0.8,
+    };
+    if(modifications != null) {
+      sessionObject.addAll(modifications);
+    }
+    final updateSessionObject = {
+      'type': 'session.update',
+      'event_id': _generateEventId(),
+      'session': sessionObject,
+    };
+    MyLogger.debug('RealtimeProxy: update session: $updateSessionObject');
+    client.sendEvent(updateSessionObject);
+  }
+
+  String _generateEventId() {
+    return DateTime.now().millisecondsSinceEpoch.toString();
   }
 
   void _onAudioActive(int duration) {
@@ -216,31 +433,41 @@ class RealtimeProxy {
   }
 
   Future<void> _onFunctionCall(String callId, String name, String arguments) async {
-    MyLogger.info('Function call: $callId $name $arguments');
+    MyLogger.info('RealtimeProxy: Function call: $callId $name $arguments');
     final result = tools?.invokeFunction(name, arguments);
     if(result == null) {
-      MyLogger.warn('Function not found: name=$name');
+      MyLogger.warn('RealtimeProxy: Function not found: name=$name');
     } else {
-      clientWebRtc.sendFunctionResult(callId, jsonEncode(result));
+      _sendFunctionResult(callId, jsonEncode(result));
       if(result.shouldInformUser) {
-        clientWebRtc.informUserToolResult(callId);
+        _informUserToolResult(callId);
       }
     }
   }
-
-  _playPopSound(String assetPath) async {
-    if(_audioStream == null) {
-      _audioStream = getAudioStream();
-      _audioStream!.init(channels: 2, sampleRate: 24000); // If set channel to 1, only one earphone will play
-    }
-    final data = await rootBundle.load(assetPath);
-    final len = data.lengthInBytes ~/ 2;
-    Float32List floatData = Float32List(len * 2);
-    for (int i = 0; i < len; i++) {
-      final pcm16 = data.getInt16(i * 2, Endian.little);
-      floatData[i * 2] = pcm16 / 32768.0; // Normalize to [-1.0, 1.0]
-      floatData[i * 2 + 1] = floatData[i * 2]; // Make two earphones play the same sound
-    }
-    _audioStream!.push(floatData);
+  // Called when function call is done
+  void _sendFunctionResult(String callId, String result) {
+    final sendFunctionResultObject = {
+      'type': 'conversation.item.create',
+      'item': {
+        'type': 'function_call_output',
+        'call_id': callId,
+        'output': result,
+      },
+    };
+    client.sendEvent(sendFunctionResultObject);
+  }
+  // Called when the function call result need to be informed to user
+  void _informUserToolResult(String callId) {
+    _sendResponseCreate('please tell user about the tool result of call_id=$callId.');
+  }
+  void _sendResponseCreate(String text) {
+    final responseCreateObject = {
+      'type': 'response.create',
+      'response': {
+        'modalities': ['text', 'audio'],
+        'instructions': text,
+      },
+    };
+    client.sendEvent(responseCreateObject);
   }
 }

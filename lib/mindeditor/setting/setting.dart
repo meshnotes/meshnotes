@@ -16,7 +16,7 @@ class SettingData {
   String? comment;
   SettingType type;
   String defaultValue;
-
+  final String settingGroupName;
 
   SettingData({
     required this.name,
@@ -25,6 +25,7 @@ class SettingData {
     this.comment,
     this.type = SettingType.string,
     this.defaultValue = '',
+    this.settingGroupName = '',
   }) {
     if(value == '') {
       value = defaultValue;

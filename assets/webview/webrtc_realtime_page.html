@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Realtime Chat with WebRtc</title>
+  <style>
+    .button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .container {
+      text-align: center;
+      margin-top: 50px;
+    }
+  </style>
+</head>
+
+<body>
+  <script>
+    var audioContext;
+    var mediaStream;
+    var dataChannel = null;
+    var peerConnection = null;
+
+    console.log('Webview webrtc Realtime API: running websocket_realtime_page.html');
+
+    async function start(baseUrl, model, apiKey, sampleRate, numChannels, sampleSize) {
+      console.log('Webview webrtc Realtime API: start', baseUrl, model, apiKey, sampleRate, numChannels, sampleSize);
+      try {
+        const token = await _getEphemeralToken(baseUrl, model, apiKey);
+        console.log('Webview webrtc Realtime API: token=', token);
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: sampleRate,
+          latencyHint: 'interactive'
+        });
+        console.log('WebView webrtc Realtime API: AudioContext.state before resume', audioContext.state);
+        audioContext.resume().then(() => {
+          console.log('WebView webrtc Realtime API: AudioContext.state after resume', audioContext.state);
+        });
+
+        console.log('Webview webrtc Realtime API: Now create webrtc peer connection');
+        const pc = new RTCPeerConnection();
+        const audioEl = document.createElement("audio");
+        audioEl.autoplay = true;
+        pc.ontrack = e => audioEl.srcObject = e.streams[0];
+        peerConnection = pc;
+        const ms = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: sampleRate,
+            channelCount: numChannels,
+            sampleSize: sampleSize,
+            echoCancellation: true,
+          },
+          video: false,
+        });
+        mediaStream = ms;
+        pc.addTrack(ms.getTracks()[0]);
+        console.log('Webview webrtc Realtime API: Now create data channel');
+        // const dataChannelInit = new RTCDataChannelInit();
+        // dataChannelInit.ordered = true;
+        // dataChannelInit.maxRetransmits = 30;
+        // dataChannelInit.protocol = 'json';
+        // dataChannelInit.negotiated = false;
+        const dc = pc.createDataChannel("oai-events");
+        dc.addEventListener("message", (e) => {
+          window.flutter_inappwebview.callHandler('onData', e.data);
+        });
+        dataChannel = dc;
+
+        console.log('Webview webrtc Realtime API: Now create offer');
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        console.log('Webview webrtc Realtime API: Now send offer to server');
+        const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+          method: "POST",
+          body: offer.sdp,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/sdp"
+          },
+        });
+        const answer = {
+          type: "answer",
+          sdp: await sdpResponse.text(),
+        };
+        await pc.setRemoteDescription(answer);
+        console.log('Webview webrtc Realtime API: Now finish webrtc connection');
+      }
+      catch(e) {
+        console.error('Webview webrtc Realtime API: start failed', e);
+      }
+    }
+    
+    function playAudio(data, volume = 1.0) {
+      // console.log('WebView webrtc Realtime API: playAudio', data, itemId, contentIndex);
+      if(audioContext == null) {
+        console.warn('WebView webrtc Realtime API: audioContext is null');
+        return;
+      }
+      const binaryString = atob(data);
+      const uint8Data = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        uint8Data[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Convert Uint8Array to Int16Array
+      const int16Data = new Int16Array(uint8Data.buffer);
+      
+      // Convert Int16Array to Float32Array (normalize to -1 to 1)
+      const float32Data = new Float32Array(int16Data.length);
+      for (let i = 0; i < int16Data.length; i++) {
+        // Divide by 0x7FFF (32767) to normalize
+        float32Data[i] = int16Data[i] / 0x7FFF * volume;
+      }
+
+      const audioBufferObj = audioContext.createBuffer(1, float32Data.length, audioContext.sampleRate);
+      audioBufferObj.copyToChannel(float32Data, 0); // Copy PCM data to the buffer
+
+      // Create a BufferSource to play the audio
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBufferObj;
+      source.connect(audioContext.destination);
+    }
+
+    function stopRecording() {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream.getAudioTracks().forEach(track => track.stop());
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+    }
+
+    function sendBase64Event(base64Data) {
+      _sendEvent(atob(base64Data));
+    }
+
+    function mute() {
+      console.log('Webview webrtc Realtime API: mute');
+      if(mediaStream) {
+        mediaStream.getAudioTracks().forEach(track => track.enabled = false);
+      }
+    }
+
+    function unmute() {
+      console.log('Webview webrtc Realtime API: unmute');
+      if(mediaStream) {
+        mediaStream.getAudioTracks().forEach(track => track.enabled = true);
+      }
+    }
+
+    function shutdownAll() {
+      console.log('Webview webrtc Realtime API: shutdownAll');
+      stopRecording();
+      peerConnection.close();
+    }
+
+    function _sendEvent(data) {
+      if(dataChannel) {
+        dataChannel.send(data);
+      }
+    }
+    function _sendJsonEvent(data) {
+      _sendEvent(JSON.stringify(data));
+    }
+    
+    async function _getEphemeralToken(url, model, apiKey) {
+      try {
+        const response = await fetch(url + '/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: model,
+            voice: "alloy",
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Webview webrtc Realtime API: get ephemeral token', data);
+        const clientSecret = data.client_secret.value;
+        if(clientSecret == null) {
+          throw new Error('Webview webrtc Realtime API: get ephemeral token failed, client_secret is null');
+        }
+        return clientSecret;
+      } catch (error) {
+        console.error('Webview webrtc Realtime API: get ephemeral token failed', error);
+        throw error;
+      }
+    }
+  </script>
+</body>
+
+</html>

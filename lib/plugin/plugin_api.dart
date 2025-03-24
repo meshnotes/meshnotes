@@ -74,7 +74,7 @@ class ToolbarInformation {
 
 class GlobalToolbarInformation {
   IconData buttonIcon;
-  Widget? Function(void Function() onClose) buildWidget;
+  Widget? Function({required void Function() onClose}) buildWidget;
   String tip;
   final bool Function() isAvailable;
 
@@ -122,4 +122,5 @@ abstract class Platform {
   bool isAndroid();
   bool isIOS();
   bool isMobile();
+  bool isLinux();
 }

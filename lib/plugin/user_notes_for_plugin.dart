@@ -12,6 +12,7 @@ class UserNotes {
   }
 
   String getNotesContent() {
+    //TODO when content more than about 10K, need to divide it into directories and contents
     return jsonEncode(toJson());
   }
 }
