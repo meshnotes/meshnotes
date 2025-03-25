@@ -36,6 +36,7 @@ class StartVillageParameter {
   String deviceId;
   UserPrivateInfo userInfo;
   bool useMulticast;
+  String? logPath;
 
   StartVillageParameter({
     required this.localPort,
@@ -43,6 +44,7 @@ class StartVillageParameter {
     required this.deviceId,
     required this.userInfo,
     required this.useMulticast,
+    this.logPath,
   });
 }
 

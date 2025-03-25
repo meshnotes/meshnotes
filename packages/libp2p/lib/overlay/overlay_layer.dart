@@ -211,9 +211,9 @@ class VillageOverlay implements ApplicationController {
   }
   void _onDetected(String peerDeviceId, InternetAddress peerIp, int peerPort) {
     // Let the peer with smaller device id to connect
-    MyLogger.debug('${logPrefix} Detected peer($peerDeviceId) with address(${peerIp.address}:$peerPort)');
+    MyLogger.info('${logPrefix} Detected peer($peerDeviceId) with address(${peerIp.address}:$peerPort)');
     if(_deviceId.compareTo(peerDeviceId) < 0) {
-      MyLogger.debug('${logPrefix} My deviceId(${_deviceId}) is smaller than peerDeviceId($peerDeviceId), so try to connect');
+      MyLogger.info('${logPrefix} My deviceId(${_deviceId}) is smaller than peerDeviceId($peerDeviceId), so try to connect');
       for(var node in _villagers) {
         if(node.ip == peerIp && node.port == peerPort) { // Already in the _villagers list
           return;
@@ -224,6 +224,8 @@ class VillageOverlay implements ApplicationController {
         ..ip = peerIp;
       _villagers.add(node);
       _tryToConnect(node);
+    } else {
+      MyLogger.info('${logPrefix} My deviceId(${_deviceId}) is greater than peerDeviceId($peerDeviceId), so ignore');
     }
   }
   void _onConnect(VillagerNode _node) {

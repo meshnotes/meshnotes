@@ -31,7 +31,7 @@ class NetworkController {
 
   NetworkController(Isolate isolate, ReceivePort port): _isolate = isolate, _receivePort = port;
 
-  void start(Setting settings, String deviceId, UserPrivateInfo userPrivateInfo) {
+  void start(Setting settings, String deviceId, UserPrivateInfo userPrivateInfo, String? logPath) {
     if(isStarted()) return;
 
     MyLogger.info('Spawning isolate and start listening');
@@ -47,7 +47,7 @@ class NetworkController {
       if(data is SendPort) {
         MyLogger.info('Get SendPort from network isolate, start village protocol, using Bonjour=$useBonjour');
         _sendPort = data;
-        _gracefulStartVillage(localPort, cleanedServerList, deviceId, userPrivateInfo, useMulticast);
+        _gracefulStartVillage(localPort, cleanedServerList, deviceId, userPrivateInfo, useMulticast, logPath);
       } else if(data is Message) {
         if(_sendPort != null) {
           _onMessage(data);
@@ -203,7 +203,7 @@ class NetworkController {
     }
   }
 
-  void _gracefulStartVillage(String localPort, String serverList, String deviceId, UserPrivateInfo userPrivateInfo, bool useMulticast) {
+  void _gracefulStartVillage(String localPort, String serverList, String deviceId, UserPrivateInfo userPrivateInfo, bool useMulticast, String? logPath) {
     _sendPort?.send(Message(
       cmd: Command.startVillage,
       parameter: StartVillageParameter(
@@ -212,6 +212,7 @@ class NetworkController {
         deviceId: deviceId,
         userInfo: userPrivateInfo,
         useMulticast: useMulticast,
+        logPath: logPath,
       ),
     ));
   }

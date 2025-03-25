@@ -55,6 +55,7 @@ class Controller {
   final UIEventManager uiEventManager = UIEventManager();
   double? _toolbarHeight;
   ControllerState _state = ControllerState.initializing;
+  String? _logPath; // Need send to net_controller, so saved it
 
   // Getters
   DocumentManager get docManager => _docManager!;
@@ -75,6 +76,11 @@ class Controller {
   }
 
   Future<bool> initAll() async {
+    const isProduct = bool.fromEnvironment('dart.vm.product');
+    if(isProduct) {
+      _logPath = await environment.getLogPath();
+      MyLogger.resetOutputToFile(path: _logPath!);
+    }
     dbHelper = DbHelper();
     gestureHandler = GestureHandler(controller: _theOne);
     device.init();
@@ -143,6 +149,7 @@ class Controller {
       setting,
       deviceId,
       userPrivateInfo!,
+      _logPath,
     );
     MyLogger.info('Network layer started');
     return true;

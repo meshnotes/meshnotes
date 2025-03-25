@@ -52,6 +52,10 @@ class Environment {
     return firstChoicePath!;
   }
 
+  Future<String> getLogPath() async {
+    final dir = (await getLibraryPathsByEnvironment())[0];
+    return '$dir/log';
+  }
   Future<List<String>> getLibraryPathsByEnvironment() async {
     if(isWindows() || isLinux() || isMac()) {
       return [

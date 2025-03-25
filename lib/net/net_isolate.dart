@@ -83,6 +83,9 @@ class VersionChainVillager {
           return;
         }
         final parameter = msg.parameter as StartVillageParameter;
+        if(parameter.logPath != null) {
+          MyLogger.resetOutputToFile(path: parameter.logPath!);
+        }
         userPrivateInfo = parameter.userInfo;
         _signing = SigningWrapper.loadKey(userPrivateInfo!.privateKey);
         _encrypt = EncryptWrapper(key: _signing!.key);

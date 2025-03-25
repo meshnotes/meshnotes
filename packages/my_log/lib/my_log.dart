@@ -19,15 +19,30 @@ class MyLogger {
 
     logName = '[$name]';
 
-    final isProduct = bool.fromEnvironment('dart.vm.product');
-    final needsColor = !isProduct;
     logger ??= Logger(
-      printer: SimplePrinter(printTime: true, colors: needsColor),
+      printer: SimplePrinter(printTime: true, colors: true),
       level: loggerLevel,
-      output: isProduct ? AdvancedFileOutput.new(
-        path: 'log',
+      output: ConsoleOutput(),
+      filter: ProductionFilter(),
+    );
+  }
+
+  static void resetOutputToFile({required String path, bool debug=false, bool verbose=false}) {
+    logger?.close();
+    var loggerLevel = _defaultLogLevel;
+    if(debug) {
+      loggerLevel = Level.debug;
+    }
+    if(verbose) {
+      loggerLevel = Level.trace;
+    }
+    logger = Logger(
+      printer: SimplePrinter(printTime: true, colors: false),
+      level: loggerLevel,
+      output: AdvancedFileOutput.new(
+        path: path,
         maxRotatedFilesCount: 10,
-      ): ConsoleOutput(),
+      ),
       filter: ProductionFilter(),
     );
   }
