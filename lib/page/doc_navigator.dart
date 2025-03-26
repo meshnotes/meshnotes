@@ -37,6 +37,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   List<DocDataModel> docList = [];
   int? selected;
   _NetworkStatus _networkStatus = _NetworkStatus.lost;
+  int _peerCount = 0;
   final controller = Controller();
 
   @override
@@ -44,6 +45,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     super.initState();
     CallbackRegistry.registerDocumentChangedWatcher(watcherKey, refreshDocumentList);
     CallbackRegistry.registerNetworkStatusWatcher(_onNetworkStatusChanged);
+    CallbackRegistry.registerPeerNodesChangedWatcher(_onPeerNodesChanged);
     docList = controller.docManager.getAllDocuments();
     final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
@@ -54,6 +56,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     super.dispose();
     CallbackRegistry.unregisterDocumentChangedWatcher(watcherKey);
     CallbackRegistry.unregisterNetworkStatusWatcher(_onNetworkStatusChanged);
+    CallbackRegistry.unregisterPeerNodesChangedWatcher(_onPeerNodesChanged);
   }
 
   @override
@@ -203,7 +206,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   Widget _buildSettingIcon(BuildContext context) {
     return CupertinoButton(
       // padding: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 0),
-      child: const Icon(CupertinoIcons.gear, color: Colors.black),
+      child: const Icon(CupertinoIcons.gear, color: Colors.black, size: 24),
       onPressed: () {
         if(controller.environment.isSmallView(context)) {
           SettingPageSmallScreen.route(context);
@@ -217,6 +220,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     return NetworkStatusIcon(
       networkStatus: _networkStatus,
       dataStatus: _DataStatus.notSynced,
+      peerCount: _peerCount,
     );
   }
 
@@ -245,6 +249,16 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         return _NetworkStatus.connected;
     }
   }
+
+  void _onPeerNodesChanged(Map<String, NodeInfo> nodes) {
+    final newCount = nodes.values.where((node) => node.status == NodeStatus.inContact).length;
+    if(newCount == _peerCount) {
+      return;
+    }
+    setState(() {
+      _peerCount = newCount;
+    });
+  }
 }
 
 enum _NetworkStatus {
@@ -259,10 +273,12 @@ enum _DataStatus {
 class NetworkStatusIcon extends StatelessWidget {
   final _NetworkStatus networkStatus;
   final _DataStatus dataStatus;
+  final int peerCount;
 
   const NetworkStatusIcon({
     required this.networkStatus,
     required this.dataStatus,
+    required this.peerCount,
     super.key,
   });
 
@@ -270,14 +286,26 @@ class NetworkStatusIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final networkIcon = _buildNetworkIcon();
     final syncedIcon = _buildSyncedIcon();
+    final peerCountWidget = _buildPeerCount();
     final stacks = Stack(
-      alignment: Alignment.bottomLeft,
       children: [
         Container(
           child: networkIcon,
           padding: const EdgeInsets.all(2.0),
         ),
-        syncedIcon,
+        Positioned(
+          left: 0,
+          bottom: 0,
+          child: Visibility(
+            visible: false,
+            child: syncedIcon,
+          ),
+        ),
+        Positioned(
+          left: 0,
+          top: 0,
+          child: peerCountWidget,
+        ),
       ],
     );
     final result = CupertinoButton(
@@ -323,6 +351,34 @@ class NetworkStatusIcon extends StatelessWidget {
           size: size,
         );
     }
+  }
+  Widget _buildPeerCount() {
+    if(peerCount <= 0) {
+      return const SizedBox.shrink();
+    }
+    String text = peerCount.toString();
+    if(peerCount > 10) {
+      text = '9+';
+    }
+    return Container(
+      constraints: const BoxConstraints(
+        minWidth: 15,
+        minHeight: 15,
+      ),
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: Color(0xFF3CB371),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
   }
 
   void _showNetworkDetails(BuildContext context) {

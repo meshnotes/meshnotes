@@ -22,6 +22,7 @@ class CallbackRegistry {
   static Function()? _screenShotHandler;
   static Function(NetworkStatus)? _networkStatusWatcher;
   static Function(String)? _showToastCallback;
+  static Function(Map<String, NodeInfo>)? _peerNodesChangedWatcher;
 
   static void registerTitleBar(DocumentTitleBarState _s) {
     _titleBarState = _s;
@@ -195,6 +196,16 @@ class CallbackRegistry {
   }
   static void triggerScreenShot() {
     _screenShotHandler?.call();
+  }
+
+  static void registerPeerNodesChangedWatcher(Function(Map<String, NodeInfo>) watcher) {
+    _peerNodesChangedWatcher = watcher;
+  }
+  static void unregisterPeerNodesChangedWatcher(Function(Map<String, NodeInfo>) watcher) {
+    if(_peerNodesChangedWatcher == watcher) _peerNodesChangedWatcher = null;
+  }
+  static void triggerPeerNodesChanged(Map<String, NodeInfo> nodes) {
+    _peerNodesChangedWatcher?.call(nodes);
   }
 
   // Followings are callbacks for show toast and dialog in global layers

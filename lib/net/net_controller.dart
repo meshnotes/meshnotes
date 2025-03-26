@@ -129,6 +129,8 @@ class NetworkController {
     return finished!;
   }
 
+  bool isStarted() => _networkStatus != NetworkStatus.unknown;
+
   NetworkStatus getNetworkStatus() {
     return _networkStatus;
   }
@@ -148,7 +150,13 @@ class NetworkController {
     return _nodes.values.toList();
   }
 
-  bool isStarted() => _networkStatus != NetworkStatus.unknown;
+  void _updateNodeList(List<NodeInfo> list) {
+    for(final item in list) {
+      final id = item.peer;
+      _nodes[id] = item;
+    }
+    CallbackRegistry.triggerPeerNodesChanged(_nodes);
+  }
 
   void _onMessage(Message msg) {
     final controller = Controller();
@@ -179,10 +187,7 @@ class NetworkController {
         if(msg.parameter is List<NodeInfo>) {
           var list = msg.parameter as List<NodeInfo>;
           MyLogger.info('Get node list: $list');
-          for(final item in list) {
-            final id = item.peer;
-            _nodes[id] = item;
-          }
+          _updateNodeList(list);
         }
         break;
       case Command.receiveBroadcast:
