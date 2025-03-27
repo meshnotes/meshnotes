@@ -65,7 +65,7 @@ class MindBlockImplRenderObject extends RenderBox {
     this.readOnly = false,
   }) {
     paragraph = _buildParagraph(texts, fontSize);
-    placeHolder = _buildPlaceHolder(texts.isTitle()? 'Write note title here': 'Write note text here', fontSize);
+    _resetPlaceHolder();
     block.setRender(this);
   }
 
@@ -99,6 +99,7 @@ class MindBlockImplRenderObject extends RenderBox {
     paragraph.strutStyle = StrutStyle(
       fontSize: fontSize,
     );
+    _resetPlaceHolder();
   }
 
   void setTexts(ParagraphDesc _texts) {
@@ -394,5 +395,9 @@ class MindBlockImplRenderObject extends RenderBox {
     updateParagraph();
     markNeedsLayout();
     markNeedsPaint();
+  }
+
+  void _resetPlaceHolder() {
+    placeHolder = _buildPlaceHolder(texts.isTitle()? 'Write note title here': 'Write note text here', fontSize);
   }
 }

@@ -55,7 +55,7 @@ class BlockTypeButton extends StatelessWidget {
         }
         var newType = type;
         var currentType = blockState.getBlockType();
-        if(currentType == type) { // 重复点击将清除字体
+        if(currentType == type) { // Clear the block type if selected again
           newType = Constants.blockTypeTextTag;
         }
         MyLogger.debug('Setting block(id=${blockState.getBlockId()}\'s type to: $newType');

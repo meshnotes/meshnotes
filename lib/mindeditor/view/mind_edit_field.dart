@@ -505,6 +505,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     if(sameText && _lastEditingValue!.selection == value.selection) {
       MyLogger.info('updateEditingValue: Only composing different');
       _updateLastEditingValue(value);
+      controller.getEditingBlockState()?.getRender()?.markNeedsLayout(); // Immediate redraw the block to remove the composing underline
       return;
     }
     //TODO If has '\n', it's a multi-line text, need other way to check whether it exceeds the limit
