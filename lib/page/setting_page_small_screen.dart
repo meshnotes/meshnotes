@@ -8,17 +8,17 @@ import '../mindeditor/setting/setting.dart';
 import 'widget_templates.dart';
 
 class SettingPageSmallScreen extends StatefulWidget {
-  final List<SettingData> settings;
+  final List<SettingGroup> groups;
 
   const SettingPageSmallScreen({
     super.key,
-    required this.settings,
+    required this.groups,
   });
 
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return SettingPageSmallScreen(settings: Controller().setting.getSettings());
+        return SettingPageSmallScreen(groups: Controller().setting.getSettingsByGroup());
       },
       fullscreenDialog: true,
     ));
@@ -31,19 +31,20 @@ class SettingPageSmallScreen extends StatefulWidget {
 const _verticalPadding = 16.0;
 const _horizonPadding = 4.0;
 class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
-  List<String> newValue = [];
-  List<bool> hasChanged = [];
-  final List<TextEditingController> _controllers = [];
+  final Map<String, String> newValue = {};
+  final Map<String, TextEditingController> _controllers = {};
+  final Set<SettingData> changedSettings = {};
   bool everChanged = false;
   static const _settingBodyFlexValue = 7;
 
   @override
   void initState() {
     super.initState();
-    for(var item in widget.settings) {
-      newValue.add('');
-      hasChanged.add(false);
-      _controllers.add(TextEditingController(text: item.value));
+    for(var group in widget.groups) {
+      for(var item in group.settings) {
+        newValue[item.name] = item.value?? '';
+        _controllers[item.name] = TextEditingController(text: item.value);
+      }
     }
     everChanged = false;
     CallbackRegistry.hideKeyboard();
@@ -55,11 +56,12 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
     var settingBody = _buildSettingList(context);
     var bottomButtons = _buildBottomButtons(context);
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       body: Column(
         children: [
           Expanded(
             child: Container(
-              padding: EdgeInsets.all(padding),
+              padding: EdgeInsets.fromLTRB(0, padding, 0, padding),
               child: settingBody,
             ),
           ),
@@ -73,26 +75,14 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
     var row = Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        TextButton.icon(
-          icon: Icon(Icons.arrow_back, color: Colors.grey[600],),
-          label: Text('Exit', style: TextStyle(color: Colors.grey[600]),),
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.black,
-          ),
-          // style: ElevatedButton.styleFrom(
-          //   backgroundColor: Colors.green[50],
-          // ),
-          onPressed: () {
-            _exitWithoutSaving();
-          },
-        ),
+        WidgetTemplate.buildInsignificantButton(Icons.arrow_back, 'Exit', () { _exitWithoutSaving(); }, alignment: MainAxisAlignment.end),
       ],
     );
     return row;
   }
   Widget _buildSettingList(BuildContext context) {
     var list = ListView.separated(
-      itemCount: widget.settings.length + 1,
+      itemCount: widget.groups.length + 1,
       shrinkWrap: true,
       itemBuilder: (context, index) {
         if(index == 0) { // A padding before the first item
@@ -100,15 +90,12 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
             alignment: Alignment.center,
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
-            child: const Text('Settings', style: TextStyle(fontSize: Constants.styleTitleFontSize, fontWeight: FontWeight.bold),),
+            child: const Text('Settings', style: TextStyle(fontSize: Constants.styleSettingItemFontSize, fontWeight: FontWeight.bold),),
           );
         }
         index -= 1;
-        var settingItem = widget.settings[index];
-        if(settingItem.type == SettingType.bool) {
-          return _buildSwitchSetting(settingItem);
-        }
-        return _buildInputSetting(settingItem, index);
+        var groupWidget = _buildSettingGroupWidget(widget.groups[index]);
+        return groupWidget;
       },
       separatorBuilder: (BuildContext context, int index) {
         return Divider(height: 1.0, color: Colors.grey[100],);
@@ -117,6 +104,60 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
     return list;
   }
 
+  Widget _buildSettingGroupWidget(SettingGroup group) {
+    final groupName = group.name;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if(groupName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
+              child: Text(
+                groupName,
+                style: const TextStyle(
+                  fontSize: Constants.styleSettingItemFontSize,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            color: Colors.white,
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: group.settings.length,
+              separatorBuilder: (context, index) => Divider(
+                height: 1,
+                indent: _horizonPadding,
+                endIndent: _horizonPadding,
+                color: Colors.grey[200],
+              ),
+              itemBuilder: (context, index) {
+                var settingItem = group.settings[index];
+                late Widget settingWidget;
+                if(settingItem.type == SettingType.bool) {
+                  settingWidget = _buildSwitchSetting(settingItem);
+                } else {
+                  settingWidget = _buildInputSetting(settingItem, index);
+                }
+                final container = Container(
+                  padding: const EdgeInsets.symmetric(horizontal: _horizonPadding),
+                  child: settingWidget,
+                );
+                return container;
+              }
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildSwitchSetting(SettingData settingItem) {
     var row = Row(
       key: ValueKey(settingItem.name),
@@ -126,23 +167,39 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
           child: Container(
             padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
             alignment: Alignment.centerLeft,
-            child: Text(
-              settingItem.displayName!,
-              style: const TextStyle(fontSize: Constants.styleTitleFontSize,),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  settingItem.displayName!,
+                  style: const TextStyle(fontSize: Constants.styleSettingItemFontSize),
+                ),
+                if (settingItem.comment != null && settingItem.comment!.isNotEmpty)
+                  Text(
+                    settingItem.comment!,
+                    style: TextStyle(
+                      fontSize: Constants.styleSettingItemFontSize - 2,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
         Container(
           // padding: const EdgeInsets.all(4),
           alignment: Alignment.centerRight,
-          child: CupertinoSwitch(
-            value: settingItem.value?.toLowerCase() == 'true',
-            onChanged: (value) {
-              setState(() {
-                settingItem.value = value ? 'true' : 'false';
-              });
-              Controller().setting.saveSettings(widget.settings);
-            },
+          child: Transform.scale(
+            scale: 0.8,
+            child: CupertinoSwitch(
+              value: settingItem.value?.toLowerCase() == 'true',
+              onChanged: (value) {
+                setState(() {
+                  settingItem.value = value ? 'true' : 'false';
+                });
+                _saveSettings(settingItem);
+              },
+            ),
           ),
         ),
       ],
@@ -162,9 +219,24 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
           child: Container(
             padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
             alignment: Alignment.centerLeft,
-            child: Text(
-              settingItem.displayName!,
-              style: const TextStyle(fontSize: Constants.styleTitleFontSize,),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  settingItem.displayName!,
+                  style: const TextStyle(fontSize: Constants.styleSettingItemFontSize),
+                ),
+                if (settingItem.comment != null && settingItem.comment!.isNotEmpty)
+                  Text(
+                    settingItem.comment!,
+                    style: TextStyle(
+                      fontSize: Constants.styleSettingItemFontSize - 2,
+                      color: Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
             ),
           ),
         ),
@@ -179,7 +251,7 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
       child: row,
       behavior: HitTestBehavior.opaque,
       onTap: () {
-        _gotoDetail(widget.settings[index]);
+        _gotoDetail(settingItem);
       },
     );
     return gesture;
@@ -197,11 +269,14 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
       fullscreenDialog: true,
     ));
   }
-  void _onSave() {
-    Controller().setting.saveSettings(widget.settings);
+  void _onSave(SettingData settingItem) {
+    _saveSettings(settingItem);
   }
   void _exitWithoutSaving() {
     Navigator.pop(context);
+  }
+  void _saveSettings(SettingData settingItem) {
+    Controller().setting.saveSettings([settingItem]);
   }
 }
 
@@ -223,6 +298,7 @@ class _DetailSettingPage extends StatelessWidget {
     var settingDetail = _buildSetting(context);
     var bottomButtons = _buildBottomButtons(context);
     var scaffold = Scaffold(
+      backgroundColor: Colors.grey[50],
       body: Column(
         children: [
           Expanded(
@@ -235,7 +311,6 @@ class _DetailSettingPage extends StatelessWidget {
             padding: EdgeInsets.all(padding),
             child: bottomButtons,
           ),
-          // const Padding(padding: EdgeInsets.fromLTRB(0, 0, 0, 10),),
         ],
       ),
     );
@@ -249,9 +324,27 @@ class _DetailSettingPage extends StatelessWidget {
           alignment: Alignment.center,
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(_horizonPadding, _verticalPadding, _horizonPadding, _verticalPadding),
-          child: Text('Editing ${settingData.displayName}', style: const TextStyle(fontSize: Constants.styleTitleFontSize, fontWeight: FontWeight.bold),),
+          child: Column(
+            children: [
+              Text(
+                'Editing ${settingData.displayName}',
+                style: const TextStyle(
+                  fontSize: Constants.styleSettingItemFontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (settingData.comment != null && settingData.comment!.isNotEmpty)
+                Text(
+                  settingData.comment!,
+                  style: TextStyle(
+                    fontSize: Constants.styleSettingItemFontSize - 2,
+                    color: Colors.grey[600],
+                  ),
+                ),
+            ],
+          ),
         ),
-        WidgetTemplate.buildNormalInputField(settingData.comment!, _controller),
+        WidgetTemplate.buildNormalInputField('Default: ${settingData.defaultValue.isEmpty? 'None': settingData.defaultValue}', _controller),
       ],
     );
     return list;
@@ -273,6 +366,6 @@ class _DetailSettingPage extends StatelessWidget {
     if(value == settingData.value) return;
 
     settingData.value = value;
-    onSave();
+    onSave(settingData);
   }
 }

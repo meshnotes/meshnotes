@@ -32,7 +32,7 @@ class SettingData {
     }
   }
   SettingData clone() {
-    return SettingData(name: name, displayName: displayName, value: value, comment: comment, type: type, defaultValue: defaultValue);
+    return SettingData(name: name, displayName: displayName, value: value, comment: comment, type: type, defaultValue: defaultValue, settingGroupName: settingGroupName);
   }
 }
 
@@ -97,6 +97,7 @@ class Setting {
       comment: Constants.settingCommentAllowSendingNotesToPlugins,
       defaultValue: Constants.settingDefaultAllowSendingNotesToPlugins,
       type: SettingType.bool,
+      settingGroupName: 'Plugins',
     ),
     SettingData(
       name: Constants.settingKeyShowDebugMenu,
@@ -159,6 +160,25 @@ class Setting {
     MyLogger.debug('getSettings: result=$result');
     return result;
   }
+  List<SettingGroup> getSettingsByGroup() {
+    final result = getSettings();
+    result.sort((a, b) => a.settingGroupName.compareTo(b.settingGroupName));
+    final groups = <SettingGroup>[];
+    SettingGroup? currentGroup;
+    for(final item in result) {
+      if(currentGroup == null || item.settingGroupName != currentGroup.name) {
+        if(currentGroup != null) {
+          groups.add(currentGroup);
+        }
+        currentGroup = SettingGroup(item.settingGroupName, []);
+      }
+      currentGroup.settings.add(item);
+    }
+    if(currentGroup != null) {
+      groups.add(currentGroup);
+    }
+    return groups;
+  }
   // Return trimmed value of setting or default value, or null if not found
   String? getSetting(String key) {
     final setting = _settingMap[key];
@@ -208,4 +228,10 @@ class Setting {
       }
     }
   }
+}
+
+class SettingGroup {
+  final String name;
+  final List<SettingData> settings;
+  SettingGroup(this.name, this.settings);
 }

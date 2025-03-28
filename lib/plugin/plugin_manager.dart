@@ -80,6 +80,7 @@ class PluginManager {
       comment: setting.settingComment,
       defaultValue: setting.settingDefaultValue,
       type: _convertSettingType(setting.type),
+      settingGroupName: 'Plugins',
     );
     _pluginSupportedSettings.add(settingData);
   }

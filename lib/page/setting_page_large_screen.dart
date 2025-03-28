@@ -7,17 +7,17 @@ import '../mindeditor/setting/constants.dart';
 import '../mindeditor/setting/setting.dart';
 
 class SettingPageLargeScreen extends StatefulWidget {
-  final List<SettingData> settings;
+  final List<SettingGroup> groups;
 
   const SettingPageLargeScreen({
     super.key,
-    required this.settings,
+    required this.groups,
   });
 
   static void route(BuildContext context) {
     Navigator.push(context, CupertinoPageRoute(
       builder: (context) {
-        return SettingPageLargeScreen(settings: Controller().setting.getSettings());
+        return SettingPageLargeScreen(groups: Controller().setting.getSettingsByGroup());
       },
       fullscreenDialog: true,
     ));
@@ -28,22 +28,23 @@ class SettingPageLargeScreen extends StatefulWidget {
 }
 
 class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
-  List<String> newValue = [];
-  List<bool> hasChanged = [];
-  final List<TextEditingController> _controllers = [];
+  final Map<String, String> newValue = {};
+  final Map<String, TextEditingController> _controllers = {};
+  final Set<SettingData> changedSettings = {};
   bool everChanged = false;
 
   @override
   void initState() {
     super.initState();
-    for(var item in widget.settings) {
-      if(item.type == SettingType.bool) {
-        newValue.add(item.value?.toLowerCase() == 'true'? 'true': 'false');
-      } else {
-        newValue.add('');
+    for(var group in widget.groups) {
+      for(var setting in group.settings) {
+        if(setting.type == SettingType.bool) {
+          newValue[setting.name] = setting.value?.toLowerCase() == 'true'? 'true': 'false';
+        } else {
+          newValue[setting.name] = '';
+        }
+        _controllers[setting.name] = TextEditingController(text: setting.value);
       }
-      hasChanged.add(false);
-      _controllers.add(TextEditingController(text: item.value));
     }
     everChanged = false;
     CallbackRegistry.hideKeyboard();
@@ -52,7 +53,6 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
   @override
   Widget build(BuildContext context) {
     double padding = Constants.settingViewDesktopPadding.toDouble();
-    var _ = _buildTopButtons(context); //TODO Perhaps better to delete this
     var settingBody = _buildSettings(context);
     var bottomButtons = _buildBottomButtons(context);
     return Scaffold(
@@ -69,19 +69,6 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
           const Padding(padding: EdgeInsets.fromLTRB(0, 0, 0, 10),),
         ],
       )
-    );
-  }
-  Widget _buildTopButtons(BuildContext context) {
-    return Row(
-      children: [
-        const Spacer(),
-        TextButton(
-          child: const Icon(Icons.close),
-          onPressed: () {
-            _exitWithoutSaving();
-          },
-        ),
-      ],
     );
   }
   Widget _buildBottomButtons(BuildContext context) {
@@ -116,29 +103,98 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
   }
   Widget _buildSettings(BuildContext context) {
     var list = ListView.builder(
-      itemCount: widget.settings.length,
+      itemCount: widget.groups.length,
       // shrinkWrap: true,
       itemBuilder: (context, index) {
-        var settingItem = widget.settings[index];
-        if(settingItem.type == SettingType.bool) {
-          return _buildBoolSetting(settingItem, index);
-        }
-        return _buildInputSetting(settingItem, index);
+        var group = widget.groups[index];
+        final result = _buildSettingGroupWidget(index, group);
+        return result;
       },
     );
     return list;
   }
 
+  Widget _buildSettingGroupWidget(int groupIndex, SettingGroup group) {
+    final groupName = group.name;
+    final listView = ListView.builder(
+      shrinkWrap: true,
+      itemCount: group.settings.length,
+      itemBuilder: (context, index) {
+        late Widget item;
+        final settingItem = group.settings[index];
+        if(settingItem.type == SettingType.bool) {
+          item = _buildBoolSetting(settingItem, index);
+        } else {
+          item = _buildInputSetting(settingItem, index);
+        }
+        return item;
+      }
+    );
+    final result = Column(
+      children: [
+        if(groupIndex > 0)
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.grey[200]!,
+          ),
+        if(groupName.isNotEmpty)
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(10, 20, 10, 10),
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    groupName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 7,
+                child: Container(),
+              ),
+            ],
+          ),
+        listView,
+      ],
+    );
+    return result;
+  }
+
   Widget _buildBoolSetting(SettingData settingItem, int index) {
+    final settingKey = settingItem.name;
     var row = Row(
-      key: ValueKey(settingItem.name),
+      key: ValueKey(settingKey),
       children: [
         Expanded(
           flex: 3,
           child: Container(
             padding: const EdgeInsets.all(10),
             alignment: Alignment.centerRight,
-            child: Text((hasChanged[index]? '*': '') + settingItem.displayName!),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text((changedSettings.contains(settingItem)? '*': '') + settingItem.displayName!),
+                if (settingItem.comment != null && settingItem.comment!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Tooltip(
+                      message: settingItem.comment!,
+                      child: const Icon(
+                        Icons.help_outline,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -146,11 +202,14 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
           child: Container(
             padding: const EdgeInsets.all(10),
             alignment: Alignment.centerLeft,
-            child: CupertinoSwitch(
-              value: newValue[index].toLowerCase() == 'true',
-              onChanged: (value) {
-                _onBoolChanged(index, value);
-              },
+            child: Transform.scale(
+              scale: 0.8,
+              child: CupertinoSwitch(
+                value: newValue[settingKey]?.toLowerCase() == 'true',
+                onChanged: (value) {
+                  _onBoolChanged(settingItem, value);
+                },
+              ),
             ),
           ),
         ),
@@ -160,19 +219,37 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
   }
 
   Widget _buildInputSetting(SettingData settingItem, int index) {
+    final settingKey = settingItem.name;
     var formatters = <TextInputFormatter>[];
     if(settingItem.type == SettingType.number) {
       formatters.add(FilteringTextInputFormatter.digitsOnly);
     }
     var row = Row(
-      key: ValueKey(settingItem.name),
+      key: ValueKey(settingKey),
       children: [
         Expanded(
           flex: 3,
           child: Container(
             padding: const EdgeInsets.all(10),
             alignment: Alignment.centerRight,
-            child: Text((hasChanged[index]? '*': '') + settingItem.displayName!),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text((changedSettings.contains(settingItem)? '*': '') + settingItem.displayName!),
+                if (settingItem.comment != null && settingItem.comment!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Tooltip(
+                      message: settingItem.comment!,
+                      child: const Icon(
+                        Icons.help_outline,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -181,16 +258,12 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
             padding: const EdgeInsets.all(10),
             alignment: Alignment.centerLeft,
             child: CupertinoTextField(
-              controller: _controllers[index],
-              placeholder: settingItem.comment,
-              // decoration: InputDecoration(
-              //   hintText:
-              //   border: const OutlineInputBorder(),
-              // ),
+              controller: _controllers[settingKey],
+              placeholder: 'Default: ${settingItem.defaultValue.isEmpty? 'None': settingItem.defaultValue}',
               autofocus: true,
               inputFormatters: formatters,
               onChanged: (text) {
-                _onTextChanged(index, text);
+                _onTextChanged(settingItem, text);
               },
             ),
           ),
@@ -200,24 +273,27 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
     return row;
   }
 
-  void _onBoolChanged(int index, bool value) {
-    if(index < 0 || index >= widget.settings.length) return;
-    var item = widget.settings[index];
-    setState(() {
-      newValue[index] = value? 'true': 'false';
-      hasChanged[index] = item.value != newValue[index];
-      everChanged = item.value != newValue[index]? true: everChanged;
-    });
+  void _onBoolChanged(SettingData settingItem, bool boolValue) {
+    final settingKey = settingItem.name;   
+    final value = boolValue? 'true': 'false';
+    if(settingItem.value != value) {
+      newValue[settingKey] = value;
+      changedSettings.add(settingItem);
+      everChanged = true;
+      setState(() {
+      });
+    }
   }
 
-  void _onTextChanged(int index, String value) {
-    if(index < 0 || index >= widget.settings.length) return;
-    var item = widget.settings[index];
-    setState(() {
-      newValue[index] = value;
-      hasChanged[index] = item.value != value;
-      everChanged = item.value != value? true: everChanged;
-    });
+  void _onTextChanged(SettingData settingItem, String value) {
+    final settingKey = settingItem.name;
+    if(settingItem.value != value) {
+      newValue[settingKey] = value;
+      changedSettings.add(settingItem);
+      everChanged = true;
+      setState(() {
+      });
+    }
   }
 
   void _exitWithoutSaving() {
@@ -227,15 +303,12 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
   void _saveSettings() {
     if(!everChanged) return;
     var settingsToSave = <SettingData>[];
-    for(var i = 0; i < hasChanged.length; i++) {
-      if(hasChanged[i]) {
-        widget.settings[i].value = newValue[i];
-        hasChanged[i] = false;
-        settingsToSave.add(widget.settings[i]);
-      }
+    for(var settingItem in changedSettings) {
+      settingItem.value = newValue[settingItem.name];
+      settingsToSave.add(settingItem);
     }
     everChanged = false;
-    //TODO Should use async save here
+    changedSettings.clear();
     Controller().setting.saveSettings(settingsToSave);
     setState(() {
     });

@@ -15,19 +15,19 @@ class PluginAI implements PluginInstance {
   static const String settingKeyPluginKimiApiKey = 'kimi_api_key';
   static const String settingNamePluginKimiApiKey = 'API key for Kimi.ai';
   static const String settingCommentPluginKimiApiKey = 'API key for kimi.ai';
-  static const String settingKeyPluginOpenAiApiKey = 'openai_api_key';
 
+  static const String settingKeyPluginOpenAiApiKey = 'openai_api_key';
   static const String settingNamePluginOpenAiApiKey = 'API key for OpenAI';
   static const String settingCommentPluginOpenAiApiKey = 'API Key for OpenAI';
-  static const String settingKeyPluginDefaultAiService = 'default_ai_service';
 
+  static const String settingKeyPluginDefaultAiService = 'default_ai_service';
   static const String settingNamePluginDefaultAiService = 'AI service provider';
-  static const String settingCommentPluginDefaultAiService = 'Choose AI service(e.g. chatgpt, or kimi.ai. Default is chatgpt)';
+  static const String settingCommentPluginDefaultAiService = 'Choose AI service(e.g. chatgpt, or kimi.ai. Default is $settingDefaultPluginDefaultAiService)';
   static const String settingDefaultPluginDefaultAiService = 'chatgpt';
 
   static const String settingKeyUseAiForExtra = 'use_ai_for_extra';
   static const String settingNameUseAiForExtra = 'Use AI for block extra';
-  static const String settingCommentUseAiForExtra = 'Use AI to generate extra information for the block';
+  static const String settingCommentUseAiForExtra = 'Enable AI to generate extra information for editing block';
   static const String settingDefaultUseAiForExtra = 'false';
 
   late PluginProxy _proxy;

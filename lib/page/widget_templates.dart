@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/mindeditor/setting/constants.dart';
 
 typedef ActionFunction = void Function();
 
@@ -103,8 +104,9 @@ class WidgetTemplate {
   static Widget buildNormalInputField(String placeHolder, TextEditingController controller) {
     return Container(
       margin: const EdgeInsets.all(4.0),
+      height: 48.0,
       child: CupertinoTextField(
-        padding: const EdgeInsets.fromLTRB(8.0, 16.0, 8.0, 16.0),
+        style: const TextStyle(fontSize: Constants.styleSettingItemFontSize),
         placeholder: placeHolder,
         controller: controller,
       ),
