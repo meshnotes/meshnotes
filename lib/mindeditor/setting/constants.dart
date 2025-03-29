@@ -60,7 +60,7 @@ class Constants {
   static const int settingViewDesktopPadding = 40;
 
   // Global style
-  static const double styleSettingItemFontSize = 14.0;
+  static const double styleSettingItemFontSize = 16.0;
 
   // Changeable setting related
   // static const String settingKeyServerIp = 'server_ip';
