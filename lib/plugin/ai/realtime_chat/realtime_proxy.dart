@@ -300,9 +300,6 @@ class RealtimeProxy {
   void _onCreated() {
     MyLogger.info('RealtimeProxy: Session created');
     // In webrtc case, the session will automatically updated after created
-    // Maybe the session is created when requiring the ephemeral token, and the connection of webrtc is an update action for this session
-    if(implementationChoice == RealtimeChoise.webViewWebRtcImplementation) return;
-    // In other implementation, the session need to be updated after created
     _updateSession();
   }
   void _sendUserContents() {
@@ -335,13 +332,6 @@ class RealtimeProxy {
   }
   void _onSessionUpdated() {
     MyLogger.info('RealtimeProxy: Session updated');
-    // For WebRtc implementation, send real session update after received first session.updated(sent by server)
-    if(implementationChoice == RealtimeChoise.webViewWebRtcImplementation && neverReceiveSessionUpdatedYet) {
-      neverReceiveSessionUpdatedYet = false;
-      _updateSession();
-      return;
-    }
-
     _sendUserContents();
     _sendHistory();
     client.playAudio(popSoundAudioBase64);
