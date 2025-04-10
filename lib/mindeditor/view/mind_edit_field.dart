@@ -243,9 +243,9 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     controller.uiEventManager.triggerKeyboardStateOpen(true);
   }
   void hideKeyboard() {
-    if(!_hasFocus) {
-      return;
-    }
+    // if(!_hasFocus) {
+    //   return;
+    // }
     widget.focusNode.unfocus();
     _hideKeyboard = true;
     controller.uiEventManager.triggerKeyboardStateOpen(false);

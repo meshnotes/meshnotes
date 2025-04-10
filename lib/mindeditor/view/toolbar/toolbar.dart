@@ -1,7 +1,6 @@
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/appearance_setting.dart';
-import 'package:mesh_note/mindeditor/view/toolbar/block_checked_button.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/block_listing_button.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/coloring_text_button.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/icon_and_text_button.dart';
@@ -90,7 +89,8 @@ class MindEditorToolBar extends StatelessWidget {
       BlockListingButton(
         controller: controller,
         appearance: defaultAppearance,
-        listing: Constants.blockListTypeBulleted,
+        listing: const [Constants.blockListTypeBulleted],
+        targetListing: Constants.blockListTypeBulleted,
         icon: Icons.format_list_bulleted,
         tips: 'Bulleted List',
       ),
@@ -101,12 +101,13 @@ class MindEditorToolBar extends StatelessWidget {
       //   title: 'T',
       //   tips: 'Text'
       // ),
-      BlockCheckedButton(
+      BlockListingButton(
         controller: controller,
         appearance: defaultAppearance,
         icon: Icons.check_box_rounded,
+        listing: const [Constants.blockListTypeChecked, Constants.blockListTypeCheckedConfirm],
+        targetListing: Constants.blockListTypeChecked,
         tips: 'Checked list',
-        listing: Constants.blockListTypeChecked,
       ),
       BlockTypeButton.fromTitle(
         controller: controller,
@@ -154,7 +155,7 @@ class MindEditorToolBar extends StatelessWidget {
       iconSize: iconSize,
       size: size,
       fillColor: Theme.of(context).canvasColor,
-      hoverColor: Theme.of(context).colorScheme.background,
+      hoverColor: Theme.of(context).colorScheme.surface,
       disabledColor: Theme.of(context).disabledColor,
     );
   }

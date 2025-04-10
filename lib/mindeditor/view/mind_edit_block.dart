@@ -121,10 +121,7 @@ class MindEditBlockState extends State<MindEditBlock> {
               ),
             ),
             onTap: () {
-              var ok = setBlockListing(Constants.blockListTypeCheckedConfirm);
-              if(ok) {
-                CallbackRegistry.refreshDoc();
-              }
+              setBlockListing(Constants.blockListTypeCheckedConfirm);
             },
           );
           break;
@@ -139,10 +136,7 @@ class MindEditBlockState extends State<MindEditBlock> {
               ),
             ),
             onTap: () {
-              var ok = setBlockListing(Constants.blockListTypeChecked);
-              if(ok) {
-                CallbackRegistry.refreshDoc();
-              }
+              setBlockListing(Constants.blockListTypeChecked);
             },
           );
           break;

@@ -10,7 +10,8 @@ class BlockListingButton extends StatelessWidget {
   final AppearanceSetting appearance;
   final IconData icon;
   final String tips;
-  final String listing;
+  final List<String> listing;
+  final String targetListing;
 
   const BlockListingButton({
     Key? key,
@@ -19,6 +20,7 @@ class BlockListingButton extends StatelessWidget {
     required this.icon,
     required this.tips,
     required this.listing,
+    required this.targetListing,
   }): super(key: key);
 
   @override
@@ -29,7 +31,8 @@ class BlockListingButton extends StatelessWidget {
       iconData: icon,
       tip: tips,
       activeOrNot: (String? _type, String? _listing, int? _level) {
-        return listing == _listing;
+        MyLogger.info('BlockListingButton: key=$targetListing, activeOrNot: $_listing, listing=$listing');
+        return listing.contains(_listing);
       },
       onPressed: () {
         var blockState = controller.getEditingBlockState();
@@ -37,15 +40,15 @@ class BlockListingButton extends StatelessWidget {
           MyLogger.debug('Unable to set block listing: current editing block state is null!');
           return;
         }
-        var newListing = listing;
+        var newListing = targetListing;
         var currentListing = blockState.getBlockListing();
-        if(currentListing == listing) { // 重复点击将清除列表
+        if(listing.contains(currentListing)) { // Clear listing if it is already set
           newListing = Constants.blockListTypeNone;
         }
         MyLogger.debug('Setting block(id=${blockState.getBlockId()}\'s listing to: $newListing');
         blockState.setBlockListing(newListing);
       },
-      buttonKey: listing,
+      buttonKey: targetListing,
     );
   }
 
