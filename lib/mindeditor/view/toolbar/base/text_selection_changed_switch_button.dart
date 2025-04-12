@@ -6,24 +6,23 @@ import 'package:my_log/my_log.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 
 /// This Button's icon will be changed according to the current selection.
-//TODO This should be optimized
 class TextSelectionChangedButton extends StatefulWidget {
   final AppearanceSetting appearance;
   final Controller controller;
-  final Widget icon;
+  final IconData iconData;
   final String tip;
   final String buttonKey;
-  final bool Function(TextSelection?) trigger;
+  final bool Function(TextSelection?) isAvailableTester;
   final Function() onPressed;
 
   const TextSelectionChangedButton({
     Key? key,
     required this.controller,
     required this.appearance,
-    required this.icon,
+    required this.iconData,
     required this.tip,
     required this.buttonKey,
-    required this.trigger,
+    required this.isAvailableTester,
     required this.onPressed,
   }) : super(key: key);
 
@@ -32,14 +31,14 @@ class TextSelectionChangedButton extends StatefulWidget {
 }
 
 class _TextSelectionChangedButtonState extends State<TextSelectionChangedButton> {
-  bool isOn = false;
+  bool isAvailable = false;
 
   @override
   void initState() {
     super.initState();
     MyLogger.debug('_TextSelectionChangedButtonState: building selection_changed button key=${widget.buttonKey}');
     CallbackRegistry.registerSelectionChangedWatcher(widget.buttonKey, (TextSelection? selection) {
-      _setOn(widget.trigger(selection));
+      _setAvailable(widget.isAvailableTester(selection));
     });
   }
   @override
@@ -51,23 +50,24 @@ class _TextSelectionChangedButtonState extends State<TextSelectionChangedButton>
   @override
   Widget build(BuildContext context) {
     return ToolbarButton(
-      icon: widget.icon,
+      icon: Icon(widget.iconData, size: widget.appearance.iconSize, color: isAvailable? null: widget.appearance.disabledColor),
       appearance: widget.appearance,
       controller: widget.controller,
       tip: widget.tip,
-      isOn: isOn,
+      isAvailable: isAvailable,
       onPressed: () {
         widget.onPressed();
       },
     );
   }
 
-  void _setOn(bool value) {
-    if(isOn == value) {
+  void _setAvailable(bool value) {
+    MyLogger.info('TextSelectionChangedButton: _setActive($value)');
+    if(isAvailable == value) {
       return;
     }
     setState(() {
-      isOn = value;
+      isAvailable = value;
     });
   }
 }
@@ -75,7 +75,7 @@ class _TextSelectionChangedButtonState extends State<TextSelectionChangedButton>
 class ClipboardChangedButton extends StatefulWidget {
   final AppearanceSetting appearance;
   final Controller controller;
-  final Widget icon;
+  final IconData iconData;
   final String tip;
   final String buttonKey;
   final bool Function(String) showOrNot;
@@ -85,7 +85,7 @@ class ClipboardChangedButton extends StatefulWidget {
     Key? key,
     required this.controller,
     required this.appearance,
-    required this.icon,
+    required this.iconData,
     required this.tip,
     required this.buttonKey,
     required this.showOrNot,
@@ -97,13 +97,13 @@ class ClipboardChangedButton extends StatefulWidget {
 }
 
 class _ClipboardChangedButtonState extends State<ClipboardChangedButton> {
-  bool isOn = false;
+  bool isAvailable = false;
 
   @override
   void initState() {
     super.initState();
     CallbackRegistry.registerClipboardDataWatcher(widget.buttonKey, (data) {
-      _setOn(widget.showOrNot(data));
+      _setAvailable(widget.showOrNot(data));
     });
   }
   @override
@@ -115,23 +115,23 @@ class _ClipboardChangedButtonState extends State<ClipboardChangedButton> {
   @override
   Widget build(BuildContext context) {
     return ToolbarButton(
-      icon: widget.icon,
+      icon: Icon(widget.iconData, size: widget.appearance.iconSize, color: isAvailable? null: widget.appearance.disabledColor),
       appearance: widget.appearance,
       controller: widget.controller,
       tip: widget.tip,
-      isOn: isOn,
+      isAvailable: isAvailable,
       onPressed: () {
         widget.onPressed();
       },
     );
   }
 
-  void _setOn(bool value) {
-    if(isOn == value) {
+  void _setAvailable(bool value) {
+    if(isAvailable == value) {
       return;
     }
     setState(() {
-      isOn = value;
+      isAvailable = value;
     });
   }
 }

@@ -18,12 +18,12 @@ class CopyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextSelectionChangedButton(
-      icon: Icon(Icons.copy_outlined, size: appearance.iconSize),
+      iconData: Icons.copy_outlined,
       appearance: appearance,
       controller: controller,
       tip: 'Copy',
       buttonKey: 'copy',
-      trigger: (TextSelection? selection) {
+      isAvailableTester: (TextSelection? selection) {
         return (selection != null && !selection.isCollapsed);
       },
       onPressed: () async {
@@ -47,12 +47,12 @@ class CutButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextSelectionChangedButton(
-      icon: Icon(Icons.cut_outlined, size: appearance.iconSize),
+      iconData: Icons.cut_outlined,
       appearance: appearance,
       controller: controller,
       tip: 'Cut',
       buttonKey: 'cut',
-      trigger: (TextSelection? selection) {
+      isAvailableTester: (TextSelection? selection) {
         return (selection != null && !selection.isCollapsed);
       },
       onPressed: () async {
@@ -76,7 +76,7 @@ class PasteButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipboardChangedButton(
-      icon: Icon(Icons.paste_outlined, size: appearance.iconSize,),
+      iconData: Icons.paste_outlined,
       appearance: appearance,
       controller: controller,
       tip: 'Paste',

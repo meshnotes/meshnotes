@@ -11,7 +11,7 @@ class ToolbarButton extends StatefulWidget {
   final double? width;
   final double? height;
   final bool isOn;
-  final bool isActive;
+  final bool isAvailable;
 
   const ToolbarButton({
     Key? key,
@@ -21,7 +21,7 @@ class ToolbarButton extends StatefulWidget {
     required this.controller,
     required this.onPressed,
     this.isOn = false,
-    this.isActive = false,
+    this.isAvailable = true,
     this.width,
     this.height,
   }): super(key: key);
@@ -53,7 +53,7 @@ class _ToolbarButtonState extends State<ToolbarButton> {
         minHeight: widget.appearance.size,
       ),
       alignment: Alignment.center,
-      color: widget.isOn? _triggeredBackgroundColor: backgroundColor,
+      color: widget.isAvailable && widget.isOn? _triggeredBackgroundColor: backgroundColor,
       padding: widget.appearance.padding?? const EdgeInsets.all(4),
       child: widget.icon,
     );
@@ -72,7 +72,7 @@ class _ToolbarButtonState extends State<ToolbarButton> {
     );
     var gesture = GestureDetector(
       child: mouseRegion,
-      onTap: widget.onPressed,
+      onTap: widget.isAvailable? widget.onPressed: null, // Disable onTap if the button is not available
     );
     var toolTip = Tooltip(
       message: widget.tip,

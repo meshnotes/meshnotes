@@ -241,9 +241,8 @@ class NetworkController {
   Future<void> _startBonjourBroadcast() async {
     BonsoirService service = BonsoirService(
       name: _bonjourName,
-
       type: _bonjourType,
-      port: _servicePort, // Put your service port here.
+      port: _servicePort,
       attributes: {
         'device': _deviceId,
       },
@@ -262,7 +261,7 @@ class NetworkController {
     discovery.eventStream!.listen((event) {
       // `eventStream` is not null as the discovery instance is "ready" !
       if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
-        MyLogger.debug('Bonjour service found : ${event.service?.toJson()}');
+        MyLogger.info('Bonjour service found : ${event.service?.toJson()}');
         event.service!.resolve(discovery.serviceResolver); // Should be called when the user wants to connect to this service.
       } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved) {
         MyLogger.info('Bonjour service resolved : ${event.service?.toJson()}');
@@ -279,7 +278,7 @@ class NetworkController {
 
         _onDiscoverNewNode(host, port, deviceId);
       } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceLost) {
-        MyLogger.debug('Bonjour service lost : ${event.service?.toJson()}');
+        MyLogger.info('Bonjour service lost : ${event.service?.toJson()}');
       }
     });
     // Start the discovery **after** listening to discovery events :

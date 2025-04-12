@@ -25,6 +25,7 @@ import '../document/paragraph_desc.dart';
 import '../setting/constants.dart';
 import '../setting/setting.dart';
 import 'device.dart';
+import 'editor_controller.dart';
 import 'gesture_handler.dart';
 
 
@@ -116,7 +117,7 @@ class Controller {
     setting.addAdditionalSettings(_pluginManager.getPluginSupportedSettings());
     setting.load();
 
-    _initGlobalEventTasks();
+    _initGlobalEventTasks(); // Register some global event tasks
 
     MyLogger.info('initAll: finish initialization');
     eventTasksManager.triggerAfterInit();
@@ -134,9 +135,14 @@ class Controller {
   }
 
   void _initGlobalEventTasks() {
+    // Hide keyboard when user switch to navigator
     eventTasksManager.addUserSwitchToNavigatorTask(() {
       CallbackRegistry.hideKeyboard();
     });
+    // Check if the clipboard data is available every 3 seconds
+    eventTasksManager.addTimerTask('checkClipboard', () {
+      EditorController.checkIfReadyToPaste();
+    }, 3000);
   }
 
   /// Network could be starting only when the user information is ready

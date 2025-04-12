@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
@@ -428,6 +427,7 @@ class SelectionController {
       endIndex = max(endIndex, lastExtentBlockIndex);
     }
     MindBlockImplRenderObject? baseRender, extentRender;
+    int len = 0;
     // Clear selection first
     for(int idx = startIndex; idx <= endIndex; idx++) {
       /// 1. Clear selection in blocks which are out of range [startBlockIndex, endBlockIndex]
@@ -477,12 +477,16 @@ class SelectionController {
         showExtentLeader: showExtentLeader
       );
       currentRender?.markNeedsPaint();
+      len += endPos - startPos;
     }
     lastBaseBlockIndex = baseBlockIndex;
     lastBaseBlockPos = baseBlockPos;
     lastExtentBlockIndex = extentBlockIndex;
     lastExtentBlockPos = extentBlockPos;
     // CallbackRegistry.refreshTextEditingValue();
+    // Trigger selection changed event to notify the toolbar to refresh
+    // Construct a virtual selection if the selection cross multiple blocks
+    CallbackRegistry.triggerSelectionChangedEvent(TextSelection(baseOffset: baseBlockPos, extentOffset: baseBlockPos + len));
     resetCursor();
 
     // Update handles' offsets. Should run in post frame, because getCursorOffsetOfPos needs layout
