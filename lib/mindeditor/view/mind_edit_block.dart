@@ -111,30 +111,18 @@ class MindEditBlockState extends State<MindEditBlock> {
           );
           break;
         case Constants.blockListTypeChecked:
-          _leading = GestureDetector(
-            child: SizedBox(
-              height: fontSize,
-              width: Constants.tabWidth,
-              child: const Align(
-                alignment: Alignment.bottomCenter,
-                child: Icon(Icons.check_box_outline_blank_rounded, size: Constants.tabWidth - 2,),
-              ),
-            ),
+          _leading = _buildCheckedBox(
+            iconData: Icons.check_box_outline_blank_rounded,
+            fontSize: fontSize,
             onTap: () {
               setBlockListing(Constants.blockListTypeCheckedConfirm);
             },
           );
           break;
         case Constants.blockListTypeCheckedConfirm:
-          _leading = GestureDetector(
-            child: SizedBox(
-              height: fontSize,
-              width: Constants.tabWidth,
-              child: const Align(
-                alignment: Alignment.center,
-                child: Icon(Icons.check_box_rounded, size: Constants.tabWidth - 2,),
-              ),
-            ),
+          _leading = _buildCheckedBox(
+            iconData: Icons.check_box_rounded,
+            fontSize: fontSize,
             onTap: () {
               setBlockListing(Constants.blockListTypeChecked);
             },
@@ -190,6 +178,24 @@ class MindEditBlockState extends State<MindEditBlock> {
       child: widget.readOnly? block: editMouseRegion,
     );
     return expanded;
+  }
+
+  Widget _buildCheckedBox({required VoidCallback onTap, required double fontSize, required IconData iconData}) {
+    final result = GestureDetector(
+      child: Container(
+        padding: const EdgeInsets.only(right: 4),
+        child: SizedBox(
+          height: fontSize,
+          width: Constants.tabWidth,
+          child: Align(
+            alignment: Alignment.center,
+            child: Icon(iconData, size: Constants.tabWidth - 2,),
+          ),
+        ),
+      ),
+      onTap: onTap,
+    );
+    return result;
   }
 
   Widget? _buildHandler() {
