@@ -154,8 +154,9 @@ class VersionChainVillager {
     }
     final id = node.host + ':' + node.port.toString();
     final info = node.name;
+    final publicKey = node.publicKey;
     final device = node.id;
-    final nodeInfo = NodeInfo(peer: id, device: device, name: info, status: _status);
+    final nodeInfo = NodeInfo(peer: id, device: device, name: info, status: _status, publicKey: publicKey);
     _nodes[id] = nodeInfo;
     MyLogger.info('Node changed: $id: $nodeInfo');
     _reportNodes();

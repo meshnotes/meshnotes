@@ -341,7 +341,8 @@ class VillageOverlay implements ApplicationController {
   void _handleHelloMessage(VillagerNode node, String msg) {
     var hello = HelloMessage.fromJson(jsonDecode(msg));
     node.id = hello.deviceId;
-    node.name = '${hello.publicKey.substring(0, 6)}(${hello.name})';
+    node.publicKey = hello.publicKey;
+    node.name = hello.name;
     onNodeChanged(node);
   }
 

@@ -27,6 +27,7 @@ class VillagerNode {
   InternetAddress? ip;
   int port;
   String id = '?';
+  String publicKey = '';
   String name = '';
   VillagerStatus _status = VillagerStatus.unknown;
   VillagerRole _role;

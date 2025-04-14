@@ -394,6 +394,7 @@ class Controller {
         return;
       }
     }
+    //TODO should make the log shorter
     var versions = docManager.assembleRequireVersions(requiredVersions);
     MyLogger.info('receiveRequireVersions: preparing to send versions: $versions');
     network.sendVersions(versions);

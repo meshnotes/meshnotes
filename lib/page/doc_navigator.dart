@@ -382,13 +382,14 @@ class NetworkStatusIcon extends StatelessWidget {
   }
 
   void _showNetworkDetails(BuildContext context) {
+    final myPublicKey = Controller().userPrivateInfo?.publicKey?? '';
     showDialog(
       context: context,
       builder: (context) {
         return Container(
           padding: const EdgeInsets.fromLTRB(0, 50, 0, 0),
           child: Material(
-            child: NetworkDetailView(nodes: Controller().network.getNetworkDetails()),
+            child: NetworkDetailView(nodes: Controller().network.getNetworkDetails(), myPublicKey: myPublicKey),
           ),
         );
       },
