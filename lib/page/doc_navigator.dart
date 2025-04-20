@@ -39,6 +39,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   _NetworkStatus _networkStatus = _NetworkStatus.lost;
   int _peerCount = 0;
   final controller = Controller();
+  bool _isSyncing = false;
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     docList = controller.docManager.getAllDocuments();
     final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
+    controller.eventTasksManager.addSyncingTask(_updateSyncing);
   }
 
   @override
@@ -57,6 +59,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     CallbackRegistry.unregisterDocumentChangedWatcher(watcherKey);
     CallbackRegistry.unregisterNetworkStatusWatcher(_onNetworkStatusChanged);
     CallbackRegistry.unregisterPeerNodesChangedWatcher(_onPeerNodesChanged);
+    controller.eventTasksManager.removeSyncingTask(_updateSyncing);
   }
 
   @override
@@ -137,7 +140,22 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     final userName = controller.userPrivateInfo?.userName ?? 'Unknown User';
     return AppBar(
       title: Center(
-        child: Text(userName),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: _isSyncing ? const CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+              ) : null,
+            ),
+            const SizedBox(width: 8),
+            Text(userName),
+          ],
+        ),
       ),
       titleSpacing: 0,
       toolbarHeight: 48,
@@ -257,6 +275,15 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     }
     setState(() {
       _peerCount = newCount;
+    });
+  }
+
+  void _updateSyncing(bool isSyncing) {
+    if(isSyncing == _isSyncing) {
+      return;
+    }
+    setState(() {
+      _isSyncing = isSyncing;
     });
   }
 }

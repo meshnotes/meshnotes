@@ -423,4 +423,8 @@ class Controller {
       receiveVersionTree(chain.versionDag);
     }
   }
+  
+  void clearSyncingTasks() {
+    _mergeTaskRunner?.clearSyncingTasks();
+  }
 }

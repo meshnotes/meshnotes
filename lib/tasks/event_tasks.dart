@@ -8,6 +8,7 @@ class EvenTasksManager {
   final List<Function()> _userInputTasks = []; // Tasks when user input using keyboard or soft keyboard
   final List<Function()> _userSwitchToNavigator = []; // Tasks when user switches to navigator(in small screen mode)
   final List<Function()> _settingChangedTasks = []; // Tasks when user changes settings
+  final List<Function(bool isSyncing)> _syncingTasks = []; // Tasks when syncing
   final Map<String, _TimerTask> _timerTaskMap = {};
   Timer? _timer;
 
@@ -92,6 +93,20 @@ class EvenTasksManager {
   void triggerSettingChanged() {
     for(final task in _settingChangedTasks) {
       task.call();
+    }
+  }
+
+  void addSyncingTask(Function(bool isSyncing) task) {
+    if(!_syncingTasks.contains(task)) {
+      _syncingTasks.add(task);
+    }
+  }
+  void removeSyncingTask(Function(bool isSyncing) task) {
+    _syncingTasks.remove(task);
+  }
+  void triggerUpdateSyncing(bool isSyncing) {
+    for(final task in _syncingTasks) {
+      task.call(isSyncing);
     }
   }
 }

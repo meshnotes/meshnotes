@@ -563,7 +563,7 @@ class DocumentManager {
     _db.clearAllVersions();
     _db.clearAllObjects();
     _db.clearAllDocumentHashes();
-    _db.clearSyncingTables();
+    controller.clearSyncingTasks();
     _docTitles.clear();
     controller.refreshDocNavigator(); // Update docTitles
   }

@@ -29,12 +29,16 @@ class MergeTask {
     if(now - _lastCheckTimeStamp < _mergeInterval) return; // Not enough time passed, do nothing
     _lastCheckTimeStamp = now;
 
-    if(!_db.hasSyncingVersion()) return; // No syncing version, do nothing
-
+    if(!_db.hasSyncingVersion()) {
+      controller.eventTasksManager.triggerUpdateSyncing(false);
+      return; // No syncing version, do nothing
+    }
+    controller.eventTasksManager.triggerUpdateSyncing(true);
     _tryToMerge();
   }
 
   void addVersionTree(List<VersionNode> dag) {
+    controller.eventTasksManager.triggerUpdateSyncing(true);
     _storeVersionToSyncDb(dag);
     _tryToMerge();
   }
@@ -42,6 +46,11 @@ class MergeTask {
   void addResources(List<UnsignedResource> resources) {
     _storeResourcesToSyncDb(resources);
     _tryToMerge();
+  }
+
+  void clearSyncingTasks() {
+    _db.clearSyncingTables();
+    controller.eventTasksManager.triggerUpdateSyncing(false);
   }
 
   /// 1. Find missing versions, if any, send require versions and exit
@@ -68,7 +77,7 @@ class MergeTask {
       MyLogger.info('_tryToMerge: try to merge versions');
       controller.mergeVersionTree();
       MyLogger.info('_tryToMerge: clear syncing tables');
-      _db.clearSyncingTables();
+      clearSyncingTasks();
     }
   }
 
