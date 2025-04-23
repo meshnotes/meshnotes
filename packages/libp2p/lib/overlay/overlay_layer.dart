@@ -56,7 +56,7 @@ class VillageOverlay implements ApplicationController {
         port = 17974;
       }
       VillagerNode node = VillagerNode(host: host, port: port, isUpper: true);
-      _villagers.add(node);
+      _addIntoVillagersIfNotExists(node);
     }
   }
 
@@ -184,10 +184,16 @@ class VillageOverlay implements ApplicationController {
   }
 
   void _onConnected(Peer _c) {
+    VillagerNode? found;
     for(final node in _villagers) {
       if(node.getPeer() == _c) {
-        _onConnect(node);
+        found = node;
         break;
+      }
+    }
+    if(found != null) {
+      if(_resolveConflict(found)) {
+        _onConnect(found);
       }
     }
   }
@@ -200,33 +206,27 @@ class VillageOverlay implements ApplicationController {
     _c.setOnReceive((data) {
       _onRawData(node, data);
     });
-    _c.setOnDisconnect((peer) {
-      _onDisconnect(peer);
-    });
-    _c.setOnConnectFail((peer) {
-      _onConnectionFail(peer);
-    });
+    _c.setOnDisconnect(_onDisconnect);
+    _c.setOnConnectFail(_onConnectionFail);
     _villagers.add(node);
-    _onConnect(node);
+    if(_resolveConflict(node)) {
+      _onConnect(node);
+    }
   }
   void _onDetected(String peerDeviceId, InternetAddress peerIp, int peerPort) {
-    // Let the peer with smaller device id to connect
     MyLogger.info('${logPrefix} Detected peer($peerDeviceId) with address(${peerIp.address}:$peerPort)');
-    if(_deviceId.compareTo(peerDeviceId) < 0) {
-      MyLogger.info('${logPrefix} My deviceId(${_deviceId}) is smaller than peerDeviceId($peerDeviceId), so try to connect');
-      for(var node in _villagers) {
-        if(node.ip == peerIp && node.port == peerPort) { // Already in the _villagers list
-          return;
-        }
-      }
-      MyLogger.info('${logPrefix} Try to connect to new node(${peerIp.address}:$peerPort)');
-      var node = VillagerNode(host: peerIp.address, port: peerPort)
-        ..ip = peerIp;
-      _villagers.add(node);
-      _tryToConnect(node);
-    } else {
-      MyLogger.info('${logPrefix} My deviceId(${_deviceId}) is greater than peerDeviceId($peerDeviceId), so ignore');
+    if(_alreadyInVillagers(peerIp, peerPort)) {
+      return;
     }
+    MyLogger.info('${logPrefix} Try to connect to new node(${peerIp.address}:$peerPort)');
+    var node = VillagerNode(host: peerIp.address, port: peerPort)
+      ..ip = peerIp;
+    _addIntoVillagersIfNotExists(node);
+    // // To avoid both peers detected each other and made duplicate connection, try to wait a random time
+    // // If both peers still make connection at the same time, cancel one of them in a fixed strategy
+    // Timer(Duration(milliseconds: randomInt(0, 5000)), () { // Wait from 0 to 5 seconds
+    //   _tryToConnect(node);
+    // });
   }
   void _onConnect(VillagerNode _node) {
     MyLogger.info('${logPrefix} New connection to address(${_node.ip}:${_node.port}), id=${_node.id}, say Hello');
@@ -310,14 +310,12 @@ class VillageOverlay implements ApplicationController {
       onReceive: (data) {
         _onRawData(node, data);
       },
-      onDisconnect: (peer) {
-        _onDisconnect(peer);
-      },
-      onConnectionFail: (peer) {
-        _onConnectionFail(peer);
-      }
+      onDisconnect: _onDisconnect,
+      onConnectionFail: _onConnectionFail
     );
-    node.setPeer(peer);
+    if(peer != null) {
+      node.setPeer(peer);
+    }
   }
   void _tryToReconnect() {
     int now = networkNow();
@@ -354,5 +352,62 @@ class VillageOverlay implements ApplicationController {
       }
     }
     return result;
+  }
+
+  /// Check whether the node has duplicated node in _villagers list(Due to both discovery each other and connect at the same time)
+  /// If so, find the node with larger connection id(source + destination) and remove the other node
+  /// If both nodes have the same connection id, remove both to make sure the behavior is consistent with remote side. And leave hope for re-connection
+  /// @return true - if targetNode is survival, false - if targetNode is removed
+  bool _resolveConflict(VillagerNode targetNode) {
+    final targetPeer = targetNode.getPeer()!; // Should not be null in this method
+    VillagerNode? conflictNode;
+    for(var node in _villagers) {
+      if(node == targetNode) continue; // Ignore self
+      if(node.getStatus() != VillagerStatus.keepInTouch) continue; // Only check alive nodes
+      final peer = node.getPeer();
+      if(peer == null) continue;
+      if(peer.ip == targetPeer.ip && peer.port == targetPeer.port && 
+        (peer.getSourceId() != targetPeer.getSourceId() || peer.getDestinationId() != targetPeer.getDestinationId())) {
+        conflictNode = node;
+        break;
+      }
+    }
+    if(conflictNode == null) { // No duplicated node found
+      return true;
+    }
+    final conflictPeer = conflictNode.getPeer()!;
+    final targetConnectionId = targetPeer.getSourceId() + targetPeer.getDestinationId();
+    final conflictConnectionId = conflictPeer.getSourceId() + conflictPeer.getDestinationId();
+    if(conflictConnectionId <= targetConnectionId) {
+      _handleConflictNode(conflictNode);
+    }
+    if(targetConnectionId <= conflictConnectionId) {
+      _handleConflictNode(targetNode);
+    }
+    return targetConnectionId > conflictConnectionId;
+  }
+  void _handleConflictNode(VillagerNode node) {
+    final peer = node.getPeer()!;
+    MyLogger.info('${logPrefix} Drop conflict node(${peer.ip.address}:${peer.port}/${peer.getSourceId()}-${peer.getDestinationId()})');
+    peer.close();
+    onNodeChanged(node);
+  }
+
+  bool _addIntoVillagersIfNotExists(VillagerNode node) {
+    for(var v in _villagers) {
+      if(v.ip == node.ip && v.port == node.port) {
+        return false;
+      }
+    }
+    _villagers.add(node);
+    return true;
+  }
+  bool _alreadyInVillagers(InternetAddress ip, int port) {
+    for(var v in _villagers) {
+      if(v.ip == ip && v.port == port) {
+        return true;
+      }
+    }
+    return false;
   }
 }

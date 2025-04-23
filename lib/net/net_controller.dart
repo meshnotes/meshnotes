@@ -28,24 +28,24 @@ class NetworkController {
   Completer<bool>? finished;
   late int _servicePort;
   late String _deviceId;
+  final _useBonjour = true;
 
   NetworkController(Isolate isolate, ReceivePort port): _isolate = isolate, _receivePort = port;
 
   void start(Setting settings, String deviceId, UserPrivateInfo userPrivateInfo, String? logPath) {
     if(isStarted()) return;
 
-    MyLogger.info('Spawning isolate and start listening');
+    MyLogger.info('Spawning isolate and start listening: deviceId=$deviceId');
     final rawServerList = settings.getSetting(Constants.settingKeyServerList)?? Constants.settingDefaultServerList;
     final cleanedServerList = rawServerList.replaceAll('，', ',').replaceAll('：', ':');
     final localPort = settings.getSetting(Constants.settingKeyLocalPort)?? Constants.settingDefaultLocalPort;
     _servicePort = int.parse(localPort);
     _deviceId = deviceId;
     _networkStatus = NetworkStatus.starting;
-    bool useBonjour = true;
-    final useMulticast = !useBonjour;
+    final useMulticast = !_useBonjour;
     _receivePort.listen((data) {
       if(data is SendPort) {
-        MyLogger.info('Get SendPort from network isolate, start village protocol, using Bonjour=$useBonjour');
+        MyLogger.info('Get SendPort from network isolate, start village protocol, using Bonjour=$_useBonjour');
         _sendPort = data;
         _gracefulStartVillage(localPort, cleanedServerList, deviceId, userPrivateInfo, useMulticast, logPath);
       } else if(data is Message) {
@@ -54,7 +54,10 @@ class NetworkController {
         }
       }
     });
-    if(useBonjour) {
+  }
+  void startBonjour() {
+    MyLogger.info('Start Bonjour');
+    if(_useBonjour) {
       _startBonjour();
     }
   }
@@ -170,6 +173,9 @@ class NetworkController {
       case Command.sendVersions:
         // Do nothing, these parts are in net_isolate
         break;
+      case Command.villageStarted: // Only start bonjour after village started
+        startBonjour();
+        break;
       case Command.terminateOk:
         _receivePort.close();
         _isolate.kill();
@@ -235,8 +241,8 @@ class NetworkController {
   }
 
   Future<void> _startBonjour() async {
-    _startBonjourBroadcast();
-    _startBonjourDiscovery();
+    await _startBonjourBroadcast();
+    await _startBonjourDiscovery();
   }
   Future<void> _startBonjourBroadcast() async {
     BonsoirService service = BonsoirService(

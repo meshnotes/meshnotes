@@ -553,7 +553,8 @@ void main() {
     );
     await client.start();
     var connection = client.connect(loopbackIp, serverPort);
-    connection.onConnectionFail = (peer) {
+    expect(connection != null, true);
+    connection!.onConnectionFail = (peer) {
       clientFailed.complete(true);
     };
 
@@ -596,9 +597,10 @@ void main() {
       closedConnection = peer;
       clientClosed.complete(true);
     });
+    expect(connection != null, true);
 
     await Future.delayed(Duration(seconds: 5));
-    connection.close();
+    connection!.close();
     // Wait for complete
     await clientClosed.future;
     expect(closedConnection, connection);
@@ -639,13 +641,14 @@ void main() {
       closedPeer = peer;
       clientClosed.complete(true);
     });
+    expect(clientPeer != null, true);
 
     await Future.delayed(Duration(seconds: 5));
     server.stop();
     // Wait for complete
     await clientClosed.future;
     expect(closedPeer, clientPeer);
-    expect(clientPeer.getStatus(), ConnectionStatus.shutdown);
+    expect(clientPeer!.getStatus(), ConnectionStatus.shutdown);
 
     // Shutdown network services
     client.stop();
@@ -688,6 +691,7 @@ void main() {
     );
     await client.start();
     var clientConnection = client.connect(loopbackIp, serverPort);
+    expect(clientConnection != null, true);
 
     await serverConnected.future;
     await Future.delayed(Duration(seconds: 5));
@@ -695,7 +699,7 @@ void main() {
     // Wait for complete
     await serverClosed.future;
     expect(closedPeer, serverPeer);
-    expect(clientConnection.getStatus(), ConnectionStatus.shutdown);
+    expect(clientConnection!.getStatus(), ConnectionStatus.shutdown);
     expect(serverPeer!.getStatus(), ConnectionStatus.shutdown);
 
     // Shutdown network services

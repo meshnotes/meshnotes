@@ -37,7 +37,8 @@ void main() {
     await client.start();
 
     var clientConnection = client.connect(loopbackIp, serverPort);
-    clientConnection.maxHeartbeat = 1000;
+    expect(clientConnection != null, true);
+    clientConnection!.maxHeartbeat = 1000;
     var now = networkNow();
     await serverEstablished.future;
 
@@ -91,6 +92,7 @@ void main() {
     await client.start();
 
     var clientConnection = client.connect(loopbackIp, serverPort);
+    expect(clientConnection != null, true);
     await serverEstablished.future;
     List<int> data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -103,7 +105,7 @@ void main() {
       }
       dataReceived.complete(true);
     });
-    clientConnection.sendData(data);
+    clientConnection!.sendData(data);
     await dataReceived.future;
 
     clientConnection.maxHeartbeat = 1000;

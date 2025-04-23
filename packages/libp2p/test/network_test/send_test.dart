@@ -41,6 +41,7 @@ void main() {
     await client.start();
 
     var clientConnection = client.connect(loopbackIp, serverPort);
+    expect(clientConnection != null, true);
     await serverEstablished.future;
     List<int> data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -53,7 +54,7 @@ void main() {
       }
       dataReceived.complete(true);
     });
-    clientConnection.sendData(data);
+    clientConnection!.sendData(data);
     await dataReceived.future;
 
     // Shutdown all networks
@@ -92,6 +93,7 @@ void main() {
     await client.start();
 
     var clientConnection = client.connect(loopbackIp, serverPort);
+    expect(clientConnection != null, true);
     await serverEstablished.future;
     List<int> data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -104,7 +106,7 @@ void main() {
       }
       dataReceived.complete(true);
     });
-    clientConnection.sendData(data);
+    clientConnection!.sendData(data);
 
     await Future.delayed(Duration(seconds: 4));
     expect(clientConnection.retryQueue.messages.length, 1);
@@ -168,6 +170,7 @@ void main() {
     );
     await client.start();
     var clientConnection = client.connect(loopbackIp, serverPort);
+    expect(clientConnection != null, true);
     await serverEstablished.future;
 
     // Set network simulator to ignore second packet of first object
@@ -214,7 +217,7 @@ void main() {
         secondComplete.complete(true);
       }
     });
-    clientConnection.sendData(firstData);
+    clientConnection!.sendData(firstData);
     await Future.delayed(Duration(seconds: 1));
     clientConnection.sendData(secondData);
     // Expect to get second object complete first
@@ -264,6 +267,7 @@ Future<void> testSendObject(String localIp, int serverPort, int dataSize, {bool 
   await client.start();
 
   var clientConnection = client.connect(localIp, serverPort);
+  expect(clientConnection != null, true);
   await serverEstablished.future;
   List<int> bigData = List.filled(dataSize, 0);
   for(int i = 0; i < dataSize; i++) {
@@ -285,7 +289,7 @@ Future<void> testSendObject(String localIp, int serverPort, int dataSize, {bool 
     }
     dataReceived.complete(true);
   });
-  clientConnection.sendData(bigData);
+  clientConnection!.sendData(bigData);
   await dataReceived.future;
 
   // Shutdown all networks

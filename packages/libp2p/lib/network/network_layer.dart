@@ -157,10 +157,10 @@ class SOTPNetworkLayer {
     _status = NetworkStatus.invalid;
   }
 
-  Peer connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null, OnDisconnectCallback? onDisconnect, OnConnectionFail? onConnectionFail, }) {
-    // 1. 生成source connection Id
-    // 2. 将connection置为initializing状态
-    // 3. 发送connect消息
+  Peer? connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null, OnDisconnectCallback? onDisconnect, OnConnectionFail? onConnectionFail, }) {
+    // 1. Generate source connection Id randomly
+    // 2. Set connection status to initializing
+    // 3. Send connect message
     var id = _generateId();
     var ip = InternetAddress(peerIp);
     var peer = Peer(ip: ip, port: peerPort, transport: _sendDelegate, onReceiveData: onReceive, onDisconnect: onDisconnect, onConnectionFail: onConnectionFail)
@@ -172,12 +172,14 @@ class SOTPNetworkLayer {
     return peer;
   }
   void _onConnect(InternetAddress peerIp, int peerPort, PacketConnect packet) {
-    // 1. 收到connect消息后，先判断是否已有Peer（有可能是重发的connect消息）。如果没有，则生成新的Peer，生成source connection Id
-    // 2. 因为方向是相反的，将报文的source connection Id设置为dest connection Id
-    // 3. 将peer状态置为establishing
-    // 4. 发送connect_ack
+    // 1. When received connect message, find if peer is already exists(may be duplicated connect message). If not, generate a new one with source_connection_id
+    // 2. Exchange the source/destination id from receiving packet
+    // 3. Set peer's connection status to establishing
+    // 4. Send connect_ack
 
-    // 假设客户端还未收到connect_ack，因此客户端还不知道服务端的connection_id，因此只能用客户端的connection_id来判断连接
+    // When received connect, client side didn't know the server side connection_id(which will be send in server's connect_ack)
+    // So search ip:port:source_connection_id in incompletePool
+    // After connection is established, will use ip:port:dest_connection_id to find connection
     var originalId = packet.sourceConnectionId;
     var peer = incompletePool.getConnection(peerIp, peerPort, originalId);
     if(peer == null) {
@@ -190,16 +192,17 @@ class SOTPNetworkLayer {
     peer.onConnect(packet);
   }
   void _onConnectAck(InternetAddress ip, int port, PacketConnect packet) {
-    // 1. 只有客户端才会收到connect_ack，因此根据消息包的ip、端口、source connection Id查找connection
-    // 2. 如果在incompletePool查不到connection，有可能是connected消息丢失，从connectionPool查找
-    // 3. 发送connected消息
-    // 4. 连接已建立，将connection从incompletePool转移到connectionPool
+    // 1. Only client will receive connect_ack, so find connection by ip, port, and source_connection_id
+    // 2. If connection is not found in incompletePool, may cause by lost connected message(so server side resend connect_ack), search again in connectionPool
+    // 3. Send connected message
+    // 4. Now connection is successfully established, move it from incompletePool to connectionPool
+
     var originalId = packet.header.destConnectionId;
     var peer = incompletePool.getConnection(ip, port, originalId);
     var fromIncomplete = peer != null;
     if(peer == null) {
       peer = connectionPool.getConnectionById(originalId);
-      if(peer == null) { // 如果还找不到，则不处理
+      if(peer == null) { // Ignore it if connection not found
         MyLogger.warn('${logPrefix}Connection not found on receiving connect_ack: ip=$ip, port=$port, destConnectionId=$originalId');
         return;
       }
@@ -211,18 +214,21 @@ class SOTPNetworkLayer {
     }
   }
   void _onConnected(InternetAddress ip, int port, PacketConnect packet) {
-    // 1. 如果是首次收到connected消息，要从incompletePool取得connection。如果是重发的connected消息，要从connectionPool取得connection
-    // 2. 交给connection处理
+    // 1. If it's the first time to receive connected, should retrieve peer from incompletePool.
+    //    If connected is duplicated, should retrieve peer from connectionPool
+    // 2. Let peer to handle connected message
+    // 3. If connection is successfully established for the first time, trigger callback and move it from incompletePool to connectionPool
     var originalId = packet.sourceConnectionId;
     var peer = incompletePool.getConnection(ip, port, originalId);
-    if(peer == null) { // 如果incompletePool没有找到，可能是重发的connected，改为从connectionPool寻找
+    // If connection not found in incompletePool, may cause by lost connected message(so server side resend connect_ack), search again in connectionPool
+    if(peer == null) {
       peer = connectionPool.getConnectionById(packet.header.destConnectionId);
       if(peer == null) {
         MyLogger.warn('${logPrefix}Connection not found on receiving connected: ip=$ip, port=$port, sourceConnectionId=$originalId');
         return;
       }
     }
-    if(peer.onConnected(packet)) {
+    if(peer.onConnected(packet)) { // If peer is already established, here will return false
       incompletePool.removeConnection(ip, port, originalId);
       connectionPool.addConnection(peer);
       newConnectCallback?.call(peer);
@@ -374,10 +380,13 @@ class SOTPNetworkLayer {
   int _generateId() {
     while(true) {
       int id = randomId();
-      // FIXME May duplicated with incompletePool's id
-      if(connectionPool.getConnectionById(id) == null) {
-        return id;
+      if(connectionPool.getConnectionById(id) != null) {
+        continue;
       }
+      if(incompletePool.doesConnectionIdExists(id)) { // In incompletePool, connection_id is used both as source_id and destination_id, so check both
+        continue;
+      }
+      return id;
     }
   }
 

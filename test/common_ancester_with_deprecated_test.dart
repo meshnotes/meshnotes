@@ -1,6 +1,5 @@
 import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
 import 'package:mesh_note/mindeditor/document/document_manager.dart';
-import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:my_log/my_log.dart';
 import 'package:test/test.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';

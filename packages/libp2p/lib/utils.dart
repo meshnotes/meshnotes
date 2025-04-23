@@ -2,10 +2,14 @@ import 'dart:math';
 
 final _random = Random.secure();
 const minimalInitialPacketNumber = 10;
-const maximumInitialPacketNumber = 1000;
+const maximumInitialPacketNumber = 4096;
+
+int randomInt(int min, int max) {
+  return _random.nextInt(max - min) + min;
+}
 
 int randomId() {
-  return _random.nextInt(1<<32);
+  return randomInt(1, 1<<32);
 }
 
 int randomInitialPacketNumber() {

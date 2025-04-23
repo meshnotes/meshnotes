@@ -5,6 +5,7 @@ enum Command {
   terminate,
   terminateOk,
   startVillage,
+  villageStarted,
   newNodeDiscovered,
   networkStatus,
   nodeStatus,

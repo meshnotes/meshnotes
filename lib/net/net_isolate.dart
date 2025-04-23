@@ -108,11 +108,13 @@ class VersionChainVillager {
           useMulticast: parameter.useMulticast,
         );
         _sendPort.send(Message(cmd: Command.networkStatus, parameter: NetworkStatus.running,));
+        _sendPort.send(Message(cmd: Command.villageStarted, parameter: null));
         break;
       case Command.newNodeDiscovered:
         final param = msg.parameter as NewNodeDiscoveredParameter;
         _onNewNodeDiscovered(param.host, param.port, param.deviceId);
         break;
+      case Command.villageStarted:
       case Command.terminateOk:
       case Command.networkStatus:
       case Command.nodeStatus:

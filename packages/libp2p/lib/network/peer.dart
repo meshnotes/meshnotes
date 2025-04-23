@@ -103,17 +103,16 @@ class Peer {
   }
 
   bool onConnectAck(PacketConnect packet) {
-    // 1. 将connection状态置为established
-    // 2. 从发送队列中清理connect消息
-    // 3. 发送connected消息
+    // 1. Set connection status to established
+    // 2. Clear connect message from send queue
+    // 3. Send connected message
     var status = getStatus();
     if(status != ConnectionStatus.initializing && status != ConnectionStatus.established) {
       MyLogger.warn('${logPrefix} Invalid status on connect_ack: status=$_status');
       return false;
     }
-    // 对于被动连接方，收到connect_ack消息时第一次获得对方的packetNumber
+    // exchange packet number in connect/connect_ack message
     var packetNumber = packet.header.packetNumber;
-    // 如果receivePacketNumber不为0，说明已经被设置过
     if(receivePacketNumber != 0 && packetNumber != receivePacketNumber) {
       MyLogger.warn('${logPrefix} Packet number in connect_ack message inconsistent($packetNumber vs $receivePacketNumber). Use newer value');
     }
@@ -144,17 +143,17 @@ class Peer {
   }
 
   bool onConnected(PacketConnect packet) {
-    // 1. 确认connection状态为establishing
-    // 2. 将connection状态置为established
-    // 3. 从发送队列中清理connect_ack消息
+    // 1. Confirm that connection status is establishing
+    // 2. Set connection status to established
+    // 3. Clear connect_ack message from send queue
     // 4. Update _lastContact timestamp
     if(getStatus() != ConnectionStatus.establishing) {
       MyLogger.warn('${logPrefix} Invalid status on connected: status=$_status');
       return false;
     }
-    // 对于主动连接方，收到connected消息时第二次获得对方的packetNumber
+    // connect/connect_ack exchange packet number, after that, the packet number will be increased by 1 for each message
     var packetNumber = packet.header.packetNumber;
-    if(receivePacketNumber != 0 && packetNumber != receivePacketNumber) {
+    if(receivePacketNumber != 0 && packetNumber != receivePacketNumber + 1) {
       MyLogger.warn('${logPrefix} Packet number in connected message inconsistent($packetNumber vs $receivePacketNumber). Use newer value');
     }
     receivePacketNumber = packetNumber;
@@ -244,7 +243,7 @@ class Peer {
     }
   }
 
-  // 对超出MTU的消息进行分包发送
+  // Split data larger than MTU into multiple frames
   bool sendData(List<int> data) {
     if(data.length == 0) return false;
 
@@ -470,5 +469,14 @@ class ConnectionPool {
       _connectionIdMap.remove(item);
     }
     return result;
+  }
+
+  Peer? getConnection(InternetAddress ip, int port) {
+    for(var v in _connectionIdMap.values) {
+      if(v.ip == ip && v.port == port) {
+        return v;
+      }
+    }
+    return null;
   }
 }
