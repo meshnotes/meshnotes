@@ -54,6 +54,9 @@ void main() {
     await overlay2.start();
     await completer1.future;
     await completer2.future;
+
+    overlay1.stop();
+    overlay2.stop();
   });
 }
 

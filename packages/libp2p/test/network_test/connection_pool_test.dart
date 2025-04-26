@@ -12,8 +12,8 @@ void main() async {
     var ip = InternetAddress('1.2.3.4');
     int port = 1234;
     const connectionId = 123456789;
-    var connection = Peer(ip: ip, port: port, transport: (data, ip, port) {
-      return socket.send(data, ip, port);
+    var connection = Peer(ip: ip, port: port, transport: (packet, ip, port) {
+      return socket.send(packet.toBytes(), ip, port);
     });
     pool.addConnection(connection);
 
@@ -29,8 +29,8 @@ void main() async {
     var ip = InternetAddress('127.0.0.1');
     int port = 8000;
     const connectionId = 9876543210;
-    var connection = Peer(ip: ip, port: port, transport: (data, ip, port) {
-      return socket.send(data, ip, port);
+    var connection = Peer(ip: ip, port: port, transport: (packet, ip, port) {
+      return socket.send(packet.toBytes(), ip, port);
     });
     connection.setSourceId(connectionId);
 

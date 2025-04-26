@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'protocol/packet.dart';
 import 'package:libp2p/network/buffer_and_queue.dart';
 import 'package:libp2p/utils.dart';
@@ -15,7 +16,6 @@ class ConnectionController {
 
 enum ConnectionStatus {
   invalid, // connect fail or heartbeat timeout
-  initializing, // after connect package was sent
   establishing, // after connect_ack package was sent
   established, // after connected package was sent or received
   shutdown, // closed by one peer
@@ -50,19 +50,18 @@ class Peer {
   OnReceiveDataCallback? onReceiveData;
   OnDisconnectCallback? onDisconnect;
   OnConnectionFail? onConnectionFail;
-  int Function(List<int>, InternetAddress, int) _transport;
+  int Function(Packet, InternetAddress, int) _transport;
   bool alreadyScheduledNotifier = false;
 
   Peer({
     required this.ip,
     required this.port,
-    required int Function(List<int>, InternetAddress, int) transport,
+    required int Function(Packet, InternetAddress, int) transport,
     this.onReceiveData,
     this.onDisconnect,
     this.onConnectionFail,
   }): _transport = transport;
 
-  void setInitializing() => _status = ConnectionStatus.initializing;
   void setEstablishing() => _status = ConnectionStatus.establishing;
   void setEstablished() => _status = ConnectionStatus.established;
   void setInvalid() => _status = ConnectionStatus.invalid;
@@ -79,7 +78,7 @@ class Peer {
       header: _buildPacketHeader(PacketType.connect),
       sourceConnectionId: _sourceId,
     );
-    controlQueue.setConnect(packet);
+    controlQueue.setConnect(packet); // Try resend connect message if timeout
     _sendPacket(packet);
   }
 
@@ -89,7 +88,7 @@ class Peer {
       MyLogger.warn('${logPrefix} Invalid status on connect: status=$_status');
       return false;
     }
-    receivePacketNumber = packet.header.packetNumber;
+    receivePacketNumber = max(receivePacketNumber, packet.header.packetNumber);
     _sendConnectAck();
     return true;
   }
@@ -98,7 +97,7 @@ class Peer {
       header: _buildPacketHeader(PacketType.connectAck),
       sourceConnectionId: _sourceId,
     );
-    controlQueue.setConnectAck(packet);
+    controlQueue.setConnectAck(packet); // Try resend connect_ack message if timeout
     _sendPacket(packet);
   }
 
@@ -107,18 +106,18 @@ class Peer {
     // 2. Clear connect message from send queue
     // 3. Send connected message
     var status = getStatus();
-    if(status != ConnectionStatus.initializing && status != ConnectionStatus.established) {
+    if(status != ConnectionStatus.establishing && status != ConnectionStatus.established) {
       MyLogger.warn('${logPrefix} Invalid status on connect_ack: status=$_status');
       return false;
     }
     // exchange packet number in connect/connect_ack message
     var packetNumber = packet.header.packetNumber;
-    if(receivePacketNumber != 0 && packetNumber != receivePacketNumber) {
+    if(receivePacketNumber != 0 && packetNumber != receivePacketNumber + 1) {
       MyLogger.warn('${logPrefix} Packet number in connect_ack message inconsistent($packetNumber vs $receivePacketNumber). Use newer value');
     }
-    receivePacketNumber = packetNumber;
+    receivePacketNumber = max(receivePacketNumber, packetNumber);
     setDestinationId(packet.sourceConnectionId);
-    if(status == ConnectionStatus.initializing) {
+    if(status == ConnectionStatus.establishing) {
       setEstablished();
       _updateContact();
       _updateHeartbeat();
@@ -156,7 +155,7 @@ class Peer {
     if(receivePacketNumber != 0 && packetNumber != receivePacketNumber + 1) {
       MyLogger.warn('${logPrefix} Packet number in connected message inconsistent($packetNumber vs $receivePacketNumber). Use newer value');
     }
-    receivePacketNumber = packetNumber;
+    receivePacketNumber = max(receivePacketNumber, packetNumber);
     setEstablished();
     controlQueue.clearConnectAck();
     _updateContact();
@@ -294,9 +293,7 @@ class Peer {
 
   void _sendPacket(Packet packet) {
     packet.setPacketNumber(sendPacketNumber++);
-    final bytes = packet.toBytes();
-    // MyLogger.debug('${logPrefix} Sending ${packet.getType().name} message: $bytes');
-    _transportSend(bytes);
+    _transportSend(packet);
   }
 
   void updateResendQueue(int timeoutThreshold) {
@@ -335,8 +332,8 @@ class Peer {
     });
   }
 
-  void _transportSend(List<int> bytes) {
-    _transport(bytes, ip, port);
+  void _transportSend(Packet packet) {
+    _transport(packet, ip, port);
   }
 
   void updateControlQueue(int timeoutThreshold) {

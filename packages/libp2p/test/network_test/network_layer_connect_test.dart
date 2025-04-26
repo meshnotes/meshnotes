@@ -150,7 +150,7 @@ void main() {
     expect(clientConnection.port, serverPort);
     expect(clientConnection.getSourceId() != 0, true);
     expect(clientConnection.getDestinationId(), 0);
-    expect(clientConnection.getStatus(), ConnectionStatus.initializing);
+    expect(clientConnection.getStatus(), ConnectionStatus.establishing);
     // The control queue of client side connection must have exactly 1 connect packet, retry count is 0
     var clientControlQueue = clientConnection.controlQueue;
     var clientControlQueuePackets = clientControlQueue.getAllPackets();
@@ -253,14 +253,13 @@ void main() {
       },
     );
     // Set server network environment to "not sending connect_ack message"
-    server.setNetworkEnv(NetworkEnvSimulator()..sendHook = (data) {
-      var factory = PacketFactory(data: data);
-      final type = factory.getType();
+    server.setNetworkEnv(NetworkEnvSimulator(sendHook: (socket, ip, port, packet) {
+      final type = packet.getType();
       if(type == PacketType.connectAck) {
-        return false;
+        return 0;
       }
-      return true;
-    });
+      return socket.send(packet.toBytes(), ip, port);
+    }));
     MyLogger.info('[Test] start server');
     await server.start();
 
@@ -303,7 +302,7 @@ void main() {
     expect(clientConnection.port, serverPort);
     expect(clientConnection.getSourceId() != 0, true);
     expect(clientConnection.getDestinationId(), 0);
-    expect(clientConnection.getStatus(), ConnectionStatus.initializing);
+    expect(clientConnection.getStatus(), ConnectionStatus.establishing);
     // The control queue of client side connection must have exactly 1 connect packet, retry count is 0
     var clientControlQueue = clientConnection.controlQueue;
     var clientControlQueuePackets = clientControlQueue.getAllPackets();
@@ -436,14 +435,13 @@ void main() {
     );
     await client.start();
     // Set client network environment to be "not sending connected packet"
-    client.setNetworkEnv(NetworkEnvSimulator()..sendHook = (data) {
-      var factory = PacketFactory(data: data);
-      final type = factory.getType();
+    client.setNetworkEnv(NetworkEnvSimulator(sendHook: (socket, ip, port, packet) {
+      final type = packet.getType();
       if(type == PacketType.connected) {
-        return false;
+        return 0;
       }
-      return true;
-    });
+      return socket.send(packet.toBytes(), ip, port);
+    }));
     client.connect(loopbackIp, serverPort);
 
     // Wait 1 second, and check connection pool

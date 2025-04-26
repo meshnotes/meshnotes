@@ -1,36 +1,33 @@
 import 'dart:io';
-
 import 'peer.dart';
 
 class IncompleteTriple {
   InternetAddress ip;
   int port;
-  int connectionId; // Very special here: this may be the remote connection_id(when receiving connect) or the local connection_id(when sending connect)
 
   IncompleteTriple({
     required this.ip,
     required this.port,
-    required this.connectionId,
   });
 
   @override
-  int get hashCode => Object.hash(ip, port, connectionId);
+  int get hashCode => Object.hash(ip, port);
   @override
   bool operator==(Object o) {
-    return o is IncompleteTriple && o.ip == ip && o.port == port && o.connectionId == connectionId;
+    return o is IncompleteTriple && o.ip == ip && o.port == port;
   }
 }
 
 class IncompletePool {
   Map<IncompleteTriple, Peer> _map = {};
 
-  void addConnection(InternetAddress ip, int port, int id, Peer conn) {
-    var key = IncompleteTriple(ip: ip, port: port, connectionId: id);
+  void addConnection(InternetAddress ip, int port, Peer conn) {
+    var key = IncompleteTriple(ip: ip, port: port);
     _map[key] = conn;
   }
 
-  Peer? getConnection(InternetAddress ip, int port, int id) {
-    var key = IncompleteTriple(ip: ip, port: port, connectionId: id);
+  Peer? getConnection(InternetAddress ip, int port) {
+    var key = IncompleteTriple(ip: ip, port: port);
     return _map[key];
   }
 
@@ -43,8 +40,8 @@ class IncompletePool {
     return null;
   }
 
-  void removeConnection(InternetAddress ip, int port, int id) {
-    var key = IncompleteTriple(ip: ip, port: port, connectionId: id);
+  void removeConnection(InternetAddress ip, int port) {
+    var key = IncompleteTriple(ip: ip, port: port);
     _map.remove(key);
   }
 

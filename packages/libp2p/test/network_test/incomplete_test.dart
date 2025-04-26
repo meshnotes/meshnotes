@@ -11,15 +11,14 @@ void main() async {
   test('IncompletePool add and get', () {
     var ip = InternetAddress('1.2.3.4');
     int port = 8088;
-    int id = 1111;
-    var conn = Peer(ip: ip, port: port, transport: (data, ip, port) {
-      return socket.send(data, ip, port);
+    var conn = Peer(ip: ip, port: port, transport: (packet, ip, port) {
+      return socket.send(packet.toBytes(), ip, port);
     });
     var pool = IncompletePool();
-    pool.addConnection(ip, port, id, conn);
+    pool.addConnection(ip, port, conn);
 
     expect(pool.getAllConnections().length, 1);
-    var result = pool.getConnection(ip, port, id);
+    var result = pool.getConnection(ip, port);
     expect(result != null, true);
     expect(result!.ip, ip);
     expect(result.port, port);

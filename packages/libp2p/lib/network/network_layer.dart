@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:bonsoir/bonsoir.dart';
 import 'package:libp2p/network/incomplete_pool.dart';
 import 'package:my_log/my_log.dart';
 import 'package:libp2p/network/network_env.dart';
@@ -20,8 +19,6 @@ class SOTPNetworkLayer {
   static const multicastGroup = '224.0.0.179'; // Only 224.0.0.0/8 could be received by windows devices, by test result
   static const multicastGroup2 = '239.0.179.74'; // Try to send to other multicast address
   static const logPrefix = '[Network]';
-  static const _bonjourName = 'VillageProtocol';
-  static const _bonjourType = '_village-v0._udp';
   final connectionPool = ConnectionPool();
   final incompletePool = IncompletePool();
   late Timer timer;
@@ -36,9 +33,6 @@ class SOTPNetworkLayer {
   int maxTimeout = 3000;
   NetworkEnvSimulator? _networkCondition;
   bool useMulticast;
-  bool useBonjour;
-  BonsoirBroadcast? _bonjourBroadcast;
-  BonsoirDiscovery? _bonjourDiscovery;
   String _deviceId;
   int _lastSentMulticast = 0;
   static const _maxMulticastInterval = 20 * 1000; // 1 minute in milliseconds
@@ -68,7 +62,6 @@ class SOTPNetworkLayer {
     this.onDetected,
     NetworkEnvSimulator? networkCondition,
     this.useMulticast = false,
-    this.useBonjour = false, // Ignore bonjour, because it could not be used in background isolates
     required String deviceId,
   }) : _networkCondition = networkCondition, _deviceId = deviceId;
 
@@ -90,7 +83,11 @@ class SOTPNetworkLayer {
           MyLogger.warn('${logPrefix} Receive invalid packet: $data');
           return;
         }
-        var packet = packetFactory.getAbstractPacket()!;
+        var packet = packetFactory.getAbstractPacket();
+        if(packet == null) {
+          MyLogger.warn('${logPrefix} Receive invalid packet, may be corrupted or from incompatible peer: $data');
+          return;
+        }
         MyLogger.debug('${logPrefix} Receive packet with type(${packet.getType().name})');
         onReceivePacket?.call(packet);
         switch(type) {
@@ -115,7 +112,7 @@ class SOTPNetworkLayer {
             _onAnnounce(packet as PacketAnnounce, peerIp, port);
             break;
           case PacketType.announceAck:
-            if(!useMulticast && !useBonjour) break; // Ignore announce_ack if not supporting multicast or bonjour
+            if(!useMulticast) break; // Ignore announce_ack if not supporting multicast
             if(peerIp == localIp && port == servicePort) break; // Ignore packet from itself
             _onAnnounceAck(packet as PacketAnnounce, peerIp, port);
             break;
@@ -132,9 +129,6 @@ class SOTPNetworkLayer {
       _udp?.joinMulticast(InternetAddress(multicastGroup2));
       _startBroadcast(); // Bind every interface with random port, to send multicast message
     }
-    if(useBonjour) {
-      _startBonjour();
-    }
     timer = Timer.periodic(Duration(milliseconds: 1000), _networkTimerHandler);
     startedCallback?.call();
   }
@@ -149,56 +143,66 @@ class SOTPNetworkLayer {
     timer.cancel();
     _traverseAndClose(connectionPool.getAllConnections());
     _traverseAndClose(incompletePool.getAllConnections());
-    if(useBonjour) {
-      _bonjourBroadcast?.stop();
-      _bonjourDiscovery?.stop();
-    }
     udp.close();
     _status = NetworkStatus.invalid;
   }
 
+  /// 1. Generate source connection Id randomly
+  /// 2. Set connection status to initializing
+  /// 3. Send connect message
   Peer? connect(String peerIp, int peerPort, {OnReceiveDataCallback? onReceive = null, OnDisconnectCallback? onDisconnect, OnConnectionFail? onConnectionFail, }) {
-    // 1. Generate source connection Id randomly
-    // 2. Set connection status to initializing
-    // 3. Send connect message
-    var id = _generateId();
+    // If already connected or being connecting, ignore and return null
     var ip = InternetAddress(peerIp);
+    if(connectionPool.getConnection(ip, peerPort) != null) {
+      MyLogger.warn('${logPrefix} Already connected to $peerIp:$peerPort, ignore new connect request');
+      return null;
+    }
+    // But if the same ip and port is connecting, should continue the connecting process, instead of ignore it
+    // Because if both peers discover each other at the same time, they will send connect message at the same time
+    // Both side will receive connect message and already have peer in incompletePool. If ignore, both side will ignore, 
+    // and the connection cannot be established
+    if(incompletePool.getConnection(ip, peerPort) != null) {
+      MyLogger.warn('${logPrefix} Already trying to connect to $peerIp:$peerPort, continue the connecting process');
+      return null;
+    }
+    var id = _generateId();
     var peer = Peer(ip: ip, port: peerPort, transport: _sendDelegate, onReceiveData: onReceive, onDisconnect: onDisconnect, onConnectionFail: onConnectionFail)
-      ..setInitializing()
+      ..setEstablishing()
       ..setSourceId(id);
     MyLogger.info('${logPrefix} Connecting ip=$peerIp, port=$peerPort, id=$id');
-    incompletePool.addConnection(ip, peerPort, id, peer);
+    incompletePool.addConnection(ip, peerPort, peer);
     peer.connect();
     return peer;
   }
+  /// 1. When received connect message, find if peer is already exists(may be duplicated connect message, or connect to each other after discovering each other).
+  ///    If not found, generate a new one with source_connection_id
+  /// 2. Exchange the source/destination id from receiving packet
+  /// 3. Set peer's connection status to establishing
+  /// 4. Send connect_ack
   void _onConnect(InternetAddress peerIp, int peerPort, PacketConnect packet) {
-    // 1. When received connect message, find if peer is already exists(may be duplicated connect message). If not, generate a new one with source_connection_id
-    // 2. Exchange the source/destination id from receiving packet
-    // 3. Set peer's connection status to establishing
-    // 4. Send connect_ack
-
-    // When received connect, client side didn't know the server side connection_id(which will be send in server's connect_ack)
-    // So search ip:port:source_connection_id in incompletePool
-    // After connection is established, will use ip:port:dest_connection_id to find connection
-    var originalId = packet.sourceConnectionId;
-    var peer = incompletePool.getConnection(peerIp, peerPort, originalId);
+    // If already connected, ignore it
+    if(connectionPool.getConnection(peerIp, peerPort) != null) {
+      MyLogger.warn('${logPrefix} Already connected to $peerIp:$peerPort, ignore incoming connect message');
+      return;
+    }
+    var peer = incompletePool.getConnection(peerIp, peerPort);
     if(peer == null) {
+      var originalId = packet.sourceConnectionId;
       peer = Peer(ip: peerIp, port: peerPort, transport: _sendDelegate)
         ..setEstablishing();
       peer.setSourceId(_generateId());
       peer.setDestinationId(originalId);
-      incompletePool.addConnection(peerIp, peerPort, originalId, peer);
+      incompletePool.addConnection(peerIp, peerPort, peer);
     }
     peer.onConnect(packet);
   }
+  /// 1. Only client will receive connect_ack, so find connection by ip, port, and source_connection_id
+  /// 2. If connection is not found in incompletePool, may cause by lost connected message(so server side resend connect_ack), search again in connectionPool
+  /// 3. Send connected message
+  /// 4. Now connection is successfully established, move it from incompletePool to connectionPool
   void _onConnectAck(InternetAddress ip, int port, PacketConnect packet) {
-    // 1. Only client will receive connect_ack, so find connection by ip, port, and source_connection_id
-    // 2. If connection is not found in incompletePool, may cause by lost connected message(so server side resend connect_ack), search again in connectionPool
-    // 3. Send connected message
-    // 4. Now connection is successfully established, move it from incompletePool to connectionPool
-
     var originalId = packet.header.destConnectionId;
-    var peer = incompletePool.getConnection(ip, port, originalId);
+    var peer = incompletePool.getConnection(ip, port);
     var fromIncomplete = peer != null;
     if(peer == null) {
       peer = connectionPool.getConnectionById(originalId);
@@ -208,18 +212,18 @@ class SOTPNetworkLayer {
       }
     }
     if(peer.onConnectAck(packet) && fromIncomplete) {
-      incompletePool.removeConnection(ip, port, originalId);
+      incompletePool.removeConnection(ip, port);
       connectionPool.addConnection(peer);
       connectOkCallback?.call(peer);
     }
   }
+  /// 1. If it's the first time to receive connected, should retrieve peer from incompletePool.
+  ///    If connected is duplicated, should retrieve peer from connectionPool
+  /// 2. Let peer to handle connected message
+  /// 3. If connection is successfully established for the first time, trigger callback and move it from incompletePool to connectionPool
   void _onConnected(InternetAddress ip, int port, PacketConnect packet) {
-    // 1. If it's the first time to receive connected, should retrieve peer from incompletePool.
-    //    If connected is duplicated, should retrieve peer from connectionPool
-    // 2. Let peer to handle connected message
-    // 3. If connection is successfully established for the first time, trigger callback and move it from incompletePool to connectionPool
     var originalId = packet.sourceConnectionId;
-    var peer = incompletePool.getConnection(ip, port, originalId);
+    var peer = incompletePool.getConnection(ip, port);
     // If connection not found in incompletePool, may cause by lost connected message(so server side resend connect_ack), search again in connectionPool
     if(peer == null) {
       peer = connectionPool.getConnectionById(packet.header.destConnectionId);
@@ -229,7 +233,7 @@ class SOTPNetworkLayer {
       }
     }
     if(peer.onConnected(packet)) { // If peer is already established, here will return false
-      incompletePool.removeConnection(ip, port, originalId);
+      incompletePool.removeConnection(ip, port);
       connectionPool.addConnection(peer);
       newConnectCallback?.call(peer);
     }
@@ -267,7 +271,7 @@ class SOTPNetworkLayer {
       port: myPort,
       header: PacketHeader(type: PacketType.announce, destConnectionId: 0, packetNumber: 0),
     );
-    _sendDelegate(reply.toBytes(), targetAddress, targetPort, socket: socket);
+    _sendDelegate(reply, targetAddress, targetPort, socket: socket);
   }
   void _sendAnnounceAck(InternetAddress ip, int port) {
     PacketAnnounce reply = PacketAnnounce(
@@ -276,7 +280,7 @@ class SOTPNetworkLayer {
       port: servicePort,
       header: PacketHeader(type: PacketType.announceAck, destConnectionId: 0, packetNumber: 0),
     );
-    _sendDelegate(reply.toBytes(), ip, port);
+    _sendDelegate(reply, ip, port);
   }
 
   void _onBye(PacketBye packet) {
@@ -317,65 +321,6 @@ class SOTPNetworkLayer {
       }
     }
   }
-  Future<void> _startBonjour() async {
-    _startBonjourBroadcast();
-    _startBonjourDiscovery();
-  }
-  Future<void> _startBonjourBroadcast() async {
-    BonsoirService service = BonsoirService(
-      name: _bonjourName,
-
-      type: _bonjourType,
-      port: servicePort, // Put your service port here.
-      attributes: {
-        'device': _deviceId,
-      },
-    );
-
-    // And now we can broadcast it :
-    BonsoirBroadcast broadcast = BonsoirBroadcast(service: service);
-    await broadcast.ready;
-    await broadcast.start();
-    _bonjourBroadcast = broadcast;
-  }
-  Future<void> _startBonjourDiscovery() async {
-    BonsoirDiscovery discovery = BonsoirDiscovery(type: _bonjourType);
-    await discovery.ready;
-
-    /// Cannot listen to the discovery event in background isolates
-    /// Or an exception will be thrown:
-    ///   Unsupported operation: Background isolates do not support setMessageHandler(). Messages from the host platform always go to the root isolate.
-    discovery.eventStream!.listen((event) {
-      // `eventStream` is not null as the discovery instance is "ready" !
-      if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
-        MyLogger.debug('${logPrefix} Service found : ${event.service?.toJson()}');
-        event.service!.resolve(discovery.serviceResolver); // Should be called when the user wants to connect to this service.
-      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved) {
-        MyLogger.info('${logPrefix} Service resolved : ${event.service?.toJson()}');
-        final service = event.service as ResolvedBonsoirService?;
-        if(service == null) return;
-
-        final host = service.host; // May be the host name, should be resolved to ip address
-        final port = service.port;
-        if(host == null) return;
-        InternetAddress.lookup(host).then((values) {
-          for(var ip in values) {
-            if(ip.isLoopback) continue; // Ignore loopback address
-            if(ip.type == InternetAddressType.IPv4) {
-              _sendAnnounce(udp, ip, port, localIp.rawAddress, servicePort);
-              break;
-            }
-          }
-        });
-      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceLost) {
-        MyLogger.debug('${logPrefix} Service lost : ${event.service?.toJson()}');
-      }
-    });
-    // Start the discovery **after** listening to discovery events :
-    await discovery.start();
-
-    _bonjourDiscovery = discovery;
-  }
 
   int _generateId() {
     while(true) {
@@ -390,14 +335,9 @@ class SOTPNetworkLayer {
     }
   }
 
-  int _sendDelegate(List<int> data, InternetAddress ip, int port, {RawDatagramSocket? socket = null}) {
+  int _sendDelegate(Packet packet, InternetAddress ip, int port, {RawDatagramSocket? socket = null}) {
     if(socket == null) socket = udp;
-    var sendData = _networkCondition?.sendHook?.call(data)?? true;
-    if(sendData) {
-      return socket.send(data, ip, port);
-    } else {
-      return 0;
-    }
+    return _networkCondition?.sendHook.call(socket, ip, port, packet)?? socket.send(packet.toBytes(), ip, port);
   }
 
   void _networkTimerHandler(Timer _t) {

@@ -10,6 +10,7 @@ void main() async {
   test('Add application', () async {
     final runner = IsolateTester();
     await runner.start('runner1', 'runner2');
+    runner.stop();
   });
 }
 
@@ -98,12 +99,14 @@ class IsolateTester {
   }
 
   static int port1 = 1234;
-  static int port2 = 8888;
+  static int port2 = 1235;
+  static String deviceId1 = 'device1';
+  static String deviceId2 = 'device2';
   static Future<void> func1() async {
     bool first = true;
     var overlay = VillageOverlay(
       userInfo: UserPublicInfo(publicKey: 'test_key', userName: 'test', timestamp: 0),
-      sponsors: ['127.0.0.1:8888'],
+      sponsors: ['127.0.0.1:$port2'],
       onNodeChanged: (VillagerNode _node) {
         expect(_node.port, port2);
         if(first) {
@@ -113,7 +116,7 @@ class IsolateTester {
           expect(_node.id, 'device2');
         }
       },
-      deviceId: 'device1',
+      deviceId: deviceId1,
       port: port1,
     );
     overlay.start();
@@ -125,7 +128,7 @@ class IsolateTester {
       onNodeChanged: (VillagerNode _node) {
         MyLogger.info('New incoming connection(${_node.ip.toString()}:${_node.port.toString()}, ${_node.id}, ${_node.getStatus()})');
       },
-      deviceId: 'device2',
+      deviceId: deviceId2,
       port: port2,
     );
     overlay.start();

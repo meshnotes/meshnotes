@@ -174,21 +174,19 @@ void main() {
     await serverEstablished.future;
 
     // Set network simulator to ignore second packet of first object
-    client.setNetworkEnv(NetworkEnvSimulator()..sendHook = (data) {
-      PacketFactory packetFactory = PacketFactory(data: data);
-      final type = packetFactory.getType();
-      if(type != PacketType.data) return true;
-      var packetData = packetFactory.getPacketData();
+    client.setNetworkEnv(NetworkEnvSimulator(sendHook: (socket, ip, port, packet) {
+      if(packet is! PacketData) return socket.send(packet.toBytes(), ip, port);
+      PacketData packetData = packet;
       var frames = packetData.frames;
       for(var frame in frames) {
         if(frame.type != FrameType.dataFrame) continue;
         var data = frame as FrameData;
         if(data.objId == 0 && data.seqNum == 1) {
-          return false;
+          return 0;
         }
       }
-      return true;
-    });
+      return socket.send(packet.toBytes(), ip, port);
+    }));
 
     final dataSize = 5000;
     final firstObjectData = 1;

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:libp2p/application/application_api.dart';
+import 'package:libp2p/network/network_env.dart';
 import 'package:libp2p/overlay/overlay_msg.dart';
 import 'package:libp2p/utils.dart';
 import 'package:my_log/my_log.dart';
@@ -25,6 +26,7 @@ class VillageOverlay implements ApplicationController {
   SOTPNetworkLayer get _network => __network!;
   ApplicationController? _defaultApp;
   Map<String, ApplicationController> _keyToApp = {};
+  NetworkEnvSimulator? _networkEnvSimulator;
 
   // Villager node properties
   List<VillagerNode> _villagers = [];
@@ -73,6 +75,7 @@ class VillageOverlay implements ApplicationController {
       onDetected: _onDetected,
       deviceId: _deviceId,
       useMulticast: useMulticast,
+      networkCondition: _networkEnvSimulator,
     );
     await _network.start();
     // Connect to upper nodes immediately
@@ -81,6 +84,10 @@ class VillageOverlay implements ApplicationController {
   }
   void stop() {
     _network.stop();
+  }
+
+  void setNetworkEnvSimulator(NetworkEnvSimulator? networkEnvSimulator) {
+    _networkEnvSimulator = networkEnvSimulator;
   }
 
   /// @return true - success, false - failed
@@ -112,7 +119,7 @@ class VillageOverlay implements ApplicationController {
   }
   void sendToAllNodesOfUser(String appKey, ApplicationController app, String type, String data) {
     //TODO should change to only find the nodes with same user id(public key)
-    final nodes = _findAllNodes();
+    final nodes = getAllNodes();
     MyLogger.info('${logPrefix} sendToAllNodesOfUser: find nodes: $nodes');
     for(var node in nodes) {
       MyLogger.info('${logPrefix} sendToAllNodesOfUser: send to node: $node, type: $type, data: ${data.substring(0, 100)}');
@@ -192,26 +199,33 @@ class VillageOverlay implements ApplicationController {
       }
     }
     if(found != null) {
-      if(_resolveConflict(found)) {
-        _onConnect(found);
-      }
+      _onConnect(found);
     }
   }
   void _onNewConnect(Peer _c) {
     var host = _c.ip.address;
     var port = _c.port;
-    VillagerNode node = VillagerNode(host: host, port: port, isUpper: true)
-      ..ip = _c.ip
-      ..setPeer(_c);
-    _c.setOnReceive((data) {
-      _onRawData(node, data);
-    });
-    _c.setOnDisconnect(_onDisconnect);
-    _c.setOnConnectFail(_onConnectionFail);
-    _villagers.add(node);
-    if(_resolveConflict(node)) {
-      _onConnect(node);
+    VillagerNode? node = _findVillageByIpAndPort(_c.ip, _c.port);
+    if(node != null) {
+      final oldPeer = node.getPeer();
+      // If already has a valid connection, do nothing
+      if(oldPeer != null && oldPeer.getStatus() == ConnectionStatus.established) {
+        return;
+      }
+    } else { // No node found, create a new one
+      node = VillagerNode(host: host, port: port, isUpper: true)
+        ..ip = _c.ip;
     }
+    // When run here, the node is either not in _villagers list or has an invalid connection. So update it
+    node.setPeer(_c);
+    _c
+      ..setOnReceive((data) {
+        _onRawData(node!, data);
+      })
+      ..setOnDisconnect(_onDisconnect)
+      ..setOnConnectFail(_onConnectionFail);
+    _addIntoVillagersIfNotExists(node);
+    _onConnect(node);
   }
   void _onDetected(String peerDeviceId, InternetAddress peerIp, int peerPort) {
     MyLogger.info('${logPrefix} Detected peer($peerDeviceId) with address(${peerIp.address}:$peerPort)');
@@ -344,7 +358,7 @@ class VillageOverlay implements ApplicationController {
     onNodeChanged(node);
   }
 
-  List<VillagerNode> _findAllNodes() {
+  List<VillagerNode> getAllNodes() {
     var result = <VillagerNode>[];
     for(var node in _villagers) {
       if(node.getStatus() == VillagerStatus.keepInTouch) {
@@ -354,52 +368,22 @@ class VillageOverlay implements ApplicationController {
     return result;
   }
 
-  /// Check whether the node has duplicated node in _villagers list(Due to both discovery each other and connect at the same time)
-  /// If so, find the node with larger connection id(source + destination) and remove the other node
-  /// If both nodes have the same connection id, remove both to make sure the behavior is consistent with remote side. And leave hope for re-connection
-  /// @return true - if targetNode is survival, false - if targetNode is removed
-  bool _resolveConflict(VillagerNode targetNode) {
-    final targetPeer = targetNode.getPeer()!; // Should not be null in this method
-    VillagerNode? conflictNode;
+  VillagerNode? _findVillageByIpAndPort(InternetAddress ip, int port) {
     for(var node in _villagers) {
-      if(node == targetNode) continue; // Ignore self
-      if(node.getStatus() != VillagerStatus.keepInTouch) continue; // Only check alive nodes
-      final peer = node.getPeer();
-      if(peer == null) continue;
-      if(peer.ip == targetPeer.ip && peer.port == targetPeer.port && 
-        (peer.getSourceId() != targetPeer.getSourceId() || peer.getDestinationId() != targetPeer.getDestinationId())) {
-        conflictNode = node;
-        break;
+      if(node.ip == ip && node.port == port) {
+        return node;
       }
     }
-    if(conflictNode == null) { // No duplicated node found
-      return true;
-    }
-    final conflictPeer = conflictNode.getPeer()!;
-    final targetConnectionId = targetPeer.getSourceId() + targetPeer.getDestinationId();
-    final conflictConnectionId = conflictPeer.getSourceId() + conflictPeer.getDestinationId();
-    if(conflictConnectionId <= targetConnectionId) {
-      _handleConflictNode(conflictNode);
-    }
-    if(targetConnectionId <= conflictConnectionId) {
-      _handleConflictNode(targetNode);
-    }
-    return targetConnectionId > conflictConnectionId;
+    return null;
   }
-  void _handleConflictNode(VillagerNode node) {
-    final peer = node.getPeer()!;
-    MyLogger.info('${logPrefix} Drop conflict node(${peer.ip.address}:${peer.port}/${peer.getSourceId()}-${peer.getDestinationId()})');
-    peer.close();
-    onNodeChanged(node);
-  }
-
-  bool _addIntoVillagersIfNotExists(VillagerNode node) {
+  
+  bool _addIntoVillagersIfNotExists(VillagerNode target) {
     for(var v in _villagers) {
-      if(v.ip == node.ip && v.port == node.port) {
+      if(v.ip == target.ip && v.port == target.port) {
         return false;
       }
     }
-    _villagers.add(node);
+    _villagers.add(target);
     return true;
   }
   bool _alreadyInVillagers(InternetAddress ip, int port) {
