@@ -35,6 +35,8 @@ class MindEditBlockState extends State<MindEditBlock> {
   Widget? _leading;
   final LayerLink _layerLink = LayerLink();
   final controller = Controller();
+  double _topSpace = 0;
+  double _bottomSpace = 0;
 
   void setRender(MindBlockImplRenderObject r) {
     _render = r;
@@ -72,7 +74,17 @@ class MindEditBlockState extends State<MindEditBlock> {
     var blockImpl = _buildBlockImpl();
     var handler = _buildHandler();
     var extra = _buildExtra();
-    var result = _buildAll(levelSpace, handler, blockImpl, extra);
+    var all = _buildAll(levelSpace, handler, blockImpl, extra);
+    Widget result = all;
+    if(_topSpace > 0 || _bottomSpace > 0) {
+      result = Column(
+        children: [
+          SizedBox(height: _topSpace,),
+          all,
+          SizedBox(height: _bottomSpace,),
+        ],
+      );
+    }
     return result;
   }
 
@@ -87,16 +99,25 @@ class MindEditBlockState extends State<MindEditBlock> {
     var fontSize = widget.controller.setting.blockNormalFontSize;
     if(widget.texts.isTitle()) {
       fontSize = widget.controller.setting.blockTitleFontSize;
+      _topSpace = 10;
+      _bottomSpace = 10;
     } else {
       switch(widget.texts.getBlockType()) {
         case Constants.blockTypeHeadline1:
           fontSize = widget.controller.setting.blockHeadline1FontSize;
+          _topSpace = 10;
           break;
         case Constants.blockTypeHeadline2:
           fontSize = widget.controller.setting.blockHeadline2FontSize;
+          _topSpace = 5;
           break;
         case Constants.blockTypeHeadline3:
           fontSize = widget.controller.setting.blockHeadline3FontSize;
+          _topSpace = 2;
+          break;
+        default:
+          _topSpace = 0;
+          _bottomSpace = 0;
           break;
       }
       switch(widget.texts.getBlockListing()) {
