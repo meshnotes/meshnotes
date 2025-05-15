@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:my_log/my_log.dart';
-import 'abstract_agent.dart';
+import 'ai_executor.dart';
+import 'prompts.dart';
 
 class AIDialog extends StatefulWidget {
   final PluginProxy proxy;
-  final AiExecutor executor;
+  final OpenAiExecutor executor;
 
   const AIDialog({
     super.key, 
@@ -27,20 +28,23 @@ class _AIDialogState extends State<AIDialog> {
   final List<_AIAction> _supportedActions = [
     _AIAction(
       displayedText: 'Summary',
-      promptTemplate: 'Summary the following content: ',
-      //systemPrompt: 'Answer in the original language',
+      promptTemplate: 'Summary the following content:',
+      systemPrompt: SystemPrompts.summary,
     ),
     _AIAction(
       displayedText: 'Continue writing',
-      promptTemplate: 'Here is a text, continue writing by the original language: ',
+      promptTemplate: 'Continue writing the following text:',
+      systemPrompt: SystemPrompts.continueWriting,
     ),
     _AIAction(
       displayedText: 'Rewrite more',
-      promptTemplate: 'Rewrite the following text, make it better and more verbose, by the original language: ',
+      promptTemplate: 'Rewrite the following text to amplify the content:',
+      systemPrompt: SystemPrompts.rewriteMore,
     ),
     _AIAction(
       displayedText: 'Rewrite simpler',
-      promptTemplate: 'Rewrite the following text, make it more concise and simpler, by the original language: ',
+      promptTemplate: 'Rewrite the following text to simplify the content:',
+      systemPrompt: SystemPrompts.rewriteSimpler,
     ),
   ];
   String originalContent = '';
@@ -209,7 +213,7 @@ class _AIDialogState extends State<AIDialog> {
 
   void _executeAction(_AIAction action) {
     if(originalContent.isNotEmpty) {
-      var prompt = action.getPrompt(originalContent);
+      var prompt = action.getPrompt();
       MyLogger.info('_executeAction: prompt=$prompt');
       _AIContent item = _AIContent(
         text: originalContent,
@@ -218,7 +222,7 @@ class _AIDialogState extends State<AIDialog> {
       );
       contents.add(item);
       _update(item.text);
-      widget.executor.execute(userPrompt: prompt, systemPrompt: action.getSystemPrompt()).then((value) {
+      widget.executor.execute(action.getSystemPrompt(), prompt, originalContent).then((value) {
         item.result = value;
         _update(value);
       });
@@ -322,17 +326,17 @@ class _AIChatCard extends StatelessWidget {
 class _AIAction {
   String displayedText;
   String promptTemplate;
-  String? systemPrompt;
+  String systemPrompt;
 
   _AIAction({
     required this.displayedText,
     required this.promptTemplate,
-    this.systemPrompt,
+    required this.systemPrompt,
   });
 
-  String getPrompt(String text) {
-    return promptTemplate + text;
+  String getPrompt() {
+    return promptTemplate;
   }
 
-  String? getSystemPrompt() => systemPrompt;
+  String getSystemPrompt() => systemPrompt;
 }

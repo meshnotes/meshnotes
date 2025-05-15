@@ -2,11 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:my_log/my_log.dart';
-import 'abstract_agent.dart';
 import 'ai_diaglog.dart';
-import 'kimi_agent.dart';
-import 'openai_agent.dart';
-import 'prompt.dart';
+import 'ai_executor.dart';
+import 'llm_providers.dart';
+import 'prompts.dart';
 import 'realtime_chat/realtime_chat_dialog.dart';
 
 class PluginAI implements PluginInstance {
@@ -20,9 +19,17 @@ class PluginAI implements PluginInstance {
   static const String settingNamePluginOpenAiApiKey = 'API key for OpenAI';
   static const String settingCommentPluginOpenAiApiKey = 'API Key for OpenAI';
 
+  static const String settingKeyPluginQwenApiKey = 'qwen_api_key';
+  static const String settingNamePluginQwenApiKey = 'API key for Qwen';
+  static const String settingCommentPluginQwenApiKey = 'API Key for Qwen';
+
+  static const String settingKeyPluginDeepSeekApiKey = 'deepseek_api_key';
+  static const String settingNamePluginDeepSeekApiKey = 'API key for DeepSeek';
+  static const String settingCommentPluginDeepSeekApiKey = 'API Key for DeepSeek';
+
   static const String settingKeyPluginDefaultAiService = 'default_ai_service';
   static const String settingNamePluginDefaultAiService = 'AI service provider';
-  static const String settingCommentPluginDefaultAiService = 'Choose AI service(e.g. chatgpt, or kimi.ai. Default is $settingDefaultPluginDefaultAiService)';
+  static const String settingCommentPluginDefaultAiService = 'Choose AI service(chatgpt/kimi.ai/qwen/deepseek. Default is $settingDefaultPluginDefaultAiService)';
   static const String settingDefaultPluginDefaultAiService = 'chatgpt';
 
   static const String settingKeyUseAiForExtra = 'use_ai_for_extra';
@@ -87,6 +94,16 @@ class PluginAI implements PluginInstance {
         settingComment: settingCommentPluginOpenAiApiKey,
       ),
       PluginSetting(
+        settingKey: settingKeyPluginQwenApiKey,
+        settingName: settingNamePluginQwenApiKey,
+        settingComment: settingCommentPluginQwenApiKey,
+      ),
+      PluginSetting(
+        settingKey: settingKeyPluginDeepSeekApiKey,
+        settingName: settingNamePluginDeepSeekApiKey,
+        settingComment: settingCommentPluginDeepSeekApiKey,
+      ),
+      PluginSetting(
         settingKey: settingKeyPluginDefaultAiService,
         settingName: settingNamePluginDefaultAiService,
         settingComment: settingCommentPluginDefaultAiService,
@@ -128,7 +145,7 @@ class PluginAI implements PluginInstance {
     );
   }
 
-  AiExecutor? _buildAiExecutor() {
+  OpenAiExecutor? _buildAiExecutor() {
     var service = _proxy.getSettingValue(settingKeyPluginDefaultAiService);
     if(service == null || service.isEmpty) return null;
     switch(service) {
@@ -136,26 +153,34 @@ class PluginAI implements PluginInstance {
         return _buildKimiExecutor();
       case 'chatgpt':
         return _buildChatGptExecutor();
+      case 'qwen':
+        return _buildQwenExecutor();
+      case 'deepseek':
+        return _buildDeepSeekExecutor();
       default:
         return _buildChatGptExecutor();
     }
   }
-  AiExecutor? _buildKimiExecutor() {
-    var _apiKey = _proxy.getSettingValue(settingKeyPluginKimiApiKey);
+  OpenAiExecutor? _buildKimiExecutor() {
+    return _buildOpenAiExecutor(settingKeyPluginKimiApiKey, LLMProviders.kimi);
+  }
+  OpenAiExecutor? _buildChatGptExecutor() {
+    return _buildOpenAiExecutor(settingKeyPluginOpenAiApiKey, LLMProviders.openai);
+  }
+  OpenAiExecutor? _buildQwenExecutor() {
+    return _buildOpenAiExecutor(settingKeyPluginQwenApiKey, LLMProviders.qwen);
+  }
+  OpenAiExecutor? _buildDeepSeekExecutor() {
+    return _buildOpenAiExecutor(settingKeyPluginDeepSeekApiKey, LLMProviders.deepseek);
+  }
+  OpenAiExecutor? _buildOpenAiExecutor(String settingKey, LLMModel llm) {
+    var _apiKey = _proxy.getSettingValue(settingKey);
     if(_apiKey == null || _apiKey.isEmpty) {
       return null;
     }
-    KimiExecutor kimi = KimiExecutor(apiKey: _apiKey);
-    return kimi;
+    return OpenAiExecutor(apiKey: _apiKey, llm: llm);
   }
-  AiExecutor? _buildChatGptExecutor() {
-    var _apiKey = _proxy.getSettingValue(settingKeyPluginOpenAiApiKey);
-    if(_apiKey == null || _apiKey.isEmpty) {
-      return null;
-    }
-    OpenAiExecutor openAi = OpenAiExecutor(apiKey: _apiKey);
-    return openAi;
-  }
+
   List<String> noneExpression = ['None', 'None.', 'none', 'none.'];
   void _blockChangedHandler(BlockChangedEventData data) {
     if(_proxy.getSettingValue(settingKeyUseAiForExtra)?.toLowerCase() != 'true') {
@@ -164,9 +189,9 @@ class PluginAI implements PluginInstance {
     }
     MyLogger.info('AI plugin receive block changed: id=${data.blockId}, content=${data.content}');
     var executor = _buildAiExecutor();
-    final userPrompt = 'Here is the user\'s note: ${data.content}';
-    const systemPrompt = Prompts.systemPromptForBlockSuggestion;
-    executor?.execute(userPrompt: userPrompt, systemPrompt: systemPrompt).then((value) {
+    const userPrompt = 'Here is the user\'s note';
+    const systemPrompt = SystemPrompts.systemPromptForBlockSuggestion;
+    executor?.execute(systemPrompt, userPrompt, data.content).then((value) {
       MyLogger.info('Here is AI\'s reply: $value');
       final trimValue = value.trim();
       if(noneExpression.contains(trimValue)) {
