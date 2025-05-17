@@ -84,18 +84,26 @@ class AiFunctionCallParameter {
 class AiFunctionCallResult {
   final String result;
   final bool isSuccess;
-  final bool? needRetry;
+  final bool needRetry;
   final bool shouldInformUser;
 
-  AiFunctionCallResult({required this.result, this.isSuccess = true, this.needRetry, this.shouldInformUser = true});
+  AiFunctionCallResult({
+    required this.result,
+    this.isSuccess = true,
+    this.needRetry = false,
+    this.shouldInformUser = true,
+  });
 
   Map<String, dynamic> toJson() {
     final json = {
       'result': result,
       'is_success': isSuccess,
     };
-    if(needRetry != null) {
-      json['need_retry'] = needRetry!;
+    if(needRetry) {
+      json['need_retry'] = needRetry;
+    }
+    if(shouldInformUser) {
+      json['should_inform_user'] = shouldInformUser;
     }
     return json;
   }

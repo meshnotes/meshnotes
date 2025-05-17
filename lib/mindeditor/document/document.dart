@@ -186,6 +186,16 @@ class Document {
     }
     _flushDocStructure();
   }
+  void insertTextsAtTheEnd(List<String> texts) {
+    for(var text in texts) {
+      var para = ParagraphDesc.fromRawString(text);
+      para.setDocument(this);
+      paragraphs.add(para);
+      _mapOfParagraphs[para.getBlockId()] = para;
+      para.flushDb();
+    }
+    _flushDocStructure();
+  }
 
   void removeParagraph(String _id) {
     var para = getParagraph(_id);

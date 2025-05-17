@@ -6,7 +6,7 @@ import 'package:mesh_note/plugin/plugin_api.dart';
 import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
 import 'package:my_log/my_log.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'ai_tools_manager.dart';
+import '../tools/ai_tools_manager.dart';
 import 'audio_visualizer_widget.dart';
 import 'chat_messages.dart';
 import 'realtime_proxy.dart';

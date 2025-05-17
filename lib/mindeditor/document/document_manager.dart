@@ -73,6 +73,10 @@ class DocumentManager {
     return _documents[currentDocId];
   }
 
+  String? getCurrentDocId() {
+    return currentDocId;
+  }
+
   List<DocDataModel> getAllDocuments() {
     if(_docTitles.isNotEmpty) {
       return _docTitles;

@@ -17,16 +17,25 @@ abstract class PluginProxy {
   // Plugin request to show a toast
   void showToast(String message);
 
+  // Document content functions
   String getSelectedOrFocusedContent();
-  String? getSettingValue(String key);
   String? getEditingBlockId();
   void sendTextToClipboard(String text);
-  String? appendTextToNextBlock(String blockId, String text);
+  UserNotes? getUserNotes();
+  List<DocumentMeta> getAllDocumentList();
+  String getDocumentContent(String documentId);
+
+  // Document editing functions
   void addExtra(String blockId, String content);
   void clearExtra(String blockId);
-  UserNotes? getUserNotes();
   bool createNote(String title, String content);
+  String? appendTextToNextBlock(String blockId, String text);
+  void appendToDocument(String documentId, String content);
+
+  // Global functions
+  String? getSettingValue(String key);
   Platform getPlatform();
+  bool openDocument(String documentId);
 }
 
 abstract class PluginInstance {

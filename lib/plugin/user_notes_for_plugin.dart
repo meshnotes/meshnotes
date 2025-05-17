@@ -46,3 +46,19 @@ class NoteContent {
     };
   }
 }
+
+class DocumentMeta {
+  String title;
+  String docId;
+  String createdAt;
+
+  DocumentMeta({required this.title, required this.docId, required this.createdAt});
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'document_id': docId,
+      'created_at': createdAt,
+    };
+  }
+}

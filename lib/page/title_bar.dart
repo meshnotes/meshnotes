@@ -1,7 +1,5 @@
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:flutter/material.dart';
-import 'package:my_log/my_log.dart';
-
 import '../mindeditor/controller/controller.dart';
 
 class DocumentTitleBar extends StatefulWidget {

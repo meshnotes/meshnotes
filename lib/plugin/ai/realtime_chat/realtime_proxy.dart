@@ -5,7 +5,7 @@ import 'package:mesh_note/plugin/ai/realtime_chat/native_ws_implement/native_ws_
 import 'package:mesh_note/plugin/ai/realtime_chat/webview_ws_implement/webview_ws_api.dart';
 import 'package:mesh_note/plugin/user_notes_for_plugin.dart';
 import 'package:my_log/my_log.dart';
-import 'function_call.dart';
+import '../tools/function_call.dart';
 import 'chat_messages.dart';
 import 'realtime_api.dart';
 import 'realtime_prompts.dart';
@@ -332,7 +332,7 @@ class RealtimeProxy {
   }
   void _onSessionUpdated() {
     MyLogger.info('RealtimeProxy: Session updated');
-    _sendUserContents();
+    // _sendUserContents();
     _sendHistory();
     client.playAudio(popSoundAudioBase64);
   }

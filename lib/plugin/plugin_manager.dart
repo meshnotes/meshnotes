@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/editor_controller.dart';
 import 'package:mesh_note/mindeditor/controller/environment.dart';
+import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/base/toolbar_button.dart';
 import 'package:mesh_note/plugin/ai/plugin_ai.dart';
@@ -231,11 +233,53 @@ class PluginManager {
     return UserNotes(notes: notes);
   }
 
+  List<DocumentMeta> getAllDocumentList() {
+    final docManager = controller.docManager;
+    final documents = docManager.getAllDocuments();
+    List<DocumentMeta> result = [];
+    for(var document in documents) {
+      if(document.isPrivate == ModelConstants.isPrivateYes) continue;
+      final docId = document.docId;
+      final title = document.title;
+      final createdAt = _formatDate(document.timestamp);
+      final meta = DocumentMeta(title: title, docId: docId, createdAt: createdAt);
+      result.add(meta);
+    }
+    return result;
+  }
+
+  String getDocumentContent(String documentId) {
+    final docManager = controller.docManager;
+    final document = docManager.getDocument(documentId);
+    if(document == null) return '';
+    final paras = document.paragraphs;
+    final content = paras.map((para) => para.getPlainText()).join('\n');
+    return content;
+  }
+
+  void appendToDocument(String documentId, String content) {
+    final docManager = controller.docManager;
+    final document = docManager.getDocument(documentId);
+    if(document == null) return;
+
+    content = content.replaceAll('\r', '');
+    var splitTexts = content.split('\n');
+
+    document.insertTextsAtTheEnd(splitTexts);
+    if(documentId == docManager.getCurrentDocId()) {
+      CallbackRegistry.refreshDoc();
+    }
+  }
+
   bool createNote(String title, String content) {
     final docManager = controller.docManager;
     final result = docManager.createDocument(title, content);
     controller.refreshDocNavigator();
     return result;
+  }
+
+  void openDocument(String documentId) {
+    controller.openDocument(documentId);
   }
 
   Platform getPlatform() {
@@ -338,6 +382,11 @@ class PluginManager {
     );
     return widget;
   }
+
+  String _formatDate(int timestamp) {
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
+  }
 }
 
 class PluginProxyImpl implements PluginProxy {
@@ -416,6 +465,27 @@ class PluginProxyImpl implements PluginProxy {
   @override
   bool createNote(String title, String content) {
     return _manager.createNote(title, content);
+  }
+
+  @override
+  List<DocumentMeta> getAllDocumentList() {
+    return _manager.getAllDocumentList();
+  }
+
+  @override
+  String getDocumentContent(String documentId) {
+    return _manager.getDocumentContent(documentId);
+  }
+
+  @override
+  void appendToDocument(String documentId, String content) {
+    _manager.appendToDocument(documentId, content);
+  }
+
+  @override
+  bool openDocument(String documentId) {
+    _manager.openDocument(documentId);
+    return true;
   }
 
   @override
