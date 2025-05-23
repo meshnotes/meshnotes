@@ -139,10 +139,13 @@ class Controller {
     eventTasksManager.addUserSwitchToNavigatorTask(() {
       CallbackRegistry.hideKeyboard();
     });
-    // Check if the clipboard data is available every 3 seconds
-    eventTasksManager.addTimerTask('checkClipboard', () {
-      EditorController.checkIfReadyToPaste();
-    }, 3000);
+
+    // Check if the clipboard data is available every 3 seconds, only on desktop environment
+    if(environment.isDesktop()) {
+      eventTasksManager.addTimerTask('checkClipboard', () {
+        EditorController.checkIfReadyToPaste();
+      }, 3000);
+    }
   }
 
   /// Network could be starting only when the user information is ready
