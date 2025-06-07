@@ -3,10 +3,11 @@ import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 import '../mindeditor/setting/constants.dart';
+import '../mindeditor/setting/encrypted_user_private_info.dart';
 import '../util/util.dart';
 
 class SignInView extends StatefulWidget {
-  final Function(UserPrivateInfo) update;
+  final Function(EncryptedUserPrivateInfo, String) update;
 
   const SignInView({
     super.key,
@@ -20,12 +21,18 @@ class SignInView extends StatefulWidget {
 class _SignInViewState extends State<SignInView> with SingleTickerProviderStateMixin {
   static const _maxWidth = 400.0;
   static const _iconSize = 100.0;
-  UserPrivateInfo? userPrivateInfo;
+  EncryptedUserPrivateInfo? userPrivateInfo;
+  String? userPassword;
   late TextEditingController userNameController;
+  late TextEditingController passwordController;
+  late TextEditingController passwordConfirmController;
   late TextEditingController privateKeyController;
   late AnimationController _animationController;
   bool hasName = false;
   bool hasKey = false;
+  bool hasPassword = false;
+  bool passwordValid = false;
+  bool passwordConsistent = false;
   bool _canPop = true;
   late _SignInStage _stage;
 
@@ -35,9 +42,20 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     _stage = _SignInStage.mainMenu;
     userPrivateInfo = null;
     _animationController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
-    userNameController = TextEditingController();
-    privateKeyController = TextEditingController();
     hasName = false;
+    hasKey = false;
+    hasPassword = false;
+    passwordValid = false;
+    passwordConsistent = false;
+    _initControllers();
+  }
+
+  void _initControllers() {
+    userNameController = TextEditingController();
+    passwordController = TextEditingController();
+    passwordConfirmController = TextEditingController();
+    privateKeyController = TextEditingController();
+
     userNameController.addListener(() {
       var value = userNameController.value;
       if(value.text.isNotEmpty && !hasName) {
@@ -51,7 +69,34 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         });
       }
     });
-    hasKey = false;
+
+    void passwordListener() {
+      var password = passwordController.value;
+      var passwordConfirm = passwordConfirmController.value;
+      final _hasPassword = password.text.isNotEmpty;
+      if(_hasPassword != hasPassword) {
+        setState(() {
+          hasPassword = _hasPassword;
+        });
+      }
+
+      final _passwordValid = _hasPassword && passwordIsValid(password.text);
+      if(_passwordValid != passwordValid) {
+        setState(() {
+          passwordValid = _passwordValid;
+        });
+      }
+
+      final _passwordConsistent = _passwordValid && passwordIsConsistent(password.text, passwordConfirm.text);
+      if(_passwordConsistent != passwordConsistent) {
+        setState(() {
+          passwordConsistent = _passwordConsistent;
+        });
+      }
+    }
+    passwordController.addListener(passwordListener);
+    passwordConfirmController.addListener(passwordListener);
+
     privateKeyController.addListener(() {
       var value = privateKeyController.value;
       if(value.text.isNotEmpty && !hasKey) {
@@ -65,6 +110,13 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         });
       }
     });
+  }
+
+  bool passwordIsValid(String password) {
+    return password.length >= 8;
+  }
+  bool passwordIsConsistent(String password, String passwordConfirm) {
+    return password == passwordConfirm;
   }
 
   @override
@@ -101,11 +153,17 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         label: 'Create new account',
         onPressed: _gotoCreate,
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 8),
       _buildSecondaryButton(
         icon: Icons.upload_file_outlined,
         label: 'Load existing account',
         onPressed: _gotoLoad,
+      ),
+      const SizedBox(height: 8),
+      _buildSecondaryButton(
+        icon: Icons.rocket_launch_outlined,
+        label: 'Just use it',
+        onPressed: _justTry,
       ),
     ];
     
@@ -115,19 +173,11 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       children: cardContent,
     );
     
-    final exploreButton = _buildTextButton(
-      icon: Icons.rocket_launch_outlined,
-      label: 'Just explore without signing in',
-      onPressed: _justTry,
-    );
-    
     final content = _buildPageContent(
       topIcon: topIcon,
       children: [
         card,
-        // const SizedBox(height: 24),
       ],
-      bottom: exploreButton,
     );
     
     return _buildPageScaffold(
@@ -172,6 +222,41 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         controller: userNameController,
         decoration: const InputDecoration(
           hintText: 'Your name',
+          hintStyle: TextStyle(color: Colors.grey),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: InputBorder.none,
+        ),
+      ),
+    );
+    final passwordField = Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: TextField(
+        controller: passwordController,
+        obscureText: true,
+        decoration: const InputDecoration(
+          hintText: 'Set your password',
+          hintStyle: TextStyle(color: Colors.grey),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: InputBorder.none,
+        ),
+      ),
+    );
+    final passwordConfirmField = Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: TextField(
+        controller: passwordConfirmController,
+        obscureText: true,
+        decoration: const InputDecoration(
+          hintText: 'Set your password again',
+          hintStyle: TextStyle(color: Colors.grey),
           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: InputBorder.none,
         ),
@@ -180,17 +265,23 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     
     final cardContent = [
       inputField,
-      const SizedBox(height: 24),
+      const SizedBox(height: 4),
+      passwordField,
+      const SizedBox(height: 4),
+      passwordConfirmField,
+      const SizedBox(height: 4),
+      passwordErrorMessage()?? const SizedBox(height: 16), // After padding, here will show password error message
+      const SizedBox(height: 4),
       _buildPrimaryButton(
         icon: Icons.note_add_outlined,
         label: 'Create new key',
-        onPressed: hasName ? _onCreateNewKey : null,
+        onPressed: hasName && hasPassword && passwordConsistent ? _onCreateNewKey : null,
       ),
     ];
     
     final card = _buildCard(
       title: 'Create Your Account',
-      description: 'Please enter your name to generate a new key. Make sure to save your key in a secure location.',
+      description: 'Please enter your name and password to generate a new key. Make sure to save your key in a secure location.',
       children: cardContent,
     );
     
@@ -218,6 +309,19 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     );
   }
 
+  Widget? passwordErrorMessage() {
+    if(!hasPassword) {
+      return null;
+    }
+    if(!passwordValid) {
+      return const Text('Password must be at least 8 characters long', style: TextStyle(color: Colors.red));
+    }
+    if(!passwordConsistent) {
+      return const Text('Passwords do not match', style: TextStyle(color: Colors.red));
+    }
+    return null;
+  }
+
   /// Builds the account import page where users can paste their existing key
   /// Allows users to access their account from another device
   Widget _buildLoadKeyPage(BuildContext context) {
@@ -243,14 +347,33 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
         maxLines: 3,
       ),
     );
-    
+    final passwordField = Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: TextField(
+        controller: passwordController,
+        obscureText: true,
+        decoration: const InputDecoration(
+          hintText: 'Set your password',
+          hintStyle: TextStyle(color: Colors.grey),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: InputBorder.none,
+        ),
+      ),
+    );
+
     final cardContent = [
       inputField,
+      const SizedBox(height: 4),
+      passwordField,
       const SizedBox(height: 24),
       _buildPrimaryButton(
         icon: Icons.upload_file_outlined,
         label: 'Load existing key',
-        onPressed: hasKey ? _onLoadKey : null,
+        onPressed: (hasKey && hasPassword) ? _onLoadKey : null,
       ),
     ];
     
@@ -403,7 +526,11 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     String privateKey = signing.getPrivateKey();
     int now = Util.getTimeStamp();
     String userName = userNameController.value.text;
-    _setUserInfo(userPrivateInfo = UserPrivateInfo(publicKey: publicKey, userName: userName, privateKey: privateKey, timestamp: now));
+    String plainPassword = passwordController.value.text;
+    final simpleUserInfo = SimpleUserPrivateInfo(publicKey: publicKey, userName: userName, privateKey: privateKey, timestamp: now);
+    final password = _convertPassword(plainPassword);
+    var userInfo = _generateUserInfo(simpleUserInfo, password);
+    _setUserInfo(userInfo, password);
     // print('key=$privateKey');
   }
 
@@ -411,9 +538,11 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   /// Parses the key and sets up the user information
   void _onLoadKey() {
     final base64Str = privateKeyController.value.text;
+    final plainPassword = passwordController.value.text;
     try {
-      var userInfo = UserPrivateInfo.fromBase64(base64Str);
-      _setUserInfo(userInfo);
+      var userInfo = EncryptedUserPrivateInfo.fromBase64(base64Str);
+      final password = _convertPassword(plainPassword);
+      _setUserInfo(userInfo, password);
     } catch (e) {
       // Show error dialog when key parsing fails
       showDialog(
@@ -436,19 +565,36 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   /// Creates a guest account with predefined credentials
   void _justTry() {
     const guest = Constants.userNameAndKeyOfGuest;
-    userPrivateInfo = UserPrivateInfo(publicKey: guest, userName: guest, privateKey: guest, timestamp: 0);
+    final simpleUserInfo = SimpleUserPrivateInfo(publicKey: guest, userName: guest, privateKey: guest, timestamp: 0);
+    // Guest uses empty password
+    final password = _convertPassword("");
+    var userInfo = _generateUserInfo(simpleUserInfo, password);
+    _setUserInfo(userInfo, password, refresh: false);
     _onComplete();
   }
 
   /// Updates the user information and navigates to the success page
+  /// Save password as sha256 of original password
   /// Starts the animation for the transition
-  void _setUserInfo(UserPrivateInfo userInfo) {
-    setState(() {
-      userPrivateInfo = userInfo;
-      _animationController.reset();
-      _animationController.forward();
-      _stage = _SignInStage.complete;
-    });
+  void _setUserInfo(EncryptedUserPrivateInfo userInfo, String password, {bool refresh = true}) {
+    userPrivateInfo = userInfo;
+    userPassword = password;
+    if(refresh) {
+      setState(() {
+        _animationController.reset();
+        _animationController.forward();
+        _stage = _SignInStage.complete;
+      });
+    }
+  }
+
+  String _convertPassword(String plainPassword) {
+    return (plainPassword == "")? "": HashUtil.hashText(plainPassword);
+  }
+
+  EncryptedUserPrivateInfo _generateUserInfo(SimpleUserPrivateInfo userInfo, String password) {
+    final encryptedUserInfo = EncryptedUserPrivateInfo.fromSimpleUserPrivateInfoAndPassword(userInfo, password);
+    return encryptedUserInfo;
   }
 
   /// Copies the user's private key to the clipboard
@@ -465,8 +611,8 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   /// Completes the sign-in process and starts the main application
   /// Passes the user information to the parent widget
   void _onComplete() {
-    if(userPrivateInfo == null) return;
-    widget.update(userPrivateInfo!);
+    if(userPrivateInfo == null || userPassword == null) return;
+    widget.update(userPrivateInfo!, userPassword!);
   }
 
   /// Builds a scaffold with standardized layout for all pages

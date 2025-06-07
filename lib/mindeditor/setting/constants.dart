@@ -69,23 +69,32 @@ class Constants {
   // static const String settingKeyServerPort = 'server_port';
   // static const String settingCommentServerPort = 'Server Port(e.g. 12345)';
   // static const String settingDefaultServerPort = '0';
+
+  // Settings for server list
   static const String settingKeyServerList = 'server_list';
   static const String settingNameServerList = 'Server list';
   static const String settingCommentServerList = 'Separated by commas(e.g. my.com:12345,192.168.1.100:34567)';
   static const String settingDefaultServerList = '';
+  // Settings for local port
   static const String settingKeyLocalPort = 'local_port';
   static const String settingNameLocalPort = 'Local Port';
   static const String settingCommentLocalPort = 'Local UDP Port(0 for random, $settingDefaultLocalPort is default)';
   static const String settingDefaultLocalPort = '17974';
+  // Settings for user info(base64 of user name and private key)
   static const String settingKeyUserInfo = 'user_info';
   static const String settingNameUserInfo = 'User private key';
   static const String settingCommentUserInfo = 'User name and private key information(formatted in base64)';
+  // Settings for password(sha256 of original password)
+  static const String settingKeyPassword = 'password';
+  static const String settingNamePassword = 'Password';
+  static const String settingCommentPassword = 'Password for the local server';
+  // Settings for plugins
   static const String settingKeyPluginPrefix = 'plugin';
   static const String settingKeyShowDebugMenu = 'show_debug_menu';
   static const String settingNameShowDebugMenu = 'Debug menu';
   static const String settingCommentShowDebugMenu = 'Show debug functions in the menu';
   static const String settingDefaultShowDebugMenu = 'false';
-
+  // Settings for whether allow sending notes to plugins or not
   static const String settingKeyAllowSendingNotesToPlugins = 'allow_sending_notes_to_plugins';
   static const String settingNameAllowSendingNotesToPlugins = 'Allow sending notes to plugins';
   static const String settingCommentAllowSendingNotesToPlugins = 'To make plugins(like AI assistant) have knowledge of your notes(except for the private notes)';

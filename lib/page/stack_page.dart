@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
+import 'package:mesh_note/mindeditor/user/encrypted_user_private_info.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 import 'package:my_log/my_log.dart';
@@ -80,20 +80,35 @@ class _StackPageViewState extends State<StackPageView> {
     return popScope;
   }
 
-  void _updateUserInfo(UserPrivateInfo userInfo) {
-    /// 1. Update user name and key settings
+  void _updateUserInfo(EncryptedUserPrivateInfo userInfo, String password) {
+    /// 1. Update user info and password settings
     /// 2. Try to start network again
-    /// 3. set state to update UI
-    controller.userPrivateInfo = userInfo;
+    /// 3. Set state to update UI
+    var simpleUserInfo = userInfo.getSimpleUserPrivateInfo(password);
+    if(simpleUserInfo == null) {
+      MyLogger.err('StackPageView: updateUserInfo failed');
+      _showMainToast('Error: Failed to update user info');
+      return;
+    }
+    controller.userPrivateInfo = simpleUserInfo;
     final base64Str = userInfo.toBase64();
+    // Save user info and password to setting
     final userNameSetting = SettingData(
       name: Constants.settingKeyUserInfo,
       displayName: Constants.settingNameUserInfo,
       comment: Constants.settingCommentUserInfo,
       value: base64Str,
     );
-    controller.setting.saveSettings([userNameSetting]);
+    final userPasswordSetting = SettingData(
+      name: Constants.settingKeyPassword,
+      displayName: Constants.settingNamePassword,
+      comment: Constants.settingCommentPassword,
+      value: password,
+    );
+    controller.setting.saveSettings([userNameSetting, userPasswordSetting]);
+    // Try to start network
     controller.tryStartingNetwork();
+    // Update UI
     setState(() {
     });
   }

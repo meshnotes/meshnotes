@@ -32,7 +32,7 @@ class NetworkController {
 
   NetworkController(Isolate isolate, ReceivePort port): _isolate = isolate, _receivePort = port;
 
-  void start(Setting settings, String deviceId, UserPrivateInfo userPrivateInfo, String? logPath) {
+  void start(Setting settings, String deviceId, SimpleUserPrivateInfo userPrivateInfo, String? logPath) {
     if(isStarted()) return;
 
     MyLogger.info('Spawning isolate and start listening: deviceId=$deviceId');
@@ -214,7 +214,7 @@ class NetworkController {
     }
   }
 
-  void _gracefulStartVillage(String localPort, String serverList, String deviceId, UserPrivateInfo userPrivateInfo, bool useMulticast, String? logPath) {
+  void _gracefulStartVillage(String localPort, String serverList, String deviceId, SimpleUserPrivateInfo userPrivateInfo, bool useMulticast, String? logPath) {
     _sendPort?.send(Message(
       cmd: Command.startVillage,
       parameter: StartVillageParameter(

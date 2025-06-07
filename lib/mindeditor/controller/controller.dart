@@ -23,6 +23,7 @@ import '../../plugin/plugin_manager.dart';
 import '../../util/idgen.dart';
 import '../document/paragraph_desc.dart';
 import '../setting/constants.dart';
+import '../user/encrypted_user_private_info.dart';
 import '../setting/setting.dart';
 import 'device.dart';
 import 'editor_controller.dart';
@@ -50,7 +51,7 @@ class Controller {
   String deviceId = 'Unknown';
   late final SelectionController selectionController;
   String simpleDeviceId = '';
-  UserPrivateInfo? userPrivateInfo;
+  SimpleUserPrivateInfo? userPrivateInfo;
   late final PluginManager _pluginManager;
   final EvenTasksManager eventTasksManager = EvenTasksManager();
   final UIEventManager uiEventManager = UIEventManager();
@@ -206,12 +207,14 @@ class Controller {
     }
     return null;
   }
-  UserPrivateInfo? _loadUserInfo(Setting _setting) {
+  SimpleUserPrivateInfo? _loadUserInfo(Setting _setting) {
     final userInfo = _setting.getSetting(Constants.settingKeyUserInfo);
+    final password = _setting.getSetting(Constants.settingKeyPassword)?? '';
     if(userInfo == null) return null;
 
     try {
-      return UserPrivateInfo.fromBase64(userInfo);
+      var user = EncryptedUserPrivateInfo.fromBase64(userInfo);
+      return user.getSimpleUserPrivateInfo(password);
     } catch(e) {
       MyLogger.warn('Error loading user info from setting: $e');
       return null;

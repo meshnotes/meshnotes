@@ -91,6 +91,11 @@ class Setting {
       displayName: Constants.settingNameUserInfo,
       comment: Constants.settingCommentUserInfo,
     ),
+    SettingData(
+      name: Constants.settingKeyPassword,
+      displayName: Constants.settingNamePassword,
+      comment: Constants.settingCommentPassword,
+    ),
     SettingData( //TODO should use more precise privilege control mechanism, instead of this global setting
       name: Constants.settingKeyAllowSendingNotesToPlugins,
       displayName: Constants.settingNameAllowSendingNotesToPlugins,

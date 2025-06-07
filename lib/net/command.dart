@@ -35,7 +35,7 @@ class StartVillageParameter {
   String localPort;
   String serverList;
   String deviceId;
-  UserPrivateInfo userInfo;
+  SimpleUserPrivateInfo userInfo;
   bool useMulticast;
   String? logPath;
 

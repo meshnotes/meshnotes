@@ -230,57 +230,16 @@ class UserPublicInfo {
   }
 }
 
-class UserPrivateInfo {
+class SimpleUserPrivateInfo {
   String publicKey;
   String userName;
   String privateKey;
   int timestamp;
-  String signature;
-  bool isEncrypted;
 
-  UserPrivateInfo({
+  SimpleUserPrivateInfo({
     required this.publicKey,
     required this.userName,
     required this.privateKey,
     required this.timestamp,
-    this.signature = '',
-    this.isEncrypted = false,
   });
-
-  String getFeature() {
-    return 'public_key: $publicKey\n'
-        'name: $userName\n'
-        'private_key: $privateKey\n'
-        'timestamp: $timestamp\n';
-  }
-
-  UserPrivateInfo.fromJson(Map<String, dynamic> map):
-        publicKey = map['public_key'],
-        userName = map['name'],
-        privateKey = map['private_key'],
-        timestamp = map['timestamp'],
-        signature = map['sign'],
-        isEncrypted = map['encrypted'];
-
-  Map<String, dynamic> toJson() {
-    return {
-      'public_key': publicKey,
-      'name': userName,
-      'private_key': privateKey,
-      'timestamp': timestamp,
-      'sign': signature,
-      'encrypted': isEncrypted,
-    };
-  }
-
-  factory UserPrivateInfo.fromBase64(String str) {
-    final bytes = base64Decode(str.trim());
-    final json = utf8.decode(bytes);
-    return UserPrivateInfo.fromJson(jsonDecode(json));
-  }
-  String toBase64() {
-    final json = jsonEncode(this);
-    final base64 = base64Encode(utf8.encode(json));
-    return base64;
-  }
 }
