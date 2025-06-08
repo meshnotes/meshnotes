@@ -6,7 +6,8 @@ import 'package:mesh_note/mindeditor/user/encrypted_user_private_info.dart';
 import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 import 'package:my_log/my_log.dart';
-import 'sign_in_view.dart';
+import 'users_page/password_page.dart';
+import 'users_page/sign_in_page.dart';
 import '../mindeditor/controller/controller.dart';
 import '../mindeditor/setting/constants.dart';
 import 'doc_navigator.dart';
@@ -54,10 +55,24 @@ class _StackPageViewState extends State<StackPageView> {
 
   Widget _buildMainView(BuildContext context) {
     final smallView = controller.environment.isSmallView(context);
-    var userInfo = controller.userPrivateInfo;
+    var userInfo = controller.getUserPrivateInfo();
+    // If user info is not set, two possible reasons:
+    // 1. There is no user private key - in this case, the encrypted user private info is also null
+    // 2. Password error - in this case, the encrypted user private info is not null
+    // In the first case, we need to show the sign in view
+    // In the second case, we need to let user enter the correct password
     if(userInfo == null) {
       controller.setLoggingInState();
-      return _buildSignInView(context);
+      var encryptedUserInfo = controller.getEncryptedUserPrivateInfo();
+      if(encryptedUserInfo != null) {
+        // Password error
+        MyLogger.info('StackPageView: build main view, password error');
+        return _buildPasswordInputView(context, encryptedUserInfo);
+      } else {
+        // No user private key yet
+        MyLogger.info('StackPageView: build main view, no user private key');
+        return _buildSignInView(context);
+      }
     }
     controller.setRunningState();
     Widget view;
@@ -84,13 +99,7 @@ class _StackPageViewState extends State<StackPageView> {
     /// 1. Update user info and password settings
     /// 2. Try to start network again
     /// 3. Set state to update UI
-    var simpleUserInfo = userInfo.getSimpleUserPrivateInfo(password);
-    if(simpleUserInfo == null) {
-      MyLogger.err('StackPageView: updateUserInfo failed');
-      _showMainToast('Error: Failed to update user info');
-      return;
-    }
-    controller.userPrivateInfo = simpleUserInfo;
+    controller.setUserPrivateInfo(userInfo, password);
     final base64Str = userInfo.toBase64();
     // Save user info and password to setting
     final userNameSetting = SettingData(
@@ -114,7 +123,13 @@ class _StackPageViewState extends State<StackPageView> {
   }
   Widget _buildSignInView(BuildContext context) {
     return SignInView(
-      update: _updateUserInfo,
+      updateCallback: _updateUserInfo,
+    );
+  }
+  Widget _buildPasswordInputView(BuildContext context, EncryptedUserPrivateInfo encryptedUserInfo) {
+    return PasswordInputView(
+      encryptedUserInfo: encryptedUserInfo,
+      updateCallback: _updateUserInfo,
     );
   }
 

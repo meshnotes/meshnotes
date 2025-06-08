@@ -137,7 +137,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         MainMenu(controller: controller, menuType: MenuType.navigator),
       ];
     }
-    final userName = controller.userPrivateInfo?.userName ?? 'Unknown User';
+    final userName = controller.getUserPrivateInfo()?.userName ?? 'Unknown User';
     return AppBar(
       title: Center(
         child: Row(
@@ -409,7 +409,7 @@ class NetworkStatusIcon extends StatelessWidget {
   }
 
   void _showNetworkDetails(BuildContext context) {
-    final myPublicKey = Controller().userPrivateInfo?.publicKey?? '';
+    final myPublicKey = Controller().getUserPrivateInfo()?.publicKey?? '';
     showDialog(
       context: context,
       builder: (context) {

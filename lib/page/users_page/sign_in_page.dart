@@ -2,23 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/page/widget_templates.dart';
-import '../mindeditor/setting/constants.dart';
-import '../mindeditor/setting/encrypted_user_private_info.dart';
-import '../util/util.dart';
+import '../../mindeditor/setting/constants.dart';
+import '../../mindeditor/user/encrypted_user_private_info.dart';
+import '../../util/util.dart';
+import 'user_page_template.dart';
 
 class SignInView extends StatefulWidget {
-  final Function(EncryptedUserPrivateInfo, String) update;
+  final Function(EncryptedUserPrivateInfo, String) updateCallback;
 
   const SignInView({
     super.key,
-    required this.update,
+    required this.updateCallback,
   });
 
   @override
   State<StatefulWidget> createState() => _SignInViewState();
 }
 
-class _SignInViewState extends State<SignInView> with SingleTickerProviderStateMixin {
+class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   static const _maxWidth = 400.0;
   static const _iconSize = 100.0;
   EncryptedUserPrivateInfo? userPrivateInfo;
@@ -28,6 +29,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   late TextEditingController passwordConfirmController;
   late TextEditingController privateKeyController;
   late AnimationController _animationController;
+  late AnimationController _completeAnimationController;
   bool hasName = false;
   bool hasKey = false;
   bool hasPassword = false;
@@ -42,12 +44,20 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     _stage = _SignInStage.mainMenu;
     userPrivateInfo = null;
     _animationController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
+    _completeAnimationController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
     hasName = false;
     hasKey = false;
     hasPassword = false;
     passwordValid = false;
     passwordConsistent = false;
     _initControllers();
+  }
+  
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _completeAnimationController.dispose();
+    super.dispose();
   }
 
   void _initControllers() {
@@ -148,7 +158,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     );
     
     final cardContent = [
-      _buildPrimaryButton(
+      buildPrimaryButton(
         icon: Icons.note_add_outlined,
         label: 'Create new account',
         onPressed: _gotoCreate,
@@ -167,7 +177,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       ),
     ];
     
-    final card = _buildCard(
+    final card = buildCard(
       title: 'Welcome to MeshNotes',
       description: 'Create a new account if you are a first-time user. To access your data from other devices, import your existing account.',
       children: cardContent,
@@ -184,6 +194,49 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       context: context,
       title: 'Welcome',
       content: content,
+    );
+  }
+
+  /// Builds a scaffold with standardized layout for all pages
+  /// Handles animations and back navigation consistently
+  /// 
+  /// Parameters:
+  /// - context: The build context
+  /// - title: The page title shown in the app bar
+  /// - content: The main content widget
+  /// - withAnimation: Whether to apply scale animation
+  /// - withPopScope: Whether to handle back navigation
+  Widget _buildPageScaffold({
+    required BuildContext context,
+    required String title,
+    required Widget content,
+    bool withPopScope = false,
+    AnimationController? animationController,
+  }) {
+    Widget body = content;
+    
+    /// Apply animation if requested
+    if (animationController != null) {
+      body = AnimatedBuilder(
+        animation: animationController,
+        builder: (BuildContext context, Widget? child) {
+          return ScaleTransition(
+            scale: animationController,
+            child: child,
+          );
+        },
+        child: body,
+      );
+    }
+    
+    /// Add back navigation handling if requested
+    if (withPopScope) {
+      body = _buildPopScope(context, body);
+    }
+    
+    return Scaffold(
+      appBar: WidgetTemplate.buildSimpleAppBar(title),
+      body: body,
     );
   }
 
@@ -272,14 +325,14 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       const SizedBox(height: 4),
       passwordErrorMessage()?? const SizedBox(height: 16), // After padding, here will show password error message
       const SizedBox(height: 4),
-      _buildPrimaryButton(
+      buildPrimaryButton(
         icon: Icons.note_add_outlined,
         label: 'Create new key',
         onPressed: hasName && hasPassword && passwordConsistent ? _onCreateNewKey : null,
       ),
     ];
     
-    final card = _buildCard(
+    final card = buildCard(
       title: 'Create Your Account',
       description: 'Please enter your name and password to generate a new key. Make sure to save your key in a secure location.',
       children: cardContent,
@@ -304,7 +357,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       context: context,
       title: 'Create new account',
       content: content,
-      withAnimation: true,
+      animationController: _animationController,
       withPopScope: true,
     );
   }
@@ -370,14 +423,14 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       const SizedBox(height: 4),
       passwordField,
       const SizedBox(height: 24),
-      _buildPrimaryButton(
+      buildPrimaryButton(
         icon: Icons.upload_file_outlined,
         label: 'Load existing key',
         onPressed: (hasKey && hasPassword) ? _onLoadKey : null,
       ),
     ];
     
-    final card = _buildCard(
+    final card = buildCard(
       title: 'Import Your Account',
       description: 'Paste your existing key below to access your account and data from another device.',
       children: cardContent,
@@ -402,7 +455,7 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       context: context,
       title: 'Load account',
       content: content,
-      withAnimation: true,
+      animationController: _animationController,
       withPopScope: true,
     );
   }
@@ -461,14 +514,14 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     final cardContent = [
       keyInfoContainer,
       const SizedBox(height: 24),
-      _buildPrimaryButton(
+      buildPrimaryButton(
         icon: Icons.done,
         label: 'Let\'s start',
         onPressed: _onComplete,
       ),
     ];
     
-    final card = _buildCard(
+    final card = buildCard(
       title: 'Ready to go!',
       description: 'Your account has been set up. Please copy and save your key in a secure location.',
       children: cardContent,
@@ -481,11 +534,30 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
       ],
     );
     
+    Widget body = content;
+    if (_completeAnimationController.isAnimating) {
+      body = AnimatedBuilder(
+        animation: _completeAnimationController,
+        builder: (BuildContext context, Widget? child) {
+          return FadeTransition(
+            opacity: Tween<double>(begin: 1.0, end: 0.0).animate(
+              CurvedAnimation(
+                parent: _completeAnimationController,
+                curve: Curves.easeInOut,
+              ),
+            ),
+            child: child,
+          );
+        },
+        child: body,
+      );
+    }
+    
     return _buildPageScaffold(
       context: context,
       title: 'Account Created',
-      content: content,
-      withAnimation: true,
+      content: body,
+      animationController: _animationController,
       withPopScope: true,
     );
   }
@@ -528,8 +600,8 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     String userName = userNameController.value.text;
     String plainPassword = passwordController.value.text;
     final simpleUserInfo = SimpleUserPrivateInfo(publicKey: publicKey, userName: userName, privateKey: privateKey, timestamp: now);
-    final password = _convertPassword(plainPassword);
-    var userInfo = _generateUserInfo(simpleUserInfo, password);
+    final password = convertPassword(plainPassword);
+    var userInfo = generateUserInfo(simpleUserInfo, password);
     _setUserInfo(userInfo, password);
     // print('key=$privateKey');
   }
@@ -540,9 +612,13 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     final base64Str = privateKeyController.value.text;
     final plainPassword = passwordController.value.text;
     try {
-      var userInfo = EncryptedUserPrivateInfo.fromBase64(base64Str);
-      final password = _convertPassword(plainPassword);
-      _setUserInfo(userInfo, password);
+      var encryptedUserInfo = EncryptedUserPrivateInfo.fromBase64(base64Str);
+      final password = convertPassword(plainPassword);
+      final simpleUserInfo = encryptedUserInfo.getSimpleUserPrivateInfo(password);
+      if(simpleUserInfo == null) {
+        throw Exception('Invalid password');
+      }
+      _setUserInfo(encryptedUserInfo, password);
     } catch (e) {
       // Show error dialog when key parsing fails
       showDialog(
@@ -567,8 +643,8 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     const guest = Constants.userNameAndKeyOfGuest;
     final simpleUserInfo = SimpleUserPrivateInfo(publicKey: guest, userName: guest, privateKey: guest, timestamp: 0);
     // Guest uses empty password
-    final password = _convertPassword("");
-    var userInfo = _generateUserInfo(simpleUserInfo, password);
+    final password = convertPassword("");
+    var userInfo = generateUserInfo(simpleUserInfo, password);
     _setUserInfo(userInfo, password, refresh: false);
     _onComplete();
   }
@@ -588,15 +664,6 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
     }
   }
 
-  String _convertPassword(String plainPassword) {
-    return (plainPassword == "")? "": HashUtil.hashText(plainPassword);
-  }
-
-  EncryptedUserPrivateInfo _generateUserInfo(SimpleUserPrivateInfo userInfo, String password) {
-    final encryptedUserInfo = EncryptedUserPrivateInfo.fromSimpleUserPrivateInfoAndPassword(userInfo, password);
-    return encryptedUserInfo;
-  }
-
   /// Copies the user's private key to the clipboard
   /// Allows users to save their key for future use
   void _onCopyKey() {
@@ -612,50 +679,15 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
   /// Passes the user information to the parent widget
   void _onComplete() {
     if(userPrivateInfo == null || userPassword == null) return;
-    widget.update(userPrivateInfo!, userPassword!);
-  }
-
-  /// Builds a scaffold with standardized layout for all pages
-  /// Handles animations and back navigation consistently
-  /// 
-  /// Parameters:
-  /// - context: The build context
-  /// - title: The page title shown in the app bar
-  /// - content: The main content widget
-  /// - withAnimation: Whether to apply scale animation
-  /// - withPopScope: Whether to handle back navigation
-  Widget _buildPageScaffold({
-    required BuildContext context,
-    required String title,
-    required Widget content,
-    bool withAnimation = false,
-    bool withPopScope = false,
-  }) {
-    Widget body = content;
-    
-    /// Apply animation if requested
-    if (withAnimation) {
-      body = AnimatedBuilder(
-        animation: _animationController,
-        builder: (BuildContext context, Widget? child) {
-          return ScaleTransition(
-            scale: _animationController,
-            child: child,
-          );
-        },
-        child: body,
-      );
-    }
-    
-    /// Add back navigation handling if requested
-    if (withPopScope) {
-      body = _buildPopScope(context, body);
-    }
-    
-    return Scaffold(
-      appBar: WidgetTemplate.buildSimpleAppBar(title),
-      body: body,
-    );
+    setState(() {
+      _completeAnimationController.reset();
+      _completeAnimationController.forward();
+    });
+    _completeAnimationController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.updateCallback(userPrivateInfo!, userPassword!);
+      }
+    });
   }
 
   /// Creates a standardized page content container
@@ -696,90 +728,6 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  /// Creates a standardized card container for content
-  /// Provides consistent styling for all information cards
-  /// 
-  /// Parameters:
-  /// - title: The card's main title
-  /// - description: The card's descriptive text
-  /// - children: Widgets to display in the card (buttons, fields, etc.)
-  Widget _buildCard({
-    required String title,
-    required String description,
-    required List<Widget> children,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.black54,
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  /// Creates a primary action button with consistent styling
-  /// Used for the main actions on each page
-  /// 
-  /// Parameters:
-  /// - icon: The icon to display in the button
-  /// - label: The button text
-  /// - onPressed: The callback when button is pressed
-  Widget _buildPrimaryButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.black87,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: Colors.grey.withOpacity(0.3),
-        disabledForegroundColor: Colors.white70,
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        minimumSize: const Size(double.infinity, 54),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-        ],
       ),
     );
   }

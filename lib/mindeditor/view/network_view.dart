@@ -14,14 +14,14 @@ class NetworkDetailView extends StatelessWidget {
     required this.myPublicKey,
   });
 
-  static void route(BuildContext context) {
-    Navigator.push(context, CupertinoPageRoute(
-      builder: (context) {
-        return NetworkDetailView(nodes: Controller().network.getNetworkDetails(), myPublicKey: Controller().userPrivateInfo?.publicKey?? '');
-      },
-      fullscreenDialog: false,
-    ));
-  }
+  // static void route(BuildContext context) {
+  //   Navigator.push(context, CupertinoPageRoute(
+  //     builder: (context) {
+  //       return NetworkDetailView(nodes: Controller().network.getNetworkDetails(), myPublicKey: Controller().getUserPrivateInfo()?.publicKey?? '');
+  //     },
+  //     fullscreenDialog: false,
+  //   ));
+  // }
 
   @override
   Widget build(BuildContext context) {

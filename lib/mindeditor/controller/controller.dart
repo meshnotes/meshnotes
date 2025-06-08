@@ -51,7 +51,8 @@ class Controller {
   String deviceId = 'Unknown';
   late final SelectionController selectionController;
   String simpleDeviceId = '';
-  SimpleUserPrivateInfo? userPrivateInfo;
+  EncryptedUserPrivateInfo? _userPrivateInfo;
+  String _password = '';
   late final PluginManager _pluginManager;
   final EvenTasksManager eventTasksManager = EvenTasksManager();
   final UIEventManager uiEventManager = UIEventManager();
@@ -98,8 +99,8 @@ class Controller {
     _mergeTaskRunner = MergeTask(db: dbHelper);
 
     // Load user information from setting
-    userPrivateInfo = _loadUserInfo(setting);
-    MyLogger.info('initAll: load user(${userPrivateInfo?.userName}) from setting');
+    _userPrivateInfo = _loadUserInfo(setting);
+    MyLogger.info('initAll: load user(${_userPrivateInfo?.userName}) from setting');
 
     // Will failed in flutter test mode, so disabled it
     await _genDeviceId();
@@ -152,13 +153,13 @@ class Controller {
   /// Network could be starting only when the user information is ready
   /// And user private key should not be 'guest'
   bool tryStartingNetwork() {
-    if(userPrivateInfo == null) return false;
-    if(userPrivateInfo!.privateKey == Constants.userNameAndKeyOfGuest) return false;
+    final simpleUserInfo = getUserPrivateInfo();
+    if(simpleUserInfo == null) return false;
 
     network.start(
       setting,
       deviceId,
-      userPrivateInfo!,
+      simpleUserInfo,
       _logPath,
     );
     MyLogger.info('Network layer started');
@@ -171,7 +172,7 @@ class Controller {
     if(platformDeviceId != null) {
       deviceId = platformDeviceId;
     } else {
-      final userKey = userPrivateInfo?.privateKey;
+      final userKey = _userPrivateInfo?.privateKey;
       deviceId = HashUtil.hashText(userKey?? IdGen.getUid()) + ':Unknown';
     }
 
@@ -207,18 +208,30 @@ class Controller {
     }
     return null;
   }
-  SimpleUserPrivateInfo? _loadUserInfo(Setting _setting) {
+  EncryptedUserPrivateInfo? _loadUserInfo(Setting _setting) {
     final userInfo = _setting.getSetting(Constants.settingKeyUserInfo);
-    final password = _setting.getSetting(Constants.settingKeyPassword)?? '';
+    _password = _setting.getSetting(Constants.settingKeyPassword)?? '';
     if(userInfo == null) return null;
 
     try {
       var user = EncryptedUserPrivateInfo.fromBase64(userInfo);
-      return user.getSimpleUserPrivateInfo(password);
+      return user;
     } catch(e) {
       MyLogger.warn('Error loading user info from setting: $e');
       return null;
     }
+  }
+
+  void setUserPrivateInfo(EncryptedUserPrivateInfo userInfo, String password) {
+    _userPrivateInfo = userInfo;
+    _password = password;
+  }
+  SimpleUserPrivateInfo? getUserPrivateInfo() {
+    if(_userPrivateInfo == null) return null;
+    return _userPrivateInfo!.getSimpleUserPrivateInfo(_password);
+  }
+  EncryptedUserPrivateInfo? getEncryptedUserPrivateInfo() {
+    return _userPrivateInfo;
   }
 
   MouseCursor getHandCursor() {

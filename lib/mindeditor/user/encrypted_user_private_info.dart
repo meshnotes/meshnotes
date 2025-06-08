@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
+import 'package:my_log/my_log.dart';
 
 class EncryptedUserPrivateInfo {
   String publicKey;
@@ -66,6 +67,7 @@ class EncryptedUserPrivateInfo {
       return EncryptedUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: privateKey, timestamp: timestamp, isEncrypted: false);
     }
     
+    MyLogger.debug('Encrypting private key with password: $password');
     final encrypt = AesWrapper(password: password, randomNumber: timestamp);
     final encryptedPrivateKey = encrypt.encrypt(privateKey);
     return EncryptedUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: encryptedPrivateKey, timestamp: timestamp, isEncrypted: true);
@@ -79,8 +81,14 @@ class EncryptedUserPrivateInfo {
       return SimpleUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: privateKey, timestamp: timestamp);
     }
 
-    final encrypt = AesWrapper(password: password, randomNumber: timestamp);
-    final decryptedPrivateKey = encrypt.decrypt(privateKey);
-    return SimpleUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: decryptedPrivateKey, timestamp: timestamp);
+    MyLogger.debug('Decrypting private key with password: $password');
+    try {
+      final encrypt = AesWrapper(password: password, randomNumber: timestamp);
+      final decryptedPrivateKey = encrypt.decrypt(privateKey);
+      return SimpleUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: decryptedPrivateKey, timestamp: timestamp);
+    } catch(e) {
+      MyLogger.warn('Error decrypting private key: $e');
+      return null;
+    }
   }
 }
