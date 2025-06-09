@@ -36,6 +36,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   bool passwordValid = false;
   bool passwordConsistent = false;
   bool _canPop = true;
+  bool usePassword = true;
   late _SignInStage _stage;
 
   @override
@@ -58,75 +59,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     _animationController.dispose();
     _completeAnimationController.dispose();
     super.dispose();
-  }
-
-  void _initControllers() {
-    userNameController = TextEditingController();
-    passwordController = TextEditingController();
-    passwordConfirmController = TextEditingController();
-    privateKeyController = TextEditingController();
-
-    userNameController.addListener(() {
-      var value = userNameController.value;
-      if(value.text.isNotEmpty && !hasName) {
-        setState(() {
-          hasName = true;
-        });
-      }
-      if(value.text.isEmpty && hasName) {
-        setState(() {
-          hasName = false;
-        });
-      }
-    });
-
-    void passwordListener() {
-      var password = passwordController.value;
-      var passwordConfirm = passwordConfirmController.value;
-      final _hasPassword = password.text.isNotEmpty;
-      if(_hasPassword != hasPassword) {
-        setState(() {
-          hasPassword = _hasPassword;
-        });
-      }
-
-      final _passwordValid = _hasPassword && passwordIsValid(password.text);
-      if(_passwordValid != passwordValid) {
-        setState(() {
-          passwordValid = _passwordValid;
-        });
-      }
-
-      final _passwordConsistent = _passwordValid && passwordIsConsistent(password.text, passwordConfirm.text);
-      if(_passwordConsistent != passwordConsistent) {
-        setState(() {
-          passwordConsistent = _passwordConsistent;
-        });
-      }
-    }
-    passwordController.addListener(passwordListener);
-    passwordConfirmController.addListener(passwordListener);
-
-    privateKeyController.addListener(() {
-      var value = privateKeyController.value;
-      if(value.text.isNotEmpty && !hasKey) {
-        setState(() {
-          hasKey = true;
-        });
-      }
-      if(value.text.isEmpty && hasKey) {
-        setState(() {
-          hasKey = false;
-        });
-      }
-    });
-  }
-
-  bool passwordIsValid(String password) {
-    return password.length >= 8;
-  }
-  bool passwordIsConsistent(String password, String passwordConfirm) {
-    return password == passwordConfirm;
   }
 
   @override
@@ -265,7 +197,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       color: Colors.black54,
     );
     
-    final inputField = Container(
+    final nameField = Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -290,10 +222,11 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       child: TextField(
         controller: passwordController,
         obscureText: true,
-        decoration: const InputDecoration(
+        enabled: usePassword,
+        decoration: InputDecoration(
           hintText: 'Set your password',
-          hintStyle: TextStyle(color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          hintStyle: TextStyle(color: usePassword ? Colors.grey : Colors.grey.withOpacity(0.5)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: InputBorder.none,
         ),
       ),
@@ -307,28 +240,33 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       child: TextField(
         controller: passwordConfirmController,
         obscureText: true,
-        decoration: const InputDecoration(
+        enabled: usePassword,
+        decoration: InputDecoration(
           hintText: 'Set your password again',
-          hintStyle: TextStyle(color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          hintStyle: TextStyle(color: usePassword ? Colors.grey : Colors.grey.withOpacity(0.5)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: InputBorder.none,
         ),
       ),
     );
+
+    final usePasswordCheckbox = _buildNeedPasswordCheckBox();
     
     final cardContent = [
-      inputField,
+      nameField,
       const SizedBox(height: 4),
       passwordField,
       const SizedBox(height: 4),
       passwordConfirmField,
       const SizedBox(height: 4),
-      passwordErrorMessage()?? const SizedBox(height: 16), // After padding, here will show password error message
+      usePasswordCheckbox,
+      const SizedBox(height: 4),
+      _passwordErrorMessage()?? const SizedBox(height: 16), // After padding, here will show password error message
       const SizedBox(height: 4),
       buildPrimaryButton(
         icon: Icons.note_add_outlined,
         label: 'Create new key',
-        onPressed: hasName && hasPassword && passwordConsistent ? _onCreateNewKey : null,
+        onPressed: (hasName && (!usePassword || (hasPassword && passwordConsistent))) ? _onCreateNewKey : null,
       ),
     ];
     
@@ -362,7 +300,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     );
   }
 
-  Widget? passwordErrorMessage() {
+  Widget? _passwordErrorMessage() {
     if(!hasPassword) {
       return null;
     }
@@ -384,7 +322,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       color: Colors.black54,
     );
     
-    final inputField = Container(
+    final nameField = Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -394,6 +332,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
         controller: privateKeyController,
         decoration: const InputDecoration(
           hintText: 'Your existing key',
+          hintStyle: TextStyle(color: Colors.grey),
           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: InputBorder.none,
         ),
@@ -409,24 +348,29 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       child: TextField(
         controller: passwordController,
         obscureText: true,
-        decoration: const InputDecoration(
+        enabled: usePassword,
+        decoration: InputDecoration(
           hintText: 'Set your password',
-          hintStyle: TextStyle(color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          hintStyle: TextStyle(color: usePassword ? Colors.grey : Colors.grey.withOpacity(0.5)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: InputBorder.none,
         ),
       ),
     );
 
+    final usePasswordCheckbox = _buildNeedPasswordCheckBox();
+    
     final cardContent = [
-      inputField,
+      nameField,
       const SizedBox(height: 4),
       passwordField,
-      const SizedBox(height: 24),
+      const SizedBox(height: 4),
+      usePasswordCheckbox,
+      const SizedBox(height: 16),
       buildPrimaryButton(
         icon: Icons.upload_file_outlined,
         label: 'Load existing key',
-        onPressed: (hasKey && hasPassword) ? _onLoadKey : null,
+        onPressed: (hasKey && (!usePassword || hasPassword)) ? _onLoadKey : null,
       ),
     ];
     
@@ -598,7 +542,10 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     String privateKey = signing.getPrivateKey();
     int now = Util.getTimeStamp();
     String userName = userNameController.value.text;
-    String plainPassword = passwordController.value.text;
+    String plainPassword = "";
+    if(usePassword) {
+      plainPassword = passwordController.value.text;
+    }
     final simpleUserInfo = SimpleUserPrivateInfo(publicKey: publicKey, userName: userName, privateKey: privateKey, timestamp: now);
     final password = convertPassword(plainPassword);
     var userInfo = generateUserInfo(simpleUserInfo, password);
@@ -610,7 +557,10 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   /// Parses the key and sets up the user information
   void _onLoadKey() {
     final base64Str = privateKeyController.value.text;
-    final plainPassword = passwordController.value.text;
+    String plainPassword = "";
+    if(usePassword) {
+      plainPassword = passwordController.value.text;
+    }
     try {
       var encryptedUserInfo = EncryptedUserPrivateInfo.fromBase64(base64Str);
       final password = convertPassword(plainPassword);
@@ -802,6 +752,103 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
         ],
       ),
     );
+  }
+  
+  Widget _buildNeedPasswordCheckBox() {
+    return Row(
+      children: [
+        Checkbox(
+          value: usePassword,
+          onChanged: (bool? value) {
+            setState(() {
+              usePassword = value ?? true;
+              if (!usePassword) {
+                passwordController.clear();
+                passwordConfirmController.clear();
+                hasPassword = true;
+                passwordValid = true;
+                passwordConsistent = true;
+              } else {
+                hasPassword = false;
+                passwordValid = false;
+                passwordConsistent = false;
+              }
+            });
+          },
+        ),
+        const Text('Need Password'),
+      ],
+    );
+  }
+
+  void _initControllers() {
+    userNameController = TextEditingController();
+    passwordController = TextEditingController();
+    passwordConfirmController = TextEditingController();
+    privateKeyController = TextEditingController();
+
+    userNameController.addListener(() {
+      var value = userNameController.value;
+      if(value.text.isNotEmpty && !hasName) {
+        setState(() {
+          hasName = true;
+        });
+      }
+      if(value.text.isEmpty && hasName) {
+        setState(() {
+          hasName = false;
+        });
+      }
+    });
+
+    passwordController.addListener(_passwordListener);
+    passwordConfirmController.addListener(_passwordListener);
+
+    privateKeyController.addListener(() {
+      var value = privateKeyController.value;
+      if(value.text.isNotEmpty && !hasKey) {
+        setState(() {
+          hasKey = true;
+        });
+      }
+      if(value.text.isEmpty && hasKey) {
+        setState(() {
+          hasKey = false;
+        });
+      }
+    });
+  }
+
+  void _passwordListener() {
+    var password = passwordController.value;
+    var passwordConfirm = passwordConfirmController.value;
+    final _hasPassword = password.text.isNotEmpty;
+    if(_hasPassword != hasPassword) {
+      setState(() {
+        hasPassword = _hasPassword;
+      });
+    }
+
+    final _passwordValid = _hasPassword && _passwordIsValid(password.text);
+    if(_passwordValid != passwordValid) {
+      setState(() {
+        passwordValid = _passwordValid;
+      });
+    }
+
+    final _passwordConsistent = _passwordValid && _passwordIsConsistent(password.text, passwordConfirm.text);
+    if(_passwordConsistent != passwordConsistent) {
+      setState(() {
+        passwordConsistent = _passwordConsistent;
+      });
+    }
+  }
+
+  bool _passwordIsValid(String password) {
+    return password.length >= 8;
+  }
+  bool _passwordIsConsistent(String password, String passwordConfirm) {
+    return password == passwordConfirm;
   }
 }
 
