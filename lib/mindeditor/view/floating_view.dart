@@ -11,7 +11,7 @@ class FloatingViewManager {
   final _pluginTipsKey = GlobalKey<FloatingStackViewState>();
   final _popupMenuKey = GlobalKey<FloatingStackRepositionViewState>();
   final _pluginDialogKey = GlobalKey<FloatingStackViewState>();
-  Size _popupMenuSize = Size(0, 0);
+  Size _popupMenuSize = const Size(0, 0);
 
   FloatingViewManager() {
     _selectionLayer = _buildSelectionLayer();

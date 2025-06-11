@@ -1,3 +1,5 @@
+import 'package:libp2p/application/application_api.dart';
+import 'package:mesh_note/mindeditor/view/floating_stack_layer.dart';
 import 'package:mesh_note/mindeditor/view/network_view.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 import 'package:my_log/my_log.dart';
@@ -13,6 +15,7 @@ import 'inspired_page.dart';
 import 'resizable_view.dart';
 import '../mindeditor/document/dal/doc_data_model.dart';
 import '../mindeditor/setting/constants.dart';
+import 'users_page/user_info_setting_page.dart';
 
 class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
   final Function()? jumpAction;
@@ -40,6 +43,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   int _peerCount = 0;
   final controller = Controller();
   bool _isSyncing = false;
+  final userInfoSettingLayerKey = GlobalKey<FloatingStackViewState>();
+  bool _isUserInfoPopupVisible = false;
 
   @override
   void initState() {
@@ -64,6 +69,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
 
   @override
   Widget build(BuildContext context) {
+    final userInfo = controller.getUserPrivateInfo()!;
     if(widget.smallView) {
       widget.routeIfResize(context);
     }
@@ -112,32 +118,40 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       );
     }
     var systemButtons = _buildSystemButtons(context);
+    final column = Column(
+      children: [
+        titleListView,
+        Container(
+          color: Colors.white, // To eliminate the transparent background of the padding of button
+          child: createButton,
+        ),
+        systemButtons,
+      ],
+    );
+    final userInfoSettingLayer = _buildUserInfoSettingLayer();
+    final stack = Stack(
+      children: [
+        column,
+        userInfoSettingLayer,
+      ],
+    );
     return Scaffold(
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(userInfo),
       body: SizedBox(
         width: double.infinity,
-        child: Column(
-          children: [
-            titleListView,
-            Container(
-              color: Colors.white, // To eliminate the transparent background of the padding of button
-              child: createButton,
-            ),
-            systemButtons,
-          ],
-        ),
+        child: stack,
       ),
     );
   }
 
-  AppBar _buildAppBar() {
+  AppBar _buildAppBar(SimpleUserPrivateInfo userInfo) {
     List<Widget>? actions;
     if(widget.smallView) {
       actions = [
         MainMenu(controller: controller, menuType: MenuType.navigator),
       ];
     }
-    final userName = controller.getUserPrivateInfo()?.userName ?? 'Unknown User';
+    final userName = userInfo.userName;
     return AppBar(
       title: Center(
         child: Row(
@@ -153,7 +167,21 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
               ) : null,
             ),
             const SizedBox(width: 8),
-            Text(userName),
+            GestureDetector(
+              onTap: () => _toggleUserInfoSettingPopup(userInfo),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(userName),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _isUserInfoPopupVisible ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    size: 20,
+                    color: Colors.black54,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -285,6 +313,28 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     setState(() {
       _isSyncing = isSyncing;
     });
+  }
+
+  Widget _buildUserInfoSettingLayer() {
+    return FloatingStackView(
+      key: userInfoSettingLayerKey,
+    );
+  }
+  void _toggleUserInfoSettingPopup(SimpleUserPrivateInfo userInfo) {
+    if (_isUserInfoPopupVisible) {
+      _hideUserInfoSettingPopup();
+    } else {
+      _showUserInfoSettingPopup(userInfo);
+    }
+    setState(() {
+      _isUserInfoPopupVisible = !_isUserInfoPopupVisible;
+    });
+  }
+  void _showUserInfoSettingPopup(SimpleUserPrivateInfo userInfo) {
+    userInfoSettingLayerKey.currentState?.addLayer(UserInfoSettingPage(userInfo: userInfo));
+  }
+  void _hideUserInfoSettingPopup() {
+    userInfoSettingLayerKey.currentState?.clearLayer();
   }
 }
 
