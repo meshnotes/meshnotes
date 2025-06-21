@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
+import 'package:my_log/my_log.dart';
 
 typedef ActionFunction = void Function();
 
@@ -37,9 +38,11 @@ class WidgetTemplate {
 
   static Widget buildSmallIconButton(BuildContext context, IconData icon, String label, ActionFunction? action) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textSize = Theme.of(context).textTheme.bodyLarge!.fontSize!;
+    MyLogger.info('textSize: $textSize');
     final textColor = colorScheme.onPrimary;
     final backgroundColor = colorScheme.primary;
-    final borderColor = colorScheme.secondary;
+    // final borderColor = colorScheme.secondary;
     return CupertinoButton(
       padding: EdgeInsets.zero,
       child: Container(
@@ -54,9 +57,9 @@ class WidgetTemplate {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: textColor, size: 16.0,),
+            Icon(icon, color: textColor, size: textSize,),
             const SizedBox(width: 8.0,),
-            Text(label, style: TextStyle(color: textColor, fontSize: 16.0),),
+            Text(label, style: TextStyle(color: textColor, fontSize: textSize),),
           ],
         ),
       ),
@@ -64,8 +67,36 @@ class WidgetTemplate {
     );
   }
 
-  static Widget buildNormalButton(IconData icon, String label, ActionFunction? action) {
+  static Widget buildSmallBorderlessButton(BuildContext context, IconData icon, String label, ActionFunction? action) {
+    final textSize = Theme.of(context).textTheme.bodyLarge!.fontSize!;
     Color textColor = action != null? Colors.grey[600]!: Colors.grey[200]!;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12.0),
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.all(Radius.circular(4.0)),
+        ),
+        margin: const EdgeInsets.all(2.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: textColor, size: textSize,),
+            const SizedBox(width: 8.0,),
+            Text(label, style: TextStyle(color: textColor, fontSize: textSize)),
+          ],
+        ),
+      ),
+      onPressed: action,
+    );
+  }
+  static Widget buildNormalButton(BuildContext context, IconData icon, String label, ActionFunction? action) {
+    final textSize = Theme.of(context).textTheme.bodyLarge!.fontSize!;
+    Color textColor = Colors.grey;
+    if(action == null) {
+      textColor = textColor.withOpacity(0.5);
+    }
     return CupertinoButton(
       padding: EdgeInsets.zero,
       child: Container(
@@ -79,8 +110,8 @@ class WidgetTemplate {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: textColor,),
-            Text(label, style: TextStyle(color: textColor,)),
+            Icon(icon, color: textColor, size: textSize,),
+            Text(label, style: TextStyle(color: textColor, fontSize: textSize)),
           ],
         ),
       ),

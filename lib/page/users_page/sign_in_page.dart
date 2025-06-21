@@ -197,61 +197,10 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       color: Colors.black54,
     );
     
-    final nameField = Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: TextField(
-        controller: userNameController,
-        decoration: const InputDecoration(
-          hintText: 'Your name',
-          hintStyle: TextStyle(color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: InputBorder.none,
-        ),
-      ),
-    );
-    final passwordField = Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: TextField(
-        controller: passwordController,
-        obscureText: true,
-        enabled: usePassword,
-        decoration: InputDecoration(
-          hintText: 'Set your password',
-          hintStyle: TextStyle(color: usePassword ? Colors.grey : Colors.grey.withOpacity(0.5)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: InputBorder.none,
-        ),
-      ),
-    );
-    final passwordConfirmField = Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: TextField(
-        controller: passwordConfirmController,
-        obscureText: true,
-        enabled: usePassword,
-        decoration: InputDecoration(
-          hintText: 'Set your password again',
-          hintStyle: TextStyle(color: usePassword ? Colors.grey : Colors.grey.withOpacity(0.5)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: InputBorder.none,
-        ),
-      ),
-    );
-
+    final nameField = buildNormalInputField(context, 'Your name', userNameController);
+    final passwordField = buildPasswordInputField(context, 'Set your password', passwordController, usePassword);
+    final passwordConfirmField = buildPasswordInputField(context, 'Input password again', passwordConfirmController, usePassword);
     final usePasswordCheckbox = _buildNeedPasswordCheckBox();
-    
     final cardContent = [
       nameField,
       const SizedBox(height: 4),
@@ -261,7 +210,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       const SizedBox(height: 4),
       usePasswordCheckbox,
       const SizedBox(height: 4),
-      _passwordErrorMessage()?? const SizedBox(height: 16), // After padding, here will show password error message
+      passwordErrorMessage(hasPassword, passwordValid, passwordConsistent)?? const SizedBox(height: 16), // After padding, here will show password error message
       const SizedBox(height: 4),
       buildPrimaryButton(
         icon: Icons.note_add_outlined,
@@ -300,19 +249,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     );
   }
 
-  Widget? _passwordErrorMessage() {
-    if(!hasPassword) {
-      return null;
-    }
-    if(!passwordValid) {
-      return const Text('Password must be at least 8 characters long', style: TextStyle(color: Colors.red));
-    }
-    if(!passwordConsistent) {
-      return const Text('Passwords do not match', style: TextStyle(color: Colors.red));
-    }
-    return null;
-  }
-
   /// Builds the account import page where users can paste their existing key
   /// Allows users to access their account from another device
   Widget _buildLoadKeyPage(BuildContext context) {
@@ -322,41 +258,43 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       color: Colors.black54,
     );
     
-    final nameField = Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: TextField(
-        controller: privateKeyController,
-        decoration: const InputDecoration(
-          hintText: 'Your existing key',
-          hintStyle: TextStyle(color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: InputBorder.none,
-        ),
-        maxLines: 3,
-      ),
-    );
-    final passwordField = Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: TextField(
-        controller: passwordController,
-        obscureText: true,
-        enabled: usePassword,
-        decoration: InputDecoration(
-          hintText: 'Set your password',
-          hintStyle: TextStyle(color: usePassword ? Colors.grey : Colors.grey.withOpacity(0.5)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: InputBorder.none,
-        ),
-      ),
-    );
+    final nameField = buildNormalInputField(context, 'Your existing key', privateKeyController);
+    // final nameField = Container(
+    //   decoration: BoxDecoration(
+    //     color: Colors.white,
+    //     borderRadius: BorderRadius.circular(12),
+    //     border: Border.all(color: Colors.grey.withOpacity(0.3)),
+    //   ),
+    //   child: TextField(
+    //     controller: privateKeyController,
+    //     decoration: const InputDecoration(
+    //       hintText: 'Your existing key',
+    //       hintStyle: TextStyle(color: Colors.grey),
+    //       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    //       border: InputBorder.none,
+    //     ),
+    //     maxLines: 3,
+    //   ),
+    // );
+    final passwordField = buildPasswordInputField(context, 'Input password', passwordController, usePassword);
+    // final passwordField = Container(
+    //   decoration: BoxDecoration(
+    //     color: Colors.white,
+    //     borderRadius: BorderRadius.circular(12),
+    //     border: Border.all(color: Colors.grey.withOpacity(0.3)),
+    //   ),
+    //   child: TextField(
+    //     controller: passwordController,
+    //     obscureText: true,
+    //     enabled: usePassword,
+    //     decoration: InputDecoration(
+    //       hintText: 'Set your password',
+    //       hintStyle: TextStyle(color: usePassword ? Colors.grey : Colors.grey.withOpacity(0.5)),
+    //       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    //       border: InputBorder.none,
+    //     ),
+    //   ),
+    // );
 
     final usePasswordCheckbox = _buildNeedPasswordCheckBox();
     
@@ -755,29 +693,40 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   }
   
   Widget _buildNeedPasswordCheckBox() {
-    return Row(
-      children: [
-        Checkbox(
-          value: usePassword,
-          onChanged: (bool? value) {
-            setState(() {
-              usePassword = value ?? true;
-              if (!usePassword) {
-                passwordController.clear();
-                passwordConfirmController.clear();
-                hasPassword = true;
-                passwordValid = true;
-                passwordConsistent = true;
-              } else {
-                hasPassword = false;
-                passwordValid = false;
-                passwordConsistent = false;
-              }
-            });
-          },
-        ),
-        const Text('Need Password'),
-      ],
+    updateFunc() {
+      if (!usePassword) {
+        passwordController.clear();
+        passwordConfirmController.clear();
+        hasPassword = true;
+        passwordValid = true;
+        passwordConsistent = true;
+      } else {
+        hasPassword = false;
+        passwordValid = false;
+        passwordConsistent = false;
+      }
+    }
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          usePassword = !usePassword;
+          updateFunc();
+        });
+      },
+      child: Row(
+        children: [
+          Checkbox(
+            value: usePassword,
+            onChanged: (bool? value) {
+              setState(() {
+                usePassword = value ?? true;
+                updateFunc();
+              });
+            },
+          ),
+          const Text('Need Password'),
+        ],
+      ),
     );
   }
 
@@ -829,26 +778,19 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       });
     }
 
-    final _passwordValid = _hasPassword && _passwordIsValid(password.text);
+    final _passwordValid = _hasPassword && passwordIsValid(password.text);
     if(_passwordValid != passwordValid) {
       setState(() {
         passwordValid = _passwordValid;
       });
     }
 
-    final _passwordConsistent = _passwordValid && _passwordIsConsistent(password.text, passwordConfirm.text);
+    final _passwordConsistent = _passwordValid && passwordIsConsistent(password.text, passwordConfirm.text);
     if(_passwordConsistent != passwordConsistent) {
       setState(() {
         passwordConsistent = _passwordConsistent;
       });
     }
-  }
-
-  bool _passwordIsValid(String password) {
-    return password.length >= 8;
-  }
-  bool _passwordIsConsistent(String password, String passwordConfirm) {
-    return password == passwordConfirm;
   }
 }
 

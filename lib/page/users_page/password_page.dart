@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/user/encrypted_user_private_info.dart';
-
 import '../widget_templates.dart';
 import 'user_page_template.dart';
 
@@ -99,23 +97,24 @@ class _PasswordInputViewState extends State<PasswordInputView> with SingleTicker
   }
 
   Widget _buildPasswordInput() {
-    final passwordField = Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: TextField(
-        controller: passwordController,
-        obscureText: true,
-        decoration: const InputDecoration(
-          hintText: 'Set your password',
-          hintStyle: TextStyle(color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: InputBorder.none,
-        ),
-      ),
-    );
+    final passwordField = buildPasswordInputField(context, 'Set your password', passwordController, true);
+    // final passwordField = Container(
+    //   decoration: BoxDecoration(
+    //     color: Colors.white,
+    //     borderRadius: BorderRadius.circular(12),
+    //     border: Border.all(color: Colors.grey.withOpacity(0.3)),
+    //   ),
+    //   child: TextField(
+    //     controller: passwordController,
+    //     obscureText: true,
+    //     decoration: const InputDecoration(
+    //       hintText: 'Set your password',
+    //       hintStyle: TextStyle(color: Colors.grey),
+    //       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    //       border: InputBorder.none,
+    //     ),
+    //   ),
+    // );
     return passwordField;
   }
 

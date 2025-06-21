@@ -3,10 +3,15 @@ import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/controller/editor_controller.dart';
+import 'package:mesh_note/page/widget_templates.dart';
+
+import 'change_user_info_dialog.dart';
 
 class UserInfoSettingPage extends StatefulWidget {
   final SimpleUserPrivateInfo userInfo;
-  const UserInfoSettingPage({super.key, required this.userInfo});
+  final VoidCallback closeCallback;
+
+  const UserInfoSettingPage({super.key, required this.userInfo, required this.closeCallback});
 
   @override
   State<StatefulWidget> createState() => _UserInfoSettingPageState();
@@ -28,8 +33,40 @@ class _UserInfoSettingPageState extends State<UserInfoSettingPage> {
     CallbackRegistry.showToast('User info copied to clipboard');
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      children: [
+        Text(
+          '$label:',
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        WidgetTemplate.buildSmallBorderlessButton(context, Icons.copy, 'Copy User Info', _copyToClipboard),
+        WidgetTemplate.buildSmallBorderlessButton(context, Icons.lock_outline, 'Change User Info', _showChangeUserInfoDialog),
+      ],
+    );
+  }
+
+  Widget _buildContentCard() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Material(
@@ -47,111 +84,45 @@ class _UserInfoSettingPageState extends State<UserInfoSettingPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Username
-              Row(
-                children: [
-                  const Text(
-                    'Name:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.userInfo.userName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _buildInfoRow('Name', widget.userInfo.userName),
               const SizedBox(height: 12),
               // Public Key
-              Row(
-                children: [
-                  const Text(
-                    'Public:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _getShortKey(widget.userInfo.publicKey),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _buildInfoRow('Public', _getShortKey(widget.userInfo.publicKey)),
               const SizedBox(height: 12),
               // Private Key
-              Row(
-                children: [
-                  const Text(
-                    'Private:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _getShortKey(widget.userInfo.privateKey),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _buildInfoRow('Private', _getShortKey(widget.userInfo.privateKey)),
               const SizedBox(height: 16),
               // Buttons
-              Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton.icon(
-                      onPressed: _copyToClipboard,
-                      icon: const Icon(Icons.copy, size: 18),
-                      label: const Text('Copy User Info'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.black87,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton.icon(
-                      onPressed: () {
-                        // TODO: Implement change password functionality
-                        Navigator.pop(context);
-                      },
-                      icon: const Icon(Icons.lock_outline, size: 18),
-                      label: const Text('Change Password'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.black87,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _buildActionButtons(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        widget.closeCallback();
+      },
+      child: Container(
+        color: Colors.black.withOpacity(0.3),
+        child: Column(
+          children: [
+            _buildContentCard(),
+            const Spacer(), // Push content to top
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showChangeUserInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => ChangeUserInfoDialog(userInfo: widget.userInfo),
     );
   }
 }

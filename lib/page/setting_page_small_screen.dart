@@ -352,7 +352,7 @@ class _DetailSettingPage extends StatelessWidget {
   Widget _buildBottomButtons(BuildContext context) {
     var column = Column(
       children: [
-        WidgetTemplate.buildNormalButton(Icons.save, 'Save', _saveSetting),
+        WidgetTemplate.buildNormalButton(context, Icons.save, 'Save', _saveSetting),
         WidgetTemplate.buildInsignificantButton(Icons.arrow_back, 'Exit', () { _exitWithoutSaving(context); }, alignment: MainAxisAlignment.end),
       ],
     );

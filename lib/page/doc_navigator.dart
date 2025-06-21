@@ -326,15 +326,25 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     } else {
       _showUserInfoSettingPopup(userInfo);
     }
-    setState(() {
-      _isUserInfoPopupVisible = !_isUserInfoPopupVisible;
-    });
   }
   void _showUserInfoSettingPopup(SimpleUserPrivateInfo userInfo) {
-    userInfoSettingLayerKey.currentState?.addLayer(UserInfoSettingPage(userInfo: userInfo));
+    if(_isUserInfoPopupVisible) return;
+
+    userInfoSettingLayerKey.currentState?.addLayer(UserInfoSettingPage(
+      userInfo: userInfo,
+      closeCallback: _hideUserInfoSettingPopup,
+    ));
+    setState(() {
+      _isUserInfoPopupVisible = true;
+    });
   }
   void _hideUserInfoSettingPopup() {
+    if(!_isUserInfoPopupVisible) return;
+
     userInfoSettingLayerKey.currentState?.clearLayer();
+    setState(() {
+      _isUserInfoPopupVisible = false;
+    });
   }
 }
 
