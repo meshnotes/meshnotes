@@ -6,6 +6,7 @@ import 'package:mesh_note/mindeditor/controller/editor_controller.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 
 import 'change_user_info_dialog.dart';
+import 'sign_in_page.dart';
 
 class UserInfoSettingMenu extends StatefulWidget {
   final UserPrivateInfo userInfo;
@@ -58,11 +59,46 @@ class _UserInfoSettingMenuState extends State<UserInfoSettingMenu> {
   }
 
   Widget _buildActionButtons() {
-    return Column(
-      children: [
-        WidgetTemplate.buildSmallBorderlessButton(context, Icons.copy, 'Copy User Info', _copyToClipboard),
-        WidgetTemplate.buildSmallBorderlessButton(context, Icons.lock_outline, 'Change User Info', _showChangeUserInfoDialog),
-      ],
+    if (widget.userInfo.isGuest()) {
+      return Column(
+        children: [
+          WidgetTemplate.buildSmallBorderlessButton(context, Icons.person_add, 'Create Account', _showCreateAccountDialog),
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          WidgetTemplate.buildSmallBorderlessButton(context, Icons.copy, 'Copy User Info', _copyToClipboard),
+          WidgetTemplate.buildSmallBorderlessButton(context, Icons.lock_outline, 'Change User Info', _showChangeUserInfoDialog),
+        ],
+      );
+    }
+  }
+
+  void _showCreateAccountDialog() {
+    // Close the current menu first
+    widget.closeCallback();
+    
+    // Show the sign-in view to create a new account
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => SignInView(
+        updateCallback: (userInfo, password) {
+          // Handle the new account creation
+          final controller = Controller();
+          controller.setUserPrivateInfo(userInfo, password);
+          controller.tryStartingNetwork();
+          Navigator.of(context).pop(); // Close the dialog
+        },
+      ),
+    );
+  }
+
+  void _showChangeUserInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => ChangeUserInfoDialog(userInfo: widget.userInfo),
     );
   }
 
@@ -116,13 +152,6 @@ class _UserInfoSettingMenuState extends State<UserInfoSettingMenu> {
           ],
         ),
       ),
-    );
-  }
-
-  void _showChangeUserInfoDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => ChangeUserInfoDialog(userInfo: widget.userInfo),
     );
   }
 }

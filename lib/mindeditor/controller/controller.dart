@@ -153,13 +153,13 @@ class Controller {
   /// Network could be starting only when the user information is ready
   /// And user private key should not be 'guest'
   bool tryStartingNetwork() {
-    final simpleUserInfo = getUserPrivateInfo();
-    if(simpleUserInfo == null) return false;
+    final userInfo = getUserPrivateInfo();
+    if(userInfo == null || userInfo.isGuest()) return false;
 
     network.start(
       setting,
       deviceId,
-      simpleUserInfo,
+      userInfo,
       _logPath,
     );
     MyLogger.info('Network layer started');
@@ -240,6 +240,7 @@ class Controller {
       value: password,
     );
     setting.saveSettings([userNameSetting, userPasswordSetting]);
+    eventTasksManager.triggerUserInfoChanged();
   }
   UserPrivateInfo? getUserPrivateInfo() {
     if(_userPrivateInfo == null) return null;
@@ -252,7 +253,6 @@ class Controller {
     final password = newPassword?? _password;
     final newEncryptedUserInfo = EncryptedUserPrivateInfo.fromUserPrivateInfoAndPassword(newUserInfo, password);
     setUserPrivateInfo(newEncryptedUserInfo, password);
-    eventTasksManager.triggerUserInfoChanged();
     return true;
   }
 
