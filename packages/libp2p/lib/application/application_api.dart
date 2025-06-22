@@ -230,16 +230,27 @@ class UserPublicInfo {
   }
 }
 
-class SimpleUserPrivateInfo {
+class UserPrivateInfo {
+  static const String guestKey = 'guest';
   String publicKey;
   String userName;
   String privateKey;
   int timestamp;
 
-  SimpleUserPrivateInfo({
+  UserPrivateInfo({
     required this.publicKey,
     required this.userName,
     required this.privateKey,
     required this.timestamp,
   });
+
+  UserPrivateInfo.makeGuest({required int timestamp}):
+        publicKey = guestKey,
+        userName = guestKey,
+        privateKey = guestKey,
+        timestamp = timestamp;
+
+  bool isGuest() {
+    return privateKey == guestKey;
+  }
 }

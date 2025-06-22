@@ -15,7 +15,7 @@ import 'inspired_page.dart';
 import 'resizable_view.dart';
 import '../mindeditor/document/dal/doc_data_model.dart';
 import '../mindeditor/setting/constants.dart';
-import 'users_page/user_info_setting_page.dart';
+import 'users_page/user_info_setting_menu.dart';
 
 class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
   final Function()? jumpAction;
@@ -146,7 +146,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     );
   }
 
-  AppBar _buildAppBar(SimpleUserPrivateInfo userInfo) {
+  AppBar _buildAppBar(UserPrivateInfo userInfo) {
     List<Widget>? actions;
     if(widget.smallView) {
       actions = [
@@ -325,17 +325,17 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       key: userInfoSettingLayerKey,
     );
   }
-  void _toggleUserInfoSettingPopup(SimpleUserPrivateInfo userInfo) {
+  void _toggleUserInfoSettingPopup(UserPrivateInfo userInfo) {
     if (_isUserInfoPopupVisible) {
       _hideUserInfoSettingPopup();
     } else {
       _showUserInfoSettingPopup(userInfo);
     }
   }
-  void _showUserInfoSettingPopup(SimpleUserPrivateInfo userInfo) {
+  void _showUserInfoSettingPopup(UserPrivateInfo userInfo) {
     if(_isUserInfoPopupVisible) return;
 
-    userInfoSettingLayerKey.currentState?.addLayer(UserInfoSettingPage(
+    userInfoSettingLayerKey.currentState?.addLayer(UserInfoSettingMenu(
       userInfo: userInfo,
       closeCallback: _hideUserInfoSettingPopup,
     ));

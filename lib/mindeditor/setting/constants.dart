@@ -100,7 +100,7 @@ class Constants {
   static const String settingCommentAllowSendingNotesToPlugins = 'To make plugins(like AI assistant) have knowledge of your notes(except for the private notes)';
   static const String settingDefaultAllowSendingNotesToPlugins = 'false';
 
-  static const String userNameAndKeyOfGuest = 'guest';
+  // static const String userNameAndKeyOfGuest = 'guest';
 
   static const String resourceKeyVersionTree = 'version_tree';
 }

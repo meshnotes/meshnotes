@@ -67,7 +67,7 @@ class _PasswordInputViewState extends State<PasswordInputView> with SingleTicker
   void _tryDecrypt() {
     final password = convertPassword(passwordController.text);
     try {
-      final simpleInfo = widget.encryptedUserInfo.getSimpleUserPrivateInfo(password);
+      final simpleInfo = widget.encryptedUserInfo.getUserPrivateInfo(password);
       if (simpleInfo != null) {
         setState(() {
           _isAnimating = true;

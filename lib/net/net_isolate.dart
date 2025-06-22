@@ -43,7 +43,7 @@ class VersionChainVillager {
   SigningWrapper? _signing;
   VerifyingWrapper? _verify;
   EncryptWrapper? _encrypt;
-  SimpleUserPrivateInfo? userPrivateInfo;
+  UserPrivateInfo? userPrivateInfo;
 
   VersionChainVillager({
     required SendPort sendPort,

@@ -241,16 +241,16 @@ class Controller {
     );
     setting.saveSettings([userNameSetting, userPasswordSetting]);
   }
-  SimpleUserPrivateInfo? getUserPrivateInfo() {
+  UserPrivateInfo? getUserPrivateInfo() {
     if(_userPrivateInfo == null) return null;
-    return _userPrivateInfo!.getSimpleUserPrivateInfo(_password);
+    return _userPrivateInfo!.getUserPrivateInfo(_password);
   }
   EncryptedUserPrivateInfo? getEncryptedUserPrivateInfo() {
     return _userPrivateInfo;
   }
-  bool changeUserInfo(SimpleUserPrivateInfo newUserInfo, String? newPassword) {
+  bool changeUserInfo(UserPrivateInfo newUserInfo, String? newPassword) {
     final password = newPassword?? _password;
-    final newEncryptedUserInfo = EncryptedUserPrivateInfo.fromSimpleUserPrivateInfoAndPassword(newUserInfo, password);
+    final newEncryptedUserInfo = EncryptedUserPrivateInfo.fromUserPrivateInfoAndPassword(newUserInfo, password);
     setUserPrivateInfo(newEncryptedUserInfo, password);
     eventTasksManager.triggerUserInfoChanged();
     return true;

@@ -7,17 +7,17 @@ import 'package:mesh_note/page/widget_templates.dart';
 
 import 'change_user_info_dialog.dart';
 
-class UserInfoSettingPage extends StatefulWidget {
-  final SimpleUserPrivateInfo userInfo;
+class UserInfoSettingMenu extends StatefulWidget {
+  final UserPrivateInfo userInfo;
   final VoidCallback closeCallback;
 
-  const UserInfoSettingPage({super.key, required this.userInfo, required this.closeCallback});
+  const UserInfoSettingMenu({super.key, required this.userInfo, required this.closeCallback});
 
   @override
-  State<StatefulWidget> createState() => _UserInfoSettingPageState();
+  State<StatefulWidget> createState() => _UserInfoSettingMenuState();
 }
 
-class _UserInfoSettingPageState extends State<UserInfoSettingPage> {
+class _UserInfoSettingMenuState extends State<UserInfoSettingMenu> {
   String _getShortKey(String key) {
     if (key.length <= 12) return key;
     return '${key.substring(0, 6)}...${key.substring(key.length - 6)}';

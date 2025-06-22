@@ -104,8 +104,8 @@ String convertPassword(String plainPassword) {
   return (plainPassword == "")? "": HashUtil.hashText(plainPassword);
 }
 
-EncryptedUserPrivateInfo generateUserInfo(SimpleUserPrivateInfo userInfo, String password) {
-  final encryptedUserInfo = EncryptedUserPrivateInfo.fromSimpleUserPrivateInfoAndPassword(userInfo, password);
+EncryptedUserPrivateInfo generateEncryptedUserInfo(UserPrivateInfo userInfo, String password) {
+  final encryptedUserInfo = EncryptedUserPrivateInfo.fromUserPrivateInfoAndPassword(userInfo, password);
   return encryptedUserInfo;
 }
 

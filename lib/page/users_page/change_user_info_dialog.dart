@@ -7,7 +7,7 @@ import '../widget_templates.dart';
 import 'user_page_template.dart';
 
 class ChangeUserInfoDialog extends StatefulWidget {
-  final SimpleUserPrivateInfo userInfo;
+  final UserPrivateInfo userInfo;
   const ChangeUserInfoDialog({super.key, required this.userInfo});
 
   @override
@@ -120,7 +120,7 @@ class _ChangeUserInfoDialogState extends State<ChangeUserInfoDialog> {
       name = _usernameController.text.trim();
     }
     final now = Util.getTimeStamp();
-    final newUserInfo = SimpleUserPrivateInfo(
+    final newUserInfo = UserPrivateInfo(
       publicKey: widget.userInfo.publicKey,
       userName: name,
       privateKey: widget.userInfo.privateKey,

@@ -59,14 +59,14 @@ class EncryptedUserPrivateInfo {
   }
 
   /// Create an encrypted user private info from a simple user private info and a password
-  /// If the password is empty string, the private key is not encrypted
+  /// If the password is empty string, or the user is a guest, the private key is not encrypted
   /// If the password is not empty, the private key is encrypted
-  factory EncryptedUserPrivateInfo.fromSimpleUserPrivateInfoAndPassword(SimpleUserPrivateInfo simpleUserInfo, String password) {
-    final name = simpleUserInfo.userName;
-    final publicKey = simpleUserInfo.publicKey;
-    final privateKey = simpleUserInfo.privateKey;
-    final timestamp = simpleUserInfo.timestamp;
-    if(password.isEmpty) {
+  factory EncryptedUserPrivateInfo.fromUserPrivateInfoAndPassword(UserPrivateInfo userInfo, String password) {
+    final name = userInfo.userName;
+    final publicKey = userInfo.publicKey;
+    final privateKey = userInfo.privateKey;
+    final timestamp = userInfo.timestamp;
+    if(password.isEmpty || userInfo.isGuest()) {
       return EncryptedUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: privateKey, timestamp: timestamp, isEncrypted: false);
     }
     
@@ -76,19 +76,19 @@ class EncryptedUserPrivateInfo {
     return EncryptedUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: encryptedPrivateKey, timestamp: timestamp, isEncrypted: true);
   }
 
-  SimpleUserPrivateInfo? getSimpleUserPrivateInfo(String password) {
+  UserPrivateInfo? getUserPrivateInfo(String password) {
     final name = userName;
     final publicKey = this.publicKey;
     final timestamp = this.timestamp;
     if(!isEncrypted) {
-      return SimpleUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: privateKey, timestamp: timestamp);
+      return UserPrivateInfo(publicKey: publicKey, userName: name, privateKey: privateKey, timestamp: timestamp);
     }
 
     MyLogger.debug('Decrypting private key with password: $password');
     try {
       final encrypt = AesWrapper(password: password, randomNumber: timestamp);
       final decryptedPrivateKey = encrypt.decrypt(privateKey);
-      return SimpleUserPrivateInfo(publicKey: publicKey, userName: name, privateKey: decryptedPrivateKey, timestamp: timestamp);
+      return UserPrivateInfo(publicKey: publicKey, userName: name, privateKey: decryptedPrivateKey, timestamp: timestamp);
     } catch(e) {
       MyLogger.warn('Error decrypting private key: $e');
       return null;

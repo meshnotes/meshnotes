@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/page/widget_templates.dart';
-import '../../mindeditor/setting/constants.dart';
 import '../../mindeditor/user/encrypted_user_private_info.dart';
 import '../../util/util.dart';
 import 'user_page_template.dart';
@@ -484,10 +483,10 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     if(usePassword) {
       plainPassword = passwordController.value.text;
     }
-    final simpleUserInfo = SimpleUserPrivateInfo(publicKey: publicKey, userName: userName, privateKey: privateKey, timestamp: now);
+    final userInfo = UserPrivateInfo(publicKey: publicKey, userName: userName, privateKey: privateKey, timestamp: now);
     final password = convertPassword(plainPassword);
-    var userInfo = generateUserInfo(simpleUserInfo, password);
-    _setUserInfo(userInfo, password);
+    final encryptedUserInfo = generateEncryptedUserInfo(userInfo, password);
+    _setUserInfo(encryptedUserInfo, password);
     // print('key=$privateKey');
   }
 
@@ -502,8 +501,8 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     try {
       var encryptedUserInfo = EncryptedUserPrivateInfo.fromBase64(base64Str);
       final password = convertPassword(plainPassword);
-      final simpleUserInfo = encryptedUserInfo.getSimpleUserPrivateInfo(password);
-      if(simpleUserInfo == null) {
+      final userInfo = encryptedUserInfo.getUserPrivateInfo(password);
+      if(userInfo == null) {
         throw Exception('Invalid password');
       }
       _setUserInfo(encryptedUserInfo, password);
@@ -528,11 +527,10 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   /// Allows users to try the app without creating an account
   /// Creates a guest account with predefined credentials
   void _justTry() {
-    const guest = Constants.userNameAndKeyOfGuest;
-    final simpleUserInfo = SimpleUserPrivateInfo(publicKey: guest, userName: guest, privateKey: guest, timestamp: 0);
+    final guestUserInfo = UserPrivateInfo.makeGuest(timestamp: Util.getTimeStamp());
     // Guest uses empty password
     final password = convertPassword("");
-    var userInfo = generateUserInfo(simpleUserInfo, password);
+    var userInfo = generateEncryptedUserInfo(guestUserInfo, password);
     _setUserInfo(userInfo, password, refresh: false);
     _onComplete();
   }
