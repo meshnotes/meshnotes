@@ -225,6 +225,21 @@ class Controller {
   void setUserPrivateInfo(EncryptedUserPrivateInfo userInfo, String password) {
     _userPrivateInfo = userInfo;
     _password = password;
+    final base64Str = userInfo.toBase64();
+    // Save user info and password to setting
+    final userNameSetting = SettingData(
+      name: Constants.settingKeyUserInfo,
+      displayName: Constants.settingNameUserInfo,
+      comment: Constants.settingCommentUserInfo,
+      value: base64Str,
+    );
+    final userPasswordSetting = SettingData(
+      name: Constants.settingKeyPassword,
+      displayName: Constants.settingNamePassword,
+      comment: Constants.settingCommentPassword,
+      value: password,
+    );
+    setting.saveSettings([userNameSetting, userPasswordSetting]);
   }
   SimpleUserPrivateInfo? getUserPrivateInfo() {
     if(_userPrivateInfo == null) return null;
@@ -232,6 +247,13 @@ class Controller {
   }
   EncryptedUserPrivateInfo? getEncryptedUserPrivateInfo() {
     return _userPrivateInfo;
+  }
+  bool changeUserInfo(SimpleUserPrivateInfo newUserInfo, String? newPassword) {
+    final password = newPassword?? _password;
+    final newEncryptedUserInfo = EncryptedUserPrivateInfo.fromSimpleUserPrivateInfoAndPassword(newUserInfo, password);
+    setUserPrivateInfo(newEncryptedUserInfo, password);
+    eventTasksManager.triggerUserInfoChanged();
+    return true;
   }
 
   MouseCursor getHandCursor() {

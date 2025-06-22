@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/user/encrypted_user_private_info.dart';
-import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 import 'package:my_log/my_log.dart';
 import 'users_page/password_page.dart';
 import 'users_page/sign_in_page.dart';
 import '../mindeditor/controller/controller.dart';
-import '../mindeditor/setting/constants.dart';
 import 'doc_navigator.dart';
 import 'doc_view.dart';
 
@@ -100,21 +98,6 @@ class _StackPageViewState extends State<StackPageView> {
     /// 2. Try to start network again
     /// 3. Set state to update UI
     controller.setUserPrivateInfo(userInfo, password);
-    final base64Str = userInfo.toBase64();
-    // Save user info and password to setting
-    final userNameSetting = SettingData(
-      name: Constants.settingKeyUserInfo,
-      displayName: Constants.settingNameUserInfo,
-      comment: Constants.settingCommentUserInfo,
-      value: base64Str,
-    );
-    final userPasswordSetting = SettingData(
-      name: Constants.settingKeyPassword,
-      displayName: Constants.settingNamePassword,
-      comment: Constants.settingCommentPassword,
-      value: password,
-    );
-    controller.setting.saveSettings([userNameSetting, userPasswordSetting]);
     // Try to start network
     controller.tryStartingNetwork();
     // Update UI

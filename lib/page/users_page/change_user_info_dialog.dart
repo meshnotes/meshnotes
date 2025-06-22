@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
-
+import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/util/util.dart';
 import '../widget_templates.dart';
 import 'user_page_template.dart';
 
@@ -23,10 +24,16 @@ class _ChangeUserInfoDialogState extends State<ChangeUserInfoDialog> {
   bool _passwordValid = false;
   bool _passwordConsistent = false;
   bool _passwordChanged = false;
+  bool _clearPassword = false;
+  // late EncryptedUserPrivateInfo _encryptedUserInfo;
 
   @override
   void initState() {
     super.initState();
+    // Check if user currently has a password
+    // final controller = Controller();
+    // _encryptedUserInfo = controller.getEncryptedUserPrivateInfo()!;
+    // _hasCurrentPassword = _encryptedUserInfo.isEncrypted;
     _usernameController.text = widget.userInfo.userName;
     
     // Add listeners to trigger UI rebuilds when text changes
@@ -96,6 +103,8 @@ class _ChangeUserInfoDialogState extends State<ChangeUserInfoDialog> {
         _buildUsernameField(),
         const SizedBox(height: 16),
         _buildPasswordChangeCheckbox(),
+        const SizedBox(height: 8),
+        _buildClearPasswordCheckbox(),
         const SizedBox(height: 16),
         _buildPasswordField(),
         const SizedBox(height: 16),
@@ -103,31 +112,45 @@ class _ChangeUserInfoDialogState extends State<ChangeUserInfoDialog> {
       ],
     );
   }
-  
+
   void _onConfirm() {
     // Validate password fields only if user wants to change password
-    if (_hasPassword) {
-      if (_passwordController.text.isEmpty) {
-        CallbackRegistry.showToast('Please enter a new password');
-        return;
-      }
-      if (_confirmPasswordController.text.isEmpty) {
-        CallbackRegistry.showToast('Please confirm your password');
-        return;
-      }
-      if (_passwordController.text != _confirmPasswordController.text) {
-        CallbackRegistry.showToast('Passwords do not match');
-        return;
-      }
+    var name = widget.userInfo.userName;
+    if(_nameChanged) {
+      name = _usernameController.text.trim();
+    }
+    final now = Util.getTimeStamp();
+    final newUserInfo = SimpleUserPrivateInfo(
+      publicKey: widget.userInfo.publicKey,
+      userName: name,
+      privateKey: widget.userInfo.privateKey,
+      timestamp: now,
+    );
+    
+    String? password;
+    if (_clearPassword) {
+      // Clear password - set to empty string
+      password = "";
+    } else if (_changePassword) {
+      // Change password - use entered password
+      password = _passwordController.text.trim();
+    } else {
+      // No password change
+      password = null;
     }
     
-    // TODO: Implement the actual user info change logic here
-    // You can access the new values:
-    // _usernameController.text
-    // _passwordController.text (only if _changePassword is true)
-    
-    Navigator.of(context).pop();
-    CallbackRegistry.showToast('User info updated successfully');
+    // password has three cases:
+    // 1. null: no change
+    // 2. empty: set password to be empty
+    // 3. not empty: set new password
+    final encryptedPassword = password == null? null: convertPassword(password);
+    final ok = Controller().changeUserInfo(newUserInfo, encryptedPassword);
+    if(ok) {
+      CallbackRegistry.showToast('User info updated successfully');
+      Navigator.of(context).pop();
+    } else {
+      CallbackRegistry.showToast('Failed to update user info');
+    }
   }
 
   Widget _buildDialogTitle() {
@@ -153,29 +176,32 @@ class _ChangeUserInfoDialogState extends State<ChangeUserInfoDialog> {
   }
 
   Widget _buildPasswordChangeCheckbox() {
-    updateFunc() {
-      if (!_changePassword) {
-        // Clear password fields when unchecking
-        _passwordController.clear();
-        _confirmPasswordController.clear();
-      }
+    updateFunc(bool? newValue) {
+      setState(() {
+        if (newValue == true) {
+          // Check change password and uncheck clear password
+          _changePassword = true;
+          _clearPassword = false;
+        } else {
+          // Uncheck change password
+          _changePassword = false;
+          // Clear password fields when unchecking
+          _passwordController.clear();
+          _confirmPasswordController.clear();
+        }
+      });
+      _onPasswordChanged();
     }
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _changePassword = !_changePassword;
-          updateFunc();
-        });
+        updateFunc(!_changePassword);
       },
       child: Row(
         children: [
           Checkbox(
             value: _changePassword,
             onChanged: (bool? value) {
-              setState(() {
-                _changePassword = value ?? false;
-                updateFunc();
-              });
+              updateFunc(value);
             },
           ),
           const SizedBox(width: 8),
@@ -191,6 +217,82 @@ class _ChangeUserInfoDialogState extends State<ChangeUserInfoDialog> {
     );
   }
 
+  Widget _buildClearPasswordCheckbox() {
+    updateFunc(bool? newValue) async {
+      if (newValue == true) {
+        // Show confirmation dialog before checking clear password
+        final confirmed = await _showClearPasswordConfirmationDialog();
+        if (confirmed) {
+          setState(() {
+            _clearPassword = true;
+            _changePassword = false;
+            _passwordController.clear();
+            _confirmPasswordController.clear();
+          });
+          _onPasswordChanged();
+        }
+      } else {
+        // Uncheck clear password directly
+        setState(() {
+          _clearPassword = false;
+        });
+        _onPasswordChanged();
+      }
+    }
+    return GestureDetector(
+      onTap: () async {
+        await updateFunc(!_clearPassword);
+      },
+      child: Row(
+        children: [
+          Checkbox(
+            value: _clearPassword,
+            onChanged: (bool? value) async {
+              await updateFunc(value);
+            },
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'Clear Password',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _showClearPasswordConfirmationDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Clear Password'),
+          content: const Text(
+            'Are you sure you want to clear your password? '
+            'This will remove password protection from your private key. '
+            'You can always set a new password later.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Clear Password'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+  }
+  
   void _onTextChanged() {
     // Trigger UI rebuild to update confirm button state
     final userName = _usernameController.text.trim();
@@ -211,7 +313,9 @@ class _ChangeUserInfoDialogState extends State<ChangeUserInfoDialog> {
     final hasPassword = password.isNotEmpty;
     final passwordValid = hasPassword && passwordIsValid(password);
     final passwordConsistent = passwordValid && passwordIsConsistent(password, confirmPassword);
-    final passwordChanged = hasPassword && passwordValid && passwordConsistent;
+    // When clearing password, both fields are empty and _clearPassword is true
+    final passwordChanged = _clearPassword || (hasPassword && passwordValid && passwordConsistent);
+    
     if(hasPassword != _hasPassword) {
       setState(() {
         _hasPassword = hasPassword;

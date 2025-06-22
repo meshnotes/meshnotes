@@ -56,6 +56,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
     controller.eventTasksManager.addSyncingTask(_updateSyncing);
+    controller.eventTasksManager.addUserInfoChangedTask(_onUserInfoChanged);
   }
 
   @override
@@ -65,6 +66,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     CallbackRegistry.unregisterNetworkStatusWatcher(_onNetworkStatusChanged);
     CallbackRegistry.unregisterPeerNodesChangedWatcher(_onPeerNodesChanged);
     controller.eventTasksManager.removeSyncingTask(_updateSyncing);
+    controller.eventTasksManager.removeUserInfoChangedTask(_onUserInfoChanged);
   }
 
   @override
@@ -313,6 +315,9 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     setState(() {
       _isSyncing = isSyncing;
     });
+  }
+  void _onUserInfoChanged() {
+    setState(() {});
   }
 
   Widget _buildUserInfoSettingLayer() {

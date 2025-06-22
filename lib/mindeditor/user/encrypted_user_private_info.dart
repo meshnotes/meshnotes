@@ -58,6 +58,9 @@ class EncryptedUserPrivateInfo {
     return base64;
   }
 
+  /// Create an encrypted user private info from a simple user private info and a password
+  /// If the password is empty string, the private key is not encrypted
+  /// If the password is not empty, the private key is encrypted
   factory EncryptedUserPrivateInfo.fromSimpleUserPrivateInfoAndPassword(SimpleUserPrivateInfo simpleUserInfo, String password) {
     final name = simpleUserInfo.userName;
     final publicKey = simpleUserInfo.publicKey;
