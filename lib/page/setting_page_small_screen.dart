@@ -140,6 +140,7 @@ class _SettingPageSmallScreenState extends State<SettingPageSmallScreen> {
               ),
               itemBuilder: (context, index) {
                 var settingItem = group.settings[index];
+                if(!settingItem.needDisplay) return Container();
                 late Widget settingWidget;
                 if(settingItem.type == SettingType.bool) {
                   settingWidget = _buildSwitchSetting(settingItem);

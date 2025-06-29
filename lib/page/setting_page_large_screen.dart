@@ -122,6 +122,7 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
       itemBuilder: (context, index) {
         late Widget item;
         final settingItem = group.settings[index];
+        if(!settingItem.needDisplay) return Container();
         if(settingItem.type == SettingType.bool) {
           item = _buildBoolSetting(settingItem, index);
         } else {

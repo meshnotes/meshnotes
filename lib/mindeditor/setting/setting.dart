@@ -17,6 +17,7 @@ class SettingData {
   SettingType type;
   String defaultValue;
   final String settingGroupName;
+  final bool needDisplay;
 
   SettingData({
     required this.name,
@@ -26,13 +27,23 @@ class SettingData {
     this.type = SettingType.string,
     this.defaultValue = '',
     this.settingGroupName = '',
+    this.needDisplay = true,
   }) {
     if(value == '') {
       value = defaultValue;
     }
   }
   SettingData clone() {
-    return SettingData(name: name, displayName: displayName, value: value, comment: comment, type: type, defaultValue: defaultValue, settingGroupName: settingGroupName);
+    return SettingData(
+      name: name,
+      displayName: displayName,
+      value: value,
+      comment: comment,
+      type: type,
+      defaultValue: defaultValue,
+      settingGroupName: settingGroupName,
+      needDisplay: needDisplay,
+    );
   }
 }
 
@@ -90,11 +101,13 @@ class Setting {
       name: Constants.settingKeyUserInfo,
       displayName: Constants.settingNameUserInfo,
       comment: Constants.settingCommentUserInfo,
+      needDisplay: false,
     ),
     SettingData(
       name: Constants.settingKeyPassword,
       displayName: Constants.settingNamePassword,
       comment: Constants.settingCommentPassword,
+      needDisplay: false,
     ),
     SettingData( //TODO should use more precise privilege control mechanism, instead of this global setting
       name: Constants.settingKeyAllowSendingNotesToPlugins,
@@ -171,6 +184,7 @@ class Setting {
     final groups = <SettingGroup>[];
     SettingGroup? currentGroup;
     for(final item in result) {
+      if(!item.needDisplay) continue;
       if(currentGroup == null || item.settingGroupName != currentGroup.name) {
         if(currentGroup != null) {
           groups.add(currentGroup);
