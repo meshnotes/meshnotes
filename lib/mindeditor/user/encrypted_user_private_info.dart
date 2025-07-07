@@ -95,3 +95,13 @@ class EncryptedUserPrivateInfo {
     }
   }
 }
+
+
+String convertPassword(String plainPassword) {
+  return (plainPassword == "")? "": HashUtil.hashText(plainPassword);
+}
+
+EncryptedUserPrivateInfo generateEncryptedUserInfo(UserPrivateInfo userInfo, String password) {
+  final encryptedUserInfo = EncryptedUserPrivateInfo.fromUserPrivateInfoAndPassword(userInfo, password);
+  return encryptedUserInfo;
+}

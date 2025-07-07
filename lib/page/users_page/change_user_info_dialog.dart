@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/mindeditor/user/encrypted_user_private_info.dart';
 import 'package:mesh_note/util/util.dart';
 import '../widget_templates.dart';
 import 'user_page_template.dart';

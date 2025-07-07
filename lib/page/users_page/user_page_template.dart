@@ -100,15 +100,6 @@ Widget? passwordErrorMessage(bool hasPassword, bool passwordValid, bool password
   return null;
 }
 
-String convertPassword(String plainPassword) {
-  return (plainPassword == "")? "": HashUtil.hashText(plainPassword);
-}
-
-EncryptedUserPrivateInfo generateEncryptedUserInfo(UserPrivateInfo userInfo, String password) {
-  final encryptedUserInfo = EncryptedUserPrivateInfo.fromUserPrivateInfoAndPassword(userInfo, password);
-  return encryptedUserInfo;
-}
-
 Widget buildNormalInputField(BuildContext context, String hintText, TextEditingController controller) {
   final inputField = Container(
     decoration: BoxDecoration(

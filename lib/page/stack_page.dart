@@ -5,7 +5,7 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/user/encrypted_user_private_info.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 import 'package:my_log/my_log.dart';
-import 'users_page/password_page.dart';
+import 'users_page/input_password_page.dart';
 import 'users_page/sign_in_page.dart';
 import '../mindeditor/controller/controller.dart';
 import 'doc_navigator.dart';

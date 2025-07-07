@@ -98,13 +98,13 @@ class Controller {
     _docManager = DocumentManager(db: dbHelper);
     _mergeTaskRunner = MergeTask(db: dbHelper);
 
-    // Load user information from setting
-    _userPrivateInfo = _loadUserInfo(setting);
-    MyLogger.info('initAll: load user(${_userPrivateInfo?.userName}) from setting');
-
     // Will failed in flutter test mode, so disabled it
     await _genDeviceId();
     MyLogger.info('initAll: device_id=$deviceId, simple_device_id=$simpleDeviceId');
+
+    // Load user information from setting
+    _userPrivateInfo = _loadUserInfo(setting);
+    MyLogger.info('initAll: load user(${_userPrivateInfo?.userName}) from setting');
 
     network = await initNet();
     if(!tryStartingNetwork()) {
@@ -172,8 +172,7 @@ class Controller {
     if(platformDeviceId != null) {
       deviceId = platformDeviceId;
     } else {
-      final userKey = _userPrivateInfo?.privateKey;
-      deviceId = HashUtil.hashText(userKey?? IdGen.getUid()) + ':Unknown';
+      deviceId = 'Unknown';
     }
 
     // simpleDeviceId is composed of first 8 character of deviceId and first 8 character of SHA256 of deviceId
@@ -210,7 +209,8 @@ class Controller {
   }
   EncryptedUserPrivateInfo? _loadUserInfo(Setting _setting) {
     final userInfo = _setting.getSetting(Constants.settingKeyUserInfo);
-    _password = _setting.getSetting(Constants.settingKeyPassword)?? '';
+    final encryptedPassword = _setting.getSetting(Constants.settingKeyPassword)?? '';
+    _password = _decryptPassword(encryptedPassword);
     if(userInfo == null) return null;
 
     try {
@@ -225,6 +225,7 @@ class Controller {
   void setUserPrivateInfo(EncryptedUserPrivateInfo userInfo, String password) {
     _userPrivateInfo = userInfo;
     _password = password;
+    final encryptedPassword = _encryptPassword(_password);
     final base64Str = userInfo.toBase64();
     // Save user info and password to setting
     final userNameSetting = SettingData(
@@ -237,7 +238,7 @@ class Controller {
       name: Constants.settingKeyPassword,
       displayName: Constants.settingNamePassword,
       comment: Constants.settingCommentPassword,
-      value: password,
+      value: encryptedPassword,
     );
     setting.saveSettings([userNameSetting, userPasswordSetting]);
     eventTasksManager.triggerUserInfoChanged();
@@ -467,5 +468,29 @@ class Controller {
   
   void clearSyncingTasks() {
     _mergeTaskRunner?.clearSyncingTasks();
+  }
+
+  // Use deviceId to encrypt password
+  // The purpose is to make the password more secure
+  String _encryptPassword(String password) {
+    final encrypt = _genAesWrapperForPassword();
+    final encrypted = encrypt.encrypt(password);
+    return encrypted;
+  }
+  String _decryptPassword(String encryptedPassword) {
+    final encrypt = _genAesWrapperForPassword();
+    try {
+      final decrypted = encrypt.decrypt(encryptedPassword);
+      return decrypted;
+    } catch(e) {
+      MyLogger.warn('Error decrypting password: $e. Return empty as password');
+      return convertPassword("");
+    }
+  }
+  AesWrapper _genAesWrapperForPassword() {
+    final hashOfDeviceId = HashUtil.hashText(deviceId);
+    final number = deviceId.length;
+    final encrypt = AesWrapper(password: hashOfDeviceId, randomNumber: number);
+    return encrypt;
   }
 }

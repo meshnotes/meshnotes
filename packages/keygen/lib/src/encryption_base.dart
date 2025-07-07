@@ -51,7 +51,7 @@ class AesWrapper {
   final IV iv;
 
   AesWrapper({
-    required password,
+    required String password,
     required int randomNumber,
   }): encrypter = _buildEncrypter(password),
       iv = _generateIV(randomNumber, randomNumber);
