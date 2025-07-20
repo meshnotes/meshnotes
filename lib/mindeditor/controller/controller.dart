@@ -20,7 +20,6 @@ import 'package:my_log/my_log.dart';
 import '../../net/init.dart';
 import '../../net/version_chain_api.dart';
 import '../../plugin/plugin_manager.dart';
-import '../../util/idgen.dart';
 import '../document/paragraph_desc.dart';
 import '../setting/constants.dart';
 import '../user/encrypted_user_private_info.dart';

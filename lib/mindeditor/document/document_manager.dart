@@ -1063,11 +1063,13 @@ class DocumentManager {
   }
 
   /// Check all versions has object of corresponding version hash
-  void _checkVersionTreeIntegrity() {
+  Future<void> _checkVersionTreeIntegrity() async {
+    final startTime = Util.getTimeStamp();
     var versions = _db.getAllVersions();
     int countOfProblem = 0;
     int countOfGood = 0;
     List<String> badVersions = [];
+    int integrationTime = 0;
     for(final version in versions) {
       final hash = version.versionHash;
       final versionObject = _db.getObject(hash);
@@ -1080,40 +1082,44 @@ class DocumentManager {
         MyLogger.warn('Find data inconsistency for version ${HashUtil.formatHash(hash)}');
       } else {
         countOfGood++;
-        var (good, problem) = _checkVersionIntegrity(versionObject);
+        final integityStartTime = Util.getTimeStamp();
+        //TODO 这里耗时最多
+        var (good, problem) = await _checkVersionIntegrity(versionObject);
+        final integityEndTime = Util.getTimeStamp();
+        integrationTime += integityEndTime - integityStartTime;
         countOfGood += good;
         countOfProblem += problem;
       }
     }
-    MyLogger.info('Check version tree integrity: $countOfGood good, $countOfProblem bad');
-    CallbackRegistry.showToast('Versions: $countOfGood good, $countOfProblem bad');
+    final endTime = Util.getTimeStamp();
+    MyLogger.info('Check version tree integrity: $countOfGood good, $countOfProblem bad. ${endTime - startTime}ms, ${integrationTime}ms');
+    CallbackRegistry.showToast('Versions: $countOfGood good, $countOfProblem bad. ${endTime - startTime}ms, ${integrationTime}ms');
     countOfGoodObjects = countOfGood;
     countOfBadObjects = countOfProblem;
     _badVersionSet.clear();
     _badVersionSet.addAll(badVersions);
   }
 
-  (int, int) _checkVersionIntegrity(ObjectDataModel object) {
+  Future<(int, int)> _checkVersionIntegrity(ObjectDataModel object) async {
     int countOfGood = 0;
     int countOfProblem = 0;
     var versionContent = VersionContent.fromJson(jsonDecode(object.data));
     var table = versionContent.table;
     for(var item in table) {
-
       var docHash = item.docHash;
       final docContent = _db.getObject(docHash);
       if(docContent == null) {
         countOfProblem++;
       } else {
         countOfGood++;
-        var (good, problem) = _checkDocContentIntegrity(docContent);
+        var (good, problem) = await _checkDocContentIntegrity(docContent);
         countOfGood += good;
         countOfProblem += problem;
       }
     }
     return (countOfGood, countOfProblem);
   }
-  (int, int) _checkDocContentIntegrity(ObjectDataModel docContent) {
+  Future<(int, int)> _checkDocContentIntegrity(ObjectDataModel docContent) async {
     int countOfGood = 0;
     int countOfProblem = 0;
     var doc = DocContent.fromJson(jsonDecode(docContent.data));
@@ -1130,6 +1136,7 @@ class DocumentManager {
         countOfProblem += problem;
       }
     }
+    await Future.delayed(const Duration(milliseconds: 1));
     return (countOfGood, countOfProblem);
   }
   (int, int) _checkBlockContentIntegrity(ObjectDataModel blockContent) {

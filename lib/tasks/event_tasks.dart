@@ -18,7 +18,7 @@ class EvenTasksManager {
       _afterInitTasks.add(task);
     }
   }
-  triggerAfterInit() {
+  void triggerAfterInit() {
     for(final task in _afterInitTasks) {
       task.call();
     }

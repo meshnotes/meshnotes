@@ -31,7 +31,7 @@ class BlockListingButton extends StatelessWidget {
       iconData: icon,
       tip: tips,
       activeOrNot: (String? _type, String? _listing, int? _level) {
-        MyLogger.info('BlockListingButton: key=$targetListing, activeOrNot: $_listing, listing=$listing');
+        MyLogger.debug('BlockListingButton: key=$targetListing, activeOrNot: $_listing, listing=$listing');
         return listing.contains(_listing);
       },
       onPressed: () {
