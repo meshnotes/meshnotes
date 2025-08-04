@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:keygen/keygen.dart';
-import 'package:libp2p/application/application_api.dart';
-import 'package:mesh_note/mindeditor/user/encrypted_user_private_info.dart';
 
 /// Creates a standardized card container for content
 /// Provides consistent styling for all information cards

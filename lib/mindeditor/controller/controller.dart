@@ -121,7 +121,7 @@ class Controller {
     _initGlobalEventTasks(); // Register some global event tasks
 
     MyLogger.info('initAll: finish initialization');
-    eventTasksManager.triggerAfterInit();
+    // eventTasksManager.triggerAfterReady();
     return true;
   }
 

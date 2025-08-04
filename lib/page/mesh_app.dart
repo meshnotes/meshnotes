@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_window_close/flutter_window_close.dart';
+import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 
 import '../mindeditor/controller/controller.dart';
@@ -20,6 +21,7 @@ class MeshApp extends StatefulWidget {
 class _AppLifecyclePageState extends State<MeshApp> {
   late final AppLifecycleListener _listener;
   final stackPageKey = GlobalKey();
+  bool _isFirstLoad = true;
 
   @override
   void initState() {
@@ -43,6 +45,12 @@ class _AppLifecyclePageState extends State<MeshApp> {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    if(_isFirstLoad) {
+      _isFirstLoad = false;
+      Util.runInPostFrame(() {
+        Controller().eventTasksManager.triggerAfterReady();
+      });
+    }
     return buildStackPage(context);
     // return buildRoutePage(context);
   }

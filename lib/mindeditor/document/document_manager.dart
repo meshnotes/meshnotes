@@ -50,7 +50,7 @@ class DocumentManager {
     // _allWaitingVersions.addAll(_loadAllUnavailableNodes());
     _initRetryCounter(_allWaitingVersions);
     MyLogger.info('DocumentManager: loaded missing versions: $_allWaitingVersions');
-    controller.eventTasksManager.addAfterInitTask(() {
+    controller.eventTasksManager.addAfterReadyTask(() {
       Future(() {
         checkConsistencyIfNeeded();
       });

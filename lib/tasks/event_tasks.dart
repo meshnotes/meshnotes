@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:mesh_note/util/util.dart';
 
 class EvenTasksManager {
-  final List<Function()> _afterInitTasks = [];
+  final List<Function()> _afterReadyTasks = [];
   final List<Function()> _idleTasks = [];
   final List<Function()> _userClickTasks = []; // Tasks when user clicks in the editor area
   final List<Function()> _userInputTasks = []; // Tasks when user input using keyboard or soft keyboard
@@ -13,13 +13,13 @@ class EvenTasksManager {
   final Map<String, _TimerTask> _timerTaskMap = {};
   Timer? _timer;
 
-  void addAfterInitTask(Function() task) {
-    if(!_afterInitTasks.contains(task)) {
-      _afterInitTasks.add(task);
+  void addAfterReadyTask(Function() task) {
+    if(!_afterReadyTasks.contains(task)) {
+      _afterReadyTasks.add(task);
     }
   }
-  void triggerAfterInit() {
-    for(final task in _afterInitTasks) {
+  void triggerAfterReady() {
+    for(final task in _afterReadyTasks) {
       task.call();
     }
   }
