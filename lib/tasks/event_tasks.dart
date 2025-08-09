@@ -10,6 +10,7 @@ class EvenTasksManager {
   final List<Function()> _settingChangedTasks = []; // Tasks when user changes settings
   final List<Function()> _userInfoChangedTasks = []; // Tasks when user changes user info
   final List<Function(bool isSyncing)> _syncingTasks = []; // Tasks when syncing
+  final List<Function()> _afterDocumentOpenedOnceTasks = []; // Tasks when document is opened, which should be triggered only once
   final Map<String, _TimerTask> _timerTaskMap = {};
   Timer? _timer;
 
@@ -123,6 +124,18 @@ class EvenTasksManager {
     for(final task in _userInfoChangedTasks) {
       task.call();
     }
+  }
+
+  void addAfterDocumentOpenedOnceTask(Function() task) {
+    if(!_afterDocumentOpenedOnceTasks.contains(task)) {
+      _afterDocumentOpenedOnceTasks.add(task);
+    }
+  }
+  void triggerAfterDocumentOpenedOnce() {
+    for(final task in _afterDocumentOpenedOnceTasks) {
+      task.call();
+    }
+    _afterDocumentOpenedOnceTasks.clear();
   }
 }
 

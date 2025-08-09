@@ -2,6 +2,7 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/view/toolbar/toolbar.dart';
 import 'package:flutter/material.dart';
+import 'package:mesh_note/util/util.dart';
 import 'dart:typed_data';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui' as ui;
@@ -111,6 +112,9 @@ class MindEditorState extends State<MindEditor> {
     var expanded = Expanded(
       child: withPadding,
     );
+    Util.runInPostFrame(() {
+      controller.eventTasksManager.triggerAfterDocumentOpenedOnce();
+    });
     return expanded;
   }
 

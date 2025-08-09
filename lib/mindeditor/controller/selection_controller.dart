@@ -64,6 +64,9 @@ class SelectionController {
     _releaseCursor();
   }
 
+  /// Request cursor at global offset
+  /// Should be called when user clicks or taps on the document, at which time we only know the global offset
+  /// The global offset will be converted to the local offset by checking the offset range of each block
   void requestCursorAtGlobalOffset(Offset offset) {
     final paragraphs = Controller().document?.paragraphs;
     if(paragraphs == null) return;
@@ -81,6 +84,8 @@ class SelectionController {
     blockState.setEditingBlockAndResetCursor(forceShowKeyboard: true);
   }
 
+  /// Update selection in a block
+  /// Should be called when we know the blockId and the has the TextSelection object
   void updateSelectionInBlock(String blockId, TextSelection newSelection, bool requestKeyboard) {
     var paragraphs = Controller().document?.paragraphs;
     if(paragraphs == null) return;
@@ -94,6 +99,8 @@ class SelectionController {
     var blockState = paragraphs[blockIndex].getEditState();
     blockState?.setEditingBlockAndResetCursor(requestKeyboard: requestKeyboard);
   }
+  /// Collapse selection in a block
+  /// Should be called when we know the blockId and the position of text, for example, when user delete a character
   void collapseInBlock(String blockId, int position, bool requestKeyboard) {
     updateSelectionInBlock(
       blockId,
@@ -104,6 +111,8 @@ class SelectionController {
       requestKeyboard,
     );
   }
+  /// Update selection taking into account the leading position of IME
+  /// Should be called when user input text by IME
   void updateSelectionByIMESelection(String blockId, int leadingPositionBeforeIME, TextSelection selection) {
     updateSelectionInBlock(
       blockId,
@@ -132,6 +141,8 @@ class SelectionController {
     CallbackRegistry.requestKeyboard();
   }
 
+  /// Update selection by offset, can indicate base or extent or cursor
+  /// Should be called when user drags the cursor or selection handle
   void updateSelectionByOffset(Offset offset, {SelectionExtentType type = SelectionExtentType.extent}) {
     final paragraphs = Controller().document?.paragraphs;
     if(paragraphs == null) return;
@@ -168,6 +179,10 @@ class SelectionController {
       blockState?.setEditingBlockAndResetCursor();
     }
   }
+
+  /// Update selection by block index and position
+  /// Should be called when user moves the cursor or selection handle by keyboard
+  /// the type seems to be useless
   void updateSelectionByIndexAndPos(int blockIndex, int pos, {SelectionExtentType type = SelectionExtentType.extent}) {
     final paragraphs = Controller().document?.paragraphs;
     if(paragraphs == null) return;
@@ -192,6 +207,8 @@ class SelectionController {
     blockState?.setEditingBlockAndResetCursor();
   }
 
+  /// Select a word by global offset
+  /// Should be called when user long presses or double clicks on a word
   void updateSelectionByPosRange(Offset globalOffset) {
     final controller = Controller();
     final document = controller.document;
@@ -244,6 +261,7 @@ class SelectionController {
     var (endBlockIndex, endBlockPos) = _getEndIndexAndPosFromLastMember();
     collapseTo(endBlockIndex, endBlockPos);
   }
+  /// May be duplicated with collapseInBlock
   void collapseTo(int blockIndex, int pos) {
     final controller = Controller();
     final paragraphs = controller.document?.paragraphs;
@@ -274,6 +292,22 @@ class SelectionController {
     final paragraphs = controller.document?.paragraphs;
     if(paragraphs == null) return;
     _updateSelection(0, 0, paragraphs.length - 1, paragraphs.last.getPlainText().length, paragraphs);
+  }
+
+  void selectTitle() {
+    final controller = Controller();
+    final paragraphs = controller.document?.paragraphs;
+    if(paragraphs == null) return;
+    final titleBlock = paragraphs.firstWhere((block) => block.isTitle());
+    final titleBlockState = titleBlock.getEditState();
+    if(titleBlockState == null) return;
+    final blockIndex = _getIndexOfBlock(titleBlock.getBlockId());
+    final titleBlockTextLength = titleBlockState.getPlainText().length;
+    // Show selection
+    _updateSelection(blockIndex, 0, blockIndex, titleBlockTextLength, paragraphs);
+    // Set cursor
+    var blockState = paragraphs[blockIndex].getEditState();
+    blockState?.setEditingBlockAndResetCursor();
   }
 
   // Setters

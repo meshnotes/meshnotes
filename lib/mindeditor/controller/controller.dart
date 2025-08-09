@@ -310,6 +310,9 @@ class Controller {
     // var doc = _docManager!.getCurrentDoc();
     // _currentEditorState!.refresh();
     refreshDocNavigator();
+    eventTasksManager.addAfterDocumentOpenedOnceTask(() {
+      selectionController.selectTitle();
+    });
     openDocument(docId);
   }
   void closeDocument() {

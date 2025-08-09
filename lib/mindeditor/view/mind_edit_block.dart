@@ -10,6 +10,11 @@ import '../setting/constants.dart';
 import 'mind_edit_block_impl.dart';
 
 class MindEditBlock extends StatefulWidget {
+  final ParagraphDesc texts;
+  final Controller controller;
+  final bool readOnly;
+  final bool ignoreLevel;
+  
   MindEditBlock({
     Key? key,
     required this.texts,
@@ -19,11 +24,6 @@ class MindEditBlock extends StatefulWidget {
   }): super(key: key) {
     MyLogger.debug('MindEditBlock: create new block(id=${texts.getBlockId()})');
   }
-
-  final ParagraphDesc texts;
-  final Controller controller;
-  final bool readOnly;
-  final bool ignoreLevel;
 
   @override
   State<StatefulWidget> createState() => MindEditBlockState();
