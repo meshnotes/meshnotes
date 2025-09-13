@@ -99,7 +99,21 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
           return ListTile(
             selected: index == selected,
             selectedTileColor: Colors.black12,
-            title: Text(docList[index].title),
+            dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
+            visualDensity: VisualDensity.compact,
+            minLeadingWidth: 16.0,
+            leading: Icon(
+              Icons.description_outlined,
+              size: 18.0,
+              color: Colors.grey[600],
+            ),
+            title: Text(
+              docList[index].title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 15.0),
+            ),
             onTap: () {
               var docId = docList[index].docId;
               controller.openDocument(docId);

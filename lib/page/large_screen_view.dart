@@ -17,7 +17,7 @@ class LargeScreenView extends StatelessWidget with ResizableViewMixin {
     return Row(
       children: [
         const SizedBox(
-          width: 240,
+          width: 250,
           child: DocumentNavigator(smallView: false),
         ),
         Container(
