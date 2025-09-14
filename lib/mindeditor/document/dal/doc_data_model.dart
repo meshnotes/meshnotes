@@ -18,6 +18,7 @@ class DocDataModel {
   String hash;
   int isPrivate;
   int timestamp;
+  String? parentDocId;
 
   DocDataModel({
     required this.docId,
@@ -25,6 +26,7 @@ class DocDataModel {
     this.hash = ModelConstants.hashEmpty,
     this.isPrivate = ModelConstants.isPrivateNo,
     required this.timestamp,
+    this.parentDocId,
   });
 }
 

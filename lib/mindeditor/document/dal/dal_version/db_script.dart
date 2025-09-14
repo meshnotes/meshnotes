@@ -21,11 +21,12 @@ abstract class DbScript {
       }
     }
   }
-  void upgradeDb(Database db) {}
+  /// Returns true if the upgrade is successful, false otherwise
+  bool upgradeDb(Database db);
 }
 
 class DbVersion1 extends DbScript {
-  static int ver = 1;
+  static const int ver = 1;
   static Map<String, String> sql = {
     'Create settings': 'CREATE TABLE IF NOT EXISTS settings(name TEXT PRIMARY KEY, value TEXT)',
     'Create objects': 'CREATE TABLE IF NOT EXISTS objects(obj_hash TEXT PRIMARY KEY, data TEXT, updated_at INTEGER, created_from INTEGER, status INTEGER)',
@@ -39,13 +40,27 @@ class DbVersion1 extends DbScript {
     'Create sync_versions': 'CREATE TABLE IF NOT EXISTS sync_versions(version_hash TEXT PRIMARY KEY, parents TEXT, created_at INTEGER, created_from INTEGER, status INTEGER)', // No sync_status in tmp table
   };
   DbVersion1(): super(version: ver, createSql: sql);
-}
-
-class DbFake extends DbScript {
-  static int ver = 2;
-  static Map<String, String> sql = {};
-  DbFake(): super(version: ver, createSql: sql);
 
   @override
-  void upgradeDb(Database db) {}
+  bool upgradeDb(Database db) {
+    return true;
+  }
+}
+
+class DbVersion2 extends DbScript {
+  static const int ver = 2;
+  static Map<String, String> sql = {
+    ...DbVersion1.sql,
+    // The only change is the documents table
+    'Create documents': 'CREATE TABLE IF NOT EXISTS documents(doc_id TEXT PRIMARY KEY, parent_doc_id TEXT DEFAULT NULL, doc_content TEXT, doc_hash TEXT, is_private INTEGER, updated_at INTEGER)',
+  };
+  DbVersion2(): super(version: ver, createSql: sql);
+
+  @override
+  bool upgradeDb(Database db) {
+    MyLogger.info('MeshNotesDB: upgrading documents table');
+    db.execute('ALTER TABLE documents ADD COLUMN parent_doc_id TEXT DEFAULT NULL');
+    // db.execute('CREATE INDEX IF NOT EXISTS idx_documents_parent ON documents(parent_doc_id)');
+    return true;
+  }
 }

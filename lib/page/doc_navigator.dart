@@ -14,6 +14,7 @@ import 'setting_page_small_screen.dart';
 import 'inspired_page.dart';
 import 'resizable_view.dart';
 import '../mindeditor/document/dal/doc_data_model.dart';
+import '../mindeditor/document/doc_title_node.dart';
 import '../mindeditor/setting/constants.dart';
 import 'users_page/user_info_setting_menu.dart';
 
@@ -37,7 +38,7 @@ class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
 
 class DocumentNavigatorState extends State<DocumentNavigator> {
   static const String watcherKey = 'doc_navigator';
-  List<DocDataModel> docList = [];
+  List<DocTitleNode> docList = [];
   int? selected;
   _NetworkStatus _networkStatus = _NetworkStatus.lost;
   int _peerCount = 0;
@@ -52,7 +53,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     CallbackRegistry.registerDocumentChangedWatcher(watcherKey, refreshDocumentList);
     CallbackRegistry.registerNetworkStatusWatcher(_onNetworkStatusChanged);
     CallbackRegistry.registerPeerNodesChangedWatcher(_onPeerNodesChanged);
-    docList = controller.docManager.getAllDocuments();
+    docList = controller.docManager.getHierarchicalDocumentList();
     final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
     controller.eventTasksManager.addSyncingTask(_updateSyncing);
@@ -96,36 +97,58 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       var list = ListView.builder(
         itemCount: docList.length,
         itemBuilder: (BuildContext context, int index) {
-          return ListTile(
-            selected: index == selected,
-            selectedTileColor: Colors.black12,
-            dense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
-            visualDensity: VisualDensity.compact,
-            minLeadingWidth: 16.0,
-            leading: Icon(
-              Icons.description_outlined,
-              size: 18.0,
-              color: Colors.grey[600],
+          final docNode = docList[index];
+          final indentWidth = docNode.level * 20.0; // 20 pixels per level
+          
+          return Container(
+            margin: EdgeInsets.only(left: indentWidth),
+            child: ListTile(
+              selected: index == selected,
+              selectedTileColor: Colors.black12,
+              dense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+              visualDensity: VisualDensity.compact,
+              minLeadingWidth: 14.0,
+              leading: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 16.0,
+                    child: docNode.hasChildren
+                        ? Icon(
+                            Icons.keyboard_arrow_right,
+                            size: 16.0,
+                            color: Colors.grey[600],
+                          )
+                        : null, // Transparent placeholder to keep alignment
+                  ),
+                  Icon(
+                    Icons.description_outlined,
+                    size: 18.0,
+                    color: Colors.grey[600],
+                  ),
+                ],
+              ),
+              title: Text(
+                docNode.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15.0),
+              ),
+              trailing: _buildDocumentActions(context, docNode),
+              onTap: () {
+                var docId = docNode.docId;
+                controller.openDocument(docId);
+                setState(() {
+                  selected = index;
+                });
+                if(widget.smallView && widget.jumpAction != null) {
+                  widget.jumpAction!();
+                } else {
+                  _routeDocumentViewInSmallView(context);
+                }
+              },
             ),
-            title: Text(
-              docList[index].title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 15.0),
-            ),
-            onTap: () {
-              var docId = docList[index].docId;
-              controller.openDocument(docId);
-              setState(() {
-                selected = index;
-              });
-              if(widget.smallView && widget.jumpAction != null) {
-                widget.jumpAction!();
-              } else {
-                _routeDocumentViewInSmallView(context);
-              }
-            },
           );
         },
       );
@@ -286,9 +309,114 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     );
   }
 
+  /// Build action buttons for each document item
+  Widget? _buildDocumentActions(BuildContext context, DocTitleNode docNode) {
+    return GestureDetector(
+      onTapDown: (details) {
+        _showDocumentMenu(context, details.globalPosition, docNode);
+      },
+      child: Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        child: Icon(
+          Icons.more_vert,
+          size: 16,
+          color: Colors.grey[600],
+        ),
+      ),
+    );
+  }
+
+  /// Show context menu for document
+  void _showDocumentMenu(BuildContext context, Offset position, DocTitleNode docNode) {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        overlay.size.width - position.dx,
+        overlay.size.height - position.dy,
+      ),
+      items: const [
+        PopupMenuItem<String>(
+          value: 'create_child',
+          child: Row(
+            children: [
+              Icon(Icons.add, size: 16),
+              SizedBox(width: 8),
+              Text('Create Child Document'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete, size: 16, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Delete', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value != null) {
+        switch (value) {
+          case 'create_child':
+            controller.newDocument(parentDocId: docNode.docId);
+            if(widget.smallView && widget.jumpAction != null) {
+              widget.jumpAction!();
+            } else {
+              _routeDocumentViewInSmallView(context);
+            }
+            break;
+          case 'delete':
+            _showDeleteConfirmation(context, docNode);
+            break;
+        }
+      }
+    });
+  }
+
+  /// Show delete confirmation dialog
+  void _showDeleteConfirmation(BuildContext context, DocTitleNode docNode) {
+    final hasChildren = docNode.hasChildren;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Document'),
+        content: Text(hasChildren 
+          ? 'This will delete "${docNode.title}" and all its child documents. This action cannot be undone.'
+          : 'Delete "${docNode.title}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              if (hasChildren) {
+                controller.docManager.deleteDocumentWithChildren(docNode.docId);
+              } else {
+                controller.docManager.deleteDocument(docNode.docId);
+              }
+              refreshDocumentList();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void refreshDocumentList() {
     setState(() {
-      docList = controller.docManager.getAllDocuments();
+      docList = controller.docManager.getHierarchicalDocumentList();
     });
   }
 

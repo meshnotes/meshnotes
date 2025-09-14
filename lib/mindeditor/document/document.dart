@@ -64,8 +64,8 @@ class Document {
     return doc;
   }
 
-  factory Document.createDocument(DbHelper db, String title, String content, DocumentManager parent, int now) {
-    final docId = db.newDocument(now);
+  factory Document.createDocument(DbHelper db, String title, String content, DocumentManager parent, int now, {String? parentDocId}) {
+    final docId = db.newDocument(now, parentDocId: parentDocId);
     final titlePara = ParagraphDesc.fromTitle(title);
     List<ParagraphDesc> paragraphs = [titlePara];
     for(var line in content.split('\n')) {

@@ -305,8 +305,8 @@ class Controller {
     _docManager!.openDocument(docId);
     _refreshDocumentView();
   }
-  void newDocument() {
-    var docId = _docManager!.newDocument();
+  void newDocument({String? parentDocId}) {
+    var docId = _docManager!.newDocument(parentDocId: parentDocId);
     // var doc = _docManager!.getCurrentDoc();
     // _currentEditorState!.refresh();
     refreshDocNavigator();
@@ -315,6 +315,7 @@ class Controller {
     });
     openDocument(docId);
   }
+
   void closeDocument() {
     _docManager!.closeDocument();
     _refreshDocumentView();

@@ -8,17 +8,17 @@ import 'doc_data_model.dart';
 
 class DbUpgradeInfo {
   int targetVersion;
-  Function(Database) upgradeFunc;
+  bool Function(Database) upgradeFunc;
   
-  DbUpgradeInfo(int ver, Function(Database) func): targetVersion = ver, upgradeFunc = func;
+  DbUpgradeInfo(int ver, bool Function(Database) func): targetVersion = ver, upgradeFunc = func;
 }
 
 class DbHelper {
   late Database _database;
-  DbScript dbScript = DbVersion1();
+  DbScript dbScript = DbVersion2();
   static const dbFileName = 'mesh_notes.db';
   static final Map<int, DbUpgradeInfo> _upgradeStrategy = {
-    1: DbUpgradeInfo(2, DbFake().upgradeDb),
+    1: DbUpgradeInfo(2, DbVersion2().upgradeDb),
   };
 
   // static DynamicLibrary _openOnLinux() {
@@ -44,7 +44,7 @@ class DbHelper {
   //   throw lastError;
   // }
 
-  Future<void> init() async {
+  Future<bool> init() async {
     // open.overrideFor(OperatingSystem.linux, _openOnLinux);
     // open.overrideFor(OperatingSystem.windows, _openOnWindows);
     final dbFile = await Controller().environment.getExistFileFromLibraryPathsByEnvironment(dbFileName);
@@ -53,10 +53,15 @@ class DbHelper {
     MyLogger.debug('MeshNotesDB: finish loading sqlite3');
     _database = db;
 
-    _upgradeDbIfNecessary(_database);
+    final upgradeResult = _upgradeDbIfNecessary(_database);
+    if(!upgradeResult) {
+      MyLogger.err('MeshNotesDB: upgrading db failed');
+      return false;
+    }
     _createDbIfNecessary(_database);
     _setVersion(db, dbScript.version);
     MyLogger.info('MeshNotesDB: finish initializing db');
+    return true;
   }
 
   void _createDbIfNecessary(Database db) {
@@ -79,7 +84,7 @@ class DbHelper {
     return null;
   }
 
-  void _upgradeDbIfNecessary(Database db) {
+  bool _upgradeDbIfNecessary(Database db) {
     var version = dbScript.version;
     MyLogger.debug('MeshNotesDB: checking for db upgrade...');
     final oldVersion = _getDbVersion(db);
@@ -93,10 +98,16 @@ class DbHelper {
         var info = _upgradeStrategy[ver]!;
         var nextVersion = info.targetVersion;
         MyLogger.info('MeshNotesDB: upgrading from version $ver to version $nextVersion...');
-        info.upgradeFunc(db);
+        final ok = info.upgradeFunc(db);
+        if(!ok) {
+          MyLogger.err('MeshNotesDB: upgrading from version $ver to version $nextVersion failed');
+          return false;
+        }
+        _setVersion(db, nextVersion);
         ver = nextVersion;
       }
     }
+    return true;
   }
 
   void updateParagraphType(String docId, String id, String type) {
@@ -236,7 +247,7 @@ class DbHelper {
     return result;
   }
   List<DocDataModel> getAllDocuments() {
-    const sql = 'SELECT doc_id, doc_hash, updated_at, is_private FROM documents';
+    const sql = 'SELECT doc_id, doc_hash, updated_at, is_private, parent_doc_id FROM documents';
     final resultSet = _database.select(sql, []);
     MyLogger.debug('getAllDocuments: result=$resultSet');
     var result = <DocDataModel>[];
@@ -246,7 +257,8 @@ class DbHelper {
       String docHash = row['doc_hash'];
       int isPrivate = row['is_private'];
       int updatedAt = row['updated_at'];
-      result.add(DocDataModel(docId: docId, title: '', hash: docHash, isPrivate: isPrivate, timestamp: updatedAt));
+      String? parentDocId = row['parent_doc_id'];
+      result.add(DocDataModel(docId: docId, title: '', hash: docHash, isPrivate: isPrivate, timestamp: updatedAt, parentDocId: parentDocId));
     }
     return result;
   }
@@ -408,10 +420,10 @@ class DbHelper {
     _database.execute(sql, [name]);
   }
 
-  String newDocument(int timestamp) {
+  String newDocument(int timestamp, {String? parentDocId}) {
     var docId = IdGen.getUid();
-    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at) VALUES(?, ?, ?, ?, ?)';
-    _database.execute(sql, [docId, ModelConstants.hashEmpty, '', ModelConstants.isPrivateNo, timestamp]);
+    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at, parent_doc_id) VALUES(?, ?, ?, ?, ?, ?)';
+    _database.execute(sql, [docId, ModelConstants.hashEmpty, '', ModelConstants.isPrivateNo, timestamp, parentDocId]);
 
     return docId;
   }
@@ -539,5 +551,22 @@ class DbHelper {
       createdFrom: createdFrom?? Constants.createdFromPeer,
       status: dataStatus?? ModelConstants.statusWaiting,
     );
+  }
+
+  /// Get all child documents of a specific parent document
+  List<DocDataModel> getChildDocuments(String parentDocId) {
+    const sql = 'SELECT doc_id, doc_hash, updated_at, is_private, parent_doc_id FROM documents WHERE parent_doc_id = ?';
+    final resultSet = _database.select(sql, [parentDocId]);
+    MyLogger.debug('getChildDocuments: parentDocId=$parentDocId, result=$resultSet');
+    var result = <DocDataModel>[];
+    for(final row in resultSet) {
+      String docId = row['doc_id'];
+      String docHash = row['doc_hash'];
+      int isPrivate = row['is_private'];
+      int updatedAt = row['updated_at'];
+      String? parentDocId = row['parent_doc_id'];
+      result.add(DocDataModel(docId: docId, title: '', hash: docHash, isPrivate: isPrivate, timestamp: updatedAt, parentDocId: parentDocId));
+    }
+    return result;
   }
 }

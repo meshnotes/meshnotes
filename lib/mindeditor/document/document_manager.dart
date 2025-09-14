@@ -10,6 +10,7 @@ import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
+import 'package:mesh_note/mindeditor/document/doc_title_node.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
@@ -138,13 +139,13 @@ class DocumentManager {
     return document;
   }
 
-  String newDocument() {
+  String newDocument({String? parentDocId}) {
     var title = Constants.newDocumentTitle;
     var now = Util.getTimeStamp();
-    final doc = Document.createDocument(_db, title, '', this, now);
+    final doc = Document.createDocument(_db, title, '', this, now, parentDocId: parentDocId);
     var docId = doc.id;
 
-    _updateDocTitles(DocDataModel(docId: docId, title: title, timestamp: now));
+    _updateDocTitles(DocDataModel(docId: docId, title: title, timestamp: now, parentDocId: parentDocId));
     return docId;
   }
 
@@ -161,12 +162,12 @@ class DocumentManager {
     currentDocId = null;
   }
 
-  bool createDocument(String title, String content) {
+  bool createDocument(String title, String content, {String? parentDocId}) {
     final now = Util.getTimeStamp();
-    final doc = Document.createDocument(_db, title, content, this, now);
+    final doc = Document.createDocument(_db, title, content, this, now, parentDocId: parentDocId);
     final docId = doc.id;
     _documents[docId] = doc;
-    _updateDocTitles(DocDataModel(docId: docId, title: doc.getTitle().getPlainText(), timestamp: now));
+    _updateDocTitles(DocDataModel(docId: docId, title: doc.getTitle().getPlainText(), timestamp: now, parentDocId: parentDocId));
     return docId.isNotEmpty;
   }
 
@@ -895,6 +896,31 @@ class DocumentManager {
     // Step 3
     map.removeWhere((_, value) => deprecatedNodes.contains(value));
   }
+  
+  /// Get hierarchical document list for UI display (flattened with level info)
+  List<DocTitleNode> getHierarchicalDocumentList() {
+    var roots = _buildDocumentTree();
+    List<DocTitleNode> flatList = [];
+    
+    for(var root in roots) {
+      flatList.addAll(root.toFlatList());
+    }
+    
+    return flatList;
+  }
+
+  /// Delete document and all its children recursively
+  void deleteDocumentWithChildren(String docId) {
+    var children = _getChildDocuments(docId);
+    
+    // Recursively delete all children first
+    for(var child in children) {
+      deleteDocumentWithChildren(child.docId);
+    }
+    
+    // Then delete the document itself
+    deleteDocument(docId);
+  }
 
   static void _recursiveRemoveDeprecatedNodes(DagNode node, Map<String, DagNode> map, Set<String> toRemove) {
     const tmpRemoveTag = -999999; // Use this tag instead of searching node in the toRemove set to avoid time consuming
@@ -1227,4 +1253,45 @@ class DocumentManager {
   void _deprecateVersion(String versionHash) {
     _db.updateVersionStatus(versionHash, ModelConstants.statusDeprecated);
   }
+
+  /// Get child documents of a specific parent
+  List<DocDataModel> _getChildDocuments(String parentDocId) {
+    var children = _db.getChildDocuments(parentDocId);
+    var titleMap = _db.getAllTitles();
+    for(var child in children) {
+      var blockStr = titleMap[child.docId];
+      if(blockStr != null) {
+        var block = BlockContent.fromJson(jsonDecode(blockStr));
+        child.title = block.text.isNotEmpty ? block.text[0].text : '';
+      }
+    }
+    return children;
+  }
+
+  /// Build document tree structure
+  List<DocTitleNode> _buildDocumentTree() {
+    var allDocs = getAllDocuments();
+    Map<String, DocTitleNode> nodeMap = {};
+    List<DocTitleNode> rootNodes = [];
+
+    // Create nodes for all documents
+    for(var doc in allDocs) {
+      nodeMap[doc.docId] = DocTitleNode(document: doc);
+    }
+
+    // Build parent-child relationships
+    for(var doc in allDocs) {
+      var node = nodeMap[doc.docId]!;
+      if(doc.parentDocId != null && nodeMap.containsKey(doc.parentDocId!)) {
+        var parent = nodeMap[doc.parentDocId!]!;
+        parent.addChild(node);
+      } else {
+        // Root document
+        rootNodes.add(node);
+      }
+    }
+
+    return rootNodes;
+  }
+
 }
