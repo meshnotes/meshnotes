@@ -4,7 +4,7 @@ int findLeftDifferent(String left, String right, int pos) {
   pos = math.max(0, pos);
   var minLength = math.min(left.length, right.length);
   minLength = math.min(minLength, pos);
-  // 从左边开始，找到相同字符数量
+  // Find the count of same characters from left
   for(var idx = 0; idx < minLength; idx++) {
     if(left[idx] != right[idx]) {
       return idx;
@@ -22,7 +22,7 @@ int findRightDifferent(String left, String right, int pos) {
   }
   var leftEnd = left.length - 1;
   var rightEnd = right.length - 1;
-  // 从右边开始，找到相同字符数量
+  // Find the count of same characters from right
   int count;
   for(count = 0; count < limit; count++) {
     if(left[leftEnd - count] != right[rightEnd - count]) {

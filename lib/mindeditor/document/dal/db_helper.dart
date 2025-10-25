@@ -438,11 +438,11 @@ class DbHelper {
     _database.execute(sqlContents, [docId]);
   }
 
-  void insertOrUpdateDoc(String docId, String docHash, int timestamp) {
+  void insertOrUpdateDoc(String docId, String docHash, int timestamp, {String? parentDocId}) {
     // When insert, set doc_content to empty string, is_private to 0. But when update, don't set doc_content and is_private
-    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at) VALUES(?, ?, ?, ?, ?) '
-        'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at';
-    _database.execute(sql, [docId, docHash, '', ModelConstants.isPrivateNo, timestamp]);
+    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at, parent_doc_id) VALUES(?, ?, ?, ?, ?, ?) '
+        'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at, parent_doc_id=excluded.parent_doc_id';
+    _database.execute(sql, [docId, docHash, '', ModelConstants.isPrivateNo, timestamp, parentDocId]);
   }
 
   List<(String, String)> getAllBlocks() {

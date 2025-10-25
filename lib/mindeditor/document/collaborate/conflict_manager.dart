@@ -289,6 +289,8 @@ class TransformManager {
     parent.lastChild = lastNode;
   }
 
+  /// Recursively find transform operations between target and base.
+  /// Returns a list of nodes that should be deleted in base.
   List<ContentTreeNode> _recursiveFindTransformOperations(
       ContentTreeNode? targetNode, Map<String?, ContentTreeNode> targetMap,
       ContentTreeNode? baseNode, Map<String?, ContentTreeNode> baseMap,
@@ -424,8 +426,8 @@ class TransformManager {
   void _insertToDeleteList(List<ContentTreeNode> deleteList, ContentTreeNode? node) {
     if(node == null) return;
 
-    deleteList.add(node);
     while(node != null) {
+      deleteList.add(node);
       node.parent = null;
       node = node.nextSibling;
     }

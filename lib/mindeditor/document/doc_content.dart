@@ -55,24 +55,31 @@ class VersionContentItem {
   String docId;
   String docHash;
   int updatedAt;
+  String? parentDocId;
 
   VersionContentItem({
     required this.docId,
     required this.docHash,
     required this.updatedAt,
+    this.parentDocId,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final result = <String, dynamic>{
       'doc_id': docId,
       'doc_hash': docHash,
       'updated_at': updatedAt,
     };
+    if(parentDocId != null) {
+      result['parent_doc_id'] = parentDocId;
+    }
+    return result;
   }
   VersionContentItem.fromJson(Map<String, dynamic> map):
         docId = map['doc_id'],
         docHash = map['doc_hash'],
-        updatedAt = map['updated_at'];
+        updatedAt = map['updated_at'],
+        parentDocId = map['parent_doc_id'];
 }
 
 // Data structure to describe a document's content

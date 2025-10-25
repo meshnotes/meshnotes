@@ -13,7 +13,7 @@ class ContentOperation {
   String? parentId;
   String? previousId;
   String? data;
-  bool _valid = true;
+  bool _finished = false;
   int timestamp;
 
   ContentOperation({
@@ -25,9 +25,9 @@ class ContentOperation {
     required this.timestamp,
   });
 
-  bool isValid() => _valid;
-  void setInvalid() {
-    _valid = false;
+  bool isFinished() => _finished;
+  void setFinished() {
+    _finished = true;
   }
 }
 
@@ -82,7 +82,7 @@ class DiffOperations {
       var op = ContentOperation(
         operation: ContentOperationType.add,
         targetId: item.docId,
-        parentId: null,
+        parentId: item.parentDocId,
         previousId: lastNodeId,
         data: item.docHash,
         timestamp: timestamp,
@@ -140,38 +140,43 @@ class DiffManager {
       var baseItem = baseList[baseIdx];
       final targetId = targetItem.contentId;
       final baseId = baseItem.contentId;
-      if(targetId == baseId) { // With same ID, maybe modify
+      if(targetId == baseId) { // With same ID, maybe modify or change parent
         if(targetItem.contentHash != baseItem.contentHash) {
-          var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: targetItem.contentHash, timestamp: timestamp);
-          operations.add(op);
+          var modifyOp = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: targetItem.contentHash, timestamp: timestamp);
+          operations.add(modifyOp);
+        }
+        // Check if parent relationship has changed
+        if(targetItem.parentId != baseItem.parentId) {
+          var moveOp = ContentOperation(operation: ContentOperationType.move, targetId: targetId, parentId: targetItem.parentId, previousId: lastNodeId, timestamp: timestamp);
+          operations.add(moveOp);
         }
         baseIdx++;
       } else { // ID is different in the same position, maybe move or add or del
         if(!targetMap.containsKey(baseId)) { // Should be deleted
-          var op = ContentOperation(operation: ContentOperationType.del, targetId: baseId, timestamp: timestamp);
-          operations.add(op);
+          var delOp = ContentOperation(operation: ContentOperationType.del, targetId: baseId, timestamp: timestamp);
+          operations.add(delOp);
           baseIdx++;
           continue;
         } else {
           if (baseMap.containsKey(targetId)) { // Should be moved
             baseItem = baseMap[targetId]!;
             baseList.remove(baseItem);
-            var op = ContentOperation(operation: ContentOperationType.move, targetId: targetId, parentId: null, previousId: lastNodeId, timestamp: timestamp);
-            operations.add(op);
+            var moveOp = ContentOperation(operation: ContentOperationType.move, targetId: targetId, parentId: targetItem.parentId, previousId: lastNodeId, timestamp: timestamp);
+            operations.add(moveOp);
             if (targetItem.contentHash != baseItem.contentHash) { // Should be moved and modified
-              var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: targetItem.contentHash, timestamp: timestamp);
-              operations.add(op);
+              var modifyOp = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: targetItem.contentHash, timestamp: timestamp);
+              operations.add(modifyOp);
             }
           } else { // Should be added
-            var op = ContentOperation(
+            var addOp = ContentOperation(
                 operation: ContentOperationType.add,
                 targetId: targetId,
-                parentId: null,
+                parentId: targetItem.parentId,
                 previousId: lastNodeId,
                 data: targetItem.contentHash,
                 timestamp: timestamp,
             );
-            operations.add(op);
+            operations.add(addOp);
           }
         }
       }
@@ -183,7 +188,7 @@ class DiffManager {
       var op = ContentOperation(
           operation: ContentOperationType.add,
           targetId: targetItem.contentId,
-          parentId: null,
+          parentId: targetItem.parentId,
           previousId: lastNodeId,
           data: targetItem.contentHash,
           timestamp: timestamp,
@@ -235,7 +240,7 @@ class DiffManager {
       var docId = item.docId;
       var docHash = item.docHash;
       var timestamp = item.updatedAt;
-      var node = ContentNode(contentId: docId, contentHash: docHash, previousId: lastNode?.contentId, updatedAt: timestamp);
+      var node = ContentNode(contentId: docId, contentHash: docHash, parentId: item.parentDocId, previousId: lastNode?.contentId, updatedAt: timestamp);
       list.add(node);
       map[docId] = node;
       lastNode = node;

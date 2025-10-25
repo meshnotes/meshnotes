@@ -246,7 +246,7 @@ class DocumentManager {
     genNewVersionTree();
     _setSyncing();
     Map<String, DagNode> localDagMap = _genVersionMapFromDb();
-    _tryToMergeVersionTree2(localDagMap);
+    _tryToMergeLeafNodesAndCurrent(localDagMap);
     _clearSyncing();
   }
 
@@ -344,18 +344,6 @@ class DocumentManager {
     _db.updateVersionSyncStatus(_currentVersion, Constants.syncStatusSyncing);
   }
 
-  void _tryToMergeVersionTree2(Map<String, DagNode> newMap) {
-    var leafNodes = _findAvailableLeafNodesInDag(newMap); // Find available leaf nodes before removing unavailable nodes
-    leafNodes.remove(_currentVersion);
-    if(leafNodes.isEmpty) {
-      MyLogger.info('Try to merge, but no leaf nodes available');
-      return;
-    }
-    removeMissingVersions(newMap);
-    removeDeprecatedVersions(newMap);
-    MyLogger.info('Try to merge $_currentVersion with $leafNodes');
-    _mergeVersions(newMap, leafNodes);
-  }
   /// Try to merge entire version tree, called after receiving new version_tree or receiving missing versions.
   /// 1. If some versions are still waiting for detail data, send require_versions request to other peers
   /// 2. If some versions are missing, but no waiting versions, ignore missing versions and try to merge
@@ -368,17 +356,20 @@ class DocumentManager {
     if(missingVersions.isNotEmpty && !forceMerge) {
       controller.sendRequireVersions(_allWaitingVersions.toList());
     } else {
-      var leafNodes = _findAvailableLeafNodesInDag(newMap); // Find available leaf nodes before removing unavailable nodes
-      leafNodes.remove(_currentVersion);
-      if(leafNodes.isEmpty) {
-        MyLogger.info('Try to merge, but no leaf nodes available');
-        return;
-      }
-      removeMissingVersions(newMap);
-      removeDeprecatedVersions(newMap);
-      MyLogger.info('Try to merge $_currentVersion with $leafNodes');
-      _mergeVersions(newMap, leafNodes);
+      _tryToMergeLeafNodesAndCurrent(newMap);
     }
+  }
+  void _tryToMergeLeafNodesAndCurrent(Map<String, DagNode> newMap) {
+    var leafNodes = _findAvailableLeafNodesInDag(newMap); // Find available leaf nodes before removing unavailable nodes
+    leafNodes.remove(_currentVersion);
+    if(leafNodes.isEmpty) {
+      MyLogger.info('Try to merge, but no leaf nodes available');
+      return;
+    }
+    removeMissingVersions(newMap);
+    removeDeprecatedVersions(newMap);
+    MyLogger.info('Try to merge $_currentVersion with $leafNodes');
+    _mergeVersions(newMap, leafNodes);
   }
   /// Merge all leaf nodes of versions
   /// 1. Find all leaf nodes(versions that has no child) except current version
@@ -449,8 +440,29 @@ class DocumentManager {
         docToDelete.add(docId);
       }
     }
+    // Handle hierarchical deletion: only delete root documents of deletion hierarchies
+    // Child documents will be automatically deleted by cascading deletion
+    Set<String> processedForDeletion = {};
     for(var docId in docToDelete) {
-      deleteDocument(docId);
+      if(processedForDeletion.contains(docId)) continue;
+
+      // Check if this document's parent is also being deleted
+      var docModel = _getDocTreeNode(docId);
+      bool isRootOfDeletionHierarchy = true;
+      if(docModel?.parentDocId != null && docToDelete.contains(docModel!.parentDocId!)) {
+        isRootOfDeletionHierarchy = false;
+      }
+
+      // Only delete from root of deletion hierarchy to avoid redundant operations
+      if(isRootOfDeletionHierarchy) {
+        // Get all descendants recursively to mark as processed
+        var allDescendants = _getAllDescendants(docId);
+        for(var descendant in allDescendants) {
+          processedForDeletion.add(descendant);
+        }
+        deleteDocumentWithChildren(docId);
+        processedForDeletion.add(docId);
+      }
     }
 
     bool fastForward = newVersionHash == _currentVersion || newVersionHash == targetVersion;
@@ -458,6 +470,7 @@ class DocumentManager {
     List<String> parents = fastForward? []: [_currentVersion, targetVersion]; // Ignore parents if fast_forward
     _storeVersionFromLocalAndUpdateCurrentVersion(contentVersion, parents, now, fastForward: fastForward);
   }
+  
   void _updateDoc(VersionContentItem node, Map<String, String> objects) {
     var docId = node.docId;
     DocDataModel? found;
@@ -469,15 +482,21 @@ class DocumentManager {
     }
     /// 1. If not found, insert it
     /// 2. If found, update it, and restore doc content
-
     if(found == null) {
-      found = DocDataModel(docId: docId, title: '', hash: node.docHash, timestamp: node.updatedAt);
+      found = DocDataModel(
+        docId: docId,
+        title: '',
+        hash: node.docHash,
+        timestamp: node.updatedAt,
+        parentDocId: node.parentDocId
+      );
       _docTitles.add(found);
     } else {
       found.timestamp = node.updatedAt;
+      found.parentDocId = node.parentDocId;
     }
     // Restore doc list
-    _db.insertOrUpdateDoc(docId, node.docHash, found.timestamp);
+    _db.insertOrUpdateDoc(docId, node.docHash, found.timestamp, parentDocId: node.parentDocId);
 
     // Store doc content into objects
     // var docContentStr = objects[found.hash]!;
@@ -654,7 +673,12 @@ class DocumentManager {
   static List<VersionContentItem> _genDocTreeNodeList(List<DocDataModel> list) {
     List<VersionContentItem> result = [];
     for(var item in list) {
-      var node = VersionContentItem(docId: item.docId, docHash: item.hash, updatedAt: item.timestamp);
+      var node = VersionContentItem(
+        docId: item.docId,
+        docHash: item.hash,
+        updatedAt: item.timestamp,
+        parentDocId: item.parentDocId
+      );
       result.add(node);
     }
     return result;
@@ -1266,6 +1290,20 @@ class DocumentManager {
       }
     }
     return children;
+  }
+
+  /// Get all descendants of a document recursively
+  List<String> _getAllDescendants(String parentDocId) {
+    List<String> descendants = [];
+    var children = _getChildDocuments(parentDocId);
+
+    for(var child in children) {
+      descendants.add(child.docId);
+      // Recursively get descendants of this child
+      descendants.addAll(_getAllDescendants(child.docId));
+    }
+
+    return descendants;
   }
 
   /// Build document tree structure

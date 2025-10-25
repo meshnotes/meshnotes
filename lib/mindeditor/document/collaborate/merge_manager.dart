@@ -49,14 +49,14 @@ class MergeManager {
 
   void _mergeOperations(List<ContentOperation> totalOperations, Map<String, List<ContentOperation>> opMap, List<ContentConflict> conflicts) {
     for(var thisOp in totalOperations) {
-      if(!thisOp.isValid()) continue;
+      if(thisOp.isFinished()) continue;
 
       String targetId = thisOp.targetId;
       var opList = opMap[targetId];
       if(opList == null) continue;
       for(var thatOp in opList) {
         if(thatOp == thisOp) continue;
-        if(!thatOp.isValid()) continue;
+        if(thatOp.isFinished()) continue;
 
         // Now we have thisOP and thatOp with the same targetId
         switch(thisOp.operation) {
@@ -72,14 +72,16 @@ class MergeManager {
               case ContentOperationType.move:
               case ContentOperationType.modify:
                 MyLogger.warn('Impossible operations! Add($thisOp) <==> $thatOp');
-                thatOp.setInvalid();
+                thatOp.setFinished();
                 break;
             }
             break;
           case ContentOperationType.move:
             switch(thatOp.operation) {
               case ContentOperationType.move:
-                MyLogger.warn('Conflict operations! Move($thisOp) <==> Move($thatOp)');
+                if(thisOp.parentId != thatOp.parentId || thisOp.previousId != thatOp.previousId) {
+                  MyLogger.warn('Conflict operations! Move($thisOp) <==> Move($thatOp)');
+                }
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
               case ContentOperationType.del:
@@ -113,13 +115,13 @@ class MergeManager {
             break;
           case ContentOperationType.modify:
             if(thisOp.data == null) {
-              thisOp.setInvalid();
+              thisOp.setFinished();
               continue;
             }
             switch(thatOp.operation) {
               case ContentOperationType.modify:
                 if(thatOp.data == null) {
-                  thatOp.setInvalid();
+                  thatOp.setFinished();
                   continue;
                 }
                 if(thisOp.data != thatOp.data) {
@@ -138,8 +140,8 @@ class MergeManager {
                     timestamp2: thatOp.timestamp,
                   );
                   conflicts.add(conflict);
-                  thisOp.setInvalid();
-                  thatOp.setInvalid();
+                  thisOp.setFinished();
+                  thatOp.setFinished();
                 } else {
                   _leaveLatestOperation(thisOp, thatOp); // If two operations' data are identical, leave any one shall be OK
                 }
@@ -178,9 +180,9 @@ class MergeManager {
 
   void _leaveLatestOperation(ContentOperation thisOp, ContentOperation thatOp) {
     if(thisOp.timestamp < thatOp.timestamp) {
-      thisOp.setInvalid();
+      thisOp.setFinished();
     } else {
-      thatOp.setInvalid();
+      thatOp.setFinished();
     }
   }
 
@@ -188,12 +190,12 @@ class MergeManager {
     var table = baseVersion?.table?? [];
     int now = Util.getTimeStamp();
     for(var op in operations) {
-      if(!op.isValid()) continue; // Skip deleted operation
+      if(op.isFinished()) continue; // Skip deleted operation
 
       switch(op.operation) {
         case ContentOperationType.add:
           int idx = _findIndexOf(table, op.previousId);
-          var newNode = VersionContentItem(docId: op.targetId, docHash: op.data!, updatedAt: now);
+          var newNode = VersionContentItem(docId: op.targetId, docHash: op.data!, updatedAt: now, parentDocId: op.parentId);
           table.insert(idx + 1, newNode);
           break;
         case ContentOperationType.del:
@@ -205,6 +207,7 @@ class MergeManager {
           var node = table.removeAt(idx);
           int newIdx = _findIndexOf(table, op.previousId);
           node.updatedAt = now;
+          node.parentDocId = op.parentId; // Update parent relationship
           table.insert(newIdx + 1, node);
           break;
         case ContentOperationType.modify:
