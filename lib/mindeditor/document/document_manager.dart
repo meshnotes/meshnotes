@@ -14,6 +14,7 @@ import 'package:mesh_note/mindeditor/document/doc_title_node.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/inspired_seed.dart';
 import 'package:mesh_note/mindeditor/document/paragraph_desc.dart';
+import 'collaborate/find_operation_types.dart';
 import 'doc_utils.dart';
 import 'version_tree_status.dart';
 import 'package:mesh_note/mindeditor/document/text_desc.dart';
@@ -140,13 +141,7 @@ class DocumentManager {
   }
 
   String newDocument({String? parentDocId}) {
-    var title = Constants.newDocumentTitle;
-    var now = Util.getTimeStamp();
-    final doc = Document.createDocument(_db, title, '', this, now, parentDocId: parentDocId);
-    var docId = doc.id;
-
-    _updateDocTitles(DocDataModel(docId: docId, title: title, timestamp: now, parentDocId: parentDocId));
-    return docId;
+    return _doCreateNewDocument(Constants.newDocumentTitle, '', parentDocId);
   }
 
   void deleteDocument(String docId) {
@@ -163,23 +158,7 @@ class DocumentManager {
   }
 
   bool createDocument(String title, String content, {String? parentDocId}) {
-    final now = Util.getTimeStamp();
-    final doc = Document.createDocument(_db, title, content, this, now, parentDocId: parentDocId);
-    final docId = doc.id;
-    _documents[docId] = doc;
-    _updateDocTitles(DocDataModel(docId: docId, title: doc.getTitle().getPlainText(), timestamp: now, parentDocId: parentDocId));
-    return docId.isNotEmpty;
-  }
-
-  void _updateDocTitles(DocDataModel docData) {
-    for(var item in _docTitles) {
-      if(item.docId == docData.docId) {
-        item.title = docData.title;
-        item.timestamp = docData.timestamp;
-        return;
-      }
-    }
-    _docTitles.add(docData);
+    return _doCreateNewDocument(title, content, parentDocId).isNotEmpty;
   }
 
   List<VersionDataModel> getCurrentRawVersionTree() {
@@ -405,13 +384,20 @@ class DocumentManager {
     }
     return result;
   }
+
+  /// 1. Find smaller version as base version, in order to make sure the target/base will be the same in every machine
+  /// 2. Merge target version and base version based on common version
+  /// 3. Update documents in new version tree
+  /// 4. Remove documents that are not in new version tree, that means they are deleted
+  /// 5. Store new version tree and update current version
   void _mergeCurrentAndSave(String targetVersion, String commonVersion) {
-    // Make sure to get the fix order in every machine
+    // 1. Decide base and target versions, make sure there is no difference in every machine
     String v1 = _currentVersion, v2 = targetVersion;
     if(v1.compareTo(v2) > 0) {
       v2 = _currentVersion;
       v1 = targetVersion;
     }
+    // 2. Merge versions and get result version hash
     var contentVersion = _merge(v1, v2, commonVersion);
     if(contentVersion == null) {
       return;
@@ -421,11 +407,11 @@ class DocumentManager {
       MyLogger.info('_mergeCurrentAndSave: merge result is current version($_currentVersion), do nothing');
       return;
     }
-
+    // 3. Update documents in new version tree
     for(var doc in contentVersion.table) {
       _updateDoc(doc, {});
     }
-    // Remove document that is not in new version tree, that means it is deleted
+    // 4. Remove document that is not in new version tree, that means it is deleted
     List<String> docToDelete = [];
     for(var docTitle in _docTitles) {
       final docId = docTitle.docId;
@@ -464,13 +450,28 @@ class DocumentManager {
         processedForDeletion.add(docId);
       }
     }
-
+    // 5. Store new version tree and update current version
     bool fastForward = newVersionHash == _currentVersion || newVersionHash == targetVersion;
     var now = fastForward? contentVersion.timestamp: Util.getTimeStamp();
     List<String> parents = fastForward? []: [_currentVersion, targetVersion]; // Ignore parents if fast_forward
     _storeVersionFromLocalAndUpdateCurrentVersion(contentVersion, parents, now, fastForward: fastForward);
   }
   
+  String _doCreateNewDocument(String title, String content, String? parentDocId) {
+    final now = Util.getTimeStamp();
+    final doc = Document.createDocument(_db, title, content, this, now, -1, parentDocId: parentDocId);
+    final docId = doc.id;
+    _documents[docId] = doc;
+    _updateDocTitles(DocDataModel(
+      docId: docId,
+      title: doc.getTitle().getPlainText(),
+      timestamp: now,
+      parentDocId: parentDocId,
+      orderId: -1, // place holder, will be updated later
+    ));
+    return docId;
+  }
+
   void _updateDoc(VersionContentItem node, Map<String, String> objects) {
     var docId = node.docId;
     DocDataModel? found;
@@ -488,15 +489,17 @@ class DocumentManager {
         title: '',
         hash: node.docHash,
         timestamp: node.updatedAt,
-        parentDocId: node.parentDocId
+        parentDocId: node.parentDocId,
+        orderId: -1, // place holder, will be updated later
       );
-      _docTitles.add(found);
+      _appendToDocTitles(found);
     } else {
       found.timestamp = node.updatedAt;
       found.parentDocId = node.parentDocId;
+      found.hash = node.docHash;
     }
     // Restore doc list
-    _db.insertOrUpdateDoc(docId, node.docHash, found.timestamp, parentDocId: node.parentDocId);
+    _db.insertOrUpdateDoc(docId, found.hash, found.timestamp, found.orderId, parentDocId: found.parentDocId);
 
     // Store doc content into objects
     // var docContentStr = objects[found.hash]!;
@@ -593,12 +596,7 @@ class DocumentManager {
   }
 
   void updateDocTitle(String docId, String title, int timestamp) {
-    for(var node in _docTitles) {
-      if(node.docId == docId) {
-        node.title = title;
-        node.timestamp = timestamp;
-      }
-    }
+    _doUpdateDocTitle(docId, title, timestamp);
   }
   void setModified() {
     _hasModified = true;
@@ -611,6 +609,39 @@ class DocumentManager {
       doc.clearModified();
     }
     _hasModified = false;
+  }
+
+  bool _doUpdateDocTitle(String docId, String title, int timestamp) {
+    for(var node in _docTitles) {
+      if(node.docId == docId) {
+        node.title = title;
+        node.timestamp = timestamp;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _updateDocTitles(DocDataModel docData) {
+    if(!_doUpdateDocTitle(docData.docId, docData.title, docData.timestamp)) {
+      _appendToDocTitles(docData);
+    }
+  }
+  /// Append docData to _docTitles according to its parentDocId, and decide the orderId
+  void _appendToDocTitles(DocDataModel docData) {
+    //TODO: Implement this function
+    final targetParent = docData.parentDocId;
+    final targetOrderId = docData.orderId;
+    String? currentParent = null;
+    int currentOrderId = 0;
+    for(var node in _docTitles) {
+      if(currentParent == targetParent && currentOrderId == targetOrderId) {
+        _insertBefore(node, docData);
+        return;
+      }
+    }
+    xcvafdasf;
+    _db.updateDocOrderId(docData.docId, docData.orderId);
   }
 
   void setIdle() {
@@ -985,7 +1016,7 @@ class DocumentManager {
     DiffOperations op2 = dm.findDifferentOperation(versionContent2!, commonVersionContent);
     var mm = MergeManager(baseVersion: commonVersionContent);
     var (operations, conflicts) = mm.mergeOperations(op1, op2);
-    var solvedOperations = _solveConflicts(conflicts);
+    var solvedOperations = _solveVersionConflicts(conflicts);
     operations.addAll(solvedOperations);
     var contentVersion = mm.mergeVersions(operations, [version1, version2]);
     MyLogger.info('Merge version(${HashUtil.formatHash(version1)}) and version(${HashUtil.formatHash(version2)}) based on version(${HashUtil.formatHash(commonVersion)}) '
@@ -1052,8 +1083,8 @@ class DocumentManager {
     }
   }
 
-  List<ContentOperation> _solveConflicts(List<ContentConflict> operations) {
-    List<ContentOperation> resolvedOperations = [];
+  List<TreeOperation> _solveVersionConflicts(List<ContentConflict> operations) {
+    List<TreeOperation> resolvedOperations = [];
     for(var item in operations) {
       var targetId = item.targetId;
       var baseHash = item.originalHash;
@@ -1076,19 +1107,21 @@ class DocumentManager {
         MyLogger.warn('_solveConflicts: error while loading document $docHash2');
         continue;
       }
-      ConflictManager cm = ConflictManager(baseDoc: baseDoc);
-      var (totalOperations, conflicts) = cm.mergeOperations(doc1, timestamp1, doc2, timestamp2);
+      // Solve document conflicts
+      DocumentConflictManager cm = DocumentConflictManager(baseDoc: baseDoc);
+      var (totalOperations, conflicts) = cm.mergeDocumentOperations(doc1, timestamp1, doc2, timestamp2);
       //TODO ignore conflicts now, should be optimized here if a better solution is found
       if(conflicts.isNotEmpty) {
         MyLogger.warn('mergeOperations: should not have any conflict here!');
       }
+      // Generate new document that merges doc1 and doc2
       var newDoc = cm.mergeDocument(totalOperations);
       var now = Util.getTimeStamp();
       var newDocHash = newDoc.getHash();
       if(!_db.hasObject(newDocHash)) { // Create a local merged document if not exists
         _db.storeObject(newDocHash, jsonEncode(newDoc), now, Constants.createdFromLocal, ModelConstants.statusAvailable);
       }
-      var op = ContentOperation(operation: ContentOperationType.modify, targetId: targetId, data: newDocHash, timestamp: now);
+      var op = TreeOperation(type: TreeOperationType.modify, id: targetId, newData: newDocHash, timestamp: now);
       MyLogger.info('Solve conflict of document($docHash1) and document($docHash2) based on document($baseHash), generate new document($newDocHash)');
       resolvedOperations.add(op);
     }

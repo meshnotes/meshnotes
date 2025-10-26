@@ -3,6 +3,8 @@ import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 
+import 'find_operation_types.dart';
+
 class MergeManager {
   VersionContent? baseVersion;
 
@@ -38,8 +40,8 @@ class MergeManager {
   ///     2.5.3 compatible to move operations
   ///     2.5.4 add is not possible
   /// 3. Return all operations and conflicts
-  (List<ContentOperation>, List<ContentConflict>) mergeOperations(DiffOperations op1, DiffOperations op2) {
-    var totalOperations = <ContentOperation>[...op1.operations, ...op2.operations];
+  (List<TreeOperation>, List<ContentConflict>) mergeOperations(DiffOperations op1, DiffOperations op2) {
+    var totalOperations = <TreeOperation>[...op1.operations, ...op2.operations];
     var opMap = _buildOperationsMap(totalOperations);
 
     List<ContentConflict> conflicts = [];
@@ -47,11 +49,11 @@ class MergeManager {
     return (totalOperations, conflicts);
   }
 
-  void _mergeOperations(List<ContentOperation> totalOperations, Map<String, List<ContentOperation>> opMap, List<ContentConflict> conflicts) {
+  void _mergeOperations(List<TreeOperation> totalOperations, Map<String, List<TreeOperation>> opMap, List<ContentConflict> conflicts) {
     for(var thisOp in totalOperations) {
       if(thisOp.isFinished()) continue;
 
-      String targetId = thisOp.targetId;
+      String targetId = thisOp.id;
       var opList = opMap[targetId];
       if(opList == null) continue;
       for(var thatOp in opList) {
@@ -59,72 +61,92 @@ class MergeManager {
         if(thatOp.isFinished()) continue;
 
         // Now we have thisOP and thatOp with the same targetId
-        switch(thisOp.operation) {
-          case ContentOperationType.add:
-            switch(thatOp.operation) {
-              case ContentOperationType.add:
-                if(thisOp.data != thatOp.data || thisOp.parentId != thatOp.parentId || thisOp.previousId != thatOp.previousId) {
+        switch(thisOp.type) {
+          case TreeOperationType.add:
+            switch(thatOp.type) {
+              case TreeOperationType.add:
+                if(thisOp.newData != thatOp.newData || thisOp.parentId != thatOp.parentId || thisOp.previousId != thatOp.previousId) {
                   MyLogger.warn('Conflict operations! Add($thisOp) <==> Add($thatOp)');
                 }
                 _leaveLatestOperation(thisOp, thatOp); // Leave only the latest add, even if title/data/parentId/previousId are all identity
                 break;
-              case ContentOperationType.del:
-              case ContentOperationType.move:
-              case ContentOperationType.modify:
-                MyLogger.warn('Impossible operations! Add($thisOp) <==> $thatOp');
+              case TreeOperationType.del:
+                MyLogger.warn('Impossible operations! Add($thisOp) <==> Del($thatOp)');
+                thatOp.setFinished();
+                break;
+              case TreeOperationType.move:
+                MyLogger.warn('Impossible operations! Add($thisOp) <==> Move($thatOp)');
+                thatOp.setFinished();
+                break;
+              case TreeOperationType.modify:
+                MyLogger.warn('Impossible operations! Add($thisOp) <==> Modify($thatOp)');
                 thatOp.setFinished();
                 break;
             }
             break;
-          case ContentOperationType.move:
-            switch(thatOp.operation) {
-              case ContentOperationType.move:
+          case TreeOperationType.move:
+            switch(thatOp.type) {
+              case TreeOperationType.add:
+                MyLogger.warn('Impossible operations! Move($thisOp) <==> Add($thatOp)');
+                _leaveLatestOperation(thisOp, thatOp);
+                break;
+              case TreeOperationType.del:
+                MyLogger.warn('Conflict operations! Move($thisOp) <==> Del($thatOp)');
+                _leaveLatestOperation(thisOp, thatOp);
+                break;
+              case TreeOperationType.move:
                 if(thisOp.parentId != thatOp.parentId || thisOp.previousId != thatOp.previousId) {
                   MyLogger.warn('Conflict operations! Move($thisOp) <==> Move($thatOp)');
                 }
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
-              case ContentOperationType.del:
-                MyLogger.warn('Conflict operations! Move($thisOp) <==> Del($thatOp)');
-                _leaveLatestOperation(thisOp, thatOp);
-                break;
-              case ContentOperationType.add:
-                MyLogger.warn('Impossible operations! Move($thisOp) <==> Add($thatOp)');
-                _leaveLatestOperation(thisOp, thatOp);
-                break;
-              case ContentOperationType.modify:
+              case TreeOperationType.modify:
                 // Compatible, do nothing
                 break;
             }
             break;
-          case ContentOperationType.del:
-            switch(thatOp.operation) {
-              case ContentOperationType.move:
-              case ContentOperationType.modify:
-                MyLogger.warn('Conflict operations! Del($thisOp) <==> $thatOp');
+          case TreeOperationType.del:
+            switch(thatOp.type) {
+              case TreeOperationType.add:
+                MyLogger.warn('Impossible operations! Del($thisOp) <==> Add($thatOp)');
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
-              case ContentOperationType.del:
+              case TreeOperationType.del:
                 _leaveLatestOperation(thisOp, thatOp); // Compatible, only leave one
                 break;
-              case ContentOperationType.add:
-                MyLogger.warn('Impossible operations! Del($thisOp) <==> Add($thatOp)');
+              case TreeOperationType.move:
+                MyLogger.warn('Conflict operations! Del($thisOp) <==> Move($thatOp)');
+                _leaveLatestOperation(thisOp, thatOp);
+                break;
+              case TreeOperationType.modify:
+                MyLogger.warn('Conflict operations! Del($thisOp) <==> Modify($thatOp)');
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
             }
             break;
-          case ContentOperationType.modify:
-            if(thisOp.data == null) {
+          case TreeOperationType.modify:
+            if(thisOp.newData == null) {
               thisOp.setFinished();
               continue;
             }
-            switch(thatOp.operation) {
-              case ContentOperationType.modify:
-                if(thatOp.data == null) {
+            switch(thatOp.type) {
+              case TreeOperationType.add:
+                MyLogger.warn('Impossible operations! Modify($thisOp) <==> Add($thatOp)');
+                _leaveLatestOperation(thisOp, thatOp);
+                break;
+              case TreeOperationType.del:
+                MyLogger.warn('Conflict operations! Modify($thisOp) <==> Del($thatOp)');
+                _leaveLatestOperation(thisOp, thatOp);
+                break;
+              case TreeOperationType.move:
+                // Compatible, do nothing
+                break;
+              case TreeOperationType.modify:
+                if(thatOp.newData == null) {
                   thatOp.setFinished();
                   continue;
                 }
-                if(thisOp.data != thatOp.data) {
+                if(thisOp.newData != thatOp.newData) {
                   MyLogger.warn('Find conflicts between $thisOp and $thatOp');
                   var baseHash = _findBaseHash(targetId);
                   if(baseHash == null) {
@@ -134,8 +156,8 @@ class MergeManager {
                   var conflict = ContentConflict(
                     targetId: targetId,
                     originalHash: baseHash,
-                    conflictHash1: thisOp.data!,
-                    conflictHash2: thatOp.data!,
+                    conflictHash1: thisOp.newData!,
+                    conflictHash2: thatOp.newData!,
                     timestamp1: thisOp.timestamp,
                     timestamp2: thatOp.timestamp,
                   );
@@ -146,17 +168,6 @@ class MergeManager {
                   _leaveLatestOperation(thisOp, thatOp); // If two operations' data are identical, leave any one shall be OK
                 }
                 break;
-              case ContentOperationType.del:
-                MyLogger.warn('Conflict operations! Modify($thisOp) <==> Del($thatOp)');
-                _leaveLatestOperation(thisOp, thatOp);
-                break;
-              case ContentOperationType.move:
-                // Compatible, do nothing
-                break;
-              case ContentOperationType.add:
-                MyLogger.warn('Impossible operations! Modify($thisOp) <==> Add($thatOp)');
-                _leaveLatestOperation(thisOp, thatOp);
-                break;
             }
             break;
         }
@@ -164,13 +175,13 @@ class MergeManager {
     }
   }
 
-  Map<String, List<ContentOperation>> _buildOperationsMap(List<ContentOperation> opList) {
-    var result = <String, List<ContentOperation>>{};
+  Map<String, List<TreeOperation>> _buildOperationsMap(List<TreeOperation> opList) {
+    var result = <String, List<TreeOperation>>{};
     for(var item in opList) {
-      String contentId = item.targetId;
+      String contentId = item.id;
       var ops = result[contentId];
       if(ops == null) {
-        ops = <ContentOperation>[];
+        ops = [];
         result[contentId] = ops;
       }
       ops.add(item);
@@ -178,7 +189,7 @@ class MergeManager {
     return result;
   }
 
-  void _leaveLatestOperation(ContentOperation thisOp, ContentOperation thatOp) {
+  void _leaveLatestOperation(TreeOperation thisOp, thatOp) {
     if(thisOp.timestamp < thatOp.timestamp) {
       thisOp.setFinished();
     } else {
@@ -186,34 +197,34 @@ class MergeManager {
     }
   }
 
-  VersionContent mergeVersions(List<ContentOperation> operations, List<String> parents) {
+  VersionContent mergeVersions(List<TreeOperation> operations, List<String> parents) {
     var table = baseVersion?.table?? [];
     int now = Util.getTimeStamp();
     for(var op in operations) {
       if(op.isFinished()) continue; // Skip deleted operation
 
-      switch(op.operation) {
-        case ContentOperationType.add:
+      switch(op.type) {
+        case TreeOperationType.add:
           int idx = _findIndexOf(table, op.previousId);
-          var newNode = VersionContentItem(docId: op.targetId, docHash: op.data!, updatedAt: now, parentDocId: op.parentId);
+          var newNode = VersionContentItem(docId: op.id, docHash: op.newData!, updatedAt: now, parentDocId: op.parentId);
           table.insert(idx + 1, newNode);
           break;
-        case ContentOperationType.del:
-          int idx = _findIndexOf(table, op.targetId);
+        case TreeOperationType.del:
+          int idx = _findIndexOf(table, op.id);
           table.removeAt(idx);
           break;
-        case ContentOperationType.move:
-          int idx = _findIndexOf(table, op.targetId);
+        case TreeOperationType.move:
+          int idx = _findIndexOf(table, op.id);
           var node = table.removeAt(idx);
           int newIdx = _findIndexOf(table, op.previousId);
           node.updatedAt = now;
           node.parentDocId = op.parentId; // Update parent relationship
           table.insert(newIdx + 1, node);
           break;
-        case ContentOperationType.modify:
-          int idx = _findIndexOf(table, op.targetId);
+        case TreeOperationType.modify:
+          int idx = _findIndexOf(table, op.id);
           var node = table[idx];
-          node.docHash = op.data!;
+          node.docHash = op.newData!;
           node.updatedAt = now;
           break;
       }

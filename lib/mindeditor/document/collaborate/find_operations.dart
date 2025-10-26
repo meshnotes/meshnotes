@@ -1,33 +1,14 @@
 import './find_operation_types.dart';
 
 /// Find transform operations from base to target
-/// 1. Convert base and target to flat structure
-/// 2. Find differences between target and base
-/// 3. Convert diff to transform operations
-List<TreeOperation> findOperations(List<TreeResource> base, List<TreeResource> target) {
-  final flatBase = _convertToFlat(base);
-  final flatTarget = _convertToFlat(target);
-  final (indexGenerator, oldMap, newMap) = _generateIndexes(flatBase, flatTarget);
-
-  final (added, deleted, moved, modified) = findDifferences(flatBase, flatTarget, oldMap, newMap, indexGenerator);
-
-  final operations = _convertDifferencesToOperations(added, deleted, moved, modified, oldMap, newMap);
-  
+/// 1. Generate maps and indexes for base and target, package them into a resource descriptor
+/// 2. Find differences(added, deleted, moved, and modified) between base and target
+/// 3. Convert differences to transform operations
+List<TreeOperation> findOperationsByFlat(List<FlatResource> base, target, int targetTimestamp) {
+  final resourceDescriptor = _generateIndexes(base, target, targetTimestamp);
+  final diffDescriptor = _findDifferences(resourceDescriptor);
+  final operations = _convertDifferencesToOperations(diffDescriptor, resourceDescriptor);
   return operations;
-}
-
-class FlatResource {
-  final String id;
-  final String content;
-  final String? parentId;
-  final String? previousId;
-
-  const FlatResource({
-    required this.id,
-    required this.content,
-    required this.parentId,
-    required this.previousId,
-  });
 }
 
 class _IndexGenerator {
@@ -53,25 +34,57 @@ class _IndexGenerator {
   }
 }
 
-/// Convert tree structure to flat structure
-List<FlatResource> _convertToFlat(List<TreeResource> roots) {
-  final List<FlatResource> result = [];
+class _ResourceDescriptor {
+  final List<FlatResource> base;
+  final List<FlatResource> target;
+  final int targetTimestamp;
+  final Map<String, FlatResource> baseMap;
+  final Map<String, FlatResource> targetMap;
+  final _IndexGenerator indexGenerator;
 
-  void traverse(String? parentId, List<TreeResource> nodes) {
-    String? previousId;
-    for (final node in nodes) {
-      // Keep only id/content in the flattened view; children are ignored in flat
-      result.add(FlatResource(id: node.id, content: node.content, parentId: parentId, previousId: previousId));
-      if (node.children.isNotEmpty) {
-        traverse(node.id, node.children);
-      }
-      previousId = node.id;
-    }
-  }
-
-  traverse(null, roots);
-  return result;
+  _ResourceDescriptor({
+    required this.base,
+    required this.target,
+    required this.targetTimestamp,
+    required this.baseMap,
+    required this.targetMap,
+    required this.indexGenerator,
+  });
 }
+
+class _DiffDescriptor {
+  final List<String> added;
+  final List<String> deleted;
+  final List<String> moved;
+  final List<String> modified;
+
+  _DiffDescriptor({
+    required this.added,
+    required this.deleted,
+    required this.moved,
+    required this.modified,
+  });
+}
+
+// /// Convert tree structure to flat structure
+// List<FlatResource> _convertToFlat(List<TreeResource> roots) {
+//   final List<FlatResource> result = [];
+
+//   void traverse(String? parentId, List<TreeResource> nodes) {
+//     String? previousId;
+//     for (final node in nodes) {
+//       // Keep only id/content in the flattened view; children are ignored in flat
+//       result.add(FlatResource(id: node.id, content: node.content, parentId: parentId, previousId: previousId, updatedAt: node.updatedAt));
+//       if (node.children.isNotEmpty) {
+//         traverse(node.id, node.children);
+//       }
+//       previousId = node.id;
+//     }
+//   }
+
+//   traverse(null, roots);
+//   return result;
+// }
 
 /// Find differences between target and base
 /// 1. Find unchanged nodes using LIS(Longest Increasing Subsequence) algorithm
@@ -79,9 +92,11 @@ List<FlatResource> _convertToFlat(List<TreeResource> roots) {
 /// 3. Find moved nodes
 /// 4. Find modified nodes
 /// 5. Return the differences
-(List<String>, List<String>, List<String>, List<String>) 
-findDifferences(List<FlatResource> flatBase, List<FlatResource> flatTarget, Map<String, FlatResource> oldMap, Map<String, FlatResource> newMap, _IndexGenerator indexGenerator) {
-
+_DiffDescriptor _findDifferences(_ResourceDescriptor resourceDescriptor) {
+  final oldMap = resourceDescriptor.baseMap;
+  final newMap = resourceDescriptor.targetMap;
+  final indexGenerator = resourceDescriptor.indexGenerator;
+  final flatTarget = resourceDescriptor.target;
   // Use indexGenerator to find unchanged nodes(LIS algorithm)
   final unchanged = _findUnchangedNodes(oldMap, flatTarget, indexGenerator);
 
@@ -91,11 +106,11 @@ findDifferences(List<FlatResource> flatBase, List<FlatResource> flatTarget, Map<
 
   final (moved, modified) = _findModifiedNodes(oldMap, newMap, unchanged);
 
-  return (added, deleted, moved, modified);
+  return _DiffDescriptor(added: added, deleted: deleted, moved: moved, modified: modified);
 }
 
 /// Returns index map, old key map, and new key map
-(_IndexGenerator, Map<String, FlatResource>, Map<String, FlatResource>) _generateIndexes(List<FlatResource> flatBase, List<FlatResource> flatTarget) {
+_ResourceDescriptor _generateIndexes(List<FlatResource> flatBase, List<FlatResource> flatTarget, int targetTimestamp) {
   final indexGenerator = _IndexGenerator(); // Build index for each id
   Map<String, FlatResource> oldMap = {};
   Map<String, FlatResource> newMap = {};
@@ -109,7 +124,14 @@ findDifferences(List<FlatResource> flatBase, List<FlatResource> flatTarget, Map<
     indexGenerator.generateIndex(item.id);
     newMap[item.id] = item;
   }
-  return (indexGenerator, oldMap, newMap);
+  return _ResourceDescriptor(
+    base: flatBase,
+    target: flatTarget,
+    targetTimestamp: targetTimestamp,
+    baseMap: oldMap,
+    targetMap: newMap,
+    indexGenerator: indexGenerator,
+  );
 }
 
 /// Use LIS algorithm to find longest common node key list
@@ -176,10 +198,17 @@ List<String> _subtract(Map<String, FlatResource> map1, Map<String, FlatResource>
   return (moved, modified);
 }
 
-List<TreeOperation> _convertDifferencesToOperations(List<String> added, deleted, moved, modified, Map<String, FlatResource> oldMap, newMap) {
+List<TreeOperation> _convertDifferencesToOperations(_DiffDescriptor diffDescriptor, _ResourceDescriptor resourceDescriptor) {
+  final added = diffDescriptor.added;
+  final deleted = diffDescriptor.deleted;
+  final moved = diffDescriptor.moved;
+  final modified = diffDescriptor.modified;
+  final oldMap = resourceDescriptor.baseMap;
+  final newMap = resourceDescriptor.targetMap;
+  final targetTimestamp = resourceDescriptor.targetTimestamp;
   List<TreeOperation> result = [];
   result.addAll(_generateAddedNodes(added, newMap));
-  result.addAll(_generateDeletedNodes(deleted, newMap));
+  result.addAll(_generateDeletedNodes(deleted, targetTimestamp));
   result.addAll(_generateMovedNodes(moved, newMap));
   result.addAll(_generateModifiedNodes(modified, oldMap, newMap));
   return result;
@@ -192,15 +221,22 @@ List<TreeOperation> _generateAddedNodes(List<String> added, Map<String, FlatReso
     if(targetItem == null) {
       continue;
     }
-    result.add(TreeOperation(type: TreeOperationType.add, id: item, parentId: targetItem.parentId, previousId: targetItem.previousId));
+    result.add(TreeOperation(
+      type: TreeOperationType.add,
+      id: item,
+      parentId: targetItem.parentId,
+      previousId: targetItem.previousId,
+      newData: targetItem.content,
+      timestamp: targetItem.updatedAt,
+    ));
   }
   return result;
 }
 
-List<TreeOperation> _generateDeletedNodes(List<String> deleted, Map<String, FlatResource> map) {
+List<TreeOperation> _generateDeletedNodes(List<String> deleted, int targetTimestamp) {
   List<TreeOperation> result = [];
   for(var item in deleted) {
-    result.add(TreeOperation(type: TreeOperationType.del, id: item));
+    result.add(TreeOperation(type: TreeOperationType.del, id: item, timestamp: targetTimestamp));
   }
   return result;
 }
@@ -212,7 +248,13 @@ List<TreeOperation> _generateMovedNodes(List<String> moved, Map<String, FlatReso
     if(targetItem == null) {
       continue;
     }
-    result.add(TreeOperation(type: TreeOperationType.move, id: item, parentId: targetItem.parentId, previousId: targetItem.previousId));
+    result.add(TreeOperation(
+      type: TreeOperationType.move,
+      id: item,
+      parentId: targetItem.parentId,
+      previousId: targetItem.previousId,
+      timestamp: targetItem.updatedAt,
+    ));
   }
   return result;
 }
@@ -225,7 +267,12 @@ List<TreeOperation> _generateModifiedNodes(List<String> modified, Map<String, Fl
     if(oldItem == null || targetItem == null) {
       continue;
     }
-    result.add(TreeOperation(type: TreeOperationType.modify, id: item, originalData: oldItem.content, newData: targetItem.content));
+    result.add(TreeOperation(
+      type: TreeOperationType.modify,
+      id: item,
+      newData: targetItem.content,
+      timestamp: targetItem.updatedAt,
+    ));
   }
   return result;
 }

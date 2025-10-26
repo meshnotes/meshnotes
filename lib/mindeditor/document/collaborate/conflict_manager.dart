@@ -2,14 +2,14 @@ import 'package:mesh_note/mindeditor/document/collaborate/merge_manager.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:my_log/my_log.dart';
 
-class ConflictManager {
+class DocumentConflictManager {
   DocContent baseDoc;
 
-  ConflictManager({
+  DocumentConflictManager({
     required this.baseDoc,
   });
 
-  (List<TransformOperation>, List<ContentConflict>) mergeOperations(DocContent doc1, int timestamp1, DocContent doc2, int timestamp2) {
+  (List<TransformOperation>, List<ContentConflict>) mergeDocumentOperations(DocContent doc1, int timestamp1, DocContent doc2, int timestamp2) {
     TransformManager tm1 = TransformManager(baseContent: baseDoc, createdAt: timestamp1);
     var operations1 = tm1.findTransformOperations(doc1);
     TransformManager tm2 = TransformManager(baseContent: baseDoc, createdAt: timestamp2);

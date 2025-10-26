@@ -1,3 +1,4 @@
+import 'package:mesh_note/mindeditor/document/collaborate/find_operation_types.dart';
 import 'package:test/test.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/find_operations.dart';
 
@@ -47,55 +48,52 @@ void main() {
     });
   });
 
-  group('findDifferences', () {
+  group('findOperations', () {
     test('empty input returns empty list', () {
-      final (added, deleted, moved, modified) = findDifferences([], []);
-      expect(added, equals([]));
-      expect(deleted, equals([]));
-      expect(moved, equals([]));
-      expect(modified, equals([]));
+      final operations = findOperationsByFlat(<FlatResource>[], <FlatResource>[], 0);
+      expect(operations.length, equals(0));
     });
 
     test('flat list of elements: add element', () {
       final list1 = _buildFlatList(['a', 'b', 'c', 'd', 'e']);
       final list2 = _buildFlatList(['a', 'f', 'b', 'c', 'd', 'e', 'g']);
-      final (added, deleted, moved, modified) = findDifferences(list1, list2);
-      expect(added, equals(['f', 'g']));
-      expect(deleted, equals([]));
-      expect(moved, equals([]));
-      expect(modified, equals([]));
+      final result = findOperationsByFlat(list1, list2, 0);
+      expect(result.length, equals(2));
+      expect(result[0].type, equals(TreeOperationType.add));
+      expect(result[0].id, equals('f'));
+      expect(result[1].type, equals(TreeOperationType.add));
+      expect(result[1].id, equals('g'));
     });
 
     test('flat list of elements: delete element', () {
       final list1 = _buildFlatList(['a', 'b', 'c', 'd', 'e']);
       final list2 = _buildFlatList(['b', 'c', 'd', 'e']);
-      final (added, deleted, moved, modified) = findDifferences(list1, list2);
-      expect(added, equals([]));
-      expect(deleted, equals(['a']));
-      expect(moved, equals([]));
-      expect(modified, equals([]));
+      final result = findOperationsByFlat(list1, list2, 0);
+      expect(result.length, equals(1));
+      expect(result[0].type, equals(TreeOperationType.del));
+      expect(result[0].id, equals('a'));
     });
 
     test('flat list of elements: move element', () {
       final list1 = _buildFlatList(['a', 'b', 'c', 'd', 'e']);
       final list2 = _buildFlatList(['a', 'e', 'b', 'd', 'c']);
-      final (added, deleted, moved, modified) = findDifferences(list1, list2);
-      expect(added, equals([]));
-      expect(deleted, equals([]));
-      expect(moved.contains('d'), isTrue);
-      expect(moved.contains('e'), isTrue);
-      expect(modified, equals([]));
+      final result = findOperationsByFlat(list1, list2, 0);
+      expect(result.length, equals(2));
+      expect(result[0].type, equals(TreeOperationType.move));
+      expect(result[0].id, equals('d'));
+      expect(result[1].type, equals(TreeOperationType.move));
+      expect(result[1].id, equals('e'));
     });
 
     test('flat list of elements: modify element', () {
       final list1 = _buildFlatListWithContent([['a'], ['b', 'b1'], ['c'], ['d'], ['e']]);
       final list2 = _buildFlatListWithContent([['a'], ['b', 'b2'], ['c'], ['d'], ['e', 'e2']]);
-      final (added, deleted, moved, modified) = findDifferences(list1, list2);
-      expect(added, equals([]));
-      expect(deleted, equals([]));
-      expect(moved, equals([]));
-      expect(modified.contains('b'), isTrue);
-      expect(modified.contains('e'), isTrue);
+      final result = findOperationsByFlat(list1, list2, 0);
+      expect(result.length, equals(2));
+      expect(result[0].type, equals(TreeOperationType.modify));
+      expect(result[0].id, equals('b'));
+      expect(result[1].type, equals(TreeOperationType.modify));
+      expect(result[1].id, equals('e'));
     });
 
     test('tree list of elements: add element', () {
@@ -155,13 +153,12 @@ void main() {
           'previous': 'e',
         }
       });
-      final (added, deleted, moved, modified) = findDifferences(list1, list2);
-      expect(added.contains('f'), isTrue);
-      expect(added.contains('g'), isTrue);
-      expect(added.contains('h'), isTrue);
-      expect(deleted, equals([]));
-      expect(moved, equals([]));
-      expect(modified, equals([]));
+      final result = findOperationsByFlat(list1, list2, 0);
+      expect(result.length, equals(3));
+      final expectedNodes = ['f', 'g', 'h'];
+      for(var expectedNode in expectedNodes) {
+        expect(result.any((operation) => operation.id == expectedNode && operation.type == TreeOperationType.add), isTrue);
+      }
     });
 
     test('tree list of elements: delete element', () {
@@ -209,12 +206,12 @@ void main() {
           'previous': 'd',
         },
       });
-      final (added, deleted, moved, modified) = findDifferences(list1, list2);
-      expect(added, equals([]));
-      expect(deleted.contains('c'), isTrue);
-      expect(deleted.contains('f'), isTrue);
-      expect(moved, equals([]));
-      expect(modified, equals([]));
+      final result = findOperationsByFlat(list1, list2, 0);
+      expect(result.length, equals(2));
+      final expectedNodes = ['c', 'f'];
+      for(var expectedNode in expectedNodes) {
+        expect(result.any((operation) => operation.id == expectedNode && operation.type == TreeOperationType.del), isTrue);
+      }
     });
 
    test('tree list of elements: move element', () {
@@ -278,12 +275,12 @@ void main() {
           'previous': 'g',
         },
       });
-      final (added, deleted, moved, modified) = findDifferences(list1, list2);
-      expect(added, equals([]));
-      expect(deleted, equals([]));
-      expect(moved.contains('c'), isTrue); // reparent
-      expect(moved.contains('d'), isTrue); // move
-      expect(modified, equals([]));
+      final result = findOperationsByFlat(list1, list2, 0);
+      expect(result.length, equals(2));
+      final expectedNodes = ['c', 'd'];
+      for(var expectedNode in expectedNodes) {
+        expect(result.any((operation) => operation.id == expectedNode && operation.type == TreeOperationType.move), isTrue);
+      }
     });
   });
 }
@@ -307,7 +304,7 @@ List<FlatResource> _buildFlatList(List<String> tags) {
   List<FlatResource> result = [];
   String? previous;
   for(var tag in tags) {
-    result.add(FlatResource(id: tag, content: tag, parentId: null, previousId: previous));
+    result.add(FlatResource(id: tag, content: tag, parentId: null, previousId: previous, updatedAt: 0));
     previous = tag;
   }
   return result;
@@ -322,7 +319,7 @@ List<FlatResource> _buildFlatListWithContent(List<List<String>> content) {
     if(item.length > 1) {
       content = item[1];
     }
-    result.add(FlatResource(id: key, content: content, parentId: null, previousId: previous));
+    result.add(FlatResource(id: key, content: content, parentId: null, previousId: previous, updatedAt: 0));
     previous = key;
   }
   return result;
@@ -335,7 +332,7 @@ List<FlatResource> _buildTreeListWithContent(Map<String, Map<String, String?>> c
     final subMap = item.value;
     var parentId = subMap['parent'];
     var previousId = subMap['previous'];
-    result.add(FlatResource(id: key, content: key, parentId: parentId, previousId: previousId));
+    result.add(FlatResource(id: key, content: key, parentId: parentId, previousId: previousId, updatedAt: 0));
   }
   return result;
 }

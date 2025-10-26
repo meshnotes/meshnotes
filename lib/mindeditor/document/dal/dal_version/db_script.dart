@@ -52,7 +52,7 @@ class DbVersion2 extends DbScript {
   static Map<String, String> sql = {
     ...DbVersion1.sql,
     // The only change is the documents table
-    'Create documents': 'CREATE TABLE IF NOT EXISTS documents(doc_id TEXT PRIMARY KEY, parent_doc_id TEXT DEFAULT NULL, doc_content TEXT, doc_hash TEXT, is_private INTEGER, updated_at INTEGER)',
+    'Create documents': 'CREATE TABLE IF NOT EXISTS documents(doc_id TEXT PRIMARY KEY, parent_doc_id TEXT DEFAULT NULL, order_id INTEGER DEFAULT 0, doc_content TEXT, doc_hash TEXT, is_private INTEGER, updated_at INTEGER)',
   };
   DbVersion2(): super(version: ver, createSql: sql);
 

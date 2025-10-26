@@ -13,8 +13,8 @@ void main() {
     var doc1 = _genSimpleDocContent(['a', 'b', 'c']);
     var doc2 = _genSimpleDocContent(['d', 'e']);
 
-    var cm = ConflictManager(baseDoc: baseDoc);
-    var (operations, conflicts) = cm.mergeOperations(doc1, 0, doc2, 1);
+    var cm = DocumentConflictManager(baseDoc: baseDoc);
+    var (operations, conflicts) = cm.mergeDocumentOperations(doc1, 0, doc2, 1);
     var newDoc = cm.mergeDocument(operations);
     var contents = newDoc.contents;
 
@@ -42,8 +42,8 @@ void main() {
     var doc1 = _genSimpleDocContent(['a', 'b', 'd']); // delete c and e
     var doc2 = _genSimpleDocContent(['b', 'd', 'e']); // delete a and c
 
-    var cm = ConflictManager(baseDoc: baseDoc);
-    var (operations, conflicts) = cm.mergeOperations(doc1, 0, doc2, 1);
+    var cm = DocumentConflictManager(baseDoc: baseDoc);
+    var (operations, conflicts) = cm.mergeDocumentOperations(doc1, 0, doc2, 1);
     var newDoc = cm.mergeDocument(operations);
     var contents = newDoc.contents;
 
@@ -62,8 +62,8 @@ void main() {
     var doc1 = _genSimpleDocContent(['b', 'a', 'c', 'd']);
     var doc2 = _genSimpleDocContent(['a', 'b', 'd', 'c']);
 
-    var cm = ConflictManager(baseDoc: baseDoc);
-    var (operations, conflicts) = cm.mergeOperations(doc1, 0, doc2, 1);
+    var cm = DocumentConflictManager(baseDoc: baseDoc);
+    var (operations, conflicts) = cm.mergeDocumentOperations(doc1, 0, doc2, 1);
     var newDoc = cm.mergeDocument(operations);
     var contents = newDoc.contents;
 
@@ -93,8 +93,8 @@ void main() {
     doc2.contents[1].blockHash = 'hash_b_2';
     doc2.contents[2].blockHash = 'hash_c_2';
 
-    var cm = ConflictManager(baseDoc: baseDoc);
-    var (operations, conflicts) = cm.mergeOperations(doc1, 0, doc2, 1);
+    var cm = DocumentConflictManager(baseDoc: baseDoc);
+    var (operations, conflicts) = cm.mergeDocumentOperations(doc1, 0, doc2, 1);
     var newDoc = cm.mergeDocument(operations);
     var contents = newDoc.contents;
 
@@ -118,8 +118,8 @@ void main() {
     var doc2 = _genSimpleDocContent(['a', 'e', 'b', 'c', 'd', 'f']); // move e, modify a, add f
     doc2.contents[0].blockHash = 'hash_a_2';
 
-    var cm = ConflictManager(baseDoc: baseDoc);
-    var (operations, conflicts) = cm.mergeOperations(doc1, 0, doc2, 1);
+    var cm = DocumentConflictManager(baseDoc: baseDoc);
+    var (operations, conflicts) = cm.mergeDocumentOperations(doc1, 0, doc2, 1);
     var newDoc = cm.mergeDocument(operations);
     var contents = newDoc.contents;
 

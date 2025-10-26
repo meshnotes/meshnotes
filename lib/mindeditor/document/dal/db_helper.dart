@@ -135,6 +135,21 @@ class DbHelper {
     _database.execute(sql, [docContent, timestamp, docId]);
   }
 
+  void updateDocTimestamp(String docId, int timestamp) {
+    const sqlUpdateDoc = 'UPDATE documents SET updated_at=? WHERE doc_id=? AND updated_at<?';
+    _database.execute(sqlUpdateDoc, [timestamp, docId, timestamp]);
+  }
+
+  void updateDocOrderId(String docId, int orderId) {
+    const sql = 'UPDATE documents SET order_id=? WHERE doc_id=?';
+    _database.execute(sql, [orderId, docId]);
+  }
+
+  void clearAllDocumentHashes() {
+    const sql = 'UPDATE documents SET doc_hash=?';
+    _database.execute(sql, [ModelConstants.hashEmpty]);
+  }
+
   void storeDocBlock(String docId, String blockId, String data, int timestamp) {
     const sql = 'INSERT INTO blocks(doc_id, block_id, data, updated_at) VALUES(?, ?, ?, ?) '
         'ON CONFLICT(doc_id, block_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at';
@@ -186,11 +201,6 @@ class DbHelper {
       );
     }
     return result;
-  }
-
-  void updateDocTimestamp(String docId, int timestamp) {
-    const sqlUpdateDoc = 'UPDATE documents SET updated_at=? WHERE doc_id=? AND updated_at<?';
-    _database.execute(sqlUpdateDoc, [timestamp, docId, timestamp]);
   }
 
   VersionDataModel? getVersionData(String versionHash) {
@@ -247,7 +257,7 @@ class DbHelper {
     return result;
   }
   List<DocDataModel> getAllDocuments() {
-    const sql = 'SELECT doc_id, doc_hash, updated_at, is_private, parent_doc_id FROM documents';
+    const sql = 'SELECT doc_id, doc_hash, updated_at, is_private, parent_doc_id, order_id FROM documents';
     final resultSet = _database.select(sql, []);
     MyLogger.debug('getAllDocuments: result=$resultSet');
     var result = <DocDataModel>[];
@@ -258,7 +268,16 @@ class DbHelper {
       int isPrivate = row['is_private'];
       int updatedAt = row['updated_at'];
       String? parentDocId = row['parent_doc_id'];
-      result.add(DocDataModel(docId: docId, title: '', hash: docHash, isPrivate: isPrivate, timestamp: updatedAt, parentDocId: parentDocId));
+      int orderId = row['order_id'];
+      result.add(DocDataModel(
+        docId: docId,
+        title: '',
+        hash: docHash,
+        isPrivate: isPrivate,
+        timestamp: updatedAt,
+        parentDocId: parentDocId,
+        orderId: orderId,
+      ));
     }
     return result;
   }
@@ -390,10 +409,6 @@ class DbHelper {
     const sql = 'DELETE FROM objects';
     _database.execute(sql);
   }
-  void clearAllDocumentHashes() {
-    const sql = 'UPDATE documents SET doc_hash=?';
-    _database.execute(sql, [ModelConstants.hashEmpty]);
-  }
 
   void clearSyncingTables() {
     const sqlVersions = 'DELETE FROM sync_versions';
@@ -420,10 +435,10 @@ class DbHelper {
     _database.execute(sql, [name]);
   }
 
-  String newDocument(int timestamp, {String? parentDocId}) {
+  String newDocument(int timestamp, int orderId, {String? parentDocId}) {
     var docId = IdGen.getUid();
-    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at, parent_doc_id) VALUES(?, ?, ?, ?, ?, ?)';
-    _database.execute(sql, [docId, ModelConstants.hashEmpty, '', ModelConstants.isPrivateNo, timestamp, parentDocId]);
+    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at, parent_doc_id, order_id) VALUES(?, ?, ?, ?, ?, ?, ?)';
+    _database.execute(sql, [docId, ModelConstants.hashEmpty, '', ModelConstants.isPrivateNo, timestamp, parentDocId, orderId]);
 
     return docId;
   }
@@ -438,11 +453,11 @@ class DbHelper {
     _database.execute(sqlContents, [docId]);
   }
 
-  void insertOrUpdateDoc(String docId, String docHash, int timestamp, {String? parentDocId}) {
+  void insertOrUpdateDoc(String docId, String docHash, int timestamp, int orderId, {String? parentDocId}) {
     // When insert, set doc_content to empty string, is_private to 0. But when update, don't set doc_content and is_private
-    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at, parent_doc_id) VALUES(?, ?, ?, ?, ?, ?) '
-        'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at, parent_doc_id=excluded.parent_doc_id';
-    _database.execute(sql, [docId, docHash, '', ModelConstants.isPrivateNo, timestamp, parentDocId]);
+    const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at, parent_doc_id, order_id) VALUES(?, ?, ?, ?, ?, ?, ?) '
+        'ON CONFLICT(doc_id) DO UPDATE SET doc_hash=excluded.doc_hash, updated_at=excluded.updated_at, parent_doc_id=excluded.parent_doc_id, order_id=excluded.order_id';
+    _database.execute(sql, [docId, docHash, '', ModelConstants.isPrivateNo, timestamp, parentDocId, orderId]);
   }
 
   List<(String, String)> getAllBlocks() {
@@ -555,7 +570,7 @@ class DbHelper {
 
   /// Get all child documents of a specific parent document
   List<DocDataModel> getChildDocuments(String parentDocId) {
-    const sql = 'SELECT doc_id, doc_hash, updated_at, is_private, parent_doc_id FROM documents WHERE parent_doc_id = ?';
+    const sql = 'SELECT doc_id, doc_hash, updated_at, is_private, parent_doc_id, order_id FROM documents WHERE parent_doc_id = ?';
     final resultSet = _database.select(sql, [parentDocId]);
     MyLogger.debug('getChildDocuments: parentDocId=$parentDocId, result=$resultSet');
     var result = <DocDataModel>[];
@@ -565,7 +580,16 @@ class DbHelper {
       int isPrivate = row['is_private'];
       int updatedAt = row['updated_at'];
       String? parentDocId = row['parent_doc_id'];
-      result.add(DocDataModel(docId: docId, title: '', hash: docHash, isPrivate: isPrivate, timestamp: updatedAt, parentDocId: parentDocId));
+      int orderId = row['order_id'];
+      result.add(DocDataModel(
+        docId: docId,
+        title: '',
+        hash: docHash,
+        isPrivate: isPrivate,
+        timestamp: updatedAt,
+        parentDocId: parentDocId,
+        orderId: orderId,
+      ));
     }
     return result;
   }
