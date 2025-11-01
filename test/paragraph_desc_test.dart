@@ -49,6 +49,6 @@ void testStyleSetting1() {
 ParagraphDesc _newDocumentWithJson(String json) {
   var result = ParagraphDesc.fromStringList(IdGen.getUid(), 'text', json, Constants.blockListTypeNone, Constants.blockLevelDefault);
   // Set db and parent to null for test
-  Document(id: IdGen.getUid(), paras: [result], parent: null, time: Util.getTimeStamp(), db: null);
+  Document(id: IdGen.getUid(), paras: [result], manager: null, time: Util.getTimeStamp(), db: null);
   return result;
 }

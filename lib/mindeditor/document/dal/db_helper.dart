@@ -453,6 +453,14 @@ class DbHelper {
     _database.execute(sqlContents, [docId]);
   }
 
+  void deleteDocuments(List<String> docIds) {
+    if (docIds.isEmpty) return;
+    // Generate placeholders based on the number of IDs
+    final placeholders = List.filled(docIds.length, '?').join(', ');
+    final sql = 'DELETE FROM documents WHERE doc_id IN ($placeholders)';
+    _database.execute(sql, docIds);
+  }
+
   void insertOrUpdateDoc(String docId, String docHash, int timestamp, int orderId, {String? parentDocId}) {
     // When insert, set doc_content to empty string, is_private to 0. But when update, don't set doc_content and is_private
     const sql = 'INSERT INTO documents(doc_id, doc_hash, doc_content, is_private, updated_at, parent_doc_id, order_id) VALUES(?, ?, ?, ?, ?, ?, ?) '

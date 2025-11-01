@@ -301,8 +301,8 @@ class Controller {
       CallbackRegistry.closeDocument();
     }
   }
-  void openDocument(String docId) {
-    _docManager!.openDocument(docId);
+  void openDocument(String docId, {bool needSyncVersionTree = true}) {
+    _docManager!.openDocument(docId, needSyncVersionTree: needSyncVersionTree);
     _refreshDocumentView();
   }
   void newDocument({String? parentDocId}) {
@@ -313,7 +313,7 @@ class Controller {
     eventTasksManager.addAfterDocumentOpenedOnceTask(() {
       selectionController.selectTitle();
     });
-    openDocument(docId);
+    openDocument(docId, needSyncVersionTree: false);
   }
 
   void closeDocument() {

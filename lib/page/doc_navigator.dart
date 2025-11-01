@@ -13,7 +13,6 @@ import 'menu.dart';
 import 'setting_page_small_screen.dart';
 import 'inspired_page.dart';
 import 'resizable_view.dart';
-import '../mindeditor/document/dal/doc_data_model.dart';
 import '../mindeditor/document/doc_title_node.dart';
 import '../mindeditor/setting/constants.dart';
 import 'users_page/user_info_setting_menu.dart';
@@ -38,7 +37,7 @@ class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
 
 class DocumentNavigatorState extends State<DocumentNavigator> {
   static const String watcherKey = 'doc_navigator';
-  List<DocTitleNode> docList = [];
+  List<DocTitleFlat> docList = [];
   int? selected;
   _NetworkStatus _networkStatus = _NetworkStatus.lost;
   int _peerCount = 0;
@@ -53,7 +52,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     CallbackRegistry.registerDocumentChangedWatcher(watcherKey, refreshDocumentList);
     CallbackRegistry.registerNetworkStatusWatcher(_onNetworkStatusChanged);
     CallbackRegistry.registerPeerNodesChangedWatcher(_onPeerNodesChanged);
-    docList = controller.docManager.getHierarchicalDocumentList();
+    docList = controller.docManager.getFlattenedDocumentList();
     final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
     controller.eventTasksManager.addSyncingTask(_updateSyncing);
@@ -114,7 +113,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
                 children: [
                   SizedBox(
                     width: 16.0,
-                    child: docNode.hasChildren
+                    child: docNode.hasChild()
                         ? Icon(
                             Icons.keyboard_arrow_right,
                             size: 16.0,
@@ -310,7 +309,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   }
 
   /// Build action buttons for each document item
-  Widget? _buildDocumentActions(BuildContext context, DocTitleNode docNode) {
+  Widget? _buildDocumentActions(BuildContext context, DocTitleFlat docNode) {
     return GestureDetector(
       onTapDown: (details) {
         _showDocumentMenu(context, details.globalPosition, docNode);
@@ -329,7 +328,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   }
 
   /// Show context menu for document
-  void _showDocumentMenu(BuildContext context, Offset position, DocTitleNode docNode) {
+  void _showDocumentMenu(BuildContext context, Offset position, DocTitleFlat docNode) {
     final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     
     showMenu<String>(
@@ -382,8 +381,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   }
 
   /// Show delete confirmation dialog
-  void _showDeleteConfirmation(BuildContext context, DocTitleNode docNode) {
-    final hasChildren = docNode.hasChildren;
+  void _showDeleteConfirmation(BuildContext context, DocTitleFlat docNode) {
+    final hasChildren = docNode.hasChild();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -416,7 +415,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
 
   void refreshDocumentList() {
     setState(() {
-      docList = controller.docManager.getHierarchicalDocumentList();
+      docList = controller.docManager.getFlattenedDocumentList();
     });
   }
 

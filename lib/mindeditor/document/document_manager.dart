@@ -33,7 +33,7 @@ class DocumentManager {
   VersionManager vm = VersionManager();
   DiffManager dm = DiffManager();
   String? currentDocId;
-  List<DocDataModel> _docTitles = [];
+  List<DocTitleMeta> _docTitles = [];
   String _currentVersion = '';
   int _currentVersionTimestamp = 0;
   Timer? _idleTimer;
@@ -79,32 +79,40 @@ class DocumentManager {
     return currentDocId;
   }
 
-  List<DocDataModel> getAllDocuments() {
-    if(_docTitles.isNotEmpty) {
-      return _docTitles;
-    }
-    var data = _getAllDocumentAndTitles();
+  List<DocTitleMeta> getAllFlatDocumentTitlesUnsorted() {
+    var data = _getRawDocumentData();
     var (_version, _time) = _getCurrentVersionAndTimestamp();
     _currentVersion = _version;
     _currentVersionTimestamp = _time;
-    _docTitles = data;
-    for(var docTitle in _docTitles) {
-      if(docTitle.timestamp > _currentVersionTimestamp) {
+    List<DocTitleMeta> result = [];
+    for(var docData in data) {
+      if(docData.timestamp > _currentVersionTimestamp) {
         setModified();
       }
+      final docTitle = DocTitleMeta(
+        docId: docData.docId,
+        title: docData.title,
+        hash: docData.hash,
+        isPrivate: docData.isPrivate,
+        timestamp: docData.timestamp,
+        orderId: docData.orderId,
+        parentDocId: docData.parentDocId,
+        parent: null,
+      );
+      result.add(docTitle);
     }
-    return _docTitles;
+    return result;
   }
 
   /// Open document with docId to be current document
-  void openDocument(String docId) {
+  void openDocument(String docId, {bool needSyncVersionTree = true}) {
     if(docId == currentDocId) return;
 
     if(currentDocId != null) {
       _documents[currentDocId]?.closeDocument();
     }
     // If modified, sync it before opening new document
-    if(hasModified()) {
+    if(hasModified() && needSyncVersionTree) {
       controller.tryToSaveAndSendVersionTree();
     }
 
@@ -145,9 +153,10 @@ class DocumentManager {
   }
 
   void deleteDocument(String docId) {
-    _db.deleteDocument(docId);
-    _docTitles.removeWhere((e) => e.docId == docId);
-    _documents.remove(docId);
+    final relatedDocIds = _recursiveGetDocumentId(docId);
+    _db.deleteDocuments(relatedDocIds);
+    _removeDocTitleNode(docId);
+    _documents.removeWhere((key, value) => relatedDocIds.contains(key));
     setModified();
   }
   void deleteCurrentDocument() {
@@ -413,17 +422,10 @@ class DocumentManager {
     }
     // 4. Remove document that is not in new version tree, that means it is deleted
     List<String> docToDelete = [];
-    for(var docTitle in _docTitles) {
-      final docId = docTitle.docId;
-      bool found = false;
-      for(var docNode in contentVersion.table) {
-        if(docId == docNode.docId) {
-          found = true;
-          break;
-        }
-      }
-      if(!found) {
-        docToDelete.add(docId);
+    final allDocTitles = _getAllDocTitles();
+    for(var docTitle in allDocTitles) {
+      if(!contentVersion.table.any((e) => e.docId == docTitle.docId)) {
+        docToDelete.add(docTitle.docId);
       }
     }
     // Handle hierarchical deletion: only delete root documents of deletion hierarchies
@@ -462,32 +464,31 @@ class DocumentManager {
     final doc = Document.createDocument(_db, title, content, this, now, -1, parentDocId: parentDocId);
     final docId = doc.id;
     _documents[docId] = doc;
-    _updateDocTitles(DocDataModel(
+    _updateDocTitles(DocTitleMeta(
       docId: docId,
       title: doc.getTitle().getPlainText(),
+      hash: ModelConstants.hashEmpty,
+      isPrivate: ModelConstants.isPrivateNo,
       timestamp: now,
-      parentDocId: parentDocId,
       orderId: -1, // place holder, will be updated later
+      parentDocId: parentDocId,
+      parent: null,
     ));
+    CallbackRegistry.triggerDocumentChangedEvent();
     return docId;
   }
 
   void _updateDoc(VersionContentItem node, Map<String, String> objects) {
     var docId = node.docId;
-    DocDataModel? found;
-    for(var item in _docTitles) {
-      if(item.docId == docId) {
-        found = item;
-        break;
-      }
-    }
+    var found = _findDocTitleNode(docId);
     /// 1. If not found, insert it
     /// 2. If found, update it, and restore doc content
     if(found == null) {
-      found = DocDataModel(
+      found = DocTitleMeta(
         docId: docId,
         title: '',
         hash: node.docHash,
+        isPrivate: ModelConstants.isPrivateNo,
         timestamp: node.updatedAt,
         parentDocId: node.parentDocId,
         orderId: -1, // place holder, will be updated later
@@ -612,36 +613,91 @@ class DocumentManager {
   }
 
   bool _doUpdateDocTitle(String docId, String title, int timestamp) {
-    for(var node in _docTitles) {
-      if(node.docId == docId) {
-        node.title = title;
-        node.timestamp = timestamp;
-        return true;
-      }
-    }
-    return false;
+    final targetNode = _findDocTitleNode(docId);
+    if(targetNode == null) return false;
+    targetNode.title = title;
+    targetNode.timestamp = timestamp;
+    return true;
   }
 
-  void _updateDocTitles(DocDataModel docData) {
+  void _updateDocTitles(DocTitleMeta docData) {
     if(!_doUpdateDocTitle(docData.docId, docData.title, docData.timestamp)) {
       _appendToDocTitles(docData);
     }
   }
   /// Append docData to _docTitles according to its parentDocId, and decide the orderId
-  void _appendToDocTitles(DocDataModel docData) {
-    //TODO: Implement this function
+  /// All nodes following the new node must update their orderId
+  void _appendToDocTitles(DocTitleMeta docData) {
+    // 1. Find the list with the same parent
     final targetParent = docData.parentDocId;
-    final targetOrderId = docData.orderId;
-    String? currentParent = null;
-    int currentOrderId = 0;
-    for(var node in _docTitles) {
-      if(currentParent == targetParent && currentOrderId == targetOrderId) {
-        _insertBefore(node, docData);
-        return;
-      }
+    var targetOrderId = docData.orderId;
+    final listToBeInserted = _getChildrenOfParent(targetParent);
+    // 2. Insert to the proper position
+    if(targetOrderId < 0 || targetOrderId >= listToBeInserted.length) {
+      listToBeInserted.add(docData);
+      targetOrderId = listToBeInserted.length - 1;
+    } else {
+      listToBeInserted.insert(targetOrderId, docData);
     }
-    xcvafdasf;
-    _db.updateDocOrderId(docData.docId, docData.orderId);
+    // 3. Update the orderId of all nodes following the new node, including the new node itself
+    for(var i = targetOrderId; i < listToBeInserted.length; i++) {
+      listToBeInserted[i].orderId = i;
+      _db.updateDocOrderId(listToBeInserted[i].docId, listToBeInserted[i].orderId);
+    }
+  }
+  void _removeDocTitleNode(String docId) {
+    final targetNode = _findDocTitleNode(docId);
+    if(targetNode == null) return;
+    final orderId = targetNode.orderId;
+    final parentNode = targetNode.parent;
+    List<DocTitleMeta> siblings = _docTitles;
+    if(parentNode != null) {
+      siblings = parentNode.children;
+    }
+    siblings.removeAt(orderId);
+    for(var i = orderId; i < siblings.length; i++) {
+      siblings[i].orderId = i;
+      _db.updateDocOrderId(siblings[i].docId, siblings[i].orderId);
+    }
+  }
+  DocTitleMeta? _findDocTitleNode(String docId) {
+    /// Recursively search the node with the given docId
+    /// Return null if not found
+    DocTitleMeta? _recursivelyFindDocTitleNode(List<DocTitleMeta> list, String docId) {
+      for(var node in list) {
+        if(node.docId == docId) {
+          return node;
+        }
+      }
+      for(var node in list) {
+        final result = _recursivelyFindDocTitleNode(node.children, docId);
+        if(result != null) {
+          return result;
+        }
+      }
+      return null;
+    }
+    return _recursivelyFindDocTitleNode(_docTitles, docId);
+  }
+  List<String> _recursiveGetDocumentId(String docId) {
+    final targetNode = _findDocTitleNode(docId);
+    if(targetNode == null) return [];
+    final children = targetNode.children;
+    List<String> result = [docId];
+    for(var child in children) {
+      result.addAll(_recursiveGetDocumentId(child.docId));
+    }
+    return result;
+  }
+  /// Get all the children of target parent
+  /// If parent is null, return root list
+  /// If parent is not found, return root list
+  List<DocTitleMeta> _getChildrenOfParent(String? parentDocId) {
+    if(parentDocId == null) {
+      return _docTitles;
+    }
+    final targetNode = _findDocTitleNode(parentDocId);
+    return targetNode?.children?? _docTitles;
   }
 
   void setIdle() {
@@ -653,13 +709,8 @@ class DocumentManager {
     });
   }
 
-  DocDataModel? _getDocTreeNode(String docId) {
-    for(var node in _docTitles) {
-      if(node.docId == docId) {
-        return node;
-      }
-    }
-    return null;
+  DocTitleMeta? _getDocTreeNode(String docId) {
+    return _findDocTitleNode(docId);
   }
 
   void _storeVersionFromLocalAndUpdateCurrentVersion(VersionContent version, List<String> parents, int now, {bool fastForward = false}) {
@@ -695,13 +746,13 @@ class DocumentManager {
     List<Document> modifiedDocuments = _findDocumentsNeedToUpdate();
     Map<String, String> newHashes = _genAndSaveDocuments(modifiedDocuments);
     _updateDocumentHashes(newHashes, now);
-    var docTable = _genDocTreeNodeList(_docTitles);
+    var docTable = _genDocTreeNodeList(getFlattenedDocumentList());
     var version = VersionContent(table: docTable, timestamp: now, parentsHash: parents);
     _clearModified(modifiedDocuments);
     return version;
   }
 
-  static List<VersionContentItem> _genDocTreeNodeList(List<DocDataModel> list) {
+  static List<VersionContentItem> _genDocTreeNodeList(List<DocTitleFlat> list) {
     List<VersionContentItem> result = [];
     for(var item in list) {
       var node = VersionContentItem(
@@ -731,7 +782,7 @@ class DocumentManager {
         modifiedDocIds.add(doc.id);
       }
     }
-    for(var docTitle in _docTitles) {
+    for(var docTitle in _getAllDocTitles()) {
       if(docTitle.hash == ModelConstants.hashEmpty) {
         modifiedDocIds.add(docTitle.docId);
         continue;
@@ -760,11 +811,11 @@ class DocumentManager {
     return result;
   }
   void _updateDocumentHashes(Map<String, String> newHashes, int now) {
-    for(var docData in _docTitles) {
-      final docId = docData.docId;
+    for(var docTitle in _getAllDocTitles()) {
+      final docId = docTitle.docId;
       var newHash = newHashes[docId];
       if(newHash != null) {
-        docData.hash = newHash;
+        docTitle.hash = newHash;
         _db.updateDocHash(docId, newHash, now);
       }
     }
@@ -953,12 +1004,16 @@ class DocumentManager {
   }
   
   /// Get hierarchical document list for UI display (flattened with level info)
-  List<DocTitleNode> getHierarchicalDocumentList() {
-    var roots = _buildDocumentTree();
-    List<DocTitleNode> flatList = [];
+  List<DocTitleFlat> getFlattenedDocumentList() {
+    if(_docTitles.isEmpty) {
+      _buildDocumentTreeAndSort();
+    }
+    var roots = _docTitles;
+    List<DocTitleFlat> flatList = [];
     
+    int level = 0;
     for(var root in roots) {
-      flatList.addAll(root.toFlatList());
+      flatList.addAll(root.toFlatList(level));
     }
     
     return flatList;
@@ -1134,7 +1189,7 @@ class DocumentManager {
     return DocContent.fromJson(jsonDecode(obj.data));
   }
 
-  List<DocDataModel> _getAllDocumentAndTitles() {
+  List<DocDataModel> _getRawDocumentData() {
     var data = _db.getAllDocuments();
     var titleMap = _db.getAllTitles();
     for(var doc in data) {
@@ -1340,29 +1395,50 @@ class DocumentManager {
   }
 
   /// Build document tree structure
-  List<DocTitleNode> _buildDocumentTree() {
-    var allDocs = getAllDocuments();
-    Map<String, DocTitleNode> nodeMap = {};
-    List<DocTitleNode> rootNodes = [];
+  List<DocTitleMeta> _buildDocumentTreeAndSort() {
+    var allDocsInFlat = getAllFlatDocumentTitlesUnsorted();
+    Map<String, DocTitleMeta> nodeMap = {};
+    List<DocTitleMeta> rootNodes = [];
 
     // Create nodes for all documents
-    for(var doc in allDocs) {
-      nodeMap[doc.docId] = DocTitleNode(document: doc);
+    for(var doc in allDocsInFlat) {
+      nodeMap[doc.docId] = doc;
     }
 
     // Build parent-child relationships
-    for(var doc in allDocs) {
-      var node = nodeMap[doc.docId]!;
-      if(doc.parentDocId != null && nodeMap.containsKey(doc.parentDocId!)) {
-        var parent = nodeMap[doc.parentDocId!]!;
-        parent.addChild(node);
+    for(var doc in allDocsInFlat) {
+      var node = nodeMap[doc.docId];
+      if(node == null) continue;
+
+      final parentDocId = doc.parentDocId;
+      if(parentDocId != null) {
+        var parent = nodeMap[parentDocId];
+        if(parent == null) continue;
+
+        node.parent = parent;
+        parent.children.add(node);
       } else {
-        // Root document
         rootNodes.add(node);
       }
     }
-
+    // Sort each levels by orderId
+    for(var root in rootNodes) {
+      root.recursivelySortChildren();
+    }
+    rootNodes.sort((a, b) => a.orderId.compareTo(b.orderId));
+    _docTitles = rootNodes;
     return rootNodes;
   }
 
+  List<DocTitleMeta> _getAllDocTitles() {
+    List<DocTitleMeta> _recursiveGetDocTitles(List<DocTitleMeta> list) {
+      List<DocTitleMeta> result = [];
+      for(var node in list) {
+        result.add(node);
+        result.addAll(_recursiveGetDocTitles(node.children));
+      }
+      return result;
+    }
+    return _recursiveGetDocTitles(_docTitles);
+  }
 }

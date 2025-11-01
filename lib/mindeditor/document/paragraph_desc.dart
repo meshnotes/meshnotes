@@ -251,8 +251,8 @@ class ParagraphDesc {
     return _state;
   }
 
-  void flushDb() {
-    _storeBlock(); // Save immediately
+  void flushDb({bool needUpdateTitle = true}) {
+    _storeBlock(needUpdateTitle: needUpdateTitle); // Save immediately
   }
 
   void storeObject(int timestamp) {
@@ -488,13 +488,13 @@ class ParagraphDesc {
   }
 
   // Save text to database immediately
-  void _storeBlock() {
+  void _storeBlock({bool needUpdateTitle = true}) {
     MyLogger.verbose('Save to blocks: id=${getBlockId()}');
     var block = _convertToBlockContent();
     _lastUpdate = Util.getTimeStamp();
     _db?.storeDocBlock(parent.id, getBlockId(), jsonEncode(block), _lastUpdate);
     _db?.updateDocTimestamp(parent.id, _lastUpdate);
-    if(isTitle()) {
+    if(isTitle() && needUpdateTitle) {
       MyLogger.verbose('Save to title');
       parent.updateTitle(getPlainText());
     }

@@ -4,7 +4,7 @@ import './find_operation_types.dart';
 /// 1. Generate maps and indexes for base and target, package them into a resource descriptor
 /// 2. Find differences(added, deleted, moved, and modified) between base and target
 /// 3. Convert differences to transform operations
-List<TreeOperation> findOperationsByFlat(List<FlatResource> base, target, int targetTimestamp) {
+List<TreeOperation> findOperations(List<FlatResource> base, target, int targetTimestamp) {
   final resourceDescriptor = _generateIndexes(base, target, targetTimestamp);
   final diffDescriptor = _findDifferences(resourceDescriptor);
   final operations = _convertDifferencesToOperations(diffDescriptor, resourceDescriptor);

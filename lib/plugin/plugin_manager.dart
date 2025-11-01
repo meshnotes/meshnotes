@@ -212,7 +212,7 @@ class PluginManager {
     if(allowSendingNotesToPlugins == null || allowSendingNotesToPlugins != 'true') return null;
 
     final docManager = controller.docManager;
-    final documents = docManager.getAllDocuments();
+    final documents = docManager.getAllFlatDocumentTitlesUnsorted();
     List<UserNote> notes = [];
     for(var document in documents) {
       final docId = document.docId;
@@ -235,7 +235,7 @@ class PluginManager {
 
   List<DocumentMeta> getAllDocumentList() {
     final docManager = controller.docManager;
-    final documents = docManager.getAllDocuments();
+    final documents = docManager.getAllFlatDocumentTitlesUnsorted(); // Notice this list did not sorted by orderId
     List<DocumentMeta> result = [];
     for(var document in documents) {
       if(document.isPrivate == ModelConstants.isPrivateYes) continue;

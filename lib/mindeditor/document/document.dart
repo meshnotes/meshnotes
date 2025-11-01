@@ -7,6 +7,7 @@ import '../controller/controller.dart';
 import '../setting/constants.dart';
 import 'dal/db_helper.dart';
 import 'dal/doc_data_model.dart';
+import 'doc_title_node.dart';
 import 'paragraph_desc.dart';
 import 'document_manager.dart';
 
@@ -17,13 +18,13 @@ class Document {
   bool _hasModified = false;
   int _lastUpdate;
   String? _editingBlockId;
-  DocumentManager? parent;
+  DocumentManager? manager;
   final DbHelper? _db;
   final controller = Controller();
 
   Document({
     required this.id,
-    this.parent,
+    this.manager,
     required List<ParagraphDesc> paras,
     required int time,
     DbHelper? db,
@@ -38,7 +39,7 @@ class Document {
     }
   }
 
-  factory Document.loadByNode(DbHelper db, DocDataModel docNode, DocumentManager parent) {
+  factory Document.loadByNode(DbHelper db, DocTitleMeta docNode, DocumentManager manager) {
     List<ParagraphDesc> paragraphs = [];
     // Load content
     var blocks = _loadBlocks(db, docNode.docId);
@@ -47,7 +48,7 @@ class Document {
     Document doc = Document(
       id: docNode.docId,
       paras: paragraphs,
-      parent: parent,
+      manager: manager,
       time: docNode.timestamp,
       db: db,
     );
@@ -75,12 +76,12 @@ class Document {
     Document doc = Document(
       id: docId,
       paras: paragraphs,
-      parent: parent,
+      manager: parent,
       time: now,
       db: db,
     );
     for(var p in paragraphs) {
-      p.flushDb(); // Here will set modified
+      p.flushDb(needUpdateTitle: false); // Here will set modified, No need to update title because it's creating
     }
     doc._flushDocStructure();
     return doc;
@@ -215,7 +216,7 @@ class Document {
   void updateTitle(String title) {
     var now = Util.getTimeStamp();
     // _db.storeDocTitle(id, title, now);
-    parent?.updateDocTitle(id, title, now);
+    manager?.updateDocTitle(id, title, now);
 
     _lastUpdate = now;
     setModified();
@@ -318,7 +319,7 @@ class Document {
 
   void setModified() {
     _hasModified = true;
-    parent?.setModified();
+    manager?.setModified();
   }
   bool getModified() {
     return _hasModified;

@@ -50,14 +50,14 @@ void main() {
 
   group('findOperations', () {
     test('empty input returns empty list', () {
-      final operations = findOperationsByFlat(<FlatResource>[], <FlatResource>[], 0);
+      final operations = findOperations(<FlatResource>[], <FlatResource>[], 0);
       expect(operations.length, equals(0));
     });
 
     test('flat list of elements: add element', () {
       final list1 = _buildFlatList(['a', 'b', 'c', 'd', 'e']);
       final list2 = _buildFlatList(['a', 'f', 'b', 'c', 'd', 'e', 'g']);
-      final result = findOperationsByFlat(list1, list2, 0);
+      final result = findOperations(list1, list2, 0);
       expect(result.length, equals(2));
       expect(result[0].type, equals(TreeOperationType.add));
       expect(result[0].id, equals('f'));
@@ -68,7 +68,7 @@ void main() {
     test('flat list of elements: delete element', () {
       final list1 = _buildFlatList(['a', 'b', 'c', 'd', 'e']);
       final list2 = _buildFlatList(['b', 'c', 'd', 'e']);
-      final result = findOperationsByFlat(list1, list2, 0);
+      final result = findOperations(list1, list2, 0);
       expect(result.length, equals(1));
       expect(result[0].type, equals(TreeOperationType.del));
       expect(result[0].id, equals('a'));
@@ -77,7 +77,7 @@ void main() {
     test('flat list of elements: move element', () {
       final list1 = _buildFlatList(['a', 'b', 'c', 'd', 'e']);
       final list2 = _buildFlatList(['a', 'e', 'b', 'd', 'c']);
-      final result = findOperationsByFlat(list1, list2, 0);
+      final result = findOperations(list1, list2, 0);
       expect(result.length, equals(2));
       expect(result[0].type, equals(TreeOperationType.move));
       expect(result[0].id, equals('d'));
@@ -88,7 +88,7 @@ void main() {
     test('flat list of elements: modify element', () {
       final list1 = _buildFlatListWithContent([['a'], ['b', 'b1'], ['c'], ['d'], ['e']]);
       final list2 = _buildFlatListWithContent([['a'], ['b', 'b2'], ['c'], ['d'], ['e', 'e2']]);
-      final result = findOperationsByFlat(list1, list2, 0);
+      final result = findOperations(list1, list2, 0);
       expect(result.length, equals(2));
       expect(result[0].type, equals(TreeOperationType.modify));
       expect(result[0].id, equals('b'));
@@ -153,7 +153,7 @@ void main() {
           'previous': 'e',
         }
       });
-      final result = findOperationsByFlat(list1, list2, 0);
+      final result = findOperations(list1, list2, 0);
       expect(result.length, equals(3));
       final expectedNodes = ['f', 'g', 'h'];
       for(var expectedNode in expectedNodes) {
@@ -206,7 +206,7 @@ void main() {
           'previous': 'd',
         },
       });
-      final result = findOperationsByFlat(list1, list2, 0);
+      final result = findOperations(list1, list2, 0);
       expect(result.length, equals(2));
       final expectedNodes = ['c', 'f'];
       for(var expectedNode in expectedNodes) {
@@ -275,7 +275,7 @@ void main() {
           'previous': 'g',
         },
       });
-      final result = findOperationsByFlat(list1, list2, 0);
+      final result = findOperations(list1, list2, 0);
       expect(result.length, equals(2));
       final expectedNodes = ['c', 'd'];
       for(var expectedNode in expectedNodes) {

@@ -70,7 +70,7 @@ class DiffManager {
     final targetVersionTimestamp = targetVersion.timestamp; // Use for delete operation to determine the timestamp
     var targetList = convertToContentNodes(targetVersion);
     var baseList = convertToContentNodes(baseVersion);
-    final operations = findOperationsByFlat(baseList, targetList, targetVersionTimestamp);
+    final operations = findOperations(baseList, targetList, targetVersionTimestamp);
     return DiffOperations(operations: operations, versionHash: targetVersion.getHash());
   }
 

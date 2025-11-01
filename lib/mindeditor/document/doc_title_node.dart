@@ -1,67 +1,87 @@
 import 'dal/doc_data_model.dart';
 
 /// Tree node for hierarchical document structure
-class DocTitleNode {
-  DocDataModel document;
-  List<DocTitleNode> children;
-  DocTitleNode? parent;
-  int level;
+class DocTitleMeta {
+  String docId;
+  String title;
+  String hash;
+  int isPrivate;
+  int timestamp;
+  int orderId;
+  String? parentDocId;
+  DocTitleMeta? parent;
+  List<DocTitleMeta> children = [];
 
-  DocTitleNode({
-    required this.document,
-    this.children = const [],
+  DocTitleMeta({
+    required this.docId,
+    required this.title,
+    required this.isPrivate,
+    required this.timestamp,
+    required this.orderId,
+    this.hash = ModelConstants.hashEmpty,
+    this.parentDocId,
     this.parent,
-    this.level = 0,
-  }) {
-    children = List.from(children); // Make a mutable copy
-  }
-
-  /// Get document ID
-  String get docId => document.docId;
-
-  /// Get document title
-  String get title => document.title;
-
-  /// Check if this node has children
-  bool get hasChildren => children.isNotEmpty;
-
-  /// Check if this is a root node
-  bool get isRoot => parent == null;
-
-  /// Add a child node
-  void addChild(DocTitleNode child) {
-    child.parent = this;
-    child.level = level + 1;
-    children.add(child);
-  }
-
-  /// Remove a child node
-  void removeChild(DocTitleNode child) {
-    child.parent = null;
-    children.remove(child);
-  }
-
-  /// Get all descendant nodes (recursive)
-  List<DocTitleNode> getAllDescendants() {
-    List<DocTitleNode> descendants = [];
-    for (var child in children) {
-      descendants.add(child);
-      descendants.addAll(child.getAllDescendants());
-    }
-    return descendants;
-  }
+  });
 
   /// Convert tree to flat list for UI display
-  List<DocTitleNode> toFlatList() {
-    List<DocTitleNode> result = [this];
+  List<DocTitleFlat> toFlatList(int level) {
+    List<DocTitleFlat> result = [];
+    result.add(DocTitleFlat(
+      docId: docId,
+      title: title,
+      isPrivate: isPrivate,
+      timestamp: timestamp,
+      hash: hash,
+      orderId: orderId,
+      parentDocId: parentDocId,
+      level: level,
+      hasChild: hasChild(),
+    ));
     for (var child in children) {
-      result.addAll(child.toFlatList());
+      result.addAll(child.toFlatList(level + 1));
     }
     return result;
   }
 
-  @override
-  String toString() {
-    return 'DocTreeNode(docId: $docId, title: $title, level: $level, children: ${children.length})';
+  // void recursivelyUpdateLevel(int newLevel) {
+  //   level = newLevel;
+  //   for (var child in children) {
+  //     child.recursivelyUpdateLevel(newLevel + 1);
+  //   }
+  // }
+
+  bool hasChild() => children.isNotEmpty;
+
+  void recursivelySortChildren() {
+    children.sort((a, b) => a.orderId.compareTo(b.orderId));
+    for (var child in children) {
+      child.recursivelySortChildren();
+    }
   }
+}
+
+class DocTitleFlat {
+  String docId;
+  String title;
+  String hash;
+  int isPrivate;
+  int timestamp;
+  int orderId;
+  String? parentDocId;
+  int level;
+  final bool _hasChild;
+
+  DocTitleFlat({
+    required this.docId,
+    required this.title,
+    required this.isPrivate,
+    required this.timestamp,
+    required this.orderId,
+    this.hash = ModelConstants.hashEmpty,
+    this.parentDocId,
+    this.level = 0,
+    bool hasChild = false,
+  }): _hasChild = hasChild;
+
+  bool hasChild() => _hasChild;
 }

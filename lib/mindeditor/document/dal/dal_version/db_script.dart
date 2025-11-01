@@ -59,7 +59,7 @@ class DbVersion2 extends DbScript {
   @override
   bool upgradeDb(Database db) {
     MyLogger.info('MeshNotesDB: upgrading documents table');
-    db.execute('ALTER TABLE documents ADD COLUMN parent_doc_id TEXT DEFAULT NULL');
+    db.execute('ALTER TABLE documents ADD COLUMN parent_doc_id TEXT DEFAULT NULL, ADD COLUMN order_id INTEGER DEFAULT 0');
     // db.execute('CREATE INDEX IF NOT EXISTS idx_documents_parent ON documents(parent_doc_id)');
     return true;
   }

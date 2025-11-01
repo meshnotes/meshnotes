@@ -27,11 +27,11 @@ class DocUtils {
       var docHash = item.docHash;
       var docObject = _db.getObject(docHash)?? (findSyncingObject? _db.getSyncingObject(docHash): null);
       if(docObject == null) {
-        MyLogger.info('_genRequiredObjects: document is missing! docId=$docId, docHash=$docHash');
+        MyLogger.info('genDependingObjects: document is missing! docId=$docId, docHash=$docHash');
         result[docHash] = RelatedObject(objHash: docHash, objContent: '', createdAt: 0); // Different from genRequiredObjects
         continue;
       }
-      MyLogger.info('_genRequiredObjects: docId=$docId, docHash=$docHash, docStr=$docObject');
+      MyLogger.info('genDependingObjects: docId=$docId, docHash=$docHash, docStr=$docObject');
       result[docHash] = RelatedObject(objHash: docHash, objContent: docObject.data, createdAt: docObject.timestamp);
 
       //TODO should load history document by docHash
@@ -64,7 +64,7 @@ class DocUtils {
       var docHash = item.docHash;
       var docObject = _db.getObject(docHash)?? (findSyncingObject? _db.getSyncingObject(docHash): null);
       if(docObject == null) continue;
-      MyLogger.info('_genRequiredObjects: docId=$docId, docHash=$docHash, docStr=$docObject');
+      MyLogger.info('genRequiredObjects: docId=$docId, docHash=$docHash, docStr=$docObject');
       result[docHash] = RelatedObject(objHash: docHash, objContent: docObject.data, createdAt: docObject.timestamp);
 
       //TODO should load history document by docHash

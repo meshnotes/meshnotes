@@ -1,3 +1,5 @@
+import 'package:keygen/keygen.dart';
+
 class VersionNode {
   String versionHash;
   int createdAt;
@@ -104,7 +106,7 @@ class SendVersions {
 
   @override
   String toString() {
-    return '$versionHash: $requiredObjects';
+    return '${HashUtil.formatHash(versionHash)}: $requiredObjects';
   }
 }
 
@@ -134,7 +136,7 @@ class RelatedObject {
 
   @override
   String toString() {
-    return '$objHash/$createdAt';
+    return '${HashUtil.formatHash(objHash)}/$createdAt';
   }
 }
 
