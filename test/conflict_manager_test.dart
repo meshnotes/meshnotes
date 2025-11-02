@@ -1,4 +1,4 @@
-import 'package:mesh_note/mindeditor/document/collaborate/conflict_manager.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/document_conflict.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:my_log/my_log.dart';
 import 'package:test/test.dart';

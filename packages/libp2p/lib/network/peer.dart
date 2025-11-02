@@ -190,7 +190,7 @@ class Peer {
           if(!needAck) break;
           _sendDataAck(packet.header.packetNumber, frame.objId, frame.seqNum);
 
-          MyLogger.verbose('${logPrefix} Data in peer.onData(): $data');
+          // MyLogger.verbose('${logPrefix} Data in peer.onData(): $data');
           // If this object has already been notified, do nothing.
           // Or we should check if any object is ready to notify upper layer.
           if(receiveQueue.isDone(objId)) break;

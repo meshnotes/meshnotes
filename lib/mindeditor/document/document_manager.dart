@@ -4,7 +4,7 @@ import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
-import 'package:mesh_note/mindeditor/document/collaborate/conflict_manager.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/document_conflict.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/merge_manager.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';

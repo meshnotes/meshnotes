@@ -68,13 +68,13 @@ class DiffManager {
     }
 
     final targetVersionTimestamp = targetVersion.timestamp; // Use for delete operation to determine the timestamp
-    var targetList = convertToContentNodes(targetVersion);
-    var baseList = convertToContentNodes(baseVersion);
+    var targetList = _convertToContentNodes(targetVersion);
+    var baseList = _convertToContentNodes(baseVersion);
     final operations = findOperations(baseList, targetList, targetVersionTimestamp);
     return DiffOperations(operations: operations, versionHash: targetVersion.getHash());
   }
 
-  List<FlatResource> convertToContentNodes(VersionContent contentVersion) {
+  List<FlatResource> _convertToContentNodes(VersionContent contentVersion) {
     var list = <FlatResource>[];
     String? previousNodeId;
     String? lastParentId;
