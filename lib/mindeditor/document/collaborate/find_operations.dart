@@ -6,8 +6,7 @@ import './find_operation_types.dart';
 /// 3. Convert differences to transform operations
 List<TreeOperation> findOperations(List<FlatResource> base, target, int targetTimestamp) {
   final resourceDescriptor = _generateIndexes(base, target, targetTimestamp);
-  final diffDescriptor = _findDifferences(resourceDescriptor);
-  final operations = _convertDifferencesToOperations(diffDescriptor, resourceDescriptor);
+  final operations = _generateOperations(resourceDescriptor);
   return operations;
 }
 
@@ -52,61 +51,73 @@ class _ResourceDescriptor {
   });
 }
 
-class _DiffDescriptor {
-  final List<String> added;
-  final List<String> deleted;
-  final List<String> moved;
-  final List<String> modified;
-
-  _DiffDescriptor({
-    required this.added,
-    required this.deleted,
-    required this.moved,
-    required this.modified,
-  });
-}
-
-// /// Convert tree structure to flat structure
-// List<FlatResource> _convertToFlat(List<TreeResource> roots) {
-//   final List<FlatResource> result = [];
-
-//   void traverse(String? parentId, List<TreeResource> nodes) {
-//     String? previousId;
-//     for (final node in nodes) {
-//       // Keep only id/content in the flattened view; children are ignored in flat
-//       result.add(FlatResource(id: node.id, content: node.content, parentId: parentId, previousId: previousId, updatedAt: node.updatedAt));
-//       if (node.children.isNotEmpty) {
-//         traverse(node.id, node.children);
-//       }
-//       previousId = node.id;
-//     }
-//   }
-
-//   traverse(null, roots);
-//   return result;
-// }
-
 /// Find differences between target and base
 /// 1. Find unchanged nodes using LIS(Longest Increasing Subsequence) algorithm
-/// 2. Find added nodes and deleted nodes
-/// 3. Find moved nodes
-/// 4. Find modified nodes
-/// 5. Return the differences
-_DiffDescriptor _findDifferences(_ResourceDescriptor resourceDescriptor) {
+/// 2. Find transform operations from base to target using the unchanged nodes
+/// 3. Return the differences
+List<TreeOperation> _generateOperations(_ResourceDescriptor resourceDescriptor) {
   final oldMap = resourceDescriptor.baseMap;
   final newMap = resourceDescriptor.targetMap;
   final indexGenerator = resourceDescriptor.indexGenerator;
   final flatTarget = resourceDescriptor.target;
+  final flatBase = resourceDescriptor.base;
   // Use indexGenerator to find unchanged nodes(LIS algorithm)
-  final unchanged = _findUnchangedNodes(oldMap, flatTarget, indexGenerator);
+  final unchangedSet = _findUnchangedNodes(oldMap, flatTarget, indexGenerator);
 
-  // Use oldMap and newMap to find added and deleted nodes
-  final added = _findAddedNodes(oldMap, newMap);
-  final deleted = _findDeletedNodes(oldMap, newMap);
+  return _findOperations(flatTarget, flatBase, newMap, oldMap, unchangedSet);
+}
 
-  final (moved, modified) = _findModifiedNodes(oldMap, newMap, unchanged);
-
-  return _DiffDescriptor(added: added, deleted: deleted, moved: moved, modified: modified);
+/// Find operations transform from flatTarget to flatBase
+/// For each node in target list(flatTarget)
+/// 1. If the node is unchanged
+///   1.1 If the node's data is different, it's modified
+///   1.2 If the node's parent(only check the parent is adequate) is different, it's moved
+///   1.3 Otherwise, it's unchanged
+/// 2. If the node is not in base list(flatBase), it's added
+/// 3. If the node is in base list(flatBase)
+///   3.1 If the node's data is different, it's modified
+///   3.2 If the node's parent or previous node is different, it's moved
+/// 4. Find the deleted nodes(in the base list but not in the target list)
+List<TreeOperation> _findOperations(List<FlatResource> flatTarget, flatBase, Map<String, FlatResource> newMap, oldMap, Set<String> unchanged) {
+  List<TreeOperation> result = [];
+  for(var item in flatTarget) {
+    final oldItem = oldMap[item.id];
+    // 1. Unchanged nodes are skipped
+    if(unchanged.contains(item.id)) {
+      if(oldItem != null) {
+        if(oldItem.content != item.content) {
+          _addModifiedOperation(result, item);
+        }
+        if(oldItem.parentId != item.parentId) {
+          _addMovedOperation(result, item);
+        }
+      }
+      continue;
+    }
+    if(!oldMap.containsKey(item.id)) {
+      // 2. If the node is not in base list, it's added
+      _addAddedOperation(result, item);
+    } else {
+      if(oldItem == null) {
+        continue;
+      }
+      // 3.1 Modified node
+      if(oldItem.content != item.content) {
+        _addModifiedOperation(result, item);
+      }
+      // 3.2 Moved node
+      if(oldItem.parentId != item.parentId || oldItem.previousId != item.previousId) {
+        _addMovedOperation(result, item);
+      }
+      // If the node is moved, but the parent and previous node are not changed, it could have a move operation, but not necessary.
+      // It depends on the original architecture: tree or flat.
+      // 1. For tree node, this node may moved with the parent node, so move operation is not necessary.
+      // 2. For flat node, this node will have same the parent id and order, so move operation is necessary either.
+    }
+  }
+  // 4. Deleted nodes
+  _addDeletedOperations(result, oldMap, newMap);
+  return result;
 }
 
 /// Returns index map, old key map, and new key map
@@ -148,133 +159,50 @@ Set<String> _findUnchangedNodes(Map<String, FlatResource> oldMap, List<FlatResou
   return commonKeys;
 }
 
-List<String> _findAddedNodes(Map<String, FlatResource> oldMap, Map<String, FlatResource> newMap) {
-  return _subtract(newMap, oldMap);
-}
-
-List<String> _findDeletedNodes(Map<String, FlatResource> oldMap, Map<String, FlatResource> newMap) {
-  return _subtract(oldMap, newMap);
-}
-
-List<String> _subtract(Map<String, FlatResource> map1, Map<String, FlatResource> map2) {
-  final List<String> result = [];
-  for(var k in map1.keys) {
-    if(!map2.containsKey(k)) {
-      result.add(k);
+void _addDeletedOperations(List<TreeOperation> result, Map<String, FlatResource> oldMap, Map<String, FlatResource> newMap) {
+  for(final e in oldMap.entries) {
+    if(!newMap.containsKey(e.key)) {
+      _addDeletedOperation(result, e.value);
     }
   }
-  return result;
 }
 
-/// `modified` includes both moved and modified nodes
-/// If topological relationship is changed, it's moved
-/// If content is changed, it's modified
-/// A node may be both moved and modified
-(List<String>, List<String>) _findModifiedNodes(Map<String, FlatResource> oldMap, Map<String, FlatResource> newMap, Set<String> unchanged) {
-  final List<String> moved = [];
-  final List<String> modified = [];
-  for(var item in oldMap.entries) {
-    final key = item.key;
-    final oldNode = item.value;
-    final newNode = newMap[key];
-    // newNode does not exist, it's deleted, not common node
-    if(newNode == null) {
-      continue;
-    }
-    // 1. If content is different, it's modified
-    if(oldNode.content != newNode.content) {
-      modified.add(key);
-    }
-    // 2. If unchanged set does not contain this node, it has been moved
-    if(!unchanged.contains(key)) {
-      moved.add(key);
-    } else {
-      // 3. If the order is unchanged but parent is different, it's moved
-      if(oldNode.parentId != newNode.parentId) {
-        moved.add(key);
-      }
-    }
-  }
-  return (moved, modified);
+void _addAddedOperation(List<TreeOperation> result, FlatResource item) {
+  result.add(TreeOperation(
+    type: TreeOperationType.add,
+    id: item.id,
+    parentId: item.parentId,
+    previousId: item.previousId,
+    newData: item.content,
+    timestamp: item.updatedAt,
+  ));
 }
 
-List<TreeOperation> _convertDifferencesToOperations(_DiffDescriptor diffDescriptor, _ResourceDescriptor resourceDescriptor) {
-  final added = diffDescriptor.added;
-  final deleted = diffDescriptor.deleted;
-  final moved = diffDescriptor.moved;
-  final modified = diffDescriptor.modified;
-  final oldMap = resourceDescriptor.baseMap;
-  final newMap = resourceDescriptor.targetMap;
-  final targetTimestamp = resourceDescriptor.targetTimestamp;
-  List<TreeOperation> result = [];
-  result.addAll(_generateAddedNodes(added, newMap));
-  result.addAll(_generateDeletedNodes(deleted, targetTimestamp));
-  result.addAll(_generateMovedNodes(moved, newMap));
-  result.addAll(_generateModifiedNodes(modified, oldMap, newMap));
-  return result;
+void _addModifiedOperation(List<TreeOperation> result, FlatResource item) {
+  result.add(TreeOperation(
+    type: TreeOperationType.modify,
+    id: item.id,
+    newData: item.content,
+    timestamp: item.updatedAt,
+  ));
 }
 
-List<TreeOperation> _generateAddedNodes(List<String> added, Map<String, FlatResource> map) {
-  List<TreeOperation> result = [];
-  for(var item in added) {
-    final targetItem = map[item];
-    if(targetItem == null) {
-      continue;
-    }
-    result.add(TreeOperation(
-      type: TreeOperationType.add,
-      id: item,
-      parentId: targetItem.parentId,
-      previousId: targetItem.previousId,
-      newData: targetItem.content,
-      timestamp: targetItem.updatedAt,
-    ));
-  }
-  return result;
+void _addMovedOperation(List<TreeOperation> result, FlatResource item) {
+  result.add(TreeOperation(
+    type: TreeOperationType.move,
+    id: item.id,
+    parentId: item.parentId,
+    previousId: item.previousId,
+    timestamp: item.updatedAt,
+  ));
 }
 
-List<TreeOperation> _generateDeletedNodes(List<String> deleted, int targetTimestamp) {
-  List<TreeOperation> result = [];
-  for(var item in deleted) {
-    result.add(TreeOperation(type: TreeOperationType.del, id: item, timestamp: targetTimestamp));
-  }
-  return result;
-}
-
-List<TreeOperation> _generateMovedNodes(List<String> moved, Map<String, FlatResource> map) {
-  List<TreeOperation> result = [];
-  for(var item in moved) {
-    final targetItem = map[item];
-    if(targetItem == null) {
-      continue;
-    }
-    result.add(TreeOperation(
-      type: TreeOperationType.move,
-      id: item,
-      parentId: targetItem.parentId,
-      previousId: targetItem.previousId,
-      timestamp: targetItem.updatedAt,
-    ));
-  }
-  return result;
-}
-
-List<TreeOperation> _generateModifiedNodes(List<String> modified, Map<String, FlatResource> oldMap, newMap) {
-  List<TreeOperation> result = [];
-  for(var item in modified) {
-    final oldItem = oldMap[item];
-    final targetItem = newMap[item];
-    if(oldItem == null || targetItem == null) {
-      continue;
-    }
-    result.add(TreeOperation(
-      type: TreeOperationType.modify,
-      id: item,
-      newData: targetItem.content,
-      timestamp: targetItem.updatedAt,
-    ));
-  }
-  return result;
+void _addDeletedOperation(List<TreeOperation> result, FlatResource item) {
+  result.add(TreeOperation(
+    type: TreeOperationType.del,
+    id: item.id,
+    timestamp: item.updatedAt,
+  ));
 }
 
 List<int> findLongestIncreasingSubsequence(List<int> sequence) {

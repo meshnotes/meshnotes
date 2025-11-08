@@ -1,6 +1,8 @@
-import 'package:mesh_note/mindeditor/document/collaborate/merge_manager.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/version_merge_manager.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:my_log/my_log.dart';
+import 'find_operation_types.dart';
+import 'find_operations.dart';
 
 class DocumentConflictManager {
   DocContent baseDoc;
@@ -9,60 +11,56 @@ class DocumentConflictManager {
     required this.baseDoc,
   });
 
-  (List<TransformOperation>, List<ContentConflict>) mergeDocumentOperations(DocContent doc1, int timestamp1, DocContent doc2, int timestamp2) {
+  (List<TreeOperation>, List<ContentConflict>) mergeDocumentOperations(DocContent doc1, int timestamp1, DocContent doc2, int timestamp2) {
     TransformManager tm1 = TransformManager(baseContent: baseDoc, createdAt: timestamp1);
     var operations1 = tm1.findTransformOperations(doc1);
     TransformManager tm2 = TransformManager(baseContent: baseDoc, createdAt: timestamp2);
     var operations2 = tm2.findTransformOperations(doc2);
 
     var totalOperations = [...operations1, ...operations2];
-    List<ContentConflict> conflicts = [];
     var opMap = _buildOperationMap(totalOperations);
-    _mergeTransformOperations(totalOperations, opMap, conflicts);
+    final conflicts = _mergeTransformOperations(totalOperations, opMap);
     return (totalOperations, conflicts);
   }
 
-  DocContent mergeDocument(List<TransformOperation> operations) {
+  DocContent mergeDocument(List<TreeOperation> operations) {
     var contents = baseDoc.contents;
     for(var op in operations) {
-      if(!op.isValid()) continue; // Skip deleted operation
+      if(op.isFinished()) continue; // Skip deleted operation
       if(op.parentId != null) {
         MyLogger.warn('mergeDocument: parent of all nodes must be null in current version!!');
       }
 
       switch(op.type) {
-        case TransformType.add:
-          int idx = _findIndexOf(contents, op.previousId);
-          var newBlock = DocContentItem(blockId: op.targetId, blockHash: op.data!);
-          contents.insert(idx + 1, newBlock);
+        case TreeOperationType.add:
+          var newBlock = DocContentItem(blockId: op.id, blockHash: op.newData!, updatedAt: op.timestamp);
+          _insertIntoTreeContent(contents, op.parentId, op.previousId, newBlock);
           break;
-        case TransformType.del:
-          int idx = _findIndexOf(contents, op.targetId);
-          contents.removeAt(idx);
+        case TreeOperationType.del:
+          _removeFromTreeContent(contents, op.id);
           break;
-        case TransformType.move:
-          int idx = _findIndexOf(contents, op.targetId);
-          var node = contents.removeAt(idx);
-          int newIdx = _findIndexOf(contents, op.previousId);
-          contents.insert(newIdx + 1, node);
+        case TreeOperationType.move:
+          final node = _removeFromTreeContent(contents, op.id);
+          if(node != null) _insertIntoTreeContent(contents, op.parentId, op.previousId, node);
           break;
-        case TransformType.modify:
-          int idx = _findIndexOf(contents, op.targetId);
-          var node = contents[idx];
-          node.blockHash = op.data!;
+        case TreeOperationType.modify:
+          final (siblings, node) = _findNodeInTreeContent(contents, op.id);
+          if(node != null) {
+            node.blockHash = op.newData!;
+          }
           break;
       }
     }
     return DocContent(contents: contents);
   }
 
-  Map<String, List<TransformOperation>> _buildOperationMap(List<TransformOperation> operations) {
-    var result = <String, List<TransformOperation>>{};
+  Map<String, List<TreeOperation>> _buildOperationMap(List<TreeOperation> operations) {
+    var result = <String, List<TreeOperation>>{};
     for(var item in operations) {
-      String contentId = item.targetId;
+      String contentId = item.id;
       var ops = result[contentId];
       if(ops == null) {
-        ops = <TransformOperation>[];
+        ops = <TreeOperation>[];
         result[contentId] = ops;
       }
       ops.add(item);
@@ -73,166 +71,163 @@ class DocumentConflictManager {
     return result;
   }
 
-  void _mergeTransformOperations(List<TransformOperation> operations, Map<String, List<TransformOperation>> map, List<ContentConflict> conflicts) {
+  List<ContentConflict> _mergeTransformOperations(List<TreeOperation> operations, Map<String, List<TreeOperation>> map) {
+    List<ContentConflict> conflicts = [];
     for(var thisOp in operations) {
-      if(!thisOp.isValid()) continue;
+      if(thisOp.isFinished()) continue;
 
-      String targetId = thisOp.targetId;
+      String targetId = thisOp.id;
       var opList = map[targetId];
       if(opList == null) continue;
       for(var thatOp in opList) {
         if(thatOp == thisOp) continue;
-        if(!thatOp.isValid()) continue;
+        if(thatOp.isFinished()) continue;
 
         // Now we have thisOP and thatOp with the same targetId
         switch(thisOp.type) {
-          case TransformType.add:
+          case TreeOperationType.add:
             switch(thatOp.type) {
-              case TransformType.add:
-                if(thisOp.data != thatOp.data || thisOp.parentId != thatOp.parentId || thisOp.previousId != thatOp.previousId) {
+              case TreeOperationType.add:
+                if(thisOp.newData != thatOp.newData || thisOp.parentId != thatOp.parentId || thisOp.previousId != thatOp.previousId) {
                   MyLogger.warn('Conflict transform operations! Add($thisOp) <==> Add($thatOp)');
                 }
                 _leaveLatestOperation(thisOp, thatOp); // Leave only the latest add, even if title/data/parentId/previousId are all identity
                 break;
-              case TransformType.del:
-              case TransformType.move:
-              case TransformType.modify:
+              case TreeOperationType.del:
+              case TreeOperationType.move:
+              case TreeOperationType.modify:
                 MyLogger.warn('Impossible transform operations! Add($thisOp) <==> $thatOp');
-                thatOp.setInvalid();
+                thatOp.setFinished();
                 break;
             }
             break;
-          case TransformType.move:
+          case TreeOperationType.move:
             switch(thatOp.type) {
-              case TransformType.move:
+              case TreeOperationType.move:
                 MyLogger.warn('Conflict transform operations! Move($thisOp) <==> Move($thatOp)');
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
-              case TransformType.del:
+              case TreeOperationType.del:
                 MyLogger.warn('Conflict transform operations! Move($thisOp) <==> Del($thatOp)');
-                thatOp.setInvalid();
+                thatOp.setFinished();
                 break;
-              case TransformType.add:
+              case TreeOperationType.add:
                 MyLogger.warn('Impossible transform operations! Move($thisOp) <==> Add($thatOp)');
-                thisOp.setInvalid();
+                thisOp.setFinished();
                 break;
-              case TransformType.modify:
+              case TreeOperationType.modify:
                 // Compatible, do nothing
                 break;
             }
             break;
-          case TransformType.del:
+          case TreeOperationType.del:
             switch(thatOp.type) {
-              case TransformType.move:
-              case TransformType.modify:
+              case TreeOperationType.move:
+              case TreeOperationType.modify:
                 MyLogger.warn('Conflict transform operations! Del($thisOp) <==> $thatOp');
-                thisOp.setInvalid();
+                thisOp.setFinished();
                 break;
-              case TransformType.del:
+              case TreeOperationType.del:
                 _leaveLatestOperation(thisOp, thatOp); // Compatible, only leave one
                 break;
-              case TransformType.add:
+              case TreeOperationType.add:
                 MyLogger.warn('Impossible transform operations! Del($thisOp) <==> Add($thatOp)');
-                thisOp.setInvalid();
+                thisOp.setFinished();
                 break;
             }
             break;
-          case TransformType.modify:
-            if(thisOp.data == null) {
-              thisOp.setInvalid();
+          case TreeOperationType.modify:
+            if(thisOp.newData == null) {
+              thisOp.setFinished();
               continue;
             }
             switch(thatOp.type) {
-              case TransformType.modify:
-                if(thisOp.data != thatOp.data) {
+              case TreeOperationType.modify:
+                if(thisOp.newData != thatOp.newData) {
                   MyLogger.warn('Conflict transform operations! Modify($thisOp) <==> Del($thatOp)');
                   //TODO should merge block here, if a good solution is found
                 }
                 _leaveLatestOperation(thisOp, thatOp);
                 break;
-              case TransformType.del:
+              case TreeOperationType.del:
                 MyLogger.warn('Conflict transform operations! Modify($thisOp) <==> Del($thatOp)');
-                thatOp.setInvalid();
+                thatOp.setFinished();
                 break;
-              case TransformType.move:
+              case TreeOperationType.move:
                 // Compatible, do nothing
                 break;
-              case TransformType.add:
+              case TreeOperationType.add:
                 MyLogger.warn('Impossible transform operations! Modify($thisOp) <==> Add($thatOp)');
-                thisOp.setInvalid();
+                thisOp.setFinished();
                 break;
             }
             break;
         }
       }
     }
+    return conflicts;
   }
-  void _leaveLatestOperation(TransformOperation thisOp, TransformOperation thatOp) {
+  void _leaveLatestOperation(TreeOperation thisOp, TreeOperation thatOp) {
     if(thisOp.timestamp < thatOp.timestamp) {
-      thisOp.setInvalid();
+      thisOp.setFinished();
     } else {
-      thatOp.setInvalid();
+      thatOp.setFinished();
     }
   }
-  int _findIndexOf(List<DocContentItem> table, String? contentId) {
-    if(contentId == null) {
-      return -1;
-    }
-    for(int idx = 0; idx < table.length; idx++) {
-      if(table[idx].blockId == contentId) {
-        return idx;
+
+  /// Insert a node into the tree content, based on the parentId and previousId
+  /// Returns true if inserted, false otherwise
+  bool _insertIntoTreeContent(List<DocContentItem> contents, String? parentId, String? previousId, DocContentItem node) {
+    bool _recursiveInsert(List<DocContentItem> contents, String? parentId, String? previousId, DocContentItem node) {
+      for(var item in contents) {
+        if(item.blockId == parentId) {// Found the parent node
+          // Insert at the beginning if no previousId is provided
+          if(previousId == null) {
+            item.children.insert(0, node);
+            return true;
+          }
+          // Insert at the proper position
+          for(int i = 0; i < item.children.length; i++) {
+            if(item.children[i].blockId == previousId) {
+              item.children.insert(i + 1, node);
+              return true;
+            }
+          }
+        }
+        // If not found, try the children
+        if(_recursiveInsert(item.children, parentId, previousId, node)) return true;
       }
+      return false;
     }
-    return -1;
+    return _recursiveInsert(contents, parentId, previousId, node);
   }
-}
 
-class ContentTreeNode {
-  String? contentId;
-  String? data;
-  ContentTreeNode? parent;
-  ContentTreeNode? previousSibling, nextSibling;
-  ContentTreeNode? firstChild, lastChild;
+  /// Remove a node from the tree content, based on the contentId
+  /// Returns the removed node if found, null otherwise
+  DocContentItem? _removeFromTreeContent(List<DocContentItem> contents, String contentId) {
+    final (siblings, node) = _findNodeInTreeContent(contents, contentId);
+    if(node != null) {
+      siblings.remove(node);
+      return node;
+    }
+    return null;
+  }
 
-  ContentTreeNode({
-    this.contentId,
-    this.data,
-    this.parent,
-    this.previousSibling,
-    this.nextSibling,
-    this.firstChild,
-    this.lastChild,
-  });
-}
-
-enum TransformType {
-  add,
-  del,
-  move,
-  modify,
-}
-
-class TransformOperation {
-  String targetId;
-  TransformType type;
-  String? data;
-  String? parentId;
-  String? previousId;
-  int timestamp;
-  bool _isValid = true;
-
-  TransformOperation({
-    required this.targetId,
-    required this.type,
-    required this.timestamp,
-    this.data,
-    this.parentId,
-    this.previousId,
-  });
-
-  bool isValid() => _isValid;
-  void setInvalid() {
-    _isValid = false;
+  /// Find a node in the tree content, based on the contentId
+  /// Returns the found node if found, null otherwise
+  (List<DocContentItem>, DocContentItem?) _findNodeInTreeContent(List<DocContentItem> contents, String contentId) {
+    (List<DocContentItem>, DocContentItem?) _recursiveFind(List<DocContentItem> siblings, String contentId) {
+      for(var item in siblings) {
+        if(item.blockId == contentId) {
+          return (siblings, item);
+        }
+        // If not found, try the children
+        final (s, ret) = _recursiveFind(item.children, contentId);
+        if(ret != null) return (s, ret);
+      }
+      return ([], null);
+    }
+    return _recursiveFind(contents, contentId);
   }
 }
 
@@ -245,203 +240,39 @@ class TransformManager {
     required this.createdAt,
   });
 
-  List<TransformOperation> findTransformOperations(DocContent targetContent) {
-    var (rootBase, mapBase) = _buildContentTree(baseContent);
-    var (rootTarget, mapTarget) = _buildContentTree(targetContent);
-
-    List<TransformOperation> operations = [];
-    List<ContentTreeNode> deleteList = _recursiveFindTransformOperations(rootTarget.firstChild, mapTarget, rootBase.firstChild, mapBase, operations);
-    for(var item in deleteList) {
-      _recursiveGenerateDeleteOperations(item, operations);
-    }
+  List<TreeOperation> findTransformOperations(DocContent targetContent) {
+    var baseList = _buildContentList(baseContent);
+    var targetList = _buildContentList(targetContent);
+    final operations = findOperations(baseList, targetList, createdAt);
     return operations;
+    // var (rootBase, mapBase) = _buildContentTree(baseContent);
+    // var (rootTarget, mapTarget) = _buildContentTree(targetContent);
+
+    // List<TreeOperation> operations = [];
+    // List<ContentTreeNode> deleteList = _recursiveFindTransformOperations(rootTarget.firstChild, mapTarget, rootBase.firstChild, mapBase, operations);
+    // for(var item in deleteList) {
+    //   _recursiveGenerateDeleteOperations(item, operations);
+    // }
+    // return operations;
   }
 
-  (ContentTreeNode, Map<String?, ContentTreeNode>) _buildContentTree(DocContent doc) {
-    ContentTreeNode root = ContentTreeNode();
-    Map<String?, ContentTreeNode> map = {
-      null: root,
-    };
-
-    _recursiveBuildContentTreeNode(root, doc.contents, map); // Build root and map recursively
-    return (root, map);
-  }
-  void _recursiveBuildContentTreeNode(ContentTreeNode parent, List<DocContentItem> nodes, Map<String?, ContentTreeNode> map) {
-    ContentTreeNode? lastNode;
-    for(var item in nodes) {
-      final blockId = item.blockId;
-      final blockHash = item.blockHash;
-      final children = item.children;
-      ContentTreeNode node = ContentTreeNode(
-        contentId: blockId,
-        data: blockHash,
-        parent: parent,
-        previousSibling: lastNode,
-      );
-      map[blockId] = node;
-      parent.firstChild ??= node;
-      lastNode?.nextSibling = node;
-      lastNode = node;
-      if(children.isNotEmpty) {
-        _recursiveBuildContentTreeNode(node, children, map);
+  List<FlatResource> _buildContentList(DocContent doc) {
+    var list = <FlatResource>[];
+    List<FlatResource> _recursiveBuildContentList(List<DocContentItem> blocks, String? parentId) {
+      var list = <FlatResource>[];
+      String? previousNodeId;
+      for(var block in blocks) {
+        var blockId = block.blockId;
+        var blockHash = block.blockHash;
+        var timestamp = block.updatedAt ?? createdAt; // Old version may not contain timestamp, so use document's timestamp
+        var resource = FlatResource(id: blockId, content: blockHash, parentId: parentId, previousId: previousNodeId, updatedAt: timestamp);
+        list.add(resource);
+        list.addAll(_recursiveBuildContentList(block.children, blockId));
+        previousNodeId = blockId;
       }
+      return list;
     }
-    parent.lastChild = lastNode;
-  }
-
-  /// Recursively find transform operations between target and base.
-  /// Returns a list of nodes that should be deleted in base.
-  List<ContentTreeNode> _recursiveFindTransformOperations(
-      ContentTreeNode? targetNode, Map<String?, ContentTreeNode> targetMap,
-      ContentTreeNode? baseNode, Map<String?, ContentTreeNode> baseMap,
-      List<TransformOperation> operations) {
-
-    List<ContentTreeNode> deleteList = [];
-    String? lastNodeId;
-    while(targetNode != null && baseNode != null) {
-      final targetId = targetNode.contentId!;
-      final baseId = baseNode.contentId!;
-      if(targetId == baseId) { // With same ID, maybe modify
-        if(targetNode.data != baseNode.data) {
-          var op = TransformOperation(type: TransformType.modify, targetId: targetId, data: targetNode.data, timestamp: createdAt);
-          operations.add(op);
-          baseNode.data = targetNode.data;
-        }
-        var deletedInChild = _recursiveFindTransformOperations(targetNode.firstChild, targetMap, baseNode.firstChild, baseMap, operations);
-        deleteList.addAll(deletedInChild);
-
-        targetNode = targetNode.nextSibling;
-        baseNode = baseNode.nextSibling;
-      } else { // IDs are different in the same position, maybe move or add or del
-        if(!targetMap.containsKey(baseId)) { // Should be deleted, add del operation, no need to build recursively
-          var op = TransformOperation(type: TransformType.del, targetId: baseId, timestamp: createdAt);
-          operations.add(op);
-          var nextBaseNode = baseNode.nextSibling;
-          _deleteNode(baseNode, baseMap, deleteList);
-
-          baseNode = nextBaseNode;
-          continue;
-        }
-        if(baseMap.containsKey(targetId)) { // Should be moved, add move operation and wait for next round to check whether need to modify, and recursively analyze children node
-          var toBeMoved = baseMap[targetId]!;
-          var op = TransformOperation(type: TransformType.move, targetId: targetId, parentId: targetNode.parent?.contentId, previousId: lastNodeId, timestamp: createdAt);
-          operations.add(op);
-          _moveNodeToReplace(toBeMoved, baseNode);
-
-          baseNode = toBeMoved;
-          continue;
-        }
-        // Should be added, insert add operation, and build children recursively
-        var op = TransformOperation(
-          type: TransformType.add,
-          targetId: targetId,
-          parentId: targetNode.parent?.contentId,
-          previousId: lastNodeId,
-          data: targetNode.data,
-          timestamp: createdAt,
-        );
-        operations.add(op);
-        targetNode = targetNode.nextSibling;
-      }
-      lastNodeId = targetId;
-    }
-    while(targetNode != null) {
-      var op = TransformOperation(
-        type: TransformType.add,
-        data: targetNode.data,
-        targetId: targetNode.contentId!,
-        parentId: targetNode.parent?.contentId,
-        previousId: lastNodeId,
-        timestamp: createdAt,
-      );
-      operations.add(op);
-      lastNodeId = targetNode.contentId;
-      targetNode = targetNode.nextSibling;
-    }
-    // Move remaining base nodes to toBeDeleted list.
-    _insertToDeleteList(deleteList, baseNode);
-    return deleteList;
-  }
-
-  void _deleteNode(ContentTreeNode toBeDeleted, Map<String?, ContentTreeNode> map, List<ContentTreeNode> remainingList) {
-    /// 1. Remove toBeDeleted from tree
-    /// 2. Remove toBeDeleted from map
-    /// 3. Add all children of toBeDeleted to remainingList
-    // step 1
-    _pickOutFromTree(toBeDeleted);
-    // step 2
-    String contentId = toBeDeleted.contentId!;
-    map.remove(contentId);
-    // step 3
-    var child = toBeDeleted.firstChild;
-    _insertToDeleteList(remainingList, child);
-  }
-
-  void _moveNodeToReplace(ContentTreeNode toBeMove, ContentTreeNode toBeReplace) {
-    /// 1. Remove toBeMove from tree
-    /// 2. Insert toBeMove in front of toBeReplace
-    ///   2.1 update previous sibling
-    ///   2.2 update next sibling
-    /// 3. If toBeReplace is the first child of its parent, update parent's first child
-    _pickOutFromTree(toBeMove);
-    var previousSibling = toBeReplace.previousSibling;
-    var parent = toBeReplace.parent;
-    toBeMove.previousSibling = previousSibling;
-    previousSibling?.nextSibling = toBeMove;
-    toBeMove.nextSibling = toBeReplace;
-    toBeReplace.previousSibling = toBeMove;
-    if(parent != null && parent.firstChild == toBeReplace) {
-      parent.firstChild = toBeMove;
-    }
-  }
-
-  void _pickOutFromTree(ContentTreeNode node) {
-    /// 1. Remove from parent
-    ///   1.1 if it is the first child, make parent's first child to be its next sibling
-    ///   1.2 if it is the last child, make parent's last child to be its previous sibling
-    /// 2 Remove from sibling
-    ///   2.1 if it has previous sibling, make previous sibling's next sibling to be its next sibling
-    ///   2.2 if it has next sibling, make next sibling's previous sibling to be its previous sibling
-    var parent = node.parent;
-    var previousSibling = node.previousSibling;
-    var nextSibling = node.nextSibling;
-    // step 1.1
-    if(parent != null) {
-      if(parent.lastChild == node) {
-        parent.lastChild = node.previousSibling;
-      }
-      if(parent.firstChild == node) {
-        parent.firstChild = node.nextSibling;
-      }
-    }
-    // step 1.2
-    if(previousSibling != null) {
-      previousSibling.nextSibling = nextSibling;
-    }
-    if(nextSibling != null) {
-      nextSibling.previousSibling = previousSibling;
-    }
-  }
-
-  void _insertToDeleteList(List<ContentTreeNode> deleteList, ContentTreeNode? node) {
-    if(node == null) return;
-
-    while(node != null) {
-      deleteList.add(node);
-      node.parent = null;
-      node = node.nextSibling;
-    }
-  }
-
-  void _recursiveGenerateDeleteOperations(ContentTreeNode remainingNodes, List<TransformOperation> operations) {
-    ContentTreeNode? node = remainingNodes;
-    while(node != null) {
-      var op = TransformOperation(targetId: node.contentId!, type: TransformType.del, timestamp: createdAt);
-      operations.add(op);
-      if(node.firstChild != null) {
-        _recursiveGenerateDeleteOperations(node.firstChild!, operations);
-      }
-      node = node.nextSibling;
-    }
+    list.addAll(_recursiveBuildContentList(doc.contents, null));
+    return list;
   }
 }

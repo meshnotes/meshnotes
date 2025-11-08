@@ -377,6 +377,7 @@ class Document {
       var item = DocContentItem(
         blockId: p.getBlockId(),
         blockHash: hash,
+        updatedAt: p.getLastUpdated(),
       );
       list.add(item);
     }

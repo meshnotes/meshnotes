@@ -40,23 +40,23 @@ class MergeManager {
   ///     2.5.3 compatible to move operations
   ///     2.5.4 add is not possible
   /// 3. Return all operations and conflicts
-  (List<TreeOperation>, List<ContentConflict>) mergeOperations(DiffOperations op1, DiffOperations op2) {
+  (List<TreeOperation>, List<ContentConflict>) mergeOperationsAndFileConflicts(DiffOperations op1, DiffOperations op2) {
     var totalOperations = <TreeOperation>[...op1.operations, ...op2.operations];
     var opMap = _buildOperationsMap(totalOperations);
 
-    List<ContentConflict> conflicts = [];
-    _mergeOperations(totalOperations, opMap, conflicts);
+    final conflicts =_findConflicts(totalOperations, opMap);
     return (totalOperations, conflicts);
   }
 
-  void _mergeOperations(List<TreeOperation> totalOperations, Map<String, List<TreeOperation>> opMap, List<ContentConflict> conflicts) {
+  List<ContentConflict> _findConflicts(List<TreeOperation> totalOperations, Map<String, List<TreeOperation>> opMap) {
+    List<ContentConflict> conflicts = [];
     for(var thisOp in totalOperations) {
       if(thisOp.isFinished()) continue;
 
       String targetId = thisOp.id;
       var opList = opMap[targetId];
       if(opList == null) continue;
-      for(var thatOp in opList) {
+      for(var thatOp in opList) { // Find all operations on the same node
         if(thatOp == thisOp) continue;
         if(thatOp.isFinished()) continue;
 
@@ -173,6 +173,7 @@ class MergeManager {
         }
       }
     }
+    return conflicts;
   }
 
   Map<String, List<TreeOperation>> _buildOperationsMap(List<TreeOperation> opList) {
@@ -199,45 +200,48 @@ class MergeManager {
 
   VersionContent mergeVersions(List<TreeOperation> operations, List<String> parents) {
     var table = baseVersion?.table?? [];
-    int now = Util.getTimeStamp();
     for(var op in operations) {
       if(op.isFinished()) continue; // Skip deleted operation
 
       switch(op.type) {
         case TreeOperationType.add:
-          int idx = _findIndexOf(table, op.previousId);
-          var newNode = VersionContentItem(docId: op.id, docHash: op.newData!, updatedAt: now, parentDocId: op.parentId);
+          int idx = _findIndexOf(table, op.parentId, op.previousId);
+          var newNode = VersionContentItem(docId: op.id, docHash: op.newData!, updatedAt: op.timestamp, parentDocId: op.parentId);
           table.insert(idx + 1, newNode);
           break;
         case TreeOperationType.del:
-          int idx = _findIndexOf(table, op.id);
+          int idx = _findIndexOf(table, op.parentId, op.id);
           table.removeAt(idx);
           break;
         case TreeOperationType.move:
-          int idx = _findIndexOf(table, op.id);
+          int idx = _findIndexOf(table, op.parentId, op.id);
           var node = table.removeAt(idx);
-          int newIdx = _findIndexOf(table, op.previousId);
-          node.updatedAt = now;
+          int newIdx = _findIndexOf(table, op.parentId, op.previousId);
+          node.updatedAt = op.timestamp;
           node.parentDocId = op.parentId; // Update parent relationship
           table.insert(newIdx + 1, node);
           break;
         case TreeOperationType.modify:
-          int idx = _findIndexOf(table, op.id);
+          int idx = _findIndexOf(table, op.parentId, op.id);
           var node = table[idx];
           node.docHash = op.newData!;
-          node.updatedAt = now;
+          node.updatedAt = op.timestamp;
           break;
       }
     }
+    int now = Util.getTimeStamp();
     return VersionContent(table: table, timestamp: now, parentsHash: parents);
   }
 
-  int _findIndexOf(List<VersionContentItem> table, String? contentId) {
-    if(contentId == null) {
+  int _findIndexOf(List<VersionContentItem> table, String? parentId, targetId) {
+    // Both parent and previous id are null, that means it's the first node
+    if(parentId == null && targetId == null) {
       return -1;
     }
+    // If contentId is null, use parentId. Because it's the first child of this parent. Otherwise, find the target id directly
+    targetId ??= parentId;
     for(int idx = 0; idx < table.length; idx++) {
-      if(table[idx].docId == contentId) {
+      if(table[idx].docId == targetId) {
         return idx;
       }
     }

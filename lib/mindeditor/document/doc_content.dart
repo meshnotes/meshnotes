@@ -119,24 +119,27 @@ class DocContent {
 class DocContentItem {
   String blockId;
   String blockHash;
-  List<DocContentItem> children;
+  int? updatedAt;
+  List<DocContentItem> children = [];
 
   DocContentItem({
     required this.blockId,
     required this.blockHash,
-    this.children = const [],
+    this.updatedAt,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'block_id': blockId,
       'block_hash': blockHash,
+      if(updatedAt != null) 'updated_at': updatedAt,
       'children': children,
     };
   }
   DocContentItem.fromJson(Map<String, dynamic> map):
         blockId = map['block_id'],
         blockHash = map['block_hash'],
+        updatedAt = map['updated_at'],
         children = _recursiveList(map['children']);
 
   static List<DocContentItem> _recursiveList(List<dynamic>? list) {

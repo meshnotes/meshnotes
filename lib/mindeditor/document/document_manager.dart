@@ -5,7 +5,7 @@ import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/document_conflict.dart';
-import 'package:mesh_note/mindeditor/document/collaborate/merge_manager.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/version_merge_manager.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/version_manager.dart';
 import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
@@ -410,6 +410,9 @@ class DocumentManager {
     var contentVersion = _merge(v1, v2, commonVersion);
     if(contentVersion == null) {
       return;
+    }
+    if(MyLogger.isDebug()) {
+      MyLogger.debug('New version content: ${contentVersion.toJson()}');
     }
     var newVersionHash = contentVersion.getHash();
     if(newVersionHash == _currentVersion) {
@@ -1059,9 +1062,11 @@ class DocumentManager {
       return versionContent1;
     }
     if(commonVersion == version1) {
+      MyLogger.info('Merge: directly use version2(${HashUtil.formatHash(version2)}) as result');
       return versionContent2!;
     }
     if(commonVersion == version2) {
+      MyLogger.info('Merge: directly use version1(${HashUtil.formatHash(version1)}) as result');
       return versionContent1!;
     }
 
@@ -1070,7 +1075,7 @@ class DocumentManager {
     DiffOperations op1 = dm.findDifferentOperation(versionContent1!, commonVersionContent);
     DiffOperations op2 = dm.findDifferentOperation(versionContent2!, commonVersionContent);
     var mm = MergeManager(baseVersion: commonVersionContent);
-    var (operations, conflicts) = mm.mergeOperations(op1, op2);
+    var (operations, conflicts) = mm.mergeOperationsAndFileConflicts(op1, op2);
     var solvedOperations = _solveVersionConflicts(conflicts);
     operations.addAll(solvedOperations);
     var contentVersion = mm.mergeVersions(operations, [version1, version2]);
@@ -1311,7 +1316,8 @@ class DocumentManager {
     return blockContent;
   }
   static DocContent _genDocContentWithTitle(String docId, String blockId, BlockContent blockContent) {
-    DocContentItem block = DocContentItem(blockId: blockId, blockHash: '');
+    final now = Util.getTimeStamp();
+    DocContentItem block = DocContentItem(blockId: blockId, blockHash: '', updatedAt: now);
     return DocContent(contents: [block]);
   }
 

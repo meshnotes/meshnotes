@@ -5,6 +5,7 @@ class MyLogger {
   static String? prefix;
   static const _defaultLogLevel = Level.info;
   static String logName = '';
+  static bool _isDebug = false;
 
   static void init({bool usePrint=false, bool debug=false, bool verbose=false, required String name}) {
     if(logger != null) return;
@@ -12,9 +13,11 @@ class MyLogger {
     var loggerLevel = _defaultLogLevel;
     if(debug) {
       loggerLevel = Level.debug;
+      _isDebug = true;
     }
     if(verbose) {
       loggerLevel = Level.trace;
+      _isDebug = true;
     }
 
     logName = '[$name]';
@@ -82,5 +85,9 @@ class MyLogger {
 
   static void fatal(String msg) {
     logger!.f('$logName: $msg');
+  }
+
+  static bool isDebug() {
+    return _isDebug;
   }
 }

@@ -1,5 +1,5 @@
 import 'package:mesh_note/mindeditor/document/collaborate/find_operation_types.dart';
-import 'package:mesh_note/mindeditor/document/collaborate/merge_manager.dart';
+import 'package:mesh_note/mindeditor/document/collaborate/version_merge_manager.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import 'package:test/test.dart';
@@ -16,7 +16,7 @@ void main() {
     int timestamp2 = timestamp1 + 1000;
     var diffOperations2 = _genSimpleDiffOperations('ver2', ['d', 'e'], timestamp2);
     var mm = MergeManager(baseVersion: null);
-    var (operations, conflicts) = mm.mergeOperations(diffOperations1, diffOperations2);
+    var (operations, conflicts) = mm.mergeOperationsAndFileConflicts(diffOperations1, diffOperations2);
 
     expect(conflicts.length, 0);
     expect(operations.length, 5);
