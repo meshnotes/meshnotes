@@ -526,7 +526,7 @@ class SelectionController {
     // Update handles' offsets. Should run in post frame, because getCursorOffsetOfPos needs layout
     Util.runInPostFrame(() {
       Offset? baseCursorOffset, extentCursorOffset;
-      //FIXME baseRender and extentRender may be null when the block is not in the viewport. Should use a more stable way to mark the handles
+      //FIXME baseRender and extentRender may be null or not attached when the block is not in the viewport. Should use a more stable way to mark the handles
       if(baseRender != null) {
         baseCursorOffset = baseRender.getCursorOffsetOfPos(lastBaseBlockPos);
       }

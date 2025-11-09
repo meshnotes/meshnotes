@@ -76,19 +76,17 @@ class DiffManager {
 
   List<FlatResource> _convertToContentNodes(VersionContent contentVersion) {
     var list = <FlatResource>[];
-    String? previousNodeId;
-    String? lastParentId;
+    Map<String?, String> lastChildIdOfParent = {}; // key: parentId, value: last child id. Both could be null
     for(var item in contentVersion.table) {
       var docId = item.docId;
       var docHash = item.docHash;
       var timestamp = item.updatedAt;
-      if(item.parentDocId != lastParentId) { // If parentId is changed, that means it's the first child of previous node, so reset previousNodeId
-        previousNodeId = null;
-      }
-      var resource = FlatResource(id: docId, content: docHash, parentId: item.parentDocId, previousId: previousNodeId, updatedAt: timestamp);
+      final parentId = item.parentDocId;
+      // If parentId occurs first time, previousId is null. Otherwise, it's the last child id of parent
+      final previousId = lastChildIdOfParent[parentId];
+      var resource = FlatResource(id: docId, content: docHash, parentId: parentId, previousId: previousId, updatedAt: timestamp);
       list.add(resource);
-      previousNodeId = docId;
-      lastParentId = item.parentDocId;
+      lastChildIdOfParent[parentId] = docId; // Remember last child id of parent
     }
     return list;
   }

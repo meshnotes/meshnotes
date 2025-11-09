@@ -1,3 +1,4 @@
+import 'package:keygen/keygen.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/diff_manager.dart';
 import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/util/util.dart';
@@ -146,8 +147,8 @@ class MergeManager {
                   thatOp.setFinished();
                   continue;
                 }
-                if(thisOp.newData != thatOp.newData) {
-                  MyLogger.warn('Find conflicts between $thisOp and $thatOp');
+                if(thisOp.newData != thatOp.newData) { // Two versions modify the same document, should use document merge
+                  MyLogger.warn('Version conflict: Find conflicts between $thisOp and $thatOp');
                   var baseHash = _findBaseHash(targetId);
                   if(baseHash == null) {
                     MyLogger.warn('Data incorrect! base hash should not be null if there are modification conflict!! target_id=$targetId, base_version=$baseVersion');
@@ -276,4 +277,9 @@ class ContentConflict {
     required this.timestamp1,
     required this.timestamp2,
   });
+
+  @override
+  String toString() {
+    return 'ContentConflict(targetId=$targetId, originalHash=${HashUtil.formatHash(originalHash)}, conflictHash1=${HashUtil.formatHash(conflictHash1)}, conflictHash2=${HashUtil.formatHash(conflictHash2)}, timestamp1=$timestamp1, timestamp2=$timestamp2)';
+  }
 }

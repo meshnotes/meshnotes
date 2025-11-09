@@ -20,6 +20,12 @@ class DocumentConflictManager {
     var totalOperations = [...operations1, ...operations2];
     var opMap = _buildOperationMap(totalOperations);
     final conflicts = _mergeTransformOperations(totalOperations, opMap);
+
+    if(MyLogger.isDebug()) {
+      MyLogger.debug('mergeDocumentOperations: operations1=$operations1');
+      MyLogger.debug('mergeDocumentOperations: operations2=$operations2');
+      MyLogger.debug('mergeDocumentOperations: conflicts=$conflicts');
+    }
     return (totalOperations, conflicts);
   }
 
@@ -27,9 +33,9 @@ class DocumentConflictManager {
     var contents = baseDoc.contents;
     for(var op in operations) {
       if(op.isFinished()) continue; // Skip deleted operation
-      if(op.parentId != null) {
-        MyLogger.warn('mergeDocument: parent of all nodes must be null in current version!!');
-      }
+      // if(op.parentId != null) {
+      //   MyLogger.warn('mergeDocument: parent of all nodes must be null in current version!!');
+      // }
 
       switch(op.type) {
         case TreeOperationType.add:
@@ -178,6 +184,21 @@ class DocumentConflictManager {
   /// Insert a node into the tree content, based on the parentId and previousId
   /// Returns true if inserted, false otherwise
   bool _insertIntoTreeContent(List<DocContentItem> contents, String? parentId, String? previousId, DocContentItem node) {
+    // If parentId is null, must insert to the top level
+    if(parentId == null) {
+      if(previousId == null) {
+        contents.insert(0, node);
+        return true;
+      }
+      for(int i = 0; i < contents.length; i++) {
+        if(contents[i].blockId == previousId) {
+          contents.insert(i + 1, node);
+          return true;
+        }
+      }
+      return false;
+    }
+    // If parent is not null, recursively find the proper position to insert
     bool _recursiveInsert(List<DocContentItem> contents, String? parentId, String? previousId, DocContentItem node) {
       for(var item in contents) {
         if(item.blockId == parentId) {// Found the parent node
@@ -214,7 +235,7 @@ class DocumentConflictManager {
   }
 
   /// Find a node in the tree content, based on the contentId
-  /// Returns the found node if found, null otherwise
+  /// Returns the siblings list(may need to be updated) and the target node if found, null otherwise
   (List<DocContentItem>, DocContentItem?) _findNodeInTreeContent(List<DocContentItem> contents, String contentId) {
     (List<DocContentItem>, DocContentItem?) _recursiveFind(List<DocContentItem> siblings, String contentId) {
       for(var item in siblings) {

@@ -396,9 +396,8 @@ class DocumentManager {
 
   /// 1. Find smaller version as base version, in order to make sure the target/base will be the same in every machine
   /// 2. Merge target version and base version based on common version
-  /// 3. Update documents in new version tree
-  /// 4. Remove documents that are not in new version tree, that means they are deleted
-  /// 5. Store new version tree and update current version
+  /// 3. Store new version tree and update current version
+  /// 4. Update documents and document titles tree
   void _mergeCurrentAndSave(String targetVersion, String commonVersion) {
     // 1. Decide base and target versions, make sure there is no difference in every machine
     String v1 = _currentVersion, v2 = targetVersion;
@@ -407,59 +406,26 @@ class DocumentManager {
       v1 = targetVersion;
     }
     // 2. Merge versions and get result version hash
-    var contentVersion = _merge(v1, v2, commonVersion);
+    var contentVersion = _doMerge(v1, v2, commonVersion);
     if(contentVersion == null) {
       return;
     }
     if(MyLogger.isDebug()) {
-      MyLogger.debug('New version content: ${contentVersion.toJson()}');
+      MyLogger.debug('_mergeCurrentAndSave: New version content: ${contentVersion.toJson()}');
     }
     var newVersionHash = contentVersion.getHash();
     if(newVersionHash == _currentVersion) {
       MyLogger.info('_mergeCurrentAndSave: merge result is current version($_currentVersion), do nothing');
       return;
     }
-    // 3. Update documents in new version tree
-    for(var doc in contentVersion.table) {
-      _updateDoc(doc, {});
-    }
-    // 4. Remove document that is not in new version tree, that means it is deleted
-    List<String> docToDelete = [];
-    final allDocTitles = _getAllDocTitles();
-    for(var docTitle in allDocTitles) {
-      if(!contentVersion.table.any((e) => e.docId == docTitle.docId)) {
-        docToDelete.add(docTitle.docId);
-      }
-    }
-    // Handle hierarchical deletion: only delete root documents of deletion hierarchies
-    // Child documents will be automatically deleted by cascading deletion
-    Set<String> processedForDeletion = {};
-    for(var docId in docToDelete) {
-      if(processedForDeletion.contains(docId)) continue;
 
-      // Check if this document's parent is also being deleted
-      var docModel = _getDocTreeNode(docId);
-      bool isRootOfDeletionHierarchy = true;
-      if(docModel?.parentDocId != null && docToDelete.contains(docModel!.parentDocId!)) {
-        isRootOfDeletionHierarchy = false;
-      }
-
-      // Only delete from root of deletion hierarchy to avoid redundant operations
-      if(isRootOfDeletionHierarchy) {
-        // Get all descendants recursively to mark as processed
-        var allDescendants = _getAllDescendants(docId);
-        for(var descendant in allDescendants) {
-          processedForDeletion.add(descendant);
-        }
-        deleteDocumentWithChildren(docId);
-        processedForDeletion.add(docId);
-      }
-    }
-    // 5. Store new version tree and update current version
+    // 3. Store new version tree and update current version
     bool fastForward = newVersionHash == _currentVersion || newVersionHash == targetVersion;
     var now = fastForward? contentVersion.timestamp: Util.getTimeStamp();
     List<String> parents = fastForward? []: [_currentVersion, targetVersion]; // Ignore parents if fast_forward
     _storeVersionFromLocalAndUpdateCurrentVersion(contentVersion, parents, now, fastForward: fastForward);
+    // 4. Update documents and document titles tree
+    _updateDocsTitlesWithOrder(contentVersion.table);
   }
   
   String _doCreateNewDocument(String title, String content, String? parentDocId) {
@@ -481,30 +447,24 @@ class DocumentManager {
     return docId;
   }
 
-  void _updateDoc(VersionContentItem node, Map<String, String> objects) {
-    var docId = node.docId;
-    var found = _findDocTitleNode(docId);
-    /// 1. If not found, insert it
-    /// 2. If found, update it, and restore doc content
-    if(found == null) {
-      found = DocTitleMeta(
-        docId: docId,
-        title: '',
-        hash: node.docHash,
-        isPrivate: ModelConstants.isPrivateNo,
-        timestamp: node.updatedAt,
-        parentDocId: node.parentDocId,
-        orderId: -1, // place holder, will be updated later
-      );
-      _appendToDocTitles(found);
-    } else {
-      found.timestamp = node.updatedAt;
-      found.parentDocId = node.parentDocId;
-      found.hash = node.docHash;
+  void _updateDocsTitlesWithOrder(List<VersionContentItem> table) {
+    String? lastParentId;
+    int orderId = 0;
+    for(var doc in table) {
+      final parentId = doc.parentDocId;
+      if(parentId != lastParentId) {
+        orderId = 0;
+        lastParentId = parentId;
+      }
+      _updateDoc(doc, orderId, {});
+      orderId++;
     }
-    // Restore doc list
-    _db.insertOrUpdateDoc(docId, found.hash, found.timestamp, found.orderId, parentDocId: found.parentDocId);
-
+    _buildDocumentTreeAndSort();
+  }
+  void _updateDoc(VersionContentItem node, int orderId, Map<String, String> objects) {
+    var docId = node.docId;
+    String docTitle = '';
+    final timestamp = node.updatedAt;
     // Store doc content into objects
     // var docContentStr = objects[found.hash]!;
     var docObject = _db.getObject(node.docHash);
@@ -527,15 +487,43 @@ class DocumentManager {
         for(var t in blockContent.text) {
           title += t.text;
         }
-        found.title = title;
+        docTitle = title;
       }
       // _db.storeObject(blockHash, blockStr);
-      _db.storeDocBlock(docId, blockId, blockStr, found.timestamp);
+      _db.storeDocBlock(docId, blockId, blockStr, timestamp);
     }
-    // Update doc content
-    _db.updateDocContent(docId, docContentStr, found.timestamp);
 
-    // If document was loaded, update it
+    // Update doc title
+    var found = _findDocTitleNode(docId);
+    /// 1. If not found, insert it
+    /// 2. If found, update it, and restore doc content
+    if(found == null) {
+      found = DocTitleMeta(
+        docId: docId,
+        title: docTitle,
+        hash: node.docHash,
+        isPrivate: ModelConstants.isPrivateNo,
+        timestamp: timestamp,
+        parentDocId: node.parentDocId,
+        orderId: orderId, // place holder, will be updated later
+      );
+      // _appendToDocTitles(found, needUpdateDb: false);
+    } else {
+      found.timestamp = timestamp;
+      found.parentDocId = node.parentDocId;
+      found.hash = node.docHash;
+      found.title = docTitle;
+      found.orderId = orderId;
+    }
+    if(MyLogger.isDebug()) {
+      MyLogger.debug('_updateDoc: docId=$docId, title=$docTitle, parentDocId=${node.parentDocId}, orderId=$orderId');
+    }
+    // Restore doc list
+    _db.insertOrUpdateDoc(docId, node.docHash, timestamp, orderId, parentDocId: node.parentDocId);
+    // Update doc content
+    _db.updateDocContent(docId, docContentStr, timestamp);
+
+    // If document was opened, update it
     var openingDocument = _documents[docId];
     if(openingDocument != null) {
       var newDocument = getDocument(docId, getDirectly: true);
@@ -630,7 +618,7 @@ class DocumentManager {
   }
   /// Append docData to _docTitles according to its parentDocId, and decide the orderId
   /// All nodes following the new node must update their orderId
-  void _appendToDocTitles(DocTitleMeta docData) {
+  void _appendToDocTitles(DocTitleMeta docData, {bool needUpdateDb = true}) {
     // 1. Find the list with the same parent
     final targetParent = docData.parentDocId;
     var targetOrderId = docData.orderId;
@@ -642,12 +630,15 @@ class DocumentManager {
     } else {
       listToBeInserted.insert(targetOrderId, docData);
     }
+
+    if(!needUpdateDb) return;
     // 3. Update the orderId of all nodes following the new node, including the new node itself
     for(var i = targetOrderId; i < listToBeInserted.length; i++) {
       listToBeInserted[i].orderId = i;
       _db.updateDocOrderId(listToBeInserted[i].docId, listToBeInserted[i].orderId);
     }
   }
+
   void _removeDocTitleNode(String docId) {
     final targetNode = _findDocTitleNode(docId);
     if(targetNode == null) return;
@@ -1047,7 +1038,7 @@ class DocumentManager {
     toRemove.add(node.versionHash);
   }
 
-  VersionContent? _merge(String version1, String version2, String commonVersion) {
+  VersionContent? _doMerge(String version1, String version2, String commonVersion) {
     MyLogger.info('_merge: merging version(${HashUtil.formatHash(version1)}) and version(${HashUtil.formatHash(version2)}) based on version(${HashUtil.formatHash(commonVersion)})');
     final versionContent1 = _loadVersionContent(version1);
     final versionContent2 = _loadVersionContent(version2);

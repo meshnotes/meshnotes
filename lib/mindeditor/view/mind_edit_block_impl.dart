@@ -246,7 +246,7 @@ class MindBlockImplRenderObject extends RenderBox {
     final lineHeight = paragraph.getFullHeightForCaret(TextPosition(offset: pos));
     final rect = _calculateCursorRectByPosition(TextPosition(offset: pos), height: lineHeight);
     var localPoint = Offset(rect.left, rect.bottom);
-    var globalPoint = localToGlobal(localPoint);
+    var globalPoint = localToGlobal(localPoint); //TODO: Failed assertion: line 3374 pos 12: 'attached': is not true.
     return globalPoint;
   }
 

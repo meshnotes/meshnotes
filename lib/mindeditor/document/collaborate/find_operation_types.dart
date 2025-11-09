@@ -48,4 +48,9 @@ class TreeOperation {
   void setFinished() {
     _finished = true;
   }
+
+  @override
+  String toString() {
+    return 'TreeOperation(type=$type, id=$id, parentId=$parentId, previousId=$previousId, timestamp=$timestamp)';
+  }
 }

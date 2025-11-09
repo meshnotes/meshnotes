@@ -51,6 +51,8 @@ class EditorController {
         return; // Clipboard API is not supported on this platform.
       }
       CallbackRegistry.triggerClipboardDataEvent(clipboardData.text!);
+    }).onError((e, s) {
+      MyLogger.err('checkIfReadyToPaste: error=$e, stackTrace=$s');
     });
   }
 }

@@ -5,7 +5,8 @@ import 'mindeditor/controller/controller.dart';
 
 Future<void> appInit() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MyLogger.init(name: 'main', debug: false);
+  const isProduct = bool.fromEnvironment('dart.vm.product');
+  MyLogger.init(name: 'main', debug: !isProduct);
   final controller = Controller();
   await controller.initAll();
   // Make title bar looks better
