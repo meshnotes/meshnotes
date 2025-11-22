@@ -448,16 +448,13 @@ class DocumentManager {
   }
 
   void _updateDocsTitlesWithOrder(List<VersionContentItem> table) {
-    String? lastParentId;
-    int orderId = 0;
+    Map<String?, int> orderIdMap = {};
     for(var doc in table) {
       final parentId = doc.parentDocId;
-      if(parentId != lastParentId) {
-        orderId = 0;
-        lastParentId = parentId;
-      }
+      int orderId = orderIdMap[parentId]?? 0;
       _updateDoc(doc, orderId, {});
       orderId++;
+      orderIdMap[parentId] = orderId;
     }
     _buildDocumentTreeAndSort();
   }
@@ -1437,5 +1434,99 @@ class DocumentManager {
       return result;
     }
     return _recursiveGetDocTitles(_docTitles);
+  }
+
+  /// Move a document to a new position
+  /// [docId] - the document to move
+  /// [newParentDocId] - new parent document ID (null for root level)
+  /// [newOrderId] - new position index in the target parent's children list
+  void moveDocument(String docId, String? newParentDocId, int newOrderId) {
+    final targetNode = _findDocTitleNode(docId);
+    if(targetNode == null) return;
+
+    // Prevent moving a document to be its own descendant
+    if(newParentDocId != null && _isDescendant(newParentDocId, docId)) {
+      MyLogger.warn('Cannot move document to its own descendant');
+      return;
+    }
+
+    final oldParentDocId = targetNode.parentDocId;
+    final oldOrderId = targetNode.orderId;
+
+    // If moving within the same parent
+    if(oldParentDocId == newParentDocId) {
+      _reorderWithinSameParent(docId, oldOrderId, newOrderId, newParentDocId);
+    } else {
+      _moveToNewParent(docId, oldParentDocId, newParentDocId, newOrderId);
+    }
+
+    setModified();
+    CallbackRegistry.triggerDocumentChangedEvent();
+  }
+
+  /// Check if potentialDescendant is a descendant of ancestorId
+  bool _isDescendant(String potentialDescendant, String ancestorId) {
+    final descendants = _recursiveGetDocumentId(ancestorId);
+    return descendants.contains(potentialDescendant);
+  }
+
+  /// Reorder document within the same parent
+  void _reorderWithinSameParent(String docId, int oldOrderId, int newOrderId, String? parentDocId) {
+    final siblings = _getChildrenOfParent(parentDocId);
+    if(newOrderId < 0 || newOrderId >= siblings.length) return;
+    if(oldOrderId == newOrderId) return;
+
+    // Remove from old position
+    final node = siblings.removeAt(oldOrderId);
+
+    // Insert at new position
+    siblings.insert(newOrderId, node);
+
+    // Update orderIds for affected nodes
+    final start = oldOrderId < newOrderId ? oldOrderId : newOrderId;
+    final end = oldOrderId < newOrderId ? newOrderId : oldOrderId;
+    for(var i = start; i <= end; i++) {
+      siblings[i].orderId = i;
+      _db.updateDocOrderId(siblings[i].docId, i);
+    }
+  }
+
+  /// Move document to a new parent
+  void _moveToNewParent(String docId, String? oldParentDocId, String? newParentDocId, int newOrderId) {
+    final targetNode = _findDocTitleNode(docId);
+    if(targetNode == null) return;
+
+    // Remove from old parent's children list
+    final oldSiblings = _getChildrenOfParent(oldParentDocId);
+    final oldOrderId = targetNode.orderId;
+    oldSiblings.removeAt(oldOrderId);
+
+    // Update orderIds for remaining siblings in old parent
+    for(var i = oldOrderId; i < oldSiblings.length; i++) {
+      oldSiblings[i].orderId = i;
+      _db.updateDocOrderId(oldSiblings[i].docId, i);
+    }
+
+    // Update node's parent reference
+    targetNode.parentDocId = newParentDocId;
+    if(newParentDocId != null) {
+      targetNode.parent = _findDocTitleNode(newParentDocId);
+    } else {
+      targetNode.parent = null;
+    }
+
+    // Insert into new parent's children list
+    final newSiblings = _getChildrenOfParent(newParentDocId);
+    final insertIndex = newOrderId.clamp(0, newSiblings.length);
+    newSiblings.insert(insertIndex, targetNode);
+    // Update parent and order id in database
+    targetNode.orderId = insertIndex;
+    _db.updateDocParent(docId, newParentDocId, insertIndex);
+    
+    // Update orderIds for affected nodes in new parent
+    for(var i = insertIndex + 1; i < newSiblings.length; i++) {
+      newSiblings[i].orderId = i;
+      _db.updateDocOrderId(newSiblings[i].docId, i);
+    }
   }
 }

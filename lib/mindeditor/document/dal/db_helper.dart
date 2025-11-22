@@ -145,6 +145,11 @@ class DbHelper {
     _database.execute(sql, [orderId, docId]);
   }
 
+  void updateDocParent(String docId, String? parentDocId, int orderId) {
+    const sql = 'UPDATE documents SET parent_doc_id=?, order_id=? WHERE doc_id=?';
+    _database.execute(sql, [parentDocId, orderId, docId]);
+  }
+
   void clearAllDocumentHashes() {
     const sql = 'UPDATE documents SET doc_hash=?';
     _database.execute(sql, [ModelConstants.hashEmpty]);

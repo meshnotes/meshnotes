@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/view/floating_stack_layer.dart';
 import 'package:mesh_note/mindeditor/view/network_view.dart';
@@ -37,7 +38,8 @@ class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
 
 class DocumentNavigatorState extends State<DocumentNavigator> {
   static const String watcherKey = 'doc_navigator';
-  List<DocTitleFlat> docList = [];
+  List<DocTitleFlat> totalList = []; // Total document list, including collapsed documents
+  List<DocTitleFlat> docList = []; // Document list, only including visible documents
   int? selected;
   _NetworkStatus _networkStatus = _NetworkStatus.lost;
   int _peerCount = 0;
@@ -46,13 +48,28 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   final userInfoSettingLayerKey = GlobalKey<FloatingStackViewState>();
   bool _isUserInfoPopupVisible = false;
 
+  // Drag and drop state
+  int? _draggingIndex; // The index of the document title being dragged
+  int? _dragTargetIndex; // The index of the document title being dragged to
+  _DropPosition? _dropPosition;
+
+  // Collapse/expand state
+  final Set<String> _collapsedDocIds = {};
+
+  // Auto-scroll state
+  final ScrollController _scrollController = ScrollController();
+  Timer? _autoScrollTimer;
+  final GlobalKey _listViewKey = GlobalKey();
+  double _currentScrollDelta = 0.0;
+
   @override
   void initState() {
     super.initState();
     CallbackRegistry.registerDocumentChangedWatcher(watcherKey, refreshDocumentList);
     CallbackRegistry.registerNetworkStatusWatcher(_onNetworkStatusChanged);
     CallbackRegistry.registerPeerNodesChangedWatcher(_onPeerNodesChanged);
-    docList = controller.docManager.getFlattenedDocumentList();
+    totalList = controller.docManager.getFlattenedDocumentList();
+    docList = _getFilteredDocumentList(totalList);
     final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
     controller.eventTasksManager.addSyncingTask(_updateSyncing);
@@ -67,6 +84,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     CallbackRegistry.unregisterPeerNodesChangedWatcher(_onPeerNodesChanged);
     controller.eventTasksManager.removeSyncingTask(_updateSyncing);
     controller.eventTasksManager.removeUserInfoChangedTask(_onUserInfoChanged);
+    _scrollController.dispose();
+    _autoScrollTimer?.cancel();
   }
 
   @override
@@ -93,66 +112,32 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         ),
       );
     } else {
+      // Build list with an extra drop zone at the end
       var list = ListView.builder(
-        itemCount: docList.length,
+        key: _listViewKey,
+        controller: _scrollController,
+        itemCount: docList.length + 1, // +1 for the end drop zone
         itemBuilder: (BuildContext context, int index) {
-          final docNode = docList[index];
-          final indentWidth = docNode.level * 20.0; // 20 pixels per level
-          
-          return Container(
-            margin: EdgeInsets.only(left: indentWidth),
-            child: ListTile(
-              selected: index == selected,
-              selectedTileColor: Colors.black12,
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
-              visualDensity: VisualDensity.compact,
-              minLeadingWidth: 14.0,
-              leading: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 16.0,
-                    child: docNode.hasChild()
-                        ? Icon(
-                            Icons.keyboard_arrow_right,
-                            size: 16.0,
-                            color: Colors.grey[600],
-                          )
-                        : null, // Transparent placeholder to keep alignment
-                  ),
-                  Icon(
-                    Icons.description_outlined,
-                    size: 18.0,
-                    color: Colors.grey[600],
-                  ),
-                ],
-              ),
-              title: Text(
-                docNode.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 15.0),
-              ),
-              trailing: _buildDocumentActions(context, docNode),
-              onTap: () {
-                var docId = docNode.docId;
-                controller.openDocument(docId);
-                setState(() {
-                  selected = index;
-                });
-                if(widget.smallView && widget.jumpAction != null) {
-                  widget.jumpAction!();
-                } else {
-                  _routeDocumentViewInSmallView(context);
-                }
-              },
-            ),
-          );
+          if (index < docList.length) {
+            return _buildDraggableDocItem(context, index);
+          } else {
+            // End drop zone
+            return _buildEndDropZone(context);
+          }
         },
       );
+
+      // Wrap ListView with MouseRegion to track drag position
       titleListView = Expanded(
-        child: list,
+        child: Listener(
+          onPointerMove: (event) {
+            // Only handle auto-scroll when dragging
+            if (_draggingIndex != null) {
+              _handleAutoScroll(event.position);
+            }
+          },
+          child: list,
+        ),
       );
     }
     var systemButtons = _buildSystemButtons(context);
@@ -308,6 +293,323 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     );
   }
 
+  /// Build a draggable document item with drag target zones
+  Widget _buildDraggableDocItem(BuildContext context, int index) {
+    final docNode = docList[index];
+    final indentWidth = docNode.level * 20.0;
+    final isTargeted = _dragTargetIndex == index;
+    final itemKey = GlobalKey();
+
+    // Wrap in DragTarget for accepting drops
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (details) {
+        final draggedIndex = details.data;
+        return draggedIndex != index;
+      },
+      onAcceptWithDetails: (details) {
+        final draggedIndex = details.data;
+        _handleDrop(draggedIndex, index);
+      },
+      onMove: (details) {
+        // Determine drop position based on vertical and horizontal position
+        final RenderBox? renderBox = itemKey.currentContext?.findRenderObject() as RenderBox?;
+        if (renderBox == null) {
+          // Fallback to simple "above" position if we can't get the render box
+          if (_dragTargetIndex != index || _dropPosition != _DropPosition.above) {
+            setState(() {
+              _dragTargetIndex = index;
+              _dropPosition = _DropPosition.above;
+            });
+          }
+          return;
+        }
+
+        final localPosition = renderBox.globalToLocal(details.offset);
+        final itemHeight = renderBox.size.height;
+        // Make the calculated position upper than the actual position, in order to avoid covered by finger or mouse cursor
+        final relativeY = localPosition.dy - 15.0;
+
+        // Use local X position to determine hierarchy level
+        // localPosition.dx is relative to the item's left edge (which is already indented)
+        // So we need to add back the indent to get the absolute position from sidebar's left edge
+        final absoluteXFromSidebarLeft = localPosition.dx + indentWidth;
+
+        // Calculate target level based on absolute X position from sidebar's left edge
+        // Each level is 20px wide
+        final calculatedLevel = (absoluteXFromSidebarLeft / 20).floor().clamp(0, docNode.level + 1);
+
+        _DropPosition newDropPosition;
+
+        // Determine vertical position (above/below/asChild)
+        if (relativeY < itemHeight * 0.33) {
+          // Top third: insert above as sibling
+          newDropPosition = _DropPosition.above;
+        } else if (relativeY > itemHeight * 0.67) {
+          // Bottom third: check if should be child or sibling
+          if (calculatedLevel > docNode.level) {
+            // User dragged to the right beyond target's level -> insert as child
+            newDropPosition = _DropPosition.asChild;
+          } else {
+            // Insert below as sibling
+            newDropPosition = _DropPosition.below;
+          }
+        } else {
+          // Middle third: check horizontal position
+          if (calculatedLevel > docNode.level) {
+            // User dragged to the right beyond target's level -> insert as child
+            newDropPosition = _DropPosition.asChild;
+          } else {
+            // Insert above as sibling
+            newDropPosition = _DropPosition.above;
+          }
+        }
+
+        if (_dragTargetIndex != index || _dropPosition != newDropPosition) {
+          setState(() {
+            _dragTargetIndex = index;
+            _dropPosition = newDropPosition;
+          });
+        }
+      },
+      onLeave: (details) {
+        setState(() {
+          _dragTargetIndex = null;
+          _dropPosition = null;
+        });
+      },
+      builder: (context, candidateData, rejectedData) {
+        // Show drop indicator when hovering
+        final isHovering = candidateData.isNotEmpty;
+        void _onDragCompleted() { // Reset drag and drop state, reused by onDragEnd and onDragCompleted
+          _stopAutoScroll();
+          setState(() {
+            _draggingIndex = null;
+            _dragTargetIndex = null;
+            _dropPosition = null;
+          });
+        }
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Show line above when drop position is "above"
+            if (isTargeted && isHovering && _dropPosition == _DropPosition.above)
+              _buildDropLine(indentWidth, isAsChild: false),
+
+            Container(
+              key: itemKey,
+              margin: EdgeInsets.only(left: indentWidth),
+              child: LongPressDraggable<int>(
+                data: index,
+                hapticFeedbackOnStart: true,
+                // Offset the feedback downward so it doesn't block the drop indicator
+                feedbackOffset: const Offset(0, -50),
+                feedback: Material(
+                  elevation: 6.0,
+                  child: Container(
+                    width: 300,
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(4.0),
+                      border: Border.all(color: Colors.blue, width: 1.0),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.description_outlined,
+                          size: 18.0,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            docNode.title,
+                            style: const TextStyle(fontSize: 15.0, color: Colors.black87),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                childWhenDragging: Container(
+                  color: Colors.grey.withOpacity(0.1),
+                  child: Opacity(
+                    opacity: 0.3,
+                    child: _buildDocListTile(context, index, docNode, 0),
+                  ),
+                ),
+                onDragStarted: () {
+                  setState(() {
+                    _draggingIndex = index;
+                  });
+                },
+                onDragEnd: (_) => _onDragCompleted(),
+                onDragCompleted: _onDragCompleted,
+                child: _buildDocListTile(context, index, docNode, 0),
+              ),
+            ),
+
+            // Show line below when drop position is "below"
+            if (isTargeted && isHovering && _dropPosition == _DropPosition.below)
+              _buildDropLine(indentWidth, isAsChild: false),
+
+            // Show line below with extra indent when dropping as child
+            if (isTargeted && isHovering && _dropPosition == _DropPosition.asChild)
+              _buildDropLine(indentWidth, isAsChild: true),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Build a horizontal line to indicate drop position
+  /// [indentWidth] - the base indentation of the target item
+  /// [isAsChild] - whether dropping as a child (adds extra indentation)
+  Widget _buildDropLine(double indentWidth, {bool isAsChild = false}) {
+    // Calculate number of segments based on indent level
+    final targetLevel = (indentWidth / 20).floor();
+    final numSegments = isAsChild ? targetLevel + 1 : targetLevel;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4.0), // Add vertical spacing for visibility
+      height: 3,
+      child: Row(
+        children: [
+          // Show segments for hierarchy levels
+          ...List.generate(numSegments, (index) {
+            return Row(
+              children: [
+                Container(
+                  width: 15,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                ),
+                const SizedBox(width: 5), // Gap between segments
+              ],
+            );
+          }),
+          // The main line
+          Expanded(
+            child: Container(
+              height: 3,
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build the drop zone at the end of the list
+  Widget _buildEndDropZone(BuildContext context) {
+    const endZoneIndex = -1; // Special index to identify end zone
+    final isTargeted = _dragTargetIndex == endZoneIndex;
+
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (details) => true,
+      onAcceptWithDetails: (details) {
+        final draggedIndex = details.data;
+        _handleDropAtEnd(draggedIndex);
+      },
+      onMove: (details) {
+        if (_dragTargetIndex != endZoneIndex) {
+          setState(() {
+            _dragTargetIndex = endZoneIndex;
+            _dropPosition = _DropPosition.below;
+          });
+        }
+      },
+      onLeave: (details) {
+        setState(() {
+          _dragTargetIndex = null;
+          _dropPosition = null;
+        });
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHovering = candidateData.isNotEmpty;
+
+        return Container(
+          height: isHovering && isTargeted ? 50 : 20,
+          child: Column(
+            children: [
+              if (isHovering && isTargeted)
+                _buildDropLine(0), // No indentation for root level
+              Expanded(child: Container()),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Build the list tile content for a document
+  Widget _buildDocListTile(BuildContext context, int index, DocTitleFlat docNode, double indentWidth) {
+    final isCollapsed = _collapsedDocIds.contains(docNode.docId);
+
+    return ListTile(
+      selected: index == selected,
+      selectedTileColor: Colors.black12,
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+      visualDensity: VisualDensity.compact,
+      minLeadingWidth: 14.0,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: docNode.hasChild()
+                ? () => _toggleCollapse(docNode.docId)
+                : null,
+            child: SizedBox(
+              width: 16.0,
+              child: docNode.hasChild()
+                  ? Icon(
+                      isCollapsed ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_down,
+                      size: 16.0,
+                      color: Colors.grey[600],
+                    )
+                  : null,
+            ),
+          ),
+          Icon(
+            Icons.description_outlined,
+            size: 18.0,
+            color: Colors.grey[600],
+          ),
+        ],
+      ),
+      title: Text(
+        docNode.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 15.0),
+      ),
+      trailing: _buildDocumentActions(context, docNode),
+      onTap: () {
+        var docId = docNode.docId;
+        controller.openDocument(docId);
+        setState(() {
+          selected = index;
+        });
+        if(widget.smallView && widget.jumpAction != null) {
+          widget.jumpAction!();
+        } else {
+          _routeDocumentViewInSmallView(context);
+        }
+      },
+    );
+  }
+
   /// Build action buttons for each document item
   Widget? _buildDocumentActions(BuildContext context, DocTitleFlat docNode) {
     return GestureDetector(
@@ -325,6 +627,106 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         ),
       ),
     );
+  }
+
+  /// Handle the drop operation
+  void _handleDrop(int draggedIndex, int targetIndex) {
+    if (draggedIndex == targetIndex) return;
+
+    final draggedDoc = docList[draggedIndex];
+    final targetDoc = docList[targetIndex];
+
+    String? newParentDocId;
+    int newOrderId;
+
+    // Default to inserting above if no position is set
+    final dropPos = _dropPosition ?? _DropPosition.above;
+
+    switch (dropPos) {
+      case _DropPosition.above:
+        // Insert as sibling above target
+        newParentDocId = targetDoc.parentDocId;
+        newOrderId = targetDoc.orderId;
+        break;
+      case _DropPosition.below:
+        // Insert as sibling below target
+        newParentDocId = targetDoc.parentDocId;
+        newOrderId = targetDoc.orderId + 1;
+        break;
+      case _DropPosition.asChild:
+        // Insert as first child of target
+        newParentDocId = targetDoc.docId;
+        newOrderId = 0;
+        break;
+    }
+
+    // Prevent moving a document to be its own descendant
+    if (newParentDocId != null && _isAncestor(draggedDoc.docId, newParentDocId)) {
+      CallbackRegistry.showToast('Cannot move document to its own descendant');
+      return;
+    }
+
+    // When moving within the same parent and moving downward,
+    // we need to adjust the newOrderId because the backend will first remove
+    // the dragged item, which shifts all subsequent items up by one position
+    if (draggedDoc.parentDocId == newParentDocId &&
+        draggedDoc.orderId < newOrderId) {
+      newOrderId--;
+    }
+
+    // Perform the move operation
+    controller.docManager.moveDocument(draggedDoc.docId, newParentDocId, newOrderId);
+
+    setState(() {
+      _dragTargetIndex = null;
+      _dropPosition = null;
+    });
+  }
+
+  /// Handle dropping at the end of the list
+  void _handleDropAtEnd(int draggedIndex) {
+    final draggedDoc = docList[draggedIndex];
+
+    // Find the maximum orderId among root-level documents
+    int maxOrderId = -1;
+    for (var doc in docList) {
+      if (doc.parentDocId == null && doc.orderId > maxOrderId) {
+        maxOrderId = doc.orderId;
+      }
+    }
+
+    // Insert at the end as a root-level document
+    const newParentDocId = null;
+    int newOrderId = maxOrderId + 1;
+
+    // If the dragged document is already a root-level document,
+    // we need to adjust the orderId because the backend will remove it first
+    if (draggedDoc.parentDocId == null) {
+      // After removal, the max orderId will be one less
+      newOrderId--;
+    }
+
+    // Perform the move operation
+    controller.docManager.moveDocument(draggedDoc.docId, newParentDocId, newOrderId);
+
+    setState(() {
+      _dragTargetIndex = null;
+      _dropPosition = null;
+    });
+  }
+
+  /// Check if ancestorId is an ancestor of docId
+  bool _isAncestor(String ancestorId, String docId) {
+    String? currentParent = docId;
+    while (currentParent != null) {
+      if (currentParent == ancestorId) return true;
+      final parentNode = docList.firstWhere(
+        (doc) => doc.docId == currentParent,
+        orElse: () => docList.first,
+      );
+      currentParent = parentNode.parentDocId;
+    }
+    return false;
   }
 
   /// Show context menu for document
@@ -415,8 +817,130 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
 
   void refreshDocumentList() {
     setState(() {
-      docList = controller.docManager.getFlattenedDocumentList();
+      totalList = controller.docManager.getFlattenedDocumentList();
+      docList = _getFilteredDocumentList(totalList);
     });
+  }
+
+  /// Get filtered document list (respecting collapsed state)
+  List<DocTitleFlat> _getFilteredDocumentList(List<DocTitleFlat> fullList) {
+    if (_collapsedDocIds.isEmpty) {
+      return fullList;
+    }
+
+    // Filter out children of collapsed documents
+    final result = <DocTitleFlat>[];
+    final skipUntilLevel = <int>[];
+
+    for (var doc in fullList) {
+      // Check if we should skip this document
+      if (skipUntilLevel.isNotEmpty && doc.level > skipUntilLevel.last) {
+        continue;
+      }
+
+      // Clear skip levels that no longer apply
+      while (skipUntilLevel.isNotEmpty && doc.level <= skipUntilLevel.last) {
+        skipUntilLevel.removeLast();
+      }
+
+      // Add this document to the result
+      result.add(doc);
+
+      // If this document is collapsed, skip its children
+      if (_collapsedDocIds.contains(doc.docId) && doc.hasChild()) {
+        skipUntilLevel.add(doc.level);
+      }
+    }
+
+    return result;
+  }
+
+  /// Toggle collapse/expand state of a document
+  void _toggleCollapse(String docId) {
+    setState(() {
+      if (_collapsedDocIds.contains(docId)) {
+        _collapsedDocIds.remove(docId);
+      } else {
+        _collapsedDocIds.add(docId);
+      }
+      docList = _getFilteredDocumentList(totalList);
+    });
+  }
+
+  /// Handle auto-scroll when dragging near edges
+  void _handleAutoScroll(Offset globalPosition) {
+    if (!_scrollController.hasClients) return;
+
+    // Get the render box of the ListView
+    final RenderBox? renderBox = _listViewKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      MyLogger.debug('Auto-scroll: renderBox is null');
+      return;
+    }
+
+    // Convert global position to local (relative to ListView)
+    final localPosition = renderBox.globalToLocal(globalPosition);
+    final viewportHeight = renderBox.size.height;
+
+    // Define scroll zones (top and bottom 80px)
+    const scrollZoneSize = 80.0;
+    const maxScrollSpeed = 20.0;
+
+    double? scrollDelta;
+
+    // Check if in top scroll zone
+    if (localPosition.dy >= 0 && localPosition.dy < scrollZoneSize) {
+      // Scroll up (negative delta)
+      final proximity = 1.0 - (localPosition.dy / scrollZoneSize);
+      scrollDelta = -proximity * maxScrollSpeed;
+      MyLogger.debug('Auto-scroll: top zone, dy=${localPosition.dy}, delta=$scrollDelta');
+    }
+    // Check if in bottom scroll zone
+    else if (localPosition.dy > viewportHeight - scrollZoneSize && localPosition.dy <= viewportHeight) {
+      // Scroll down (positive delta)
+      final proximity = (localPosition.dy - (viewportHeight - scrollZoneSize)) / scrollZoneSize;
+      scrollDelta = proximity * maxScrollSpeed;
+      MyLogger.debug('Auto-scroll: bottom zone, dy=${localPosition.dy}, delta=$scrollDelta');
+    }
+
+    // Start or update auto-scroll
+    if (scrollDelta != null) {
+      _startAutoScroll(scrollDelta);
+    } else {
+      _stopAutoScroll();
+    }
+  }
+
+  /// Start auto-scrolling with the given speed
+  void _startAutoScroll(double delta) {
+    _currentScrollDelta = delta;
+
+    // If already scrolling, just update the delta
+    if (_autoScrollTimer?.isActive ?? false) {
+      return;
+    }
+
+    // Start a new timer
+    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (!_scrollController.hasClients) {
+        timer.cancel();
+        _autoScrollTimer = null;
+        return;
+      }
+      final currentOffset = _scrollController.offset;
+      final newOffset = (currentOffset + _currentScrollDelta).clamp(0.0, _scrollController.position.maxScrollExtent,);
+
+      if (newOffset != currentOffset) {
+        _scrollController.jumpTo(newOffset);
+      }
+    });
+  }
+
+  /// Stop auto-scrolling
+  void _stopAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+    _currentScrollDelta = 0.0;
   }
 
   void _onNetworkStatusChanged(NetworkStatus status) {
@@ -501,6 +1025,11 @@ enum _NetworkStatus {
 enum _DataStatus {
   synced,
   notSynced,
+}
+enum _DropPosition {
+  above,    // Drop above the target item (as sibling)
+  below,    // Drop below the target item (as sibling)
+  asChild,  // Drop as child of the target item
 }
 
 class NetworkStatusIcon extends StatelessWidget {

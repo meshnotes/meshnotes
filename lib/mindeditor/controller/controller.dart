@@ -441,7 +441,7 @@ class Controller {
     }
     //TODO should make the log shorter
     var versions = docManager.assembleRequireVersions(requiredVersions);
-    MyLogger.info('receiveRequireVersions: preparing to send versions: $versions');
+    MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length > 10? versions.sublist(0, 10) : versions}');
     network.sendVersions(versions);
   }
   void receiveResources(List<UnsignedResource> resources) {
