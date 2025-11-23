@@ -20,6 +20,7 @@ class Constants {
   static const String blockListTypeCheckedConfirm = 'checked_list_y';
 
   static const int blockLevelDefault = 0;
+  static const int maxDocumentDepth = 4;
 
   static const double tabWidth = 25;
   static const double bulletedSize = 6;

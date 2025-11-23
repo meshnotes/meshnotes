@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/view/floating_stack_layer.dart';
 import 'package:mesh_note/mindeditor/view/network_view.dart';
@@ -39,6 +40,12 @@ class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
 
 class DocumentNavigatorState extends State<DocumentNavigator> {
   static const String watcherKey = 'doc_navigator';
+  static const double indentWidth = 20.0;
+  static const double dropLineHeight = 3.0;
+  static const double dropLineSegmentWidth = 15.0;
+  static const double dropLineGapWidth = indentWidth - dropLineSegmentWidth;
+  static const Color dropLineColor = Colors.blueGrey;
+
   List<DocTitleFlat> totalList = []; // Total document list, including collapsed documents
   List<DocTitleFlat> docList = []; // Document list, only including visible documents
   int? selected;
@@ -294,7 +301,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   /// Build a draggable document item with drag target zones
   Widget _buildDraggableDocItem(BuildContext context, int index) {
     final docNode = docList[index];
-    final indentWidth = docNode.level * 20.0;
+    final indentWidth = docNode.level * DocumentNavigatorState.indentWidth;
     final isTargeted = _dragTargetIndex == index;
     final itemKey = GlobalKey();
 
@@ -333,8 +340,9 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         final absoluteXFromSidebarLeft = localPosition.dx + indentWidth;
 
         // Calculate target level based on absolute X position from sidebar's left edge
-        // Each level is 20px wide
-        final calculatedLevel = (absoluteXFromSidebarLeft / 20).floor().clamp(0, docNode.level + 1);
+        // Each level is 20px wide, and clamp to the global depth cap
+        final maxIndentLevel = min(docNode.level + 1, Constants.maxDocumentDepth - 1);
+        final calculatedLevel = min((absoluteXFromSidebarLeft / DocumentNavigatorState.indentWidth).floor(), maxIndentLevel);
 
         _DropPosition newDropPosition;
 
@@ -396,7 +404,6 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
 
             Container(
               key: itemKey,
-              margin: EdgeInsets.only(left: indentWidth),
               child: LongPressDraggable<int>(
                 data: index,
                 hapticFeedbackOnStart: true,
@@ -437,7 +444,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
                   color: Colors.grey.withOpacity(0.1),
                   child: Opacity(
                     opacity: 0.3,
-                    child: _buildDocListTile(context, index, docNode, 0),
+                    child: _buildDocListTile(context, index, docNode, indentWidth: indentWidth),
                   ),
                 ),
                 onDragStarted: () {
@@ -447,7 +454,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
                 },
                 onDragEnd: (_) => _onDragCompleted(),
                 onDragCompleted: _onDragCompleted,
-                child: _buildDocListTile(context, index, docNode, 0),
+                child: _buildDocListTile(context, index, docNode, indentWidth: indentWidth),
               ),
             ),
 
@@ -469,12 +476,12 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   /// [isAsChild] - whether dropping as a child (adds extra indentation)
   Widget _buildDropLine(double indentWidth, {bool isAsChild = false}) {
     // Calculate number of segments based on indent level
-    final targetLevel = (indentWidth / 20).floor();
+    final targetLevel = (indentWidth / DocumentNavigatorState.indentWidth).floor();
     final numSegments = isAsChild ? targetLevel + 1 : targetLevel;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0), // Add vertical spacing for visibility
-      height: 3,
+      height: dropLineHeight,
       child: Row(
         children: [
           // Show segments for hierarchy levels
@@ -482,23 +489,23 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
             return Row(
               children: [
                 Container(
-                  width: 15,
-                  height: 3,
+                  width: dropLineSegmentWidth,
+                  height: dropLineHeight,
                   decoration: BoxDecoration(
-                    color: Colors.blue,
+                    color: dropLineColor,
                     borderRadius: BorderRadius.circular(1.5),
                   ),
                 ),
-                const SizedBox(width: 5), // Gap between segments
+                const SizedBox(width: dropLineGapWidth), // Gap between segments
               ],
             );
           }),
           // The main line
           Expanded(
             child: Container(
-              height: 3,
+              height: dropLineHeight,
               decoration: BoxDecoration(
-                color: Colors.blue,
+                color: dropLineColor,
                 borderRadius: BorderRadius.circular(1.5),
               ),
             ),
@@ -551,7 +558,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   }
 
   /// Build the list tile content for a document
-  Widget _buildDocListTile(BuildContext context, int index, DocTitleFlat docNode, double indentWidth) {
+  Widget _buildDocListTile(BuildContext context, int index, DocTitleFlat docNode, {double indentWidth = 0}) {
     final isCollapsed = _collapsedDocIds.contains(docNode.docId);
 
     return ListTile(
@@ -564,6 +571,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       leading: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          SizedBox(width: indentWidth),
           GestureDetector(
             onTap: docNode.hasChild()
                 ? () => _toggleCollapse(docNode.docId)
@@ -627,6 +635,45 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     );
   }
 
+  int _getSubtreeRelativeDepth(String docId) {
+    final startIndex = totalList.indexWhere((doc) => doc.docId == docId);
+    if (startIndex == -1) {
+      return 0;
+    }
+    final baseLevel = totalList[startIndex].level;
+    var maxLevel = baseLevel;
+    for (var i = startIndex + 1; i < totalList.length; i++) {
+      final doc = totalList[i];
+      if (doc.level <= baseLevel) {
+        break;
+      }
+      if (doc.level > maxLevel) {
+        maxLevel = doc.level;
+      }
+    }
+    return maxLevel - baseLevel;
+  }
+
+  int _calculateTargetLevel(DocTitleFlat targetDoc, _DropPosition dropPos) {
+    switch (dropPos) {
+      case _DropPosition.above:
+      case _DropPosition.below:
+        return targetDoc.level;
+      case _DropPosition.asChild:
+        return targetDoc.level + 1;
+    }
+  }
+
+  bool _wouldExceedDepthLimit(String docId, int targetLevel) {
+    final subtreeDepth = _getSubtreeRelativeDepth(docId);
+    final deepestLevel = targetLevel + subtreeDepth;
+    return deepestLevel >= Constants.maxDocumentDepth;
+  }
+
+  void _showDepthLimitWarning() {
+    CallbackRegistry.showToast('Document nesting cannot exceed ${Constants.maxDocumentDepth} levels');
+  }
+
   /// Handle the drop operation
   void _handleDrop(int draggedIndex, int targetIndex) {
     if (draggedIndex == targetIndex) return;
@@ -639,6 +686,12 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
 
     // Default to inserting above if no position is set
     final dropPos = _dropPosition ?? _DropPosition.above;
+    final targetLevel = _calculateTargetLevel(targetDoc, dropPos);
+
+    if (_wouldExceedDepthLimit(draggedDoc.docId, targetLevel)) {
+      _showDepthLimitWarning();
+      return;
+    }
 
     switch (dropPos) {
       case _DropPosition.above:
@@ -684,6 +737,12 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   /// Handle dropping at the end of the list
   void _handleDropAtEnd(int draggedIndex) {
     final draggedDoc = docList[draggedIndex];
+    const newLevel = 0;
+
+    if (_wouldExceedDepthLimit(draggedDoc.docId, newLevel)) {
+      _showDepthLimitWarning();
+      return;
+    }
 
     // Find the maximum orderId among root-level documents
     int maxOrderId = -1;
@@ -739,8 +798,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         overlay.size.width - position.dx,
         overlay.size.height - position.dy,
       ),
-      items: const [
-        PopupMenuItem<String>(
+      items: [
+        if(docNode.level + 1 < Constants.maxDocumentDepth) const PopupMenuItem<String>(
           value: 'create_child',
           child: Row(
             children: [
@@ -750,7 +809,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
             ],
           ),
         ),
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           value: 'delete',
           child: Row(
             children: [
@@ -765,6 +824,11 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       if (value != null) {
         switch (value) {
           case 'create_child':
+            final parentLevel = docNode.level;
+            if (parentLevel + 1 >= Constants.maxDocumentDepth) {
+              _showDepthLimitWarning();
+              return;
+            }
             controller.newDocument(parentDocId: docNode.docId);
             if(widget.smallView && widget.jumpAction != null) {
               widget.jumpAction!();
