@@ -17,6 +17,7 @@ import 'resizable_view.dart';
 import '../mindeditor/document/doc_title_node.dart';
 import '../mindeditor/setting/constants.dart';
 import 'users_page/user_info_setting_menu.dart';
+import 'sync_progress_widget.dart';
 
 class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
   final Function()? jumpAction;
@@ -45,6 +46,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   int _peerCount = 0;
   final controller = Controller();
   bool _isSyncing = false;
+  int _syncProgress = 0;
   final userInfoSettingLayerKey = GlobalKey<FloatingStackViewState>();
   bool _isUserInfoPopupVisible = false;
 
@@ -181,14 +183,10 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: _isSyncing ? const CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-              ) : null,
-            ),
+            _isSyncing ? SyncProgressWidget(
+              progress: _syncProgress,
+              size: 32,
+            ) : const SizedBox(width: 16, height: 16),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () => _toggleUserInfoSettingPopup(userInfo),
@@ -973,12 +971,13 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     });
   }
 
-  void _updateSyncing(bool isSyncing) {
-    if(isSyncing == _isSyncing) {
+  void _updateSyncing(bool isSyncing, int progress) {
+    if(isSyncing == _isSyncing && progress == _syncProgress) {
       return;
     }
     setState(() {
       _isSyncing = isSyncing;
+      _syncProgress = progress;
     });
   }
   void _onUserInfoChanged() {
@@ -1159,3 +1158,4 @@ class NetworkStatusIcon extends StatelessWidget {
     // NetworkDetailView.route(context);
   }
 }
+

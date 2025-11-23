@@ -13,44 +13,53 @@ import '../doc_utils.dart';
 import 'version_manager.dart';
 
 class MergeTask {
-  static const int _mergeInterval = 15000; // 15 seconds
+  static const int _checkInterval = 15000; // 15 seconds
+  static const int _sendMissingRequestInterval = 120000; // 2 minutes
   final DbHelper _db;
   final Controller controller = Controller();
   int _lastCheckTimeStamp = 0;
+  int _lastSentMissingRequestTimeStamp = 0;
+  int _progress = 0;
 
   MergeTask({required DbHelper db}): _db = db {
     controller.eventTasksManager.addTimerTask('mergeTask', () {
       check();
-    }, _mergeInterval);
+    }, _checkInterval);
   }
 
   void check() {
     int now = Util.getTimeStamp();
-    if(now - _lastCheckTimeStamp < _mergeInterval) return; // Not enough time passed, do nothing
+    if(now - _lastCheckTimeStamp < _checkInterval) return; // Not enough time passed, do nothing
     _lastCheckTimeStamp = now;
 
     if(!_db.hasSyncingVersion()) {
-      controller.eventTasksManager.triggerUpdateSyncing(false);
+      controller.eventTasksManager.triggerUpdateSyncing(false, _progress);
       return; // No syncing version, do nothing
     }
-    controller.eventTasksManager.triggerUpdateSyncing(true);
-    _tryToMerge();
+    controller.eventTasksManager.triggerUpdateSyncing(true, _progress);
+    if(now - _lastSentMissingRequestTimeStamp >= _sendMissingRequestInterval) {
+      _tryToMerge();
+    }
   }
 
   void addVersionTree(List<VersionNode> dag) {
-    controller.eventTasksManager.triggerUpdateSyncing(true);
+    controller.eventTasksManager.triggerUpdateSyncing(true, _progress);
     _storeVersionToSyncDb(dag);
     _tryToMerge();
   }
 
   void addResources(List<UnsignedResource> resources) {
-    _storeResourcesToSyncDb(resources);
-    _tryToMerge();
+    final addedResourceCount = _storeResourcesToSyncDb(resources);
+    if(addedResourceCount > 0) { // If no new resource added, do nothing
+      _lastSentMissingRequestTimeStamp = 0;
+      _tryToMerge();
+    }
   }
 
   void clearSyncingTasks() {
     _db.clearSyncingTables();
-    controller.eventTasksManager.triggerUpdateSyncing(false);
+    _progress = 0;
+    controller.eventTasksManager.triggerUpdateSyncing(false, 0);
   }
 
   /// 1. Find missing versions, if any, send require versions and exit
@@ -65,6 +74,7 @@ class MergeTask {
     if(missingVersions.isNotEmpty) { //TODO: Ignore some missing versions after too many retries, unless it's the leaf version
       MyLogger.info('_tryToMerge: missing versions: $missingVersions');
       controller.sendRequireVersions(missingVersions.map((node) => node.versionHash).toList());
+      _lastSentMissingRequestTimeStamp = Util.getTimeStamp();
     } else {
       final badVersions = _db.findUnavailableSyncingVersions();
       if(badVersions.isNotEmpty) { // Impossible
@@ -126,15 +136,18 @@ class MergeTask {
     ///     2.2.2. If not missing, set the status of version to be available
     Set<DagNode> missing = {};
     for(final e in map.entries) {
-      final versionHash = e.key;
+      if(missing.length >= 2) { // Don't send too many missing versions at once
+        break;
+      }
       final node = e.value;
+      if(node.status == ModelConstants.statusAvailable) { // Skip available versions
+        continue;
+      }
+      final versionHash = e.key;
       final localObject = _db.getObject(versionHash);
       final syncingObject = _db.getSyncingObject(versionHash);
       if(localObject == null && syncingObject == null) {
         missing.add(node);
-        continue;
-      }
-      if(node.status == ModelConstants.statusAvailable) { // Skip available versions
         continue;
       }
       final versionObject = localObject ?? syncingObject;
@@ -145,6 +158,16 @@ class MergeTask {
         _db.updateSyncingVersionStatus(versionHash, ModelConstants.statusAvailable);
       }
     }
+    final totalCount = map.length;
+    int availableCount = 0;
+    for(final e in map.entries) {
+      final node = e.value;
+      if(node.status == ModelConstants.statusAvailable) {
+        availableCount++;
+      }
+    }
+    MyLogger.info('_findWaitingOrMissingVersions: progress: $availableCount / $totalCount');
+    _progress = (availableCount / totalCount * 100).toInt();
     return missing;
   }
 
@@ -163,15 +186,18 @@ class MergeTask {
     return false;
   }
 
-  void _storeResourcesToSyncDb(List<UnsignedResource> resources) {
+  int _storeResourcesToSyncDb(List<UnsignedResource> resources) {
+    int addedResourceCount = 0;
     for(var res in resources) {
       String key = res.key;
       int timestamp = res.timestamp;
       String content = res.data;
       if(!_db.hasObject(key) && !_db.hasSyncingObject(key)) {
         _db.storeSyncingObject(key, content, timestamp, Constants.createdFromPeer);
+        addedResourceCount++;
       }
     }
+    return addedResourceCount;
   }
 
   void _storeSyncingVersionsToDb(Map<String, DagNode> map) {

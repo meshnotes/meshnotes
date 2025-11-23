@@ -193,7 +193,7 @@ class DbHelper {
 
     var result = <String, BlockDataModel>{};
     for(final row in resultSet) {
-      MyLogger.debug('getBlockMapOfDoc: row=$row');
+      // MyLogger.debug('getBlockMapOfDoc: row=$row');
       String blockId = row['block_id'];
       String data = row['data'];
       int updatedAt = row['updated_at'];

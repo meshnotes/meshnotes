@@ -9,7 +9,7 @@ class EvenTasksManager {
   final List<Function()> _userSwitchToNavigator = []; // Tasks when user switches to navigator(in small screen mode)
   final List<Function()> _settingChangedTasks = []; // Tasks when user changes settings
   final List<Function()> _userInfoChangedTasks = []; // Tasks when user changes user info
-  final List<Function(bool isSyncing)> _syncingTasks = []; // Tasks when syncing
+  final List<Function(bool isSyncing, int progress)> _syncingTasks = []; // Tasks when syncing
   final List<Function()> _afterDocumentOpenedOnceTasks = []; // Tasks when document is opened, which should be triggered only once
   final Map<String, _TimerTask> _timerTaskMap = {};
   Timer? _timer;
@@ -98,17 +98,17 @@ class EvenTasksManager {
     }
   }
 
-  void addSyncingTask(Function(bool isSyncing) task) {
+  void addSyncingTask(Function(bool isSyncing, int progress) task) {
     if(!_syncingTasks.contains(task)) {
       _syncingTasks.add(task);
     }
   }
-  void removeSyncingTask(Function(bool isSyncing) task) {
+  void removeSyncingTask(Function(bool isSyncing, int progress) task) {
     _syncingTasks.remove(task);
   }
-  void triggerUpdateSyncing(bool isSyncing) {
+  void triggerUpdateSyncing(bool isSyncing, int progress) {
     for(final task in _syncingTasks) {
-      task.call(isSyncing);
+      task.call(isSyncing, progress);
     }
   }
 

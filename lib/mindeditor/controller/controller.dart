@@ -476,6 +476,7 @@ class Controller {
   // Use deviceId to encrypt password
   // The purpose is to make the password more secure
   String _encryptPassword(String password) {
+    if(password.isEmpty) return '';
     final encrypt = _genAesWrapperForPassword();
     final encrypted = encrypt.encrypt(password);
     return encrypted;

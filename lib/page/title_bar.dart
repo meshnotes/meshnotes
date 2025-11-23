@@ -1,6 +1,7 @@
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:flutter/material.dart';
 import '../mindeditor/controller/controller.dart';
+import 'sync_progress_widget.dart';
 
 class DocumentTitleBar extends StatefulWidget {
   final Controller controller;
@@ -16,6 +17,7 @@ class DocumentTitleBar extends StatefulWidget {
 
 class DocumentTitleBarState extends State<DocumentTitleBar> {
   bool _isSyncing = false;
+  int _syncProgress = 0;
   List<String>? titles;
 
   @override
@@ -49,13 +51,9 @@ class DocumentTitleBarState extends State<DocumentTitleBar> {
           if (_isSyncing && widget.controller.environment.isSmallView(context))
             Padding(
               padding: const EdgeInsets.only(right: 8.0),
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
-                ),
+              child: SyncProgressWidget(
+                progress: _syncProgress,
+                size: 32,
               ),
             ),
           Expanded(
@@ -89,12 +87,13 @@ class DocumentTitleBarState extends State<DocumentTitleBar> {
     });
   }
 
-  void _updateSyncing(bool syncing) {
-    if(syncing == _isSyncing) {
+  void _updateSyncing(bool syncing, int progress) {
+    if(syncing == _isSyncing && progress == _syncProgress) {
       return;
     }
     setState(() {
       _isSyncing = syncing;
+      _syncProgress = progress;
     });
   }
 }
