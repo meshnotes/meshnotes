@@ -48,3 +48,6 @@ app.*.map.json
 /android/app/build/
 *.db
 *.conf
+
+# FVM Version Cache
+.fvm/

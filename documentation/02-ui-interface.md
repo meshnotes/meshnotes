@@ -104,6 +104,7 @@ ListView.builder(
   - As sibling (below)
   - As child
 - Indentation line indicates depth (every 20px)
+- Depth limit: document nesting is capped at 4 levels (`Constants.maxDocumentDepth`); drag-and-drop and create-child actions are blocked once the limit is reached (toast shown)
 
 ```dart
 Widget _buildDraggableDocItem(BuildContext context, int index) {
