@@ -125,6 +125,20 @@ Plugin architecture and AI integration.
 
 ---
 
+### [08. Build Tools](08-tools.md)
+Build and distribution tools for macOS.
+
+**Includes**:
+- DMG creation tool (build_dmg.sh)
+- Signing and notarization tool (sign_and_notarize_dmg.sh)
+- Complete build workflow
+- Prerequisites and setup
+- Troubleshooting guide
+
+**For**: release engineers, DevOps
+
+---
+
 ## 🚀 Getting Started
 
 ### Onboarding path
@@ -168,6 +182,7 @@ Plugin architecture and AI integration.
 | Editor features | 05-editor.md |
 | Sync logic | 06-p2p-sync.md |
 | Plugins, AI | 07-ai-plugin.md |
+| Build tools, scripts | 08-tools.md |
 
 See detailed rules in [CLAUDE.md](../CLAUDE.md#documentation).
 

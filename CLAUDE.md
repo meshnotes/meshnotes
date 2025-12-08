@@ -60,5 +60,6 @@ See [documentation/README.md](documentation/README.md) for full docs.
 | Editor features | `documentation/05-editor.md` |
 | Sync/collaboration | `documentation/06-p2p-sync.md` |
 | Plugins/AI | `documentation/07-ai-plugin.md` |
+| Build tools | `documentation/08-tools.md` |
 
 **Rules**: Update immediately • Include file paths • Explain WHY • Keep examples synced
