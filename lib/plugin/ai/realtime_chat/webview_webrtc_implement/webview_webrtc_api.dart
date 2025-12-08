@@ -10,7 +10,7 @@ import 'package:my_log/my_log.dart';
 class RealtimeWebViewWebRtcApi extends RealtimeApi {
   final aecAudioWebViewKey = GlobalKey();
   final String url = 'https://api.openai.com/v1/realtime';
-  final String model = 'gpt-4o-realtime-preview-2024-10-01';
+  final String model = 'gpt-realtime';
   final String apiKey;
   final List<Map<String, dynamic>>? toolsDescription;
   final void Function(Object, StackTrace)? onWsError;
