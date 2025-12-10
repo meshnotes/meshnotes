@@ -49,6 +49,7 @@ TEAM_ID="${TEAM_ID:-}"
 APP_PASSWORD="${APP_PASSWORD:-}"
 KEYCHAIN_PROFILE="${KEYCHAIN_PROFILE:-meshnotes-notary}"
 SKIP_NOTARIZE=false
+TIME_OUT=60m
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -191,14 +192,14 @@ if [ "$USE_NOTARYTOOL" = true ]; then
     SUBMISSION_ID=$(xcrun notarytool submit "$DMG_PATH" \
         --keychain-profile "$KEYCHAIN_PROFILE" \
         --wait \
-        --timeout 30m 2>&1 | grep -i "id:" | head -1 | sed 's/.*[Ii][Dd]: *\([a-f0-9-]*\).*/\1/')
+        --timeout $TIME_OUT 2>&1 | grep -i "id:" | head -1 | sed 's/.*[Ii][Dd]: *\([a-f0-9-]*\).*/\1/')
 
     if [ -z "$SUBMISSION_ID" ]; then
         echo -e "${YELLOW}Waiting for notarization to complete...${NC}"
         xcrun notarytool submit "$DMG_PATH" \
             --keychain-profile "$KEYCHAIN_PROFILE" \
             --wait \
-            --timeout 30m
+            --timeout $TIME_OUT
     fi
 
     # Check notarization status
