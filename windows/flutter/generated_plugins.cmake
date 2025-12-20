@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   bonsoir_windows
   flutter_inappwebview_windows
   flutter_window_close
+  permission_handler_windows
   record_windows
   sqlite3_flutter_libs
 )

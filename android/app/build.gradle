@@ -13,7 +13,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "xyz.meshnotes.meshnotes"
-    compileSdk = flutter.compileSdkVersion
+    // compileSdk = flutter.compileSdkVersion
+    compileSdk = 35  // Must be >= targetSdk
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -32,7 +33,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // minSdk = flutter.minSdkVersion
         minSdk = 26
-        targetSdk = flutter.targetSdkVersion
+        // targetSdk = flutter.targetSdkVersion
+        targetSdk = 35  // Required by Google Play (Android 15)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
