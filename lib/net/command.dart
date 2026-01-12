@@ -24,10 +24,12 @@ enum Command {
 class Message {
   Command cmd;
   dynamic parameter;
+  TimeCostStatistics stats; // Statistics of transfer time and data size
 
   Message({
     required this.cmd,
     required this.parameter,
+    required this.stats,
   });
 }
 

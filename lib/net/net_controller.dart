@@ -7,6 +7,7 @@ import 'package:bonsoir/bonsoir.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
+import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import '../mindeditor/controller/callback_registry.dart';
 import '../mindeditor/setting/constants.dart';
@@ -62,62 +63,70 @@ class NetworkController {
     }
   }
 
-  void sendVersionBroadcast(String latestVersion) {
+  void sendVersionBroadcast(String latestVersion, TimeCostStatistics stats) {
     var msg = BroadcastMessages(
       messages: {
         'latest_version': latestVersion,
       }
     );
+    stats.transportTime = Util.getTimeStamp();
     _sendPort?.send(
       Message(
         cmd: Command.sendBroadcast,
         parameter: msg,
+        stats: stats,
       ),
     );
   }
   /// Pack versionData in VersionChain, encrypt it, and sign it
-  void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp) {
+  void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp, TimeCostStatistics stats) {
     if(!isStarted()) return;
     var dag = _buildDag(versionData);
     VersionChain versionChain = VersionChain(
       versionDag: dag,
     );
+    stats.transportTime = Util.getTimeStamp();
     _sendPort?.send(
       Message(
         cmd: Command.sendVersionTree,
         parameter: SendVersionTreeParameter(
           versionChain: versionChain,
           timestamp: timestamp,
-        )
+        ),
+        stats: stats,
       )
     );
   }
 
-  void sendRequireVersions(List<String> versions) {
+  void sendRequireVersions(List<String> versions, TimeCostStatistics stats) {
     if(!isStarted()) return;
+    stats.transportTime = Util.getTimeStamp();
     _sendPort?.send(
       Message(
         cmd: Command.sendRequireVersions,
         parameter: SendRequireVersionsParameter(
           versions: versions,
-        )
+        ),
+        stats: stats,
       )
     );
   }
 
-  void sendRequireVersionTree(String latestVersion) {
+  void sendRequireVersionTree(String latestVersion, TimeCostStatistics stats) {
     // Reuse require versions message
-    sendRequireVersions([latestVersion]);
+    sendRequireVersions([latestVersion], stats);
   }
 
-  void sendVersions(List<SendVersions> versions) {
+  void sendVersions(List<SendVersions> versions, TimeCostStatistics stats) {
     if(!isStarted()) return;
+    stats.transportTime = Util.getTimeStamp();
     _sendPort?.send(
       Message(
         cmd: Command.sendVersions,
         parameter: SendVersionsParameter(
           versions: versions,
         ),
+        stats: stats,
       )
     );
   }
@@ -128,7 +137,13 @@ class NetworkController {
     _bonjourBroadcast?.stop();
     _bonjourDiscovery?.stop();
     finished = Completer();
-    _sendPort?.send(Message(cmd: Command.terminate, parameter: null));
+    _sendPort?.send(
+      Message(
+        cmd: Command.terminate,
+        parameter: null,
+        stats: TimeCostStatistics(), // Never used
+      )
+    );
     return finished!;
   }
 
@@ -199,17 +214,20 @@ class NetworkController {
       case Command.receiveBroadcast:
         final param = msg.parameter as BroadcastMessages;
         final latestVersion = param.messages['latest_version'];
+        msg.stats.receiveTime = Util.getTimeStamp();
         if(latestVersion != null) {
-          controller.receiveVersionBroadcast(latestVersion);
+          controller.receiveVersionBroadcast(latestVersion, msg.stats);
         }
         break;
       case Command.receiveProvide:
         final param = msg.parameter as ReceiveProvideParameter;
-        controller.receiveResources(param.resources);
+        msg.stats.receiveTime = Util.getTimeStamp();
+        controller.receiveResources(param.resources, msg.stats);
         break;
       case Command.receiveQuery:
         final param = msg.parameter as ReceiveQueryParameter;
-        controller.receiveRequireVersions(param.requiredObjects);
+        msg.stats.receiveTime = Util.getTimeStamp();
+        controller.receiveRequireVersions(param.requiredObjects, msg.stats);
         break;
     }
   }
@@ -225,6 +243,7 @@ class NetworkController {
         useMulticast: useMulticast,
         logPath: logPath,
       ),
+      stats: TimeCostStatistics(), // Never used
     ));
   }
 
@@ -301,6 +320,7 @@ class NetworkController {
         port: port,
         deviceId: deviceId,
       ),
+      stats: TimeCostStatistics(), // Never used
     ));
   }
 }

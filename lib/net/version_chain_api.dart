@@ -106,7 +106,8 @@ class SendVersions {
 
   @override
   String toString() {
-    return '${HashUtil.formatHash(versionHash)}: $requiredObjects';
+    final keys = requiredObjects.keys.toList();
+    return '${HashUtil.formatHash(versionHash)}: ${keys.length>10? keys.sublist(0, 10) : keys}';
   }
 }
 

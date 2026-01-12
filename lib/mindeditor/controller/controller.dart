@@ -16,6 +16,7 @@ import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
 import 'package:mesh_note/tasks/event_tasks.dart';
 import 'package:mesh_note/tasks/ui_event_manager.dart';
+import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import '../../net/init.dart';
 import '../../net/version_chain_api.dart';
@@ -64,6 +65,10 @@ class Controller {
   Document? get document => docManager.getCurrentDoc();
 
   PluginManager get pluginManager => _pluginManager;
+
+  final _TimeCostStatistics _timeCostStatistics = _TimeCostStatistics();
+  int _lastPrintStatisticsTimestamp = 0;
+  static const int _printStatisticsInterval = 10000; // Print statistics every 10 seconds
 
   double? getToolbarHeight() => _toolbarHeight;
   void setToolbarHeight(double height) {
@@ -346,13 +351,16 @@ class Controller {
   /// 2. Currently not modified or syncing
   /// 3. the newest version is valid(not '')
   void sendVersionBroadcast() {
+    final stats = TimeCostStatistics(
+      startTime: Util.getTimeStamp(),
+    );
     if(network.isAlone()) return;
     if(docManager.hasModified() || docManager.isBusy()) return;
     var latestVersion = docManager.getLatestVersion();
     MyLogger.info('sendVersionBroadcast: latestVersion=$latestVersion');
     if(latestVersion.isEmpty) return;
 
-    network.sendVersionBroadcast(latestVersion);
+    network.sendVersionBroadcast(latestVersion, stats);
   }
   bool tryToSaveAndSendVersionTree() {
     // If there is no modification, or is currently syncing, don't generate new version tree
@@ -365,32 +373,43 @@ class Controller {
       docManager.tryToGenNewVersionTreeAndOverrideCurrent();
       return true;
     } else {
+      final stats = TimeCostStatistics(
+        startTime: Util.getTimeStamp(),
+      );
       docManager.genNewVersionTree();
-      return _sendCurrentVersionTree();
+      return _sendCurrentVersionTree(stats);
     }
   }
   void clearHistoryVersions() {
     docManager.clearHistoryVersions();
   }
-  bool _sendCurrentVersionTree() {
+  bool _sendCurrentVersionTree(TimeCostStatistics stats) {
     var (versionData, timestamp) = docManager.genCurrentVersionTree();
     if(versionData.isEmpty || timestamp == 0) {
       return false;
     }
     MyLogger.info('sendVersionTree: $versionData');
-    network.sendNewVersionTree(versionData, timestamp);
+    network.sendNewVersionTree(versionData, timestamp, stats);
     docManager.markCurrentVersionAsSyncing();
     return true;
   }
   void sendRequireVersions(List<String> missingVersions) {
-    network.sendRequireVersions(missingVersions);
+    final stats = TimeCostStatistics(
+      startTime: Util.getTimeStamp(),
+    );
+    network.sendRequireVersions(missingVersions, stats);
   }
   void sendRequireVersionTree(String latestVersion) {
     //TODO Currently ignore latestVersion, but later should support specified version
-    network.sendRequireVersionTree(Constants.resourceKeyVersionTree);
+    final stats = TimeCostStatistics(
+      startTime: Util.getTimeStamp(),
+    );
+    network.sendRequireVersionTree(Constants.resourceKeyVersionTree, stats);
   }
 
-  void receiveVersionBroadcast(String latestVersion) {
+  void receiveVersionBroadcast(String latestVersion, TimeCostStatistics stats) {
+    stats.finishTime = Util.getTimeStamp();
+    _updateTimeCostStatistics(stats);
     /// 1. Check if already have latestVersion
     /// 2. If not, send require version tree
     /// 3. If there is the version, but no object, send require version
@@ -429,22 +448,27 @@ class Controller {
     }
     docManager.mergeVersionTree();
   }
-  void receiveRequireVersions(List<String> requiredVersions) {
+  void receiveRequireVersions(List<String> requiredVersions, TimeCostStatistics stats) {
+    stats.finishTime = Util.getTimeStamp();
+    _updateTimeCostStatistics(stats);
     MyLogger.info('receiveRequireVersions: receive require versions message: $requiredVersions');
     for(final item in requiredVersions) {
       //TODO Currently only send version tree if there is any resource with the key 'version_tree'.
       //TODO Maybe should make ordinary resources and version_tree coexist
       if(item == Constants.resourceKeyVersionTree) {
-        _sendCurrentVersionTree();
+        _sendCurrentVersionTree(TimeCostStatistics(startTime: Util.getTimeStamp()));
         return;
       }
     }
+    final newStats = TimeCostStatistics(
+      startTime: Util.getTimeStamp(),
+    );
     //TODO should make the log shorter
     var versions = docManager.assembleRequireVersions(requiredVersions);
     MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length > 10? versions.sublist(0, 10) : versions}');
-    network.sendVersions(versions);
+    network.sendVersions(versions, newStats);
   }
-  void receiveResources(List<UnsignedResource> resources) {
+  void receiveResources(List<UnsignedResource> resources, TimeCostStatistics stats) {
     MyLogger.info('receiveResources: receive resources: $resources');
     List<VersionChain> versionChains = [];
     List<UnsignedResource> nonChainResources = [];
@@ -467,6 +491,8 @@ class Controller {
     for(var chain in versionChains) {
       receiveVersionTree(chain.versionDag);
     }
+    stats.finishTime = Util.getTimeStamp();
+    _updateTimeCostStatistics(stats);
   }
   
   void clearSyncingTasks() {
@@ -497,4 +523,24 @@ class Controller {
     final encrypt = AesWrapper(password: hashOfDeviceId, randomNumber: number);
     return encrypt;
   }
+
+  void _updateTimeCostStatistics(TimeCostStatistics stats) {
+    final networkCost = stats.transportTime - stats.startTime;
+    final transferCost = stats.receiveTime - stats.transportTime;
+    final applicationCost = stats.finishTime - stats.receiveTime;
+    _timeCostStatistics.applicationCostMilliseconds += networkCost;
+    _timeCostStatistics.transferCostMilliseconds += transferCost;
+    _timeCostStatistics.applicationCostMilliseconds += applicationCost;
+    final now = Util.getTimeStamp();
+    if(now - _lastPrintStatisticsTimestamp >= _printStatisticsInterval) {
+      MyLogger.info('[Controller Statistics] Time cost statistics: networkCost=${_timeCostStatistics.networkCostMilliseconds}ms, transferCost=${_timeCostStatistics.transferCostMilliseconds}ms, applicationCost=${_timeCostStatistics.applicationCostMilliseconds}ms');
+      _lastPrintStatisticsTimestamp = now;
+    }
+  }
+}
+
+class _TimeCostStatistics {
+  int networkCostMilliseconds = 0;
+  int transferCostMilliseconds = 0;
+  int applicationCostMilliseconds = 0;
 }

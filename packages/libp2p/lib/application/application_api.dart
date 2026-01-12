@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-typedef OnHandleStringFunction = Function(String data);
+typedef OnHandleStringFunction = Function(String data, TimeCostStatistics stats);
 
 enum AppMessageType {
   provideAppType('provide'), // Provider other nodes the version tree
@@ -253,4 +253,18 @@ class UserPrivateInfo {
   bool isGuest() {
     return privateKey == guestKey;
   }
+}
+
+class TimeCostStatistics {
+  int startTime;
+  int transportTime;
+  int receiveTime;
+  int finishTime;
+
+  TimeCostStatistics({
+    this.startTime = 0,
+    this.transportTime = 0,
+    this.receiveTime = 0,
+    this.finishTime = 0,
+  });
 }
