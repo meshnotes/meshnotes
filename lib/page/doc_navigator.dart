@@ -4,6 +4,7 @@ import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/view/floating_stack_layer.dart';
 import 'package:mesh_note/mindeditor/view/network_view.dart';
 import 'package:mesh_note/page/widget_templates.dart';
+import 'package:mesh_note/ui/app_style.dart';
 import 'package:my_log/my_log.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
@@ -41,10 +42,10 @@ class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
 class DocumentNavigatorState extends State<DocumentNavigator> {
   static const String watcherKey = 'doc_navigator';
   static const double indentWidth = 20.0;
-  static const double dropLineHeight = 3.0;
-  static const double dropLineSegmentWidth = 15.0;
+  static const double dropLineHeight = DragDropStyle.lineHeight;
+  static const double dropLineSegmentWidth = DragDropStyle.navigatorLineSegmentWidth;
   static const double dropLineGapWidth = indentWidth - dropLineSegmentWidth;
-  static const Color dropLineColor = Colors.blueGrey;
+  static const Color dropLineColor = DragDropStyle.lineColor;
 
   List<DocTitleFlat> totalList = []; // Total document list, including collapsed documents
   List<DocTitleFlat> docList = []; // Document list, only including visible documents
@@ -408,7 +409,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
                 data: index,
                 hapticFeedbackOnStart: true,
                 // Offset the feedback downward so it doesn't block the drop indicator
-                feedbackOffset: const Offset(0, -50),
+                feedbackOffset: DragDropStyle.navigatorFeedbackOffset,
                 feedback: Material(
                   elevation: 6.0,
                   child: Container(
@@ -543,13 +544,13 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
 
-        return Container(
+        return SizedBox(
           height: isHovering && isTargeted ? 50 : 20,
           child: Column(
             children: [
               if (isHovering && isTargeted)
                 _buildDropLine(0), // No indentation for root level
-              Expanded(child: Container()),
+              const Expanded(child: SizedBox()),
             ],
           ),
         );

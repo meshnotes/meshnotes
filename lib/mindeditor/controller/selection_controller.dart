@@ -527,10 +527,10 @@ class SelectionController {
     Util.runInPostFrame(() {
       Offset? baseCursorOffset, extentCursorOffset;
       //FIXME baseRender and extentRender may be null or not attached when the block is not in the viewport. Should use a more stable way to mark the handles
-      if(baseRender != null) {
+      if(baseRender != null && baseRender.attached) {
         baseCursorOffset = baseRender.getCursorOffsetOfPos(lastBaseBlockPos);
       }
-      if(extentRender != null) {
+      if(extentRender != null && extentRender.attached) {
         extentCursorOffset = extentRender.getCursorOffsetOfPos(lastExtentBlockPos);
       }
       _showOrHideSelectionHandles(baseCursorOffset, extentCursorOffset);

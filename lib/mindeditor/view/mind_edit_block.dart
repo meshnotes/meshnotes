@@ -1,5 +1,6 @@
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/ui/app_style.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
@@ -37,6 +38,12 @@ class MindEditBlockState extends State<MindEditBlock> {
   final controller = Controller();
   double _topSpace = 0;
   double _bottomSpace = 0;
+  final GlobalKey _dragTargetKey = GlobalKey();
+  _EditorDropPosition? _dropPosition;
+
+  static const double _dropLineHeight = DragDropStyle.lineHeight;
+  static const double _dropLineSegmentWidth = DragDropStyle.editorLineSegmentWidth;
+  static const Color _dropLineColor = DragDropStyle.lineColor;
 
   void setRender(MindBlockImplRenderObject r) {
     _render = r;
@@ -75,12 +82,12 @@ class MindEditBlockState extends State<MindEditBlock> {
     var handler = _buildHandler();
     var extra = _buildExtra();
     var all = _buildAll(levelSpace, handler, blockImpl, extra);
-    Widget result = all;
+    Widget result = _buildDragTargetWrapper(all);
     if(_topSpace > 0 || _bottomSpace > 0) {
       result = Column(
         children: [
           SizedBox(height: _topSpace,),
-          all,
+          result,
           SizedBox(height: _bottomSpace,),
         ],
       );
@@ -265,7 +272,11 @@ class MindEditBlockState extends State<MindEditBlock> {
       items.insert(0, _leading!);
     }
     if(handler != null) {
-      items.insert(0, handler);
+      Widget dragHandler = handler;
+      if(_canDragCurrentBlock()) {
+        dragHandler = _buildDesktopDraggableHandler(handler);
+      }
+      items.insert(0, dragHandler);
       if(levelSpace != null) {
         items.insert(0, levelSpace);
       }
@@ -292,10 +303,237 @@ class MindEditBlockState extends State<MindEditBlock> {
     if(levelSpace != null) {
       items.insert(0, levelSpace);
     }
-    return Row(
+    Widget row = Row(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: items,
+    );
+    if(_canDragCurrentBlock() && !controller.environment.isDesktop()) {
+      row = _buildMobileDraggableBlock(row);
+    }
+    return row;
+  }
+
+  bool _canDragCurrentBlock() {
+    return !widget.readOnly && !widget.texts.isTitle();
+  }
+
+  Widget _buildDesktopDraggableHandler(Widget handler) {
+    return Draggable<_BlockDragData>(
+      data: _BlockDragData(blockId: getBlockId()),
+      feedback: _buildDragFeedback(),
+      feedbackOffset: DragDropStyle.editorFeedbackOffset,
+      childWhenDragging: Opacity(
+        opacity: 0.3,
+        child: handler,
+      ),
+      child: handler,
+    );
+  }
+
+  Widget _buildMobileDraggableBlock(Widget child) {
+    return LongPressDraggable<_BlockDragData>(
+      data: _BlockDragData(blockId: getBlockId()),
+      feedback: _buildDragFeedback(),
+      feedbackOffset: DragDropStyle.editorFeedbackOffset,
+      childWhenDragging: Opacity(
+        opacity: 0.35,
+        child: child,
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildDragFeedback() {
+    return Material(
+      elevation: 6.0,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 320),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.blue, width: 1),
+        ),
+        child: Text(
+          widget.texts.getPlainText(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 14),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDragTargetWrapper(Widget child) {
+    if(widget.readOnly) {
+      return child;
+    }
+    return DragTarget<_BlockDragData>(
+      onWillAcceptWithDetails: (details) {
+        return details.data.blockId != getBlockId();
+      },
+      onMove: (details) {
+        _updateDropPosition(details.offset);
+      },
+      onAcceptWithDetails: (details) {
+        _handleDrop(details.data.blockId);
+      },
+      onLeave: (_) {
+        if(_dropPosition != null) {
+          setState(() {
+            _dropPosition = null;
+          });
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHovering = candidateData.isNotEmpty;
+        final level = widget.texts.getBlockLevel();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if(isHovering && _dropPosition == _EditorDropPosition.above)
+              _buildDropLine(level),
+            Container(
+              key: _dragTargetKey,
+              child: child,
+            ),
+            if(isHovering && _dropPosition == _EditorDropPosition.below)
+              _buildDropLine(level),
+            if(isHovering && _dropPosition == _EditorDropPosition.asChild)
+              _buildDropLine(level, isAsChild: true),
+          ],
+        );
+      },
+    );
+  }
+
+  void _updateDropPosition(Offset globalOffset) {
+    final renderBox = _dragTargetKey.currentContext?.findRenderObject() as RenderBox?;
+    if(renderBox == null) {
+      return;
+    }
+    final local = renderBox.globalToLocal(globalOffset);
+    final h = renderBox.size.height;
+    final currentLevel = widget.texts.getBlockLevel();
+    final maxLevel = widget.controller.setting.blockMaxLevel;
+    final calculatedLevel = (local.dx / Constants.tabWidth).floor().clamp(0, maxLevel);
+
+    _EditorDropPosition nextPos;
+    if(widget.texts.isTitle()) {
+      nextPos = _EditorDropPosition.below;
+    } else {
+      final relativeY = local.dy - 10.0;
+      if(relativeY < h * 0.33) {
+        nextPos = _EditorDropPosition.above;
+      } else if(relativeY > h * 0.67) {
+        nextPos = calculatedLevel > currentLevel ? _EditorDropPosition.asChild : _EditorDropPosition.below;
+      } else {
+        nextPos = calculatedLevel > currentLevel ? _EditorDropPosition.asChild : _EditorDropPosition.above;
+      }
+    }
+    if(nextPos != _dropPosition) {
+      setState(() {
+        _dropPosition = nextPos;
+      });
+    }
+  }
+
+  void _handleDrop(String draggedBlockId) {
+    void clearDropState() {
+      if(_dropPosition != null && mounted) {
+        setState(() {
+          _dropPosition = null;
+        });
+      }
+    }
+
+    final doc = widget.controller.document;
+    if(doc == null) {
+      clearDropState();
+      return;
+    }
+    final draggedIndex = _findBlockIndex(draggedBlockId);
+    final targetIndex = _findBlockIndex(getBlockId());
+    if(draggedIndex <= 0 || targetIndex < 0) {
+      clearDropState();
+      return;
+    }
+
+    final targetPara = widget.texts;
+    final dropPos = _dropPosition ?? _EditorDropPosition.below;
+    int insertIndex;
+    int newLevel;
+    if(targetPara.isTitle()) {
+      insertIndex = 1;
+      newLevel = 0;
+    } else {
+      switch(dropPos) {
+        case _EditorDropPosition.above:
+          insertIndex = targetIndex;
+          newLevel = targetPara.getBlockLevel();
+          break;
+        case _EditorDropPosition.below:
+          insertIndex = targetIndex + 1;
+          newLevel = targetPara.getBlockLevel();
+          break;
+        case _EditorDropPosition.asChild:
+          insertIndex = targetIndex + 1;
+          newLevel = targetPara.getBlockLevel() + 1;
+          break;
+      }
+    }
+    if(newLevel > widget.controller.setting.blockMaxLevel) {
+      newLevel = widget.controller.setting.blockMaxLevel;
+    }
+
+    doc.moveParagraphToIndex(draggedBlockId, insertIndex);
+    final movedPara = doc.getParagraph(draggedBlockId);
+    if(movedPara != null && !movedPara.isTitle()) {
+      movedPara.setBlockLevel(newLevel);
+    }
+    controller.selectionController.hideSelectionHandles();
+    CallbackRegistry.rudelyCloseIME();
+    CallbackRegistry.refreshDoc(activeBlockId: draggedBlockId, position: 0);
+    _triggerBlockModified();
+
+    clearDropState();
+  }
+
+  Widget _buildDropLine(int level, {bool isAsChild = false}) {
+    final segmentCount = isAsChild ? level + 1 : level;
+    const gap = Constants.tabWidth - _dropLineSegmentWidth;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      height: _dropLineHeight,
+      child: Row(
+        children: [
+          ...List.generate(segmentCount, (_) {
+            return Row(
+              children: [
+                Container(
+                  width: _dropLineSegmentWidth,
+                  height: _dropLineHeight,
+                  decoration: BoxDecoration(
+                    color: _dropLineColor,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                ),
+                const SizedBox(width: gap),
+              ],
+            );
+          }),
+          Expanded(
+            child: Container(
+              height: _dropLineHeight,
+              decoration: BoxDecoration(
+                color: _dropLineColor,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -883,6 +1121,19 @@ class MindEditBlockState extends State<MindEditBlock> {
   void _triggerBlockModified() {
     controller.docManager.setIdle();
   }
+}
+
+class _BlockDragData {
+  final String blockId;
+  const _BlockDragData({
+    required this.blockId,
+  });
+}
+
+enum _EditorDropPosition {
+  above,
+  below,
+  asChild,
 }
 
 class BlockHandler extends StatefulWidget {

@@ -43,7 +43,8 @@ SQLite3 with tables: `documents`, `blocks`, `versions`, `objects`, `conflicts`
 ## Development
 
 - Flutter 3.24.0+, Dart 3.5.0+
-- Run tests: `flutter test` + `flutter test packages/*/test/`
+- Use fvm to run flutter or dart command
+- Run tests: `fvm flutter test` + `fvm flutter test packages/*/test/`
 
 ## Documentation
 
