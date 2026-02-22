@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-typedef OnHandleStringFunction = Function(String data, TimeCostStatistics stats);
+typedef OnHandleStringFunction = Function(
+    String data, TimeCostStatistics stats);
 
 enum AppMessageType {
   provideAppType('provide'), // Provider other nodes the version tree
@@ -29,8 +30,8 @@ class SignedMessage {
     required this.signature,
   });
 
-  SignedMessage.fromJson(Map<String, dynamic> map):
-        userPublicId = map['user'],
+  SignedMessage.fromJson(Map<String, dynamic> map)
+      : userPublicId = map['user'],
         data = map['data'],
         signature = map['sign'];
 
@@ -84,14 +85,14 @@ class SignedResource {
     required this.signature,
   });
 
-  SignedResource.fromRaw(UnsignedResource raw, String signature):
-        key = raw.key,
+  SignedResource.fromRaw(UnsignedResource raw, String signature)
+      : key = raw.key,
         subKey = raw.subKey,
         timestamp = raw.timestamp,
         data = raw.data,
         signature = signature;
-  SignedResource.fromJson(Map<String, dynamic> map):
-        key = map['key'],
+  SignedResource.fromJson(Map<String, dynamic> map)
+      : key = map['key'],
         subKey = map['sub_key'],
         timestamp = map['timestamp'],
         data = map['data'],
@@ -126,15 +127,15 @@ class SignedResources {
 
   static String getFeature(List<SignedResource> resources) {
     String feature = '';
-    for(var r in resources) {
+    for (var r in resources) {
       String json = jsonEncode(r);
       feature += 'resource: $json\n';
     }
     return feature;
   }
 
-  SignedResources.fromJson(Map<String, dynamic> map):
-        userPublicId = map['user'],
+  SignedResources.fromJson(Map<String, dynamic> map)
+      : userPublicId = map['user'],
         resources = _recursiveList(map['resources']),
         signature = map['sign'];
 
@@ -148,7 +149,7 @@ class SignedResources {
 
   static List<SignedResource> _recursiveList(List<dynamic> list) {
     List<SignedResource> result = [];
-    for(var item in list) {
+    for (var item in list) {
       SignedResource signedResource = SignedResource.fromJson(item);
       result.add(signedResource);
     }
@@ -178,7 +179,8 @@ class RequireVersions {
     required this.requiredVersions,
   });
 
-  RequireVersions.fromJson(Map<String, dynamic> map): requiredVersions = _recursiveList(map['versions']);
+  RequireVersions.fromJson(Map<String, dynamic> map)
+      : requiredVersions = _recursiveList(map['versions']);
 
   Map<String, dynamic> toJson() {
     return {
@@ -188,7 +190,7 @@ class RequireVersions {
 
   static List<String> _recursiveList(List<dynamic> list) {
     final result = <String>[];
-    for(var item in list) {
+    for (var item in list) {
       result.add(item as String);
     }
     return result;
@@ -214,8 +216,8 @@ class UserPublicInfo {
         'timestamp: $timestamp\n';
   }
 
-  UserPublicInfo.fromJson(Map<String, dynamic> map):
-        publicKey = map['public_key'],
+  UserPublicInfo.fromJson(Map<String, dynamic> map)
+      : publicKey = map['public_key'],
         userName = map['name'],
         timestamp = map['timestamp'],
         signature = map['sign'];
@@ -244,8 +246,8 @@ class UserPrivateInfo {
     required this.timestamp,
   });
 
-  UserPrivateInfo.makeGuest({required int timestamp}):
-        publicKey = guestKey,
+  UserPrivateInfo.makeGuest({required int timestamp})
+      : publicKey = guestKey,
         userName = guestKey,
         privateKey = guestKey,
         timestamp = timestamp;
@@ -260,11 +262,17 @@ class TimeCostStatistics {
   int transportTime;
   int receiveTime;
   int finishTime;
+  int versionTreeCost;
+  int requiredVersionsCost;
+  int versionCost;
 
   TimeCostStatistics({
     this.startTime = 0,
     this.transportTime = 0,
     this.receiveTime = 0,
     this.finishTime = 0,
+    this.versionTreeCost = 0,
+    this.requiredVersionsCost = 0,
+    this.versionCost = 0,
   });
 }
