@@ -16,6 +16,18 @@ flutter analyze              # Static analysis
 flutter test                 # Run tests
 ```
 
+## Code Style (Critical)
+
+- **Indentation:** 2 spaces.
+- **Line Length:** **150** characters (do NOT wrap aggressively).
+- **Keywords:** **NO spaces** after control flow keywords.
+  - `if(condition)` ✅ | `if (condition)` ❌
+  - `for(var i)` ✅ | `for (var i)` ❌
+  - `switch(val)` ✅ | `switch (val)` ❌
+  - `while(condition)` ✅ | `while (condition)` ❌
+- **Braces:** K&R style (`if(...) {`) but keep it compact.
+- **Imports:** Group `dart:`, `package:`, and relative imports.
+
 ## Architecture Summary
 
 **Main App (`lib/`)**
