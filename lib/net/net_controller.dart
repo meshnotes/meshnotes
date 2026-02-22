@@ -56,6 +56,7 @@ class NetworkController {
       }
     });
   }
+
   void startBonjour() {
     MyLogger.info('Start Bonjour');
     if(_useBonjour) {
@@ -78,6 +79,7 @@ class NetworkController {
       ),
     );
   }
+
   /// Pack versionData in VersionChain, encrypt it, and sign it
   void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp, TimeCostStatistics stats) {
     if(!isStarted()) return;
@@ -130,7 +132,7 @@ class NetworkController {
       )
     );
   }
-  
+
   Completer<bool>? gracefulTerminate() {
     if(!isStarted()) return null;
 
@@ -152,6 +154,7 @@ class NetworkController {
   NetworkStatus getNetworkStatus() {
     return _networkStatus;
   }
+
   bool isAlone() {
     if(_networkStatus != NetworkStatus.running) {
       return true;
@@ -221,30 +224,43 @@ class NetworkController {
         break;
       case Command.receiveProvide:
         final param = msg.parameter as ReceiveProvideParameter;
+        final processingTimer = Stopwatch()..start();
         msg.stats.receiveTime = Util.getTimeStamp();
         controller.receiveResources(param.resources, msg.stats);
+        processingTimer.stop();
+        final hasVersionTree = param.resources.any((resource) => resource.key == Constants.resourceKeyVersionTree);
+        if(hasVersionTree) {
+          msg.stats.versionTreeCost += processingTimer.elapsedMilliseconds;
+        } else {
+          msg.stats.versionCost += processingTimer.elapsedMilliseconds;
+        }
         break;
       case Command.receiveQuery:
         final param = msg.parameter as ReceiveQueryParameter;
+        final processingTimer = Stopwatch()..start();
         msg.stats.receiveTime = Util.getTimeStamp();
         controller.receiveRequireVersions(param.requiredObjects, msg.stats);
+        processingTimer.stop();
+        msg.stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
         break;
     }
   }
 
   void _gracefulStartVillage(String localPort, String serverList, String deviceId, UserPrivateInfo userPrivateInfo, bool useMulticast, String? logPath) {
-    _sendPort?.send(Message(
-      cmd: Command.startVillage,
-      parameter: StartVillageParameter(
-        localPort: localPort,
-        serverList: serverList,
-        deviceId: deviceId,
-        userInfo: userPrivateInfo,
-        useMulticast: useMulticast,
-        logPath: logPath,
-      ),
-      stats: TimeCostStatistics(), // Never used
-    ));
+    _sendPort?.send(
+      Message(
+        cmd: Command.startVillage,
+        parameter: StartVillageParameter(
+          localPort: localPort,
+          serverList: serverList,
+          deviceId: deviceId,
+          userInfo: userPrivateInfo,
+          useMulticast: useMulticast,
+          logPath: logPath,
+        ),
+        stats: TimeCostStatistics(), // Never used
+      )
+    );
   }
 
   List<VersionNode> _buildDag(List<VersionDataModel> data) {
@@ -263,6 +279,7 @@ class NetworkController {
     await _startBonjourBroadcast();
     await _startBonjourDiscovery();
   }
+
   Future<void> _startBonjourBroadcast() async {
     BonsoirService service = BonsoirService(
       name: _bonjourName,
@@ -279,6 +296,7 @@ class NetworkController {
     await broadcast.start();
     _bonjourBroadcast = broadcast;
   }
+
   Future<void> _startBonjourDiscovery() async {
     BonsoirDiscovery discovery = BonsoirDiscovery(type: _bonjourType);
     await discovery.ready;
@@ -313,14 +331,16 @@ class NetworkController {
 
   void _onDiscoverNewNode(String host, int port, String deviceId) {
     MyLogger.info('Bonjour node discovered: $host:$port, deviceId=$deviceId');
-    _sendPort?.send(Message(
-      cmd: Command.newNodeDiscovered,
-      parameter: NewNodeDiscoveredParameter(
-        host: host,
-        port: port,
-        deviceId: deviceId,
-      ),
-      stats: TimeCostStatistics(), // Never used
-    ));
+    _sendPort?.send(
+      Message(
+        cmd: Command.newNodeDiscovered,
+        parameter: NewNodeDiscoveredParameter(
+          host: host,
+          port: port,
+          deviceId: deviceId,
+        ),
+        stats: TimeCostStatistics(), // Never used
+      )
+    );
   }
 }
