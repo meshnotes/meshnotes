@@ -49,6 +49,9 @@ class FloatingViewManager {
   void addSelectionHandles(Widget handle1, Widget handle2) {
     _selectionKey.currentState?.addLayers(handle1, handle2);
   }
+  void removeSelectionLayerWidget(Widget widget) {
+    _selectionKey.currentState?.removeLayer(widget);
+  }
   void removeSelectionHandles(Widget handle1, Widget handle2) {
     _selectionKey.currentState?.removeLayer(handle1);
     _selectionKey.currentState?.removeLayer(handle2);

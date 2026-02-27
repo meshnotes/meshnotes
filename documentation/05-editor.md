@@ -958,6 +958,20 @@ class ParagraphDesc {
 }
 ```
 
+## Mobile Handle Magnifier
+
+**Location**: [lib/mindeditor/view/selection_handle_layer.dart](../lib/mindeditor/view/selection_handle_layer.dart)
+
+On mobile, dragging selection/cursor handles now uses a loupe-style magnifier rendered in the same floating selection layer as the handles.
+
+- Trigger: in handle `onPanStart`, `SelectionHandleLayer` converts drag position to the text hit-test offset and creates `_DragMagnifier`.
+- Follow drag: in `onPanUpdate`, selection is updated by `SelectionController.updateSelectionByOffset(...)`, and the magnifier position is updated in the same event.
+- Hide: in `onPanEnd` / `onPanCancel`, the magnifier is removed without clearing existing handles.
+
+Implementation detail:
+- `FloatingViewManager.removeSelectionLayerWidget(...)` was added so the magnifier can be removed independently from selection handles.
+- `_DragMagnifier` uses `RawMagnifier` with `focalPointOffset` so the lens is shown above the finger while magnifying the drag target area.
+
 ## Known Issues
 
 1. **Long-document performance**: scrolling may lag beyond 1000 blocks

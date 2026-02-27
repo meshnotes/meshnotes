@@ -11,12 +11,15 @@ class SelectionHandleLayer {
   Widget? _handleOfStart;
   Widget? _handleOfEnd;
   Widget? _handleOfCursor;
+  Widget? _dragMagnifier;
   // Widget? _handleOfCursor;
   _PositionedHandleState? _handleStateOfBase;
   _PositionedHandleState? _handleStateOfExtent;
   _PositionedHandleState? _handleStateOfCursor;
+  _DragMagnifierState? _dragMagnifierState;
   static const _handleSize = 16.0;
   static const _handleDragSize = 32.0;
+  static const _magnifierSize = Size(112, 64);
   bool _isDragging = false;
   int _lastScrollTime = 0;
   Timer? _scrollTimer;
@@ -62,6 +65,9 @@ class SelectionHandleLayer {
   }
   void updateHandleStateOfCursor(_PositionedHandleState state) {
     _handleStateOfCursor = state;
+  }
+  void updateDragMagnifierState(_DragMagnifierState state) {
+    _dragMagnifierState = state;
   }
   Offset? convertGlobalOffsetToSelectionLayer(Offset global) {
     final floatingViewManager = CallbackRegistry.getFloatingViewManager();
@@ -125,6 +131,8 @@ class SelectionHandleLayer {
     _handleStateOfExtent = null;
     _handleOfCursor = null;
     _handleStateOfCursor = null;
+    _dragMagnifier = null;
+    _dragMagnifierState = null;
     _isDragging = false;
   }
 
@@ -166,7 +174,9 @@ class SelectionHandleLayer {
       onPanStart: (DragStartDetails details) {
         MyLogger.info('selection handle: drag start');
         _isDragging = true;
-        _lastScrollGlobalOffset = details.globalPosition;
+        final globalOffset = _convertToSelectionOffset(details.globalPosition);
+        _showOrUpdateDragMagnifier(globalOffset);
+        _lastScrollGlobalOffset = globalOffset;
         _scrollTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
           _tryToScroll(controller, _lastScrollGlobalOffset!, type);
         });
@@ -174,9 +184,10 @@ class SelectionHandleLayer {
       onPanUpdate: (DragUpdateDetails details) {
         MyLogger.info('selection handle: drag update');
         // Handle circle has an offset from actual point of text line because it is at the bottom of cursor.
-        var globalOffset = details.globalPosition + const Offset(0, -_handleSize);
+        final globalOffset = _convertToSelectionOffset(details.globalPosition);
         _isDragging = true;
         controller.selectionController.updateSelectionByOffset(globalOffset, type: type);
+        _showOrUpdateDragMagnifier(globalOffset);
         controller.selectionController.clearPopupMenu();
         // _tryToScroll(globalOffset);
         _lastScrollGlobalOffset = globalOffset;
@@ -184,11 +195,13 @@ class SelectionHandleLayer {
       onPanEnd: (DragEndDetails details) {
         MyLogger.info('selection handle: drag end');
         _isDragging = false;
+        _hideDragMagnifier();
         _scrollTimer?.cancel();
       },
       onPanCancel: () {
         MyLogger.info('selection handle: drag cancel');
         _isDragging = false;
+        _hideDragMagnifier();
         _scrollTimer?.cancel();
       },
       onTapUp: (TapUpDetails details) {
@@ -204,6 +217,36 @@ class SelectionHandleLayer {
       type: type,
       parentLayer: this,
     );
+  }
+
+  Offset _convertToSelectionOffset(Offset offset) {
+    return offset + const Offset(0, -_handleSize);
+  }
+
+  void _showOrUpdateDragMagnifier(Offset globalOffset) {
+    if(!Controller().environment.isMobile()) return;
+
+    if(_dragMagnifierState != null) {
+      _dragMagnifierState?.updatePosition(globalOffset);
+      return;
+    }
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
+    if(floatingViewManager == null) return;
+
+    _dragMagnifier = _DragMagnifier(
+      key: UniqueKey(),
+      initPosition: globalOffset,
+      parentLayer: this,
+      magnifierSize: _magnifierSize,
+    );
+    floatingViewManager.addCursorHandle(_dragMagnifier!);
+  }
+
+  void _hideDragMagnifier() {
+    if(_dragMagnifier == null) return;
+    CallbackRegistry.getFloatingViewManager()?.removeSelectionLayerWidget(_dragMagnifier!);
+    _dragMagnifier = null;
+    _dragMagnifierState = null;
   }
 
   void _tryToScroll(Controller controller, Offset globalOffset, SelectionExtentType type) {
@@ -310,6 +353,75 @@ class _PositionedHandleState extends State<PositionedHandle> {
     if(delta == Offset.zero) return;
     setState(() {
       position -= delta;
+    });
+  }
+}
+
+class _DragMagnifier extends StatefulWidget {
+  final Offset initPosition;
+  final SelectionHandleLayer parentLayer;
+  final Size magnifierSize;
+
+  const _DragMagnifier({
+    required super.key,
+    required this.initPosition,
+    required this.parentLayer,
+    required this.magnifierSize,
+  });
+
+  @override
+  State<StatefulWidget> createState() => _DragMagnifierState();
+}
+
+class _DragMagnifierState extends State<_DragMagnifier> {
+  late Offset _globalPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _globalPosition = widget.initPosition;
+    widget.parentLayer.updateDragMagnifierState(this);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localPosition = widget.parentLayer.convertGlobalOffsetToSelectionLayer(_globalPosition)?? _globalPosition;
+    final topOffset = localPosition.dy - widget.magnifierSize.height - 48;
+    return Positioned(
+      left: localPosition.dx - widget.magnifierSize.width / 2,
+      top: topOffset,
+      child: IgnorePointer(
+        child: RawMagnifier(
+          size: widget.magnifierSize,
+          magnificationScale: 1.5,
+          focalPointOffset: const Offset(0, 48),
+          clipBehavior: Clip.hardEdge,
+          decoration: MagnifierDecoration(
+            opacity: 1,
+            shadows: const [
+              BoxShadow(
+                blurRadius: 10,
+                color: Color(0x33000000),
+                offset: Offset(0, 4),
+              ),
+            ],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: const BorderSide(
+                color: Color(0xAAFFFFFF),
+                width: 1.4,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void updatePosition(Offset globalPosition) {
+    if(globalPosition == _globalPosition) return;
+    setState(() {
+      _globalPosition = globalPosition;
     });
   }
 }
