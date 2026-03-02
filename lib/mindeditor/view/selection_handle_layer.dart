@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
@@ -72,6 +73,10 @@ class SelectionHandleLayer {
   Offset? convertGlobalOffsetToSelectionLayer(Offset global) {
     final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     return floatingViewManager?.convertGlobalOffsetToSelectionLayer(global);
+  }
+  Size? getSelectionLayerSize() {
+    final floatingViewManager = CallbackRegistry.getFloatingViewManager();
+    return floatingViewManager?.getSelectionLayerSize();
   }
 
   void hide() {
@@ -171,12 +176,15 @@ class SelectionHandleLayer {
     );
     var gesture = GestureDetector(
       behavior: HitTestBehavior.opaque,
+      onPanDown: (DragDownDetails details) {
+        _showOrUpdateDragMagnifier(details.globalPosition);
+      },
       onPanStart: (DragStartDetails details) {
         MyLogger.info('selection handle: drag start');
         _isDragging = true;
-        final globalOffset = _convertToSelectionOffset(details.globalPosition);
-        _showOrUpdateDragMagnifier(globalOffset);
-        _lastScrollGlobalOffset = globalOffset;
+        final selectionOffset = _convertToSelectionOffset(details.globalPosition);
+        _showOrUpdateDragMagnifier(details.globalPosition);
+        _lastScrollGlobalOffset = selectionOffset;
         _scrollTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
           _tryToScroll(controller, _lastScrollGlobalOffset!, type);
         });
@@ -184,13 +192,13 @@ class SelectionHandleLayer {
       onPanUpdate: (DragUpdateDetails details) {
         MyLogger.info('selection handle: drag update');
         // Handle circle has an offset from actual point of text line because it is at the bottom of cursor.
-        final globalOffset = _convertToSelectionOffset(details.globalPosition);
+        final selectionOffset = _convertToSelectionOffset(details.globalPosition);
         _isDragging = true;
-        controller.selectionController.updateSelectionByOffset(globalOffset, type: type);
-        _showOrUpdateDragMagnifier(globalOffset);
+        controller.selectionController.updateSelectionByOffset(selectionOffset, type: type);
+        _showOrUpdateDragMagnifier(details.globalPosition);
         controller.selectionController.clearPopupMenu();
         // _tryToScroll(globalOffset);
-        _lastScrollGlobalOffset = globalOffset;
+        _lastScrollGlobalOffset = selectionOffset;
       },
       onPanEnd: (DragEndDetails details) {
         MyLogger.info('selection handle: drag end');
@@ -206,7 +214,15 @@ class SelectionHandleLayer {
       },
       onTapUp: (TapUpDetails details) {
         MyLogger.info('selection handle is tapped: ${details.globalPosition}');
+        if(!_isDragging) {
+          _hideDragMagnifier();
+        }
         controller.selectionController.showPopupMenu(globalPosition: details.globalPosition);
+      },
+      onTapCancel: () {
+        if(!_isDragging) {
+          _hideDragMagnifier();
+        }
       },
       child: dragContainer,
     );
@@ -374,6 +390,9 @@ class _DragMagnifier extends StatefulWidget {
 }
 
 class _DragMagnifierState extends State<_DragMagnifier> {
+  static const _magnifierFingerGap = 8.0;
+  static const _edgePadding = 8.0;
+  static const _focalPointRaise = 6.0;
   late Offset _globalPosition;
 
   @override
@@ -386,15 +405,22 @@ class _DragMagnifierState extends State<_DragMagnifier> {
   @override
   Widget build(BuildContext context) {
     final localPosition = widget.parentLayer.convertGlobalOffsetToSelectionLayer(_globalPosition)?? _globalPosition;
-    final topOffset = localPosition.dy - widget.magnifierSize.height - 48;
+    final layerSize = widget.parentLayer.getSelectionLayerSize();
+    final maxLeft = layerSize == null? double.infinity: layerSize.width - widget.magnifierSize.width - _edgePadding;
+    final maxTop = layerSize == null? double.infinity: layerSize.height - widget.magnifierSize.height - _edgePadding;
+    final minTop = -widget.magnifierSize.height + _edgePadding;
+    final leftOffset = _clampOffset(localPosition.dx - widget.magnifierSize.width / 2, _edgePadding, maxLeft);
+    final topOffset = _clampOffset(localPosition.dy - widget.magnifierSize.height - _magnifierFingerGap, minTop, maxTop);
+    final focalPointOffsetY = widget.magnifierSize.height / 2 + _magnifierFingerGap - _focalPointRaise;
+
     return Positioned(
-      left: localPosition.dx - widget.magnifierSize.width / 2,
+      left: leftOffset,
       top: topOffset,
       child: IgnorePointer(
         child: RawMagnifier(
           size: widget.magnifierSize,
           magnificationScale: 1.5,
-          focalPointOffset: const Offset(0, 48),
+          focalPointOffset: Offset(0, focalPointOffsetY),
           clipBehavior: Clip.hardEdge,
           decoration: MagnifierDecoration(
             opacity: 1,
@@ -423,5 +449,10 @@ class _DragMagnifierState extends State<_DragMagnifier> {
     setState(() {
       _globalPosition = globalPosition;
     });
+  }
+
+  double _clampOffset(double value, double minValue, double maxValue) {
+    if(maxValue < minValue) return minValue;
+    return min(max(value, minValue), maxValue);
   }
 }

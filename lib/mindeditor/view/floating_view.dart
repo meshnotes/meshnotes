@@ -64,6 +64,10 @@ class FloatingViewManager {
     final render = _selectionKey.currentContext?.findRenderObject() as RenderBox?;
     return render?.globalToLocal(global);
   }
+  Size? getSelectionLayerSize() {
+    final render = _selectionKey.currentContext?.findRenderObject() as RenderBox?;
+    return render?.size;
+  }
   Offset? convertGlobalOffsetToPopupMenuLayer(Offset global) {
     final render = _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
     return render?.globalToLocal(global);
@@ -99,6 +103,7 @@ class FloatingViewManager {
   Widget _buildSelectionLayer() {
     return FloatingStackView(
       key: _selectionKey,
+      clipBehavior: Clip.none,
     );
   }
   Widget _buildExtraLayer() {
