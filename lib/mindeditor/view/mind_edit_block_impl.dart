@@ -213,7 +213,7 @@ class MindBlockImplRenderObject extends RenderBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     updateCurrentBox();
-    MyLogger.debug('paint: blockId=${texts.getBlockId()}, currentBox=$_currentBox, idx=${texts.getBlockIndex()}');
+    // MyLogger.debug('paint: blockId=${texts.getBlockId()}, currentBox=$_currentBox, idx=${texts.getBlockIndex()}');
     final canvas = context.canvas;
     final hasCursor = texts.hasCursor();
     var textSelection = texts.getTextSelection();

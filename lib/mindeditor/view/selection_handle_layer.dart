@@ -13,7 +13,6 @@ class SelectionHandleLayer {
   Widget? _handleOfEnd;
   Widget? _handleOfCursor;
   Widget? _dragMagnifier;
-  // Widget? _handleOfCursor;
   _PositionedHandleState? _handleStateOfBase;
   _PositionedHandleState? _handleStateOfExtent;
   _PositionedHandleState? _handleStateOfCursor;
@@ -27,6 +26,7 @@ class SelectionHandleLayer {
   Offset? _lastScrollGlobalOffset;
 
   bool isDragging() => _isDragging;
+  bool shouldShowHandleDot() => !_isDragging;
 
   void dispose() {
     //TODO should optimize here, _context should be cleared when dispose. But current implementation will cover the valid _context, because
@@ -160,12 +160,8 @@ class SelectionHandleLayer {
     final controller = Controller();
     var paintContainer = Container(
       alignment: Alignment.topCenter,
-      child: SizedBox(
-        width: _handleSize,
-        height: _handleSize,
-        child: CustomPaint(
-          painter: _HandlePainter(),
-        ),
+      child: _HandleDot(
+        parentLayer: this,
       ),
     );
     var dragContainer = Container(
@@ -181,7 +177,7 @@ class SelectionHandleLayer {
       },
       onPanStart: (DragStartDetails details) {
         MyLogger.info('selection handle: drag start');
-        _isDragging = true;
+        _setDragging(true);
         final selectionOffset = _convertToSelectionOffset(details.globalPosition);
         _showOrUpdateDragMagnifier(details.globalPosition);
         _lastScrollGlobalOffset = selectionOffset;
@@ -193,7 +189,7 @@ class SelectionHandleLayer {
         MyLogger.info('selection handle: drag update');
         // Handle circle has an offset from actual point of text line because it is at the bottom of cursor.
         final selectionOffset = _convertToSelectionOffset(details.globalPosition);
-        _isDragging = true;
+        _setDragging(true);
         controller.selectionController.updateSelectionByOffset(selectionOffset, type: type);
         _showOrUpdateDragMagnifier(details.globalPosition);
         controller.selectionController.clearPopupMenu();
@@ -202,13 +198,13 @@ class SelectionHandleLayer {
       },
       onPanEnd: (DragEndDetails details) {
         MyLogger.info('selection handle: drag end');
-        _isDragging = false;
+        _setDragging(false);
         _hideDragMagnifier();
         _scrollTimer?.cancel();
       },
       onPanCancel: () {
         MyLogger.info('selection handle: drag cancel');
-        _isDragging = false;
+        _setDragging(false);
         _hideDragMagnifier();
         _scrollTimer?.cancel();
       },
@@ -246,6 +242,9 @@ class SelectionHandleLayer {
       _dragMagnifierState?.updatePosition(globalOffset);
       return;
     }
+    if(_dragMagnifier != null) {
+      return;
+    }
     final floatingViewManager = CallbackRegistry.getFloatingViewManager();
     if(floatingViewManager == null) return;
 
@@ -255,7 +254,7 @@ class SelectionHandleLayer {
       parentLayer: this,
       magnifierSize: _magnifierSize,
     );
-    floatingViewManager.addCursorHandle(_dragMagnifier!);
+    floatingViewManager.addSelectionLayerWidgetToBottom(_dragMagnifier!);
   }
 
   void _hideDragMagnifier() {
@@ -263,6 +262,14 @@ class SelectionHandleLayer {
     CallbackRegistry.getFloatingViewManager()?.removeSelectionLayerWidget(_dragMagnifier!);
     _dragMagnifier = null;
     _dragMagnifierState = null;
+  }
+
+  void _setDragging(bool value) {
+    if(_isDragging == value) return;
+    _isDragging = value;
+    _handleStateOfBase?.refresh();
+    _handleStateOfExtent?.refresh();
+    _handleStateOfCursor?.refresh();
   }
 
   void _tryToScroll(Controller controller, Offset globalOffset, SelectionExtentType type) {
@@ -291,6 +298,8 @@ class SelectionHandleLayer {
 }
 
 class _HandlePainter extends CustomPainter {
+  const _HandlePainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     Paint paint = Paint();
@@ -307,6 +316,25 @@ class _HandlePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return false;
+  }
+}
+
+class _HandleDot extends StatelessWidget {
+  final SelectionHandleLayer parentLayer;
+
+  const _HandleDot({
+    required this.parentLayer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: SelectionHandleLayer._handleSize,
+      height: SelectionHandleLayer._handleSize,
+      child: parentLayer.shouldShowHandleDot()? CustomPaint(
+        painter: _HandlePainter(),
+      ): null,
+    );
   }
 }
 
@@ -371,6 +399,11 @@ class _PositionedHandleState extends State<PositionedHandle> {
       position -= delta;
     });
   }
+
+  void refresh() {
+    if(!mounted) return;
+    setState(() {});
+  }
 }
 
 class _DragMagnifier extends StatefulWidget {
@@ -390,9 +423,11 @@ class _DragMagnifier extends StatefulWidget {
 }
 
 class _DragMagnifierState extends State<_DragMagnifier> {
-  static const _magnifierFingerGap = 8.0;
+  static const _magnifierFingerGap = 24.0;
   static const _edgePadding = 8.0;
   static const _focalPointRaise = 6.0;
+  static const _focalPointLiftForHandle = SelectionHandleLayer._handleSize;
+  static const _focalPointHorizontalInset = 12.0;
   late Offset _globalPosition;
 
   @override
@@ -411,7 +446,12 @@ class _DragMagnifierState extends State<_DragMagnifier> {
     final minTop = -widget.magnifierSize.height + _edgePadding;
     final leftOffset = _clampOffset(localPosition.dx - widget.magnifierSize.width / 2, _edgePadding, maxLeft);
     final topOffset = _clampOffset(localPosition.dy - widget.magnifierSize.height - _magnifierFingerGap, minTop, maxTop);
-    final focalPointOffsetY = widget.magnifierSize.height / 2 + _magnifierFingerGap - _focalPointRaise;
+    final focalPointOffsetX = _clampOffset(
+      localPosition.dx - leftOffset - widget.magnifierSize.width / 2,
+      -widget.magnifierSize.width / 2 + _focalPointHorizontalInset,
+      widget.magnifierSize.width / 2 - _focalPointHorizontalInset,
+    );
+    final focalPointOffsetY = widget.magnifierSize.height / 2 + _magnifierFingerGap - _focalPointRaise - _focalPointLiftForHandle;
 
     return Positioned(
       left: leftOffset,
@@ -420,7 +460,7 @@ class _DragMagnifierState extends State<_DragMagnifier> {
         child: RawMagnifier(
           size: widget.magnifierSize,
           magnificationScale: 1.5,
-          focalPointOffset: Offset(0, focalPointOffsetY),
+          focalPointOffset: Offset(focalPointOffsetX, focalPointOffsetY),
           clipBehavior: Clip.hardEdge,
           decoration: MagnifierDecoration(
             opacity: 1,
