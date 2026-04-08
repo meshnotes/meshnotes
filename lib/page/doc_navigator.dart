@@ -561,8 +561,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   /// Build the list tile content for a document
   Widget _buildDocListTile(BuildContext context, int index, DocTitleFlat docNode, {double indentWidth = 0}) {
     final isCollapsed = _collapsedDocIds.contains(docNode.docId);
-
-    return ListTile(
+    Widget tile = ListTile(
       selected: index == selected,
       selectedTileColor: Colors.black12,
       dense: true,
@@ -615,6 +614,19 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         }
       },
     );
+    if(_draggingIndex == index) {
+      tile = _DashedBorderBox(
+        color: Colors.grey.shade400,
+        backgroundColor: Colors.grey.shade100,
+        borderRadius: 6,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 120),
+          opacity: 0.58,
+          child: tile,
+        ),
+      );
+    }
+    return tile;
   }
 
   /// Build action buttons for each document item
@@ -1094,6 +1106,75 @@ enum _DropPosition {
   above,    // Drop above the target item (as sibling)
   below,    // Drop below the target item (as sibling)
   asChild,  // Drop as child of the target item
+}
+
+class _DashedBorderBox extends StatelessWidget {
+  final Widget child;
+  final Color color;
+  final Color backgroundColor;
+  final double borderRadius;
+
+  const _DashedBorderBox({
+    required this.child,
+    required this.color,
+    required this.backgroundColor,
+    this.borderRadius = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      foregroundPainter: _DashedBorderPainter(
+        color: color,
+        borderRadius: borderRadius,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double borderRadius;
+
+  const _DashedBorderPainter({
+    required this.color,
+    required this.borderRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect.deflate(0.5), Radius.circular(borderRadius));
+    final path = Path()..addRRect(rrect);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    for(final metric in path.computeMetrics()) {
+      double distance = 0;
+      const dashWidth = 6.0;
+      const dashGap = 4.0;
+      while(distance < metric.length) {
+        final next = min(distance + dashWidth, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance += dashWidth + dashGap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
+  }
 }
 
 class NetworkStatusIcon extends StatelessWidget {

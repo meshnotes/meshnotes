@@ -974,6 +974,17 @@ Implementation detail:
 - `_DragMagnifier` uses `RawMagnifier` with a dynamic `focalPointOffset`, so the lens stays above the finger while shifting its sampling point near screen edges to keep left/right text content visible.
 - During dragging, handle dots are hidden completely and restored after the drag ends, avoiding duplicate dots both inside and outside the magnifier.
 
+## Block Dragging Feedback
+
+**Location**: [lib/mindeditor/view/mind_edit_block.dart](../lib/mindeditor/view/mind_edit_block.dart)
+
+Block drag now marks the source block inside the editor with a placeholder-like appearance while the drag is active.
+
+- Why: when desktop dragging starts from the block handler, the original block previously looked unchanged, making it hard to tell which block was being moved.
+- Implementation: `MindEditBlockState` tracks `_isBlockDragging` from both `Draggable` and `LongPressDraggable` lifecycle callbacks.
+- Rendering: the block row is wrapped with a light gray background, a dashed outline, and reduced opacity only during the active drag, so the source block remains in layout but is visually de-emphasized.
+- Result: the floating drag preview still shows the moving content, and the in-editor source block clearly reads as "currently being dragged".
+
 ## Known Issues
 
 1. **Long-document performance**: scrolling may lag beyond 1000 blocks

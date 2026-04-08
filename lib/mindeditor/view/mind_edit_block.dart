@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/ui/app_style.dart';
@@ -32,6 +34,7 @@ class MindEditBlock extends StatefulWidget {
 
 class MindEditBlockState extends State<MindEditBlock> {
   bool _mouseEntered = false;
+  bool _isBlockDragging = false;
   MindBlockImplRenderObject? _render;
   Widget? _leading;
   final LayerLink _layerLink = LayerLink();
@@ -82,6 +85,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     var handler = _buildHandler();
     var extra = _buildExtra();
     var all = _buildAll(levelSpace, handler, blockImpl, extra);
+    all = _buildDraggingDecoration(all);
     Widget result = _buildDragTargetWrapper(all);
     if(_topSpace > 0 || _bottomSpace > 0) {
       result = Column(
@@ -258,12 +262,13 @@ class MindEditBlockState extends State<MindEditBlock> {
         link: _layerLink,
         child: child,
       );
+      return SizedBox(
+        width: widget.controller.setting.blockExtraTipsSize,
+        height: widget.controller.setting.blockHandlerSize,
+        child: child,
+      );
     }
-    return SizedBox(
-      width: widget.controller.setting.blockExtraTipsSize,
-      height: widget.controller.setting.blockHandlerSize,
-      child: child,
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildAll(Widget? levelSpace, Widget? handler, Widget block, Widget extraWidget) {
@@ -318,11 +323,48 @@ class MindEditBlockState extends State<MindEditBlock> {
     return !widget.readOnly && !widget.texts.isTitle();
   }
 
+  Widget _buildDraggingDecoration(Widget child) {
+    if(!_isBlockDragging) {
+      return child;
+    }
+    return _DashedBorderBox(
+      color: Colors.grey.shade400,
+      backgroundColor: Colors.grey.shade100,
+      borderRadius: 6,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 120),
+        opacity: 0.58,
+        child: child,
+      ),
+    );
+  }
+
+  void _setBlockDragging(bool value) {
+    if(_isBlockDragging == value || !mounted) {
+      return;
+    }
+    setState(() {
+      _isBlockDragging = value;
+    });
+  }
+
   Widget _buildDesktopDraggableHandler(Widget handler) {
     return Draggable<_BlockDragData>(
       data: _BlockDragData(blockId: getBlockId()),
       feedback: _buildDragFeedback(),
       feedbackOffset: DragDropStyle.editorFeedbackOffset,
+      onDragStarted: () {
+        _setBlockDragging(true);
+      },
+      onDragEnd: (_) {
+        _setBlockDragging(false);
+      },
+      onDragCompleted: () {
+        _setBlockDragging(false);
+      },
+      onDraggableCanceled: (_, __) {
+        _setBlockDragging(false);
+      },
       childWhenDragging: Opacity(
         opacity: 0.3,
         child: handler,
@@ -336,6 +378,18 @@ class MindEditBlockState extends State<MindEditBlock> {
       data: _BlockDragData(blockId: getBlockId()),
       feedback: _buildDragFeedback(),
       feedbackOffset: DragDropStyle.editorFeedbackOffset,
+      onDragStarted: () {
+        _setBlockDragging(true);
+      },
+      onDragEnd: (_) {
+        _setBlockDragging(false);
+      },
+      onDragCompleted: () {
+        _setBlockDragging(false);
+      },
+      onDraggableCanceled: (_, __) {
+        _setBlockDragging(false);
+      },
       childWhenDragging: Opacity(
         opacity: 0.35,
         child: child,
@@ -1148,6 +1202,75 @@ class BlockHandler extends StatefulWidget {
 
   @override
   _BlockHandlerState createState() => _BlockHandlerState();
+}
+
+class _DashedBorderBox extends StatelessWidget {
+  final Widget child;
+  final Color color;
+  final Color backgroundColor;
+  final double borderRadius;
+
+  const _DashedBorderBox({
+    required this.child,
+    required this.color,
+    required this.backgroundColor,
+    this.borderRadius = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      foregroundPainter: _DashedBorderPainter(
+        color: color,
+        borderRadius: borderRadius,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double borderRadius;
+
+  const _DashedBorderPainter({
+    required this.color,
+    required this.borderRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect.deflate(0.5), Radius.circular(borderRadius));
+    final path = Path()..addRRect(rrect);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    for(final metric in path.computeMetrics()) {
+      double distance = 0;
+      const dashWidth = 6.0;
+      const dashGap = 4.0;
+      while(distance < metric.length) {
+        final next = math.min(distance + dashWidth, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance += dashWidth + dashGap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
+  }
 }
 
 class _BlockHandlerState extends State<BlockHandler> {
