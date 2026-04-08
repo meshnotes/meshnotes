@@ -964,13 +964,15 @@ class ParagraphDesc {
 
 On mobile, dragging selection/cursor handles now uses a loupe-style magnifier rendered in the same floating selection layer as the handles.
 
-- Trigger: in handle `onPanStart`, `SelectionHandleLayer` converts drag position to the text hit-test offset and creates `_DragMagnifier`.
+- Trigger: in handle `onPanDown` and `onPanStart`, `SelectionHandleLayer` creates/updates `_DragMagnifier` immediately from the raw finger global position so it appears before drag updates.
 - Follow drag: in `onPanUpdate`, selection is updated by `SelectionController.updateSelectionByOffset(...)`, and the magnifier position is updated in the same event.
-- Hide: in `onPanEnd` / `onPanCancel`, the magnifier is removed without clearing existing handles.
+- Hide: in `onPanEnd` / `onPanCancel` and non-drag `onTapUp` / `onTapCancel`, the magnifier is removed without clearing existing handles.
 
 Implementation detail:
 - `FloatingViewManager.removeSelectionLayerWidget(...)` was added so the magnifier can be removed independently from selection handles.
-- `_DragMagnifier` uses `RawMagnifier` with `focalPointOffset` so the lens is shown above the finger while magnifying the drag target area.
+- `_DragMagnifier` uses a smaller finger gap and raises the focal point slightly so the lens sits lower while keeping the sampled center higher.
+- `_DragMagnifier` still clamps horizontal bounds, but allows negative `top` so the lens can extend above the document window top when selecting the first visible row.
+- `FloatingStackView` now supports configurable `clipBehavior`; the selection floating layer uses `Clip.none` so magnifier overflow above the top edge remains visible.
 
 ## Known Issues
 
