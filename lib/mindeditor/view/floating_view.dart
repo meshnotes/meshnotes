@@ -46,8 +46,14 @@ class FloatingViewManager {
   void addCursorHandle(Widget handle) {
     _selectionKey.currentState?.addLayer(handle);
   }
+  void addSelectionLayerWidgetToBottom(Widget widget) {
+    _selectionKey.currentState?.addLayerToBottom(widget);
+  }
   void addSelectionHandles(Widget handle1, Widget handle2) {
     _selectionKey.currentState?.addLayers(handle1, handle2);
+  }
+  void removeSelectionLayerWidget(Widget widget) {
+    _selectionKey.currentState?.removeLayer(widget);
   }
   void removeSelectionHandles(Widget handle1, Widget handle2) {
     _selectionKey.currentState?.removeLayer(handle1);
@@ -60,6 +66,10 @@ class FloatingViewManager {
   Offset? convertGlobalOffsetToSelectionLayer(Offset global) {
     final render = _selectionKey.currentContext?.findRenderObject() as RenderBox?;
     return render?.globalToLocal(global);
+  }
+  Size? getSelectionLayerSize() {
+    final render = _selectionKey.currentContext?.findRenderObject() as RenderBox?;
+    return render?.size;
   }
   Offset? convertGlobalOffsetToPopupMenuLayer(Offset global) {
     final render = _popupMenuKey.currentContext?.findRenderObject() as RenderBox?;
@@ -96,6 +106,7 @@ class FloatingViewManager {
   Widget _buildSelectionLayer() {
     return FloatingStackView(
       key: _selectionKey,
+      clipBehavior: Clip.none,
     );
   }
   Widget _buildExtraLayer() {

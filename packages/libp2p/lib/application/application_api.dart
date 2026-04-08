@@ -260,11 +260,17 @@ class TimeCostStatistics {
   int transportTime;
   int receiveTime;
   int finishTime;
+  int versionTreeCost;
+  int requiredVersionsCost;
+  int versionCost;
 
   TimeCostStatistics({
     this.startTime = 0,
     this.transportTime = 0,
     this.receiveTime = 0,
     this.finishTime = 0,
+    this.versionTreeCost = 0,
+    this.requiredVersionsCost = 0,
+    this.versionCost = 0,
   });
 }

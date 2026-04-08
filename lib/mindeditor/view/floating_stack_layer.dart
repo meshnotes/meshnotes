@@ -3,8 +3,11 @@ import 'package:flutter/widgets.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 
 class FloatingStackView extends StatefulWidget {
+  final Clip clipBehavior;
+
   const FloatingStackView({
     super.key,
+    this.clipBehavior = Clip.hardEdge,
   });
 
   @override
@@ -16,6 +19,7 @@ class FloatingStackViewState extends State<FloatingStackView> {
   @override
   Widget build(BuildContext context) {
     final stack = Stack(
+      clipBehavior: widget.clipBehavior,
       children: views,
     );
     return WidgetTemplate.buildKeyboardResizableContainer(stack);
@@ -29,6 +33,11 @@ class FloatingStackViewState extends State<FloatingStackView> {
   void addLayer(Widget _w) {
     setState(() {
       views.add(_w);
+    });
+  }
+  void addLayerToBottom(Widget _w) {
+    setState(() {
+      views.insert(0, _w);
     });
   }
   void clearLayer() {

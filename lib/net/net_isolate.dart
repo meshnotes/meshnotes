@@ -25,6 +25,7 @@ class IsolateData {
     required this.token,
   });
 }
+
 void netIsolateRunner(IsolateData _data) {
   // Init MyLogger in the separated isolate
   MyLogger.init(name: 'network');
@@ -191,18 +192,21 @@ class VersionChainVillager {
     /// 2. Verify message and every single resource
     /// 3. Decrypt resources
     /// 4. Send to port to notify upper layer
+    final processingTimer = Stopwatch()..start();
     final processStartTime = DateTime.now().microsecondsSinceEpoch;
 
     final signedResources = SignedResources.fromJson(jsonDecode(data));
     final publicKey = signedResources.userPublicId;
     if(publicKey != _signing!.getCompressedPublicKey()) {
       MyLogger.info('Receive provide message from other user: $publicKey');
+      processingTimer.stop();
       return;
     }
     String feature = SignedResources.getFeature(signedResources.resources);
     final ok = _verifySignature(feature, signedResources.signature);
     if(!ok) {
       MyLogger.info('Verify provide message failed');
+      processingTimer.stop();
       return;
     }
 
@@ -240,6 +244,13 @@ class VersionChainVillager {
           'decrypt=${(decryptDuration / 1000).toStringAsFixed(2)}ms, '
           'total=${(totalProcessDuration / 1000).toStringAsFixed(2)}ms');
     }
+    processingTimer.stop();
+    final hasVersionTree = unsignedResourceList.any((resource) => resource.key == Constants.resourceKeyVersionTree);
+    if(hasVersionTree) {
+      stats.versionTreeCost += processingTimer.elapsedMilliseconds;
+    } else {
+      stats.versionCost += processingTimer.elapsedMilliseconds;
+    }
     stats.transportTime = Util.getTimeStamp();
     _sendPort.send(Message(
       cmd: Command.receiveProvide,
@@ -254,17 +265,22 @@ class VersionChainVillager {
     /// 1. Check public key is the same
     /// 2. Verify message
     /// 3. Send to port to notify upper layer
+    final processingTimer = Stopwatch()..start();
     SignedMessage signedMessage = SignedMessage.fromJson(jsonDecode(data));
     final publicKey = signedMessage.userPublicId;
     if(publicKey != _signing!.getCompressedPublicKey()) {
       MyLogger.info('Receive verify message from other user: $publicKey');
+      processingTimer.stop();
       return;
     }
     if(!_verifySignature(signedMessage.data, signedMessage.signature)) {
       MyLogger.info('Verify query message failed');
+      processingTimer.stop();
       return;
     }
     var requiredVersions = RequireVersions.fromJson(jsonDecode(signedMessage.data));
+    processingTimer.stop();
+    stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
     stats.transportTime = Util.getTimeStamp();
     _sendPort.send(Message(
       cmd: Command.receiveQuery,
@@ -311,7 +327,9 @@ class VersionChainVillager {
     String signedMessageJson = jsonEncode(signedMessage);
     _village?.sendPublish(signedMessageJson, stats);
   }
+
   void _onSendVersionTree(VersionChain versionChain, int timestamp, TimeCostStatistics stats) {
+    final processingTimer = Stopwatch()..start();
     stats.receiveTime = Util.getTimeStamp();
     String chainJson = jsonEncode(versionChain);
     String encryptedChainJson = _encrypt!.encrypt(timestamp, chainJson);
@@ -328,20 +346,26 @@ class VersionChainVillager {
     String signatureOfList = _genSignature(SignedResources.getFeature(resourceList));
     SignedResources signedResources = SignedResources(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signatureOfList);
     String signedResourcesJson = jsonEncode(signedResources);
+    processingTimer.stop();
+    stats.versionTreeCost += processingTimer.elapsedMilliseconds;
     _village?.sendVersionTree(signedResourcesJson, stats);
   }
 
   void _onSendRequireVersions(List<String> versions, TimeCostStatistics stats) {
+    final processingTimer = Stopwatch()..start();
     stats.receiveTime = Util.getTimeStamp();
     var requiredVersions = RequireVersions(requiredVersions: versions);
     String json = jsonEncode(requiredVersions);
     String signature = _genSignature(json);
     SignedMessage signedMessage = SignedMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
     String signedMessageJson = jsonEncode(signedMessage);
+    processingTimer.stop();
+    stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
     _village?.sendRequireVersions(signedMessageJson, stats);
   }
 
   void _onSendVersions(List<SendVersions> versions, TimeCostStatistics stats) {
+    final processingTimer = Stopwatch()..start();
     stats.receiveTime = Util.getTimeStamp();
     List<SignedResource> resourceList = [];
     for(var version in versions) {
@@ -377,6 +401,8 @@ class VersionChainVillager {
     final signedResources = SignedResources(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signature);
     String json = jsonEncode(signedResources);
 
+    processingTimer.stop();
+    stats.versionCost += processingTimer.elapsedMilliseconds;
     _village?.sendVersions(json, stats);
   }
 
