@@ -48,6 +48,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   double _currentScrollPixel = 0.0;
   late FloatingViewManager _floatingViewManager;
   final controller = Controller();
+  String? _flashBlockId;
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -393,6 +394,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       controller: widget.controller,
       key: ValueKey(paragraph.getBlockId()),
       readOnly: readOnly,
+      flashBlockId: _flashBlockId,
     );
     return blockView;
   }
@@ -579,9 +581,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     widget.document.clearTextSelection();
     _resetActiveBlockIndexes();
   }
-  void refreshDoc({String? activeBlockId, int position = 0}) {
+  void refreshDoc({String? activeBlockId, int position = 0, String? flashBlockId}) {
     setState(() {
       initDocAndControlBlock();
+      _flashBlockId = flashBlockId;
       if(activeBlockId != null) { // If activeId is not null, make the cursor appear on the block with activeId
         widget.controller.selectionController.collapseInBlock(activeBlockId, position, true);
       }

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/view/floating_stack_layer.dart';
 import 'package:mesh_note/mindeditor/view/network_view.dart';
+import 'package:mesh_note/mindeditor/view/drag_drop_dashed_border_box.dart';
 import 'package:mesh_note/page/widget_templates.dart';
 import 'package:mesh_note/ui/app_style.dart';
 import 'package:my_log/my_log.dart';
@@ -62,6 +63,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   int? _draggingIndex; // The index of the document title being dragged
   int? _dragTargetIndex; // The index of the document title being dragged to
   _DropPosition? _dropPosition;
+  String? _flashDocId;
+  bool _showDocMoveFlash = false;
 
   // Collapse/expand state
   final Set<String> _collapsedDocIds = {};
@@ -69,6 +72,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   // Auto-scroll state
   final ScrollController _scrollController = ScrollController();
   Timer? _autoScrollTimer;
+  Timer? _docMoveFlashTimer;
   final GlobalKey _listViewKey = GlobalKey();
   double _currentScrollDelta = 0.0;
 
@@ -96,6 +100,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     controller.eventTasksManager.removeUserInfoChangedTask(_onUserInfoChanged);
     _scrollController.dispose();
     _autoScrollTimer?.cancel();
+    _docMoveFlashTimer?.cancel();
   }
 
   @override
@@ -615,15 +620,23 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       },
     );
     if(_draggingIndex == index) {
-      tile = _DashedBorderBox(
-        color: Colors.grey.shade400,
-        backgroundColor: Colors.grey.shade100,
-        borderRadius: 6,
+      tile = DragDropDashedBorderBox(
+        color: DragDropPlaceHolderStyle.borderColor,
+        backgroundColor: DragDropPlaceHolderStyle.backgroundColor,
+        borderRadius: DragDropPlaceHolderStyle.borderRadius,
         child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 120),
-          opacity: 0.58,
+          duration: DragDropPlaceHolderStyle.fadeDuration,
+          opacity: DragDropPlaceHolderStyle.contentOpacity,
           child: tile,
         ),
+      );
+    }
+    if(_flashDocId == docNode.docId && _showDocMoveFlash) {
+      tile = DragDropDashedBorderBox(
+        color: DragDropTargetFlashStyle.borderColor,
+        backgroundColor: DragDropTargetFlashStyle.backgroundColor,
+        borderRadius: DragDropTargetFlashStyle.borderRadius,
+        child: tile,
       );
     }
     return tile;
@@ -737,9 +750,13 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         draggedDoc.orderId < newOrderId) {
       newOrderId--;
     }
+    final shouldFlashMoveTarget = draggedDoc.parentDocId != newParentDocId || draggedDoc.orderId != newOrderId;
 
     // Perform the move operation
     controller.docManager.moveDocument(draggedDoc.docId, newParentDocId, newOrderId);
+    if(shouldFlashMoveTarget) {
+      _triggerDocMoveFlash(draggedDoc.docId);
+    }
 
     setState(() {
       _dragTargetIndex = null;
@@ -775,9 +792,13 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       // After removal, the max orderId will be one less
       newOrderId--;
     }
+    final shouldFlashMoveTarget = draggedDoc.parentDocId != newParentDocId || draggedDoc.orderId != newOrderId;
 
     // Perform the move operation
     controller.docManager.moveDocument(draggedDoc.docId, newParentDocId, newOrderId);
+    if(shouldFlashMoveTarget) {
+      _triggerDocMoveFlash(draggedDoc.docId);
+    }
 
     setState(() {
       _dragTargetIndex = null;
@@ -940,6 +961,27 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
       }
       docList = _getFilteredDocumentList(totalList);
     });
+  }
+
+  void _triggerDocMoveFlash(String docId) {
+    _docMoveFlashTimer?.cancel();
+    _flashDocId = docId;
+    const flashStates = [true, false, true, false];
+    int step = 0;
+    void applyState() {
+      if(!mounted) {
+        return;
+      }
+      setState(() {
+        _showDocMoveFlash = flashStates[step];
+      });
+      step++;
+      if(step >= flashStates.length) {
+        return;
+      }
+      _docMoveFlashTimer = Timer(DragDropTargetFlashStyle.flashInterval, applyState);
+    }
+    applyState();
   }
 
   /// Handle auto-scroll when dragging near edges
@@ -1108,74 +1150,6 @@ enum _DropPosition {
   asChild,  // Drop as child of the target item
 }
 
-class _DashedBorderBox extends StatelessWidget {
-  final Widget child;
-  final Color color;
-  final Color backgroundColor;
-  final double borderRadius;
-
-  const _DashedBorderBox({
-    required this.child,
-    required this.color,
-    required this.backgroundColor,
-    this.borderRadius = 0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      foregroundPainter: _DashedBorderPainter(
-        color: color,
-        borderRadius: borderRadius,
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-
-class _DashedBorderPainter extends CustomPainter {
-  final Color color;
-  final double borderRadius;
-
-  const _DashedBorderPainter({
-    required this.color,
-    required this.borderRadius,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final rrect = RRect.fromRectAndRadius(rect.deflate(0.5), Radius.circular(borderRadius));
-    final path = Path()..addRRect(rrect);
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    for(final metric in path.computeMetrics()) {
-      double distance = 0;
-      const dashWidth = 6.0;
-      const dashGap = 4.0;
-      while(distance < metric.length) {
-        final next = min(distance + dashWidth, metric.length);
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance += dashWidth + dashGap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
-  }
-}
 
 class NetworkStatusIcon extends StatelessWidget {
   final _NetworkStatus networkStatus;

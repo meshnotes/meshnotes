@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
@@ -10,6 +10,7 @@ import '../../util/util.dart';
 import '../document/paragraph_desc.dart';
 import '../document/text_desc.dart';
 import '../setting/constants.dart';
+import 'drag_drop_dashed_border_box.dart';
 import 'mind_edit_block_impl.dart';
 
 class MindEditBlock extends StatefulWidget {
@@ -17,6 +18,8 @@ class MindEditBlock extends StatefulWidget {
   final Controller controller;
   final bool readOnly;
   final bool ignoreLevel;
+  // The block id that should show the post-move flash.
+  final String? flashBlockId;
   
   MindEditBlock({
     Key? key,
@@ -24,6 +27,7 @@ class MindEditBlock extends StatefulWidget {
     required this.controller,
     this.readOnly = false,
     this.ignoreLevel = false,
+    this.flashBlockId,
   }): super(key: key) {
     MyLogger.debug('MindEditBlock: create new block(id=${texts.getBlockId()})');
   }
@@ -35,6 +39,7 @@ class MindEditBlock extends StatefulWidget {
 class MindEditBlockState extends State<MindEditBlock> {
   bool _mouseEntered = false;
   bool _isBlockDragging = false;
+  bool _showMoveFlash = false;
   MindBlockImplRenderObject? _render;
   Widget? _leading;
   final LayerLink _layerLink = LayerLink();
@@ -43,6 +48,8 @@ class MindEditBlockState extends State<MindEditBlock> {
   double _bottomSpace = 0;
   final GlobalKey _dragTargetKey = GlobalKey();
   _EditorDropPosition? _dropPosition;
+  int? _dropLevel;
+  Timer? _moveFlashTimer;
 
   static const double _dropLineHeight = DragDropStyle.lineHeight;
   static const double _dropLineSegmentWidth = DragDropStyle.editorLineSegmentWidth;
@@ -62,10 +69,25 @@ class MindEditBlockState extends State<MindEditBlock> {
   @override
   void initState() {
     super.initState();
+    _triggerMoveFlashIfNeeded();
     if(!widget.readOnly) {
       MyLogger.debug('MindEditBlockState: initializing MindEditBlockState for block(id=${getBlockId()})');
       widget.controller.setBlockStateToTreeNode(getBlockId(), this);
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant MindEditBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if(widget.flashBlockId != oldWidget.flashBlockId) {
+      _triggerMoveFlashIfNeeded();
+    }
+  }
+
+  @override
+  void dispose() {
+    _moveFlashTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -86,6 +108,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     var extra = _buildExtra();
     var all = _buildAll(levelSpace, handler, blockImpl, extra);
     all = _buildDraggingDecoration(all);
+    all = _buildMoveFlashDecoration(all);
     Widget result = _buildDragTargetWrapper(all);
     if(_topSpace > 0 || _bottomSpace > 0) {
       result = Column(
@@ -327,15 +350,27 @@ class MindEditBlockState extends State<MindEditBlock> {
     if(!_isBlockDragging) {
       return child;
     }
-    return _DashedBorderBox(
-      color: Colors.grey.shade400,
-      backgroundColor: Colors.grey.shade100,
-      borderRadius: 6,
+    return DragDropDashedBorderBox(
+      color: DragDropPlaceHolderStyle.borderColor,
+      backgroundColor: DragDropPlaceHolderStyle.backgroundColor,
+      borderRadius: DragDropPlaceHolderStyle.borderRadius,
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 120),
-        opacity: 0.58,
+        duration: DragDropPlaceHolderStyle.fadeDuration,
+        opacity: DragDropPlaceHolderStyle.contentOpacity,
         child: child,
       ),
+    );
+  }
+
+  Widget _buildMoveFlashDecoration(Widget child) {
+    if(!_showMoveFlash) {
+      return child;
+    }
+    return DragDropDashedBorderBox(
+      color: DragDropTargetFlashStyle.borderColor,
+      backgroundColor: DragDropTargetFlashStyle.backgroundColor,
+      borderRadius: DragDropTargetFlashStyle.borderRadius,
+      child: child,
     );
   }
 
@@ -346,6 +381,29 @@ class MindEditBlockState extends State<MindEditBlock> {
     setState(() {
       _isBlockDragging = value;
     });
+  }
+
+  void _triggerMoveFlashIfNeeded() {
+    if(widget.flashBlockId != getBlockId()) {
+      return;
+    }
+    _moveFlashTimer?.cancel();
+    const flashStates = [true, false, true, false];
+    int step = 0;
+    void applyState() {
+      if(!mounted) {
+        return;
+      }
+      setState(() {
+        _showMoveFlash = flashStates[step];
+      });
+      step++;
+      if(step >= flashStates.length) {
+        return;
+      }
+      _moveFlashTimer = Timer(DragDropTargetFlashStyle.flashInterval, applyState);
+    }
+    applyState();
   }
 
   Widget _buildDesktopDraggableHandler(Widget handler) {
@@ -437,12 +495,13 @@ class MindEditBlockState extends State<MindEditBlock> {
         if(_dropPosition != null) {
           setState(() {
             _dropPosition = null;
+            _dropLevel = null;
           });
         }
       },
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
-        final level = widget.texts.getBlockLevel();
+        final level = _getDropIndicatorLevel(widget.texts.getBlockLevel());
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -455,7 +514,7 @@ class MindEditBlockState extends State<MindEditBlock> {
             if(isHovering && _dropPosition == _EditorDropPosition.below)
               _buildDropLine(level),
             if(isHovering && _dropPosition == _EditorDropPosition.asChild)
-              _buildDropLine(level, isAsChild: true),
+              _buildDropLine(level),
           ],
         );
       },
@@ -486,10 +545,82 @@ class MindEditBlockState extends State<MindEditBlock> {
         nextPos = calculatedLevel > currentLevel ? _EditorDropPosition.asChild : _EditorDropPosition.above;
       }
     }
-    if(nextPos != _dropPosition) {
+    if(nextPos != _dropPosition || calculatedLevel != _dropLevel) {
       setState(() {
         _dropPosition = nextPos;
+        _dropLevel = calculatedLevel;
       });
+    }
+  }
+
+  int _resolveDropLevel(ParagraphDesc targetPara, _EditorDropPosition dropPos) {
+    final maxLevel = widget.controller.setting.blockMaxLevel;
+    final targetLevel = targetPara.getBlockLevel();
+    final rawLevel = _dropLevel ?? targetLevel;
+    switch(dropPos) {
+      case _EditorDropPosition.above:
+      case _EditorDropPosition.below:
+        return rawLevel.clamp(0, targetLevel);
+      case _EditorDropPosition.asChild:
+        return (targetLevel + 1).clamp(0, maxLevel);
+    }
+  }
+
+  int _findAncestorOrSelfIndexAtLevel(int startIndex, int targetLevel) {
+    final paragraphs = widget.texts.parent.paragraphs;
+    for(int i = startIndex; i >= 1; i--) {
+      if(paragraphs[i].getBlockLevel() == targetLevel) {
+        return i;
+      }
+    }
+    return 1;
+  }
+
+  int _findSubtreeEndExclusive(int rootIndex) {
+    final paragraphs = widget.texts.parent.paragraphs;
+    final rootLevel = paragraphs[rootIndex].getBlockLevel();
+    for(int i = rootIndex + 1; i < paragraphs.length; i++) {
+      if(paragraphs[i].getBlockLevel() <= rootLevel) {
+        return i;
+      }
+    }
+    return paragraphs.length;
+  }
+
+  int _resolveInsertIndexForDrop(int targetIndex, ParagraphDesc targetPara, _EditorDropPosition dropPos, int newLevel) {
+    if(targetPara.isTitle()) {
+      return 1;
+    }
+    final targetLevel = targetPara.getBlockLevel();
+    switch(dropPos) {
+      case _EditorDropPosition.above:
+        if(newLevel >= targetLevel) {
+          return targetIndex;
+        }
+        return _findAncestorOrSelfIndexAtLevel(targetIndex, newLevel);
+      case _EditorDropPosition.below:
+        if(newLevel > targetLevel) {
+          return targetIndex + 1;
+        }
+        final anchorIndex = _findAncestorOrSelfIndexAtLevel(targetIndex, newLevel);
+        return _findSubtreeEndExclusive(anchorIndex);
+      case _EditorDropPosition.asChild:
+        return targetIndex + 1;
+    }
+  }
+
+  int _getDropIndicatorLevel(int currentLevel) {
+    final dropPos = _dropPosition;
+    if(dropPos == null) {
+      return currentLevel;
+    }
+    final rawLevel = _dropLevel ?? currentLevel;
+    switch(dropPos) {
+      case _EditorDropPosition.above:
+      case _EditorDropPosition.below:
+        return rawLevel.clamp(0, currentLevel);
+      case _EditorDropPosition.asChild:
+        return (currentLevel + 1).clamp(0, widget.controller.setting.blockMaxLevel);
     }
   }
 
@@ -498,6 +629,7 @@ class MindEditBlockState extends State<MindEditBlock> {
       if(_dropPosition != null && mounted) {
         setState(() {
           _dropPosition = null;
+          _dropLevel = null;
         });
       }
     }
@@ -513,33 +645,24 @@ class MindEditBlockState extends State<MindEditBlock> {
       clearDropState();
       return;
     }
+    final draggedPara = doc.getParagraph(draggedBlockId);
+    final oldLevel = draggedPara?.getBlockLevel() ?? 0;
 
     final targetPara = widget.texts;
     final dropPos = _dropPosition ?? _EditorDropPosition.below;
-    int insertIndex;
-    int newLevel;
-    if(targetPara.isTitle()) {
-      insertIndex = 1;
-      newLevel = 0;
-    } else {
-      switch(dropPos) {
-        case _EditorDropPosition.above:
-          insertIndex = targetIndex;
-          newLevel = targetPara.getBlockLevel();
-          break;
-        case _EditorDropPosition.below:
-          insertIndex = targetIndex + 1;
-          newLevel = targetPara.getBlockLevel();
-          break;
-        case _EditorDropPosition.asChild:
-          insertIndex = targetIndex + 1;
-          newLevel = targetPara.getBlockLevel() + 1;
-          break;
-      }
+    final newLevel = targetPara.isTitle()? 0: _resolveDropLevel(targetPara, dropPos);
+    final insertIndex = _resolveInsertIndexForDrop(targetIndex, targetPara, dropPos, newLevel);
+    var finalIndex = insertIndex;
+    if(finalIndex < 1) {
+      finalIndex = 1;
     }
-    if(newLevel > widget.controller.setting.blockMaxLevel) {
-      newLevel = widget.controller.setting.blockMaxLevel;
+    if(finalIndex > doc.paragraphs.length) {
+      finalIndex = doc.paragraphs.length;
     }
+    if(draggedIndex < finalIndex) {
+      finalIndex--;
+    }
+    final shouldFlashMoveTarget = finalIndex != draggedIndex || newLevel != oldLevel;
 
     doc.moveParagraphToIndex(draggedBlockId, insertIndex);
     final movedPara = doc.getParagraph(draggedBlockId);
@@ -548,14 +671,18 @@ class MindEditBlockState extends State<MindEditBlock> {
     }
     controller.selectionController.hideSelectionHandles();
     CallbackRegistry.rudelyCloseIME();
-    CallbackRegistry.refreshDoc(activeBlockId: draggedBlockId, position: 0);
+    CallbackRegistry.refreshDoc(
+      activeBlockId: draggedBlockId,
+      position: 0,
+      flashBlockId: shouldFlashMoveTarget? draggedBlockId: null,
+    );
     _triggerBlockModified();
 
     clearDropState();
   }
 
-  Widget _buildDropLine(int level, {bool isAsChild = false}) {
-    final segmentCount = isAsChild ? level + 1 : level;
+  Widget _buildDropLine(int level) {
+    final segmentCount = level;
     const gap = Constants.tabWidth - _dropLineSegmentWidth;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
@@ -1204,74 +1331,6 @@ class BlockHandler extends StatefulWidget {
   _BlockHandlerState createState() => _BlockHandlerState();
 }
 
-class _DashedBorderBox extends StatelessWidget {
-  final Widget child;
-  final Color color;
-  final Color backgroundColor;
-  final double borderRadius;
-
-  const _DashedBorderBox({
-    required this.child,
-    required this.color,
-    required this.backgroundColor,
-    this.borderRadius = 0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      foregroundPainter: _DashedBorderPainter(
-        color: color,
-        borderRadius: borderRadius,
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-
-class _DashedBorderPainter extends CustomPainter {
-  final Color color;
-  final double borderRadius;
-
-  const _DashedBorderPainter({
-    required this.color,
-    required this.borderRadius,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final rrect = RRect.fromRectAndRadius(rect.deflate(0.5), Radius.circular(borderRadius));
-    final path = Path()..addRRect(rrect);
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    for(final metric in path.computeMetrics()) {
-      double distance = 0;
-      const dashWidth = 6.0;
-      const dashGap = 4.0;
-      while(distance < metric.length) {
-        final next = math.min(distance + dashWidth, metric.length);
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance += dashWidth + dashGap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
-  }
-}
 
 class _BlockHandlerState extends State<BlockHandler> {
   Color backgroundColor = Colors.transparent;

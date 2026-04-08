@@ -984,6 +984,8 @@ Block drag now marks the source block inside the editor with a placeholder-like 
 - Implementation: `MindEditBlockState` tracks `_isBlockDragging` from both `Draggable` and `LongPressDraggable` lifecycle callbacks.
 - Rendering: the block row is wrapped with a light gray background, a dashed outline, and reduced opacity only during the active drag, so the source block remains in layout but is visually de-emphasized.
 - Result: the floating drag preview still shows the moving content, and the in-editor source block clearly reads as "currently being dragged".
+- After a successful move, the block briefly flashes at its new location with a highlighted background and dashed border so the landing position is easy to spot.
+- Dropping below the last block now correctly inserts at the true end of the document instead of stopping one position early.
 
 ## Known Issues
 

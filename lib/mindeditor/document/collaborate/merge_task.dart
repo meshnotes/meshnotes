@@ -167,7 +167,11 @@ class MergeTask {
       }
     }
     MyLogger.info('_findWaitingOrMissingVersions: progress: $availableCount / $totalCount');
-    _progress = (availableCount / totalCount * 100).toInt();
+    if(totalCount == 0) {
+      _progress = 100;
+    } else {
+      _progress = (availableCount / totalCount * 100).toInt();
+    }
     return missing;
   }
 

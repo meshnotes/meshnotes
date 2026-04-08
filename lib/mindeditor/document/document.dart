@@ -224,8 +224,8 @@ class Document {
     if(targetIndex < 1) {
       targetIndex = 1;
     }
-    if(targetIndex >= paragraphs.length) {
-      targetIndex = paragraphs.length - 1;
+    if(targetIndex > paragraphs.length) {
+      targetIndex = paragraphs.length;
     }
     if(sourceIndex == targetIndex) {
       return;

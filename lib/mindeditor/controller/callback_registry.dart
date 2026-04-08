@@ -59,8 +59,8 @@ class CallbackRegistry {
   static void refreshTextEditingValue() {
     _editFieldState?.refreshTextEditingValue();
   }
-  static void refreshDoc({String? activeBlockId, int position = 0}) {
-    _editFieldState?.refreshDoc(activeBlockId: activeBlockId, position: position);
+  static void refreshDoc({String? activeBlockId, int position = 0, String? flashBlockId}) {
+    _editFieldState?.refreshDoc(activeBlockId: activeBlockId, position: position, flashBlockId: flashBlockId);
   }
   static TextEditingValue? getLastEditingValue() {
     return _editFieldState?.getLastEditingValue();
