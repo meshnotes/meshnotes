@@ -59,13 +59,12 @@ class DragDropPlaceHolderStyle {
   static const Duration fadeDuration = Duration(milliseconds: 120);
 }
 
-class DragDropTargetFlashStyle {
-  // Border color of the post-drop flash highlight.
-  static const Color borderColor = Color(0xFFFFB74D);
-  // Background color of the post-drop flash highlight.
-  static const Color backgroundColor = Color(0xFFFFF3E0);
-  // Corner radius of the post-drop flash highlight.
-  static const double borderRadius = 6.0;
-  // Interval between flash frames after a successful move.
-  static const Duration flashInterval = Duration(milliseconds: 140);
+class DragDropTargetHighlightStyle {
+  // Time the highlight stays at full strength before fading (so the landing spot reads clearly).
+  static const Duration holdDuration = Duration(milliseconds: 200);
+  // Duration for fading drag-drop target highlight to normal style.
+  static const Duration fadeDuration = Duration(milliseconds: 500);
+  // Alpha for fill over content: strong enough to read as "feedback" tint but text stays legible.
+  static const double fillAlpha = 0.26;
+  static const Curve fadeCurve = Curves.easeOutCubic;
 }

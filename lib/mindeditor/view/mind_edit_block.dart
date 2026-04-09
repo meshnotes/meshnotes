@@ -18,7 +18,7 @@ class MindEditBlock extends StatefulWidget {
   final Controller controller;
   final bool readOnly;
   final bool ignoreLevel;
-  // The block id that should show the post-move flash.
+  // Block id for post-move highlight (same prop name as refreshDoc for API stability).
   final String? flashBlockId;
   
   MindEditBlock({
@@ -39,7 +39,7 @@ class MindEditBlock extends StatefulWidget {
 class MindEditBlockState extends State<MindEditBlock> {
   bool _mouseEntered = false;
   bool _isBlockDragging = false;
-  bool _showMoveFlash = false;
+  double _moveHighlightOpacity = 0.0;
   MindBlockImplRenderObject? _render;
   Widget? _leading;
   final LayerLink _layerLink = LayerLink();
@@ -49,7 +49,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   final GlobalKey _dragTargetKey = GlobalKey();
   _EditorDropPosition? _dropPosition;
   int? _dropLevel;
-  Timer? _moveFlashTimer;
+  Timer? _moveHighlightHoldTimer;
 
   static const double _dropLineHeight = DragDropStyle.lineHeight;
   static const double _dropLineSegmentWidth = DragDropStyle.editorLineSegmentWidth;
@@ -69,7 +69,7 @@ class MindEditBlockState extends State<MindEditBlock> {
   @override
   void initState() {
     super.initState();
-    _triggerMoveFlashIfNeeded();
+    _triggerMoveHighlightIfNeeded();
     if(!widget.readOnly) {
       MyLogger.debug('MindEditBlockState: initializing MindEditBlockState for block(id=${getBlockId()})');
       widget.controller.setBlockStateToTreeNode(getBlockId(), this);
@@ -80,13 +80,16 @@ class MindEditBlockState extends State<MindEditBlock> {
   void didUpdateWidget(covariant MindEditBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
     if(widget.flashBlockId != oldWidget.flashBlockId) {
-      _triggerMoveFlashIfNeeded();
+      if(oldWidget.flashBlockId == getBlockId() && widget.flashBlockId != getBlockId()) {
+        _moveHighlightHoldTimer?.cancel();
+      }
+      _triggerMoveHighlightIfNeeded();
     }
   }
 
   @override
   void dispose() {
-    _moveFlashTimer?.cancel();
+    _moveHighlightHoldTimer?.cancel();
     super.dispose();
   }
 
@@ -108,7 +111,7 @@ class MindEditBlockState extends State<MindEditBlock> {
     var extra = _buildExtra();
     var all = _buildAll(levelSpace, handler, blockImpl, extra);
     all = _buildDraggingDecoration(all);
-    all = _buildMoveFlashDecoration(all);
+    all = _buildMoveHighlightDecoration(all);
     Widget result = _buildDragTargetWrapper(all);
     if(_topSpace > 0 || _bottomSpace > 0) {
       result = Column(
@@ -362,15 +365,32 @@ class MindEditBlockState extends State<MindEditBlock> {
     );
   }
 
-  Widget _buildMoveFlashDecoration(Widget child) {
-    if(!_showMoveFlash) {
+  Widget _buildMoveHighlightDecoration(Widget child) {
+    if(widget.flashBlockId != getBlockId()) {
       return child;
     }
-    return DragDropDashedBorderBox(
-      color: DragDropTargetFlashStyle.borderColor,
-      backgroundColor: DragDropTargetFlashStyle.backgroundColor,
-      borderRadius: DragDropTargetFlashStyle.borderRadius,
-      child: child,
+    final fillColor = DragDropFeedbackStyle.backgroundColor.withOpacity(DragDropTargetHighlightStyle.fillAlpha);
+    return Stack(
+      children: [
+        child,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              duration: DragDropTargetHighlightStyle.fadeDuration,
+              curve: DragDropTargetHighlightStyle.fadeCurve,
+              opacity: _moveHighlightOpacity,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: fillColor,
+                  borderRadius: BorderRadius.circular(DragDropFeedbackStyle.borderRadius),
+                  border: Border.all(color: DragDropFeedbackStyle.borderColor, width: DragDropFeedbackStyle.borderWidth),
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -383,27 +403,22 @@ class MindEditBlockState extends State<MindEditBlock> {
     });
   }
 
-  void _triggerMoveFlashIfNeeded() {
+  void _triggerMoveHighlightIfNeeded() {
     if(widget.flashBlockId != getBlockId()) {
       return;
     }
-    _moveFlashTimer?.cancel();
-    const flashStates = [true, false, true, false];
-    int step = 0;
-    void applyState() {
+    _moveHighlightHoldTimer?.cancel();
+    setState(() {
+      _moveHighlightOpacity = 1.0;
+    });
+    _moveHighlightHoldTimer = Timer(DragDropTargetHighlightStyle.holdDuration, () {
       if(!mounted) {
         return;
       }
       setState(() {
-        _showMoveFlash = flashStates[step];
+        _moveHighlightOpacity = 0.0;
       });
-      step++;
-      if(step >= flashStates.length) {
-        return;
-      }
-      _moveFlashTimer = Timer(DragDropTargetFlashStyle.flashInterval, applyState);
-    }
-    applyState();
+    });
   }
 
   Widget _buildDesktopDraggableHandler(Widget handler) {

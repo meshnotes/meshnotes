@@ -40,7 +40,7 @@ class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
   State<StatefulWidget> createState() => DocumentNavigatorState();
 }
 
-class DocumentNavigatorState extends State<DocumentNavigator> {
+class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerProviderStateMixin {
   static const String watcherKey = 'doc_navigator';
   static const double indentWidth = 20.0;
   static const double dropLineHeight = DragDropStyle.lineHeight;
@@ -64,7 +64,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   int? _dragTargetIndex; // The index of the document title being dragged to
   _DropPosition? _dropPosition;
   String? _flashDocId;
-  bool _showDocMoveFlash = false;
+  late final AnimationController _docHighlightFadeController;
 
   // Collapse/expand state
   final Set<String> _collapsedDocIds = {};
@@ -72,7 +72,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
   // Auto-scroll state
   final ScrollController _scrollController = ScrollController();
   Timer? _autoScrollTimer;
-  Timer? _docMoveFlashTimer;
+  Timer? _docMoveHighlightHoldTimer;
   final GlobalKey _listViewKey = GlobalKey();
   double _currentScrollDelta = 0.0;
 
@@ -88,6 +88,10 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     _networkStatus = _convertStatus(_netStatus);
     controller.eventTasksManager.addSyncingTask(_updateSyncing);
     controller.eventTasksManager.addUserInfoChangedTask(_onUserInfoChanged);
+    _docHighlightFadeController = AnimationController(
+      vsync: this,
+      duration: DragDropTargetHighlightStyle.fadeDuration,
+    );
   }
 
   @override
@@ -100,7 +104,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     controller.eventTasksManager.removeUserInfoChangedTask(_onUserInfoChanged);
     _scrollController.dispose();
     _autoScrollTimer?.cancel();
-    _docMoveFlashTimer?.cancel();
+    _docMoveHighlightHoldTimer?.cancel();
+    _docHighlightFadeController.dispose();
   }
 
   @override
@@ -134,7 +139,10 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         itemCount: docList.length + 1, // +1 for the end drop zone
         itemBuilder: (BuildContext context, int index) {
           if (index < docList.length) {
-            return _buildDraggableDocItem(context, index);
+            return KeyedSubtree(
+              key: ValueKey(docList[index].docId),
+              child: _buildDraggableDocItem(context, index),
+            );
           } else {
             // End drop zone
             return _buildEndDropZone(context);
@@ -622,6 +630,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         }
       },
     );
+    // Draw the old position of the dragged item
     if(_draggingIndex == index) {
       tile = DragDropDashedBorderBox(
         color: DragDropPlaceHolderStyle.borderColor,
@@ -634,12 +643,27 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         ),
       );
     }
-    if(_flashDocId == docNode.docId && _showDocMoveFlash) {
-      tile = DragDropDashedBorderBox(
-        color: DragDropTargetFlashStyle.borderColor,
-        backgroundColor: DragDropTargetFlashStyle.backgroundColor,
-        borderRadius: DragDropTargetFlashStyle.borderRadius,
-        child: tile,
+    if(_flashDocId == docNode.docId) {
+      final fillColor = DragDropFeedbackStyle.backgroundColor.withOpacity(DragDropTargetHighlightStyle.fillAlpha);
+      tile = Stack(
+        children: [
+          tile,
+          Positioned.fill(
+              child: IgnorePointer(
+              child: FadeTransition(
+                opacity: _docHighlightFadeController,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: fillColor,
+                    borderRadius: BorderRadius.circular(DragDropFeedbackStyle.borderRadius),
+                    border: Border.all(color: DragDropFeedbackStyle.borderColor, width: DragDropFeedbackStyle.borderWidth),
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
     return tile;
@@ -753,12 +777,12 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
         draggedDoc.orderId < newOrderId) {
       newOrderId--;
     }
-    final shouldFlashMoveTarget = draggedDoc.parentDocId != newParentDocId || draggedDoc.orderId != newOrderId;
+    final shouldHighlight = draggedDoc.parentDocId != newParentDocId || draggedDoc.orderId != newOrderId;
 
     // Perform the move operation
     controller.docManager.moveDocument(draggedDoc.docId, newParentDocId, newOrderId);
-    if(shouldFlashMoveTarget) {
-      _triggerDocMoveFlash(draggedDoc.docId);
+    if(shouldHighlight) {
+      _triggerDocMoveHighlight(draggedDoc.docId);
     }
 
     setState(() {
@@ -800,7 +824,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     // Perform the move operation
     controller.docManager.moveDocument(draggedDoc.docId, newParentDocId, newOrderId);
     if(shouldFlashMoveTarget) {
-      _triggerDocMoveFlash(draggedDoc.docId);
+      _triggerDocMoveHighlight(draggedDoc.docId);
     }
 
     setState(() {
@@ -966,25 +990,27 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
     });
   }
 
-  void _triggerDocMoveFlash(String docId) {
-    _docMoveFlashTimer?.cancel();
+  void _triggerDocMoveHighlight(String docId) {
+    _docMoveHighlightHoldTimer?.cancel();
+    _docHighlightFadeController.stop();
     _flashDocId = docId;
-    const flashStates = [true, false, true, false];
-    int step = 0;
-    void applyState() {
+    _docHighlightFadeController.value = 1.0;
+    setState(() {});
+    _docMoveHighlightHoldTimer = Timer(DragDropTargetHighlightStyle.holdDuration, () {
       if(!mounted) {
         return;
       }
-      setState(() {
-        _showDocMoveFlash = flashStates[step];
+      _docHighlightFadeController.duration = DragDropTargetHighlightStyle.fadeDuration;
+      _docHighlightFadeController.animateTo(0.0, curve: DragDropTargetHighlightStyle.fadeCurve).whenComplete(() {
+        if(!mounted) {
+          return;
+        }
+        setState(() {
+          _flashDocId = null;
+        });
+        _docHighlightFadeController.value = 1.0;
       });
-      step++;
-      if(step >= flashStates.length) {
-        return;
-      }
-      _docMoveFlashTimer = Timer(DragDropTargetFlashStyle.flashInterval, applyState);
-    }
-    applyState();
+    });
   }
 
   /// Handle auto-scroll when dragging near edges

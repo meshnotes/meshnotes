@@ -107,7 +107,7 @@ ListView.builder(
 - Depth limit: document nesting is capped at 4 levels (`Constants.maxDocumentDepth`); drag-and-drop and create-child actions are blocked once the limit is reached (toast shown)
 - While dragging, the source document title stays visible in place with a light gray background, dashed outline, and faded content so the moved item is easy to identify
 - The floating drag preview that follows the pointer now uses shared tokens from `lib/ui/app_style.dart`, so navigator and editor drag cards stay visually aligned
-- After a successful move, the destination title briefly flashes with a highlighted background and dashed border so the new location is easy to spot
+- After a successful move, the destination title gets a semi-transparent `DragDropFeedbackStyle` tint and border (text stays readable), then fades out. Because `moveDocument` synchronously fires `triggerDocumentChangedEvent()` and the list reorders by index, per-row implicit animations were easy to lose; the fade is driven by an `AnimationController` on `DocumentNavigatorState` plus `FadeTransition`, and each row is wrapped in `KeyedSubtree(ValueKey(docId))` so reordering matches rows by document id
 
 ```dart
 Widget _buildDraggableDocItem(BuildContext context, int index) {
