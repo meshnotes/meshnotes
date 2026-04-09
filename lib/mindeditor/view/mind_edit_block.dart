@@ -458,20 +458,23 @@ class MindEditBlockState extends State<MindEditBlock> {
 
   Widget _buildDragFeedback() {
     return Material(
-      elevation: 6.0,
+      elevation: DragDropFeedbackStyle.elevation,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 320),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        constraints: const BoxConstraints(maxWidth: DragDropFeedbackStyle.blockMaxWidth),
+        padding: DragDropFeedbackStyle.blockPadding,
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: Colors.blue, width: 1),
+          color: DragDropFeedbackStyle.backgroundColor,
+          borderRadius: BorderRadius.circular(DragDropFeedbackStyle.borderRadius),
+          border: Border.all(color: DragDropFeedbackStyle.borderColor, width: DragDropFeedbackStyle.borderWidth),
         ),
         child: Text(
           widget.texts.getPlainText(),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 14),
+          style: const TextStyle(
+            fontSize: DragDropFeedbackStyle.blockFontSize,
+            color: DragDropFeedbackStyle.textColor,
+          ),
         ),
       ),
     );

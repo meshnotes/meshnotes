@@ -15,6 +15,37 @@ class DragDropStyle {
   static const Offset editorFeedbackOffset = Offset(0, -36);
 }
 
+class DragDropFeedbackStyle {
+  // Shared shadow for the floating drag preview shown under the pointer.
+  static const double elevation = 6.0;
+  // Shared background color for drag feedback cards in navigator and editor.
+  static const Color backgroundColor = Color(0xFFE3F2FD);
+  // Shared border color for drag feedback cards.
+  static const Color borderColor = Colors.blue;
+  // Shared border width for drag feedback cards.
+  static const double borderWidth = 1.0;
+  // Shared corner radius for drag feedback cards.
+  static const double borderRadius = 4.0;
+  // Width of the navigator drag preview card.
+  static const double navigatorWidth = 300.0;
+  // Max width of the editor block drag preview card.
+  static const double blockMaxWidth = 320.0;
+  // Padding inside the navigator drag preview card.
+  static const EdgeInsets navigatorPadding = EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0);
+  // Padding inside the editor block drag preview card.
+  static const EdgeInsets blockPadding = EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0);
+  // Icon size used by the navigator drag preview.
+  static const double navigatorIconSize = 18.0;
+  // Icon color used by the navigator drag preview.
+  static const Color navigatorIconColor = Color(0xFF757575);
+  // Text color used by drag preview labels.
+  static const Color textColor = Colors.black87;
+  // Font size of the navigator drag preview title.
+  static const double navigatorFontSize = 15.0;
+  // Font size of the editor block drag preview title.
+  static const double blockFontSize = 14.0;
+}
+
 class DragDropPlaceHolderStyle {
   // Border color of the in-place dragged source item.
   static const Color borderColor = Color(0xFFBDBDBD);

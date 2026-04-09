@@ -416,28 +416,31 @@ class DocumentNavigatorState extends State<DocumentNavigator> {
                 // Offset the feedback downward so it doesn't block the drop indicator
                 feedbackOffset: DragDropStyle.navigatorFeedbackOffset,
                 feedback: Material(
-                  elevation: 6.0,
+                  elevation: DragDropFeedbackStyle.elevation,
                   child: Container(
-                    width: 300,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    width: DragDropFeedbackStyle.navigatorWidth,
+                    padding: DragDropFeedbackStyle.navigatorPadding,
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(4.0),
-                      border: Border.all(color: Colors.blue, width: 1.0),
+                      color: DragDropFeedbackStyle.backgroundColor,
+                      borderRadius: BorderRadius.circular(DragDropFeedbackStyle.borderRadius),
+                      border: Border.all(color: DragDropFeedbackStyle.borderColor, width: DragDropFeedbackStyle.borderWidth),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.description_outlined,
-                          size: 18.0,
-                          color: Colors.grey[600],
+                          size: DragDropFeedbackStyle.navigatorIconSize,
+                          color: DragDropFeedbackStyle.navigatorIconColor,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             docNode.title,
-                            style: const TextStyle(fontSize: 15.0, color: Colors.black87),
+                            style: const TextStyle(
+                              fontSize: DragDropFeedbackStyle.navigatorFontSize,
+                              color: DragDropFeedbackStyle.textColor,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
