@@ -82,6 +82,11 @@ Two-pane layout for desktop:
 
 **Key components**:
 
+#### Main overflow menu (`MainMenu`)
+**Location**: [lib/page/menu.dart](../lib/page/menu.dart)
+- App bar “hamburger” actions (sync, version map, delete in editor, optional debug entries) use `IconButton` + `showMenu` instead of `PopupMenuButton`.
+- On iOS (including iPad), opening waits **200 ms** before calling `showMenu` so a follow-up synthetic touch from the system (known on **iPadOS 26+**, [flutter/flutter#177992](https://github.com/flutter/flutter/issues/177992)) does not immediately hit the menu barrier and dismiss the overlay.
+
 #### Document list
 ```dart
 ListView.builder(
