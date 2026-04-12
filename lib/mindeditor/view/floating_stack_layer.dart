@@ -35,6 +35,11 @@ class FloatingStackViewState extends State<FloatingStackView> {
       views.add(_w);
     });
   }
+  void addLayerToBottom(Widget _w) {
+    setState(() {
+      views.insert(0, _w);
+    });
+  }
   void clearLayer() {
     setState(() {
       views.clear();

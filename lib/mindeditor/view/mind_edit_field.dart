@@ -14,6 +14,7 @@ import 'package:my_log/my_log.dart';
 import '../document/paragraph_desc.dart';
 import 'view_helper.dart' as helper;
 
+const double _editFieldHorizontalPadding = 10.0;
 class MindEditField extends StatefulWidget {
   final Controller controller;
   final bool isReadOnly;
@@ -47,6 +48,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   double _currentScrollPixel = 0.0;
   late FloatingViewManager _floatingViewManager;
   final controller = Controller();
+  String? _flashBlockId;
 
   bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _hasConnection => _textInputConnection != null && _textInputConnection!.attached;
@@ -96,13 +98,8 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
 
   GestureDetector _buildEditingLayer(BuildContext context) {
     bool isMobile = controller.environment.isMobile();
-    // Mobile has no scroll bar, so need padding to make it looks more comfortable
-    final padding = isMobile? const EdgeInsets.fromLTRB(10.0, 0.0, 1.0, 0.0): const EdgeInsets.fromLTRB(10.0, 0.0, 0.0, 0.0);
     Widget listView = _buildBlockList();
-    Widget container = Container(
-      padding: padding,
-      child: listView,
-    );
+    Widget container = listView;
     if(controller.isDebugMode) {
       container = Container(
         decoration: BoxDecoration(
@@ -322,6 +319,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
   }
 
   Widget _buildBlockList() {
+    // // Mobile has no scroll bar, so need padding to make it looks more comfortable
     final blockCount = widget.document.paragraphs.length;
     // If more than 1000 blocks, use sliver ListView, otherwise use column
     if(blockCount > 1000) {
@@ -333,6 +331,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     var builder = ListView.builder(
       controller: _scrollController,
       itemCount: widget.document.paragraphs.length + 1,
+      padding: const EdgeInsets.fromLTRB(_editFieldHorizontalPadding, 0.0, _editFieldHorizontalPadding, 0.0),
       itemBuilder: (context, index) {
         if(index < widget.document.paragraphs.length) {
           return _constructBlock(widget.document.paragraphs[index]);
@@ -354,6 +353,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       ],
     );
     final scrollView = SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(_editFieldHorizontalPadding, 0.0, _editFieldHorizontalPadding, 0.0),
       controller: _scrollController,
       child: column,
     );
@@ -394,6 +394,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       controller: widget.controller,
       key: ValueKey(paragraph.getBlockId()),
       readOnly: readOnly,
+      flashBlockId: _flashBlockId,
     );
     return blockView;
   }
@@ -580,9 +581,10 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
     widget.document.clearTextSelection();
     _resetActiveBlockIndexes();
   }
-  void refreshDoc({String? activeBlockId, int position = 0}) {
+  void refreshDoc({String? activeBlockId, int position = 0, String? flashBlockId}) {
     setState(() {
       initDocAndControlBlock();
+      _flashBlockId = flashBlockId;
       if(activeBlockId != null) { // If activeId is not null, make the cursor appear on the block with activeId
         widget.controller.selectionController.collapseInBlock(activeBlockId, position, true);
       }
@@ -797,7 +799,7 @@ class MindEditFieldState extends State<MindEditField> implements TextInputClient
       final viewPortBottom = _scrollController.position.viewportDimension;
 
       if(_isOverlap(widgetTop, widgetBottom, viewPortTop, viewPortBottom)) {
-        MyLogger.debug('block[${paragraph.getBlockIndex()}] is in the view');
+        // MyLogger.debug('block[${paragraph.getBlockIndex()}] is in the view');
         if(minIndex == -1) {
           maxIndex = minIndex = idx;
         } else {

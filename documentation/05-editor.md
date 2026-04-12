@@ -964,15 +964,29 @@ class ParagraphDesc {
 
 On mobile, dragging selection/cursor handles now uses a loupe-style magnifier rendered in the same floating selection layer as the handles.
 
-- Trigger: in handle `onPanDown` and `onPanStart`, `SelectionHandleLayer` creates/updates `_DragMagnifier` immediately from the raw finger global position so it appears before drag updates.
+- Trigger: in handle `onPanDown` / `onPanStart`, `SelectionHandleLayer` reuses a single `_DragMagnifier` instance so the first drag frame does not leave an orphaned lens widget in the floating layer.
 - Follow drag: in `onPanUpdate`, selection is updated by `SelectionController.updateSelectionByOffset(...)`, and the magnifier position is updated in the same event.
 - Hide: in `onPanEnd` / `onPanCancel` and non-drag `onTapUp` / `onTapCancel`, the magnifier is removed without clearing existing handles.
 
 Implementation detail:
 - `FloatingViewManager.removeSelectionLayerWidget(...)` was added so the magnifier can be removed independently from selection handles.
-- `_DragMagnifier` uses a smaller finger gap and raises the focal point slightly so the lens sits lower while keeping the sampled center higher.
-- `_DragMagnifier` still clamps horizontal bounds, but allows negative `top` so the lens can extend above the document window top when selecting the first visible row.
-- `FloatingStackView` now supports configurable `clipBehavior`; the selection floating layer uses `Clip.none` so magnifier overflow above the top edge remains visible.
+- The magnifier is inserted at the bottom of the selection floating stack, so selection handles remain visually above it and are not sampled into the magnified content.
+- `_DragMagnifier` uses `RawMagnifier` with a dynamic `focalPointOffset`, so the lens stays above the finger while shifting its sampling point near screen edges to keep left/right text content visible.
+- During dragging, handle dots are hidden completely and restored after the drag ends, avoiding duplicate dots both inside and outside the magnifier.
+
+## Block Dragging Feedback
+
+**Location**: [lib/mindeditor/view/mind_edit_block.dart](../lib/mindeditor/view/mind_edit_block.dart)
+
+Block drag now marks the source block inside the editor with a placeholder-like appearance while the drag is active.
+
+- Why: when desktop dragging starts from the block handler, the original block previously looked unchanged, making it hard to tell which block was being moved.
+- Implementation: `MindEditBlockState` tracks `_isBlockDragging` from both `Draggable` and `LongPressDraggable` lifecycle callbacks.
+- Rendering: the block row is wrapped with a light gray background, a dashed outline, and reduced opacity only during the active drag, so the source block remains in layout but is visually de-emphasized.
+- The floating drag preview style is centralized in `lib/ui/app_style.dart`, matching the navigator drag card instead of duplicating colors, border, and sizing in the widget.
+- Result: the floating drag preview still shows the moving content, and the in-editor source block clearly reads as "currently being dragged".
+- After a successful move, the block gets a semi-transparent `DragDropFeedbackStyle` tint and border so content stays readable, then fades out with `AnimatedOpacity` (overlay remains in the tree until the fade finishes).
+- Dropping below the last block now correctly inserts at the true end of the document instead of stopping one position early.
 
 ## Known Issues
 

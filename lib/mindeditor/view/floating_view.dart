@@ -46,6 +46,9 @@ class FloatingViewManager {
   void addCursorHandle(Widget handle) {
     _selectionKey.currentState?.addLayer(handle);
   }
+  void addSelectionLayerWidgetToBottom(Widget widget) {
+    _selectionKey.currentState?.addLayerToBottom(widget);
+  }
   void addSelectionHandles(Widget handle1, Widget handle2) {
     _selectionKey.currentState?.addLayers(handle1, handle2);
   }

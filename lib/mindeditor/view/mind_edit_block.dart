@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/ui/app_style.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:my_log/my_log.dart';
@@ -7,6 +10,7 @@ import '../../util/util.dart';
 import '../document/paragraph_desc.dart';
 import '../document/text_desc.dart';
 import '../setting/constants.dart';
+import 'drag_drop_dashed_border_box.dart';
 import 'mind_edit_block_impl.dart';
 
 class MindEditBlock extends StatefulWidget {
@@ -14,6 +18,8 @@ class MindEditBlock extends StatefulWidget {
   final Controller controller;
   final bool readOnly;
   final bool ignoreLevel;
+  // Block id for post-move highlight (same prop name as refreshDoc for API stability).
+  final String? flashBlockId;
   
   MindEditBlock({
     Key? key,
@@ -21,6 +27,7 @@ class MindEditBlock extends StatefulWidget {
     required this.controller,
     this.readOnly = false,
     this.ignoreLevel = false,
+    this.flashBlockId,
   }): super(key: key) {
     MyLogger.debug('MindEditBlock: create new block(id=${texts.getBlockId()})');
   }
@@ -31,12 +38,22 @@ class MindEditBlock extends StatefulWidget {
 
 class MindEditBlockState extends State<MindEditBlock> {
   bool _mouseEntered = false;
+  bool _isBlockDragging = false;
+  double _moveHighlightOpacity = 0.0;
   MindBlockImplRenderObject? _render;
   Widget? _leading;
   final LayerLink _layerLink = LayerLink();
   final controller = Controller();
   double _topSpace = 0;
   double _bottomSpace = 0;
+  final GlobalKey _dragTargetKey = GlobalKey();
+  _EditorDropPosition? _dropPosition;
+  int? _dropLevel;
+  Timer? _moveHighlightHoldTimer;
+
+  static const double _dropLineHeight = DragDropStyle.lineHeight;
+  static const double _dropLineSegmentWidth = DragDropStyle.editorLineSegmentWidth;
+  static const Color _dropLineColor = DragDropStyle.lineColor;
 
   void setRender(MindBlockImplRenderObject r) {
     _render = r;
@@ -52,10 +69,28 @@ class MindEditBlockState extends State<MindEditBlock> {
   @override
   void initState() {
     super.initState();
+    _triggerMoveHighlightIfNeeded();
     if(!widget.readOnly) {
       MyLogger.debug('MindEditBlockState: initializing MindEditBlockState for block(id=${getBlockId()})');
       widget.controller.setBlockStateToTreeNode(getBlockId(), this);
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant MindEditBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if(widget.flashBlockId != oldWidget.flashBlockId) {
+      if(oldWidget.flashBlockId == getBlockId() && widget.flashBlockId != getBlockId()) {
+        _moveHighlightHoldTimer?.cancel();
+      }
+      _triggerMoveHighlightIfNeeded();
+    }
+  }
+
+  @override
+  void dispose() {
+    _moveHighlightHoldTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -75,12 +110,14 @@ class MindEditBlockState extends State<MindEditBlock> {
     var handler = _buildHandler();
     var extra = _buildExtra();
     var all = _buildAll(levelSpace, handler, blockImpl, extra);
-    Widget result = all;
+    all = _buildDraggingDecoration(all);
+    all = _buildMoveHighlightDecoration(all);
+    Widget result = _buildDragTargetWrapper(all);
     if(_topSpace > 0 || _bottomSpace > 0) {
       result = Column(
         children: [
           SizedBox(height: _topSpace,),
-          all,
+          result,
           SizedBox(height: _bottomSpace,),
         ],
       );
@@ -251,12 +288,13 @@ class MindEditBlockState extends State<MindEditBlock> {
         link: _layerLink,
         child: child,
       );
+      return SizedBox(
+        width: widget.controller.setting.blockExtraTipsSize,
+        height: widget.controller.setting.blockHandlerSize,
+        child: child,
+      );
     }
-    return SizedBox(
-      width: widget.controller.setting.blockExtraTipsSize,
-      height: widget.controller.setting.blockHandlerSize,
-      child: child,
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildAll(Widget? levelSpace, Widget? handler, Widget block, Widget extraWidget) {
@@ -265,7 +303,11 @@ class MindEditBlockState extends State<MindEditBlock> {
       items.insert(0, _leading!);
     }
     if(handler != null) {
-      items.insert(0, handler);
+      Widget dragHandler = handler;
+      if(_canDragCurrentBlock()) {
+        dragHandler = _buildDesktopDraggableHandler(handler);
+      }
+      items.insert(0, dragHandler);
       if(levelSpace != null) {
         items.insert(0, levelSpace);
       }
@@ -292,10 +334,405 @@ class MindEditBlockState extends State<MindEditBlock> {
     if(levelSpace != null) {
       items.insert(0, levelSpace);
     }
-    return Row(
+    Widget row = Row(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: items,
+    );
+    if(_canDragCurrentBlock() && !controller.environment.isDesktop()) {
+      row = _buildMobileDraggableBlock(row);
+    }
+    return row;
+  }
+
+  bool _canDragCurrentBlock() {
+    return !widget.readOnly && !widget.texts.isTitle();
+  }
+
+  Widget _buildDraggingDecoration(Widget child) {
+    if(!_isBlockDragging) {
+      return child;
+    }
+    return DragDropDashedBorderBox(
+      color: DragDropPlaceHolderStyle.borderColor,
+      backgroundColor: DragDropPlaceHolderStyle.backgroundColor,
+      borderRadius: DragDropPlaceHolderStyle.borderRadius,
+      child: AnimatedOpacity(
+        duration: DragDropPlaceHolderStyle.fadeDuration,
+        opacity: DragDropPlaceHolderStyle.contentOpacity,
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildMoveHighlightDecoration(Widget child) {
+    if(widget.flashBlockId != getBlockId()) {
+      return child;
+    }
+    final fillColor = DragDropFeedbackStyle.backgroundColor.withOpacity(DragDropTargetHighlightStyle.fillAlpha);
+    return Stack(
+      children: [
+        child,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              duration: DragDropTargetHighlightStyle.fadeDuration,
+              curve: DragDropTargetHighlightStyle.fadeCurve,
+              opacity: _moveHighlightOpacity,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: fillColor,
+                  borderRadius: BorderRadius.circular(DragDropFeedbackStyle.borderRadius),
+                  border: Border.all(color: DragDropFeedbackStyle.borderColor, width: DragDropFeedbackStyle.borderWidth),
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _setBlockDragging(bool value) {
+    if(_isBlockDragging == value || !mounted) {
+      return;
+    }
+    setState(() {
+      _isBlockDragging = value;
+    });
+  }
+
+  void _triggerMoveHighlightIfNeeded() {
+    if(widget.flashBlockId != getBlockId()) {
+      return;
+    }
+    _moveHighlightHoldTimer?.cancel();
+    setState(() {
+      _moveHighlightOpacity = 1.0;
+    });
+    _moveHighlightHoldTimer = Timer(DragDropTargetHighlightStyle.holdDuration, () {
+      if(!mounted) {
+        return;
+      }
+      setState(() {
+        _moveHighlightOpacity = 0.0;
+      });
+    });
+  }
+
+  Widget _buildDesktopDraggableHandler(Widget handler) {
+    return Draggable<_BlockDragData>(
+      data: _BlockDragData(blockId: getBlockId()),
+      feedback: _buildDragFeedback(),
+      feedbackOffset: DragDropStyle.editorFeedbackOffset,
+      onDragStarted: () {
+        _setBlockDragging(true);
+      },
+      onDragEnd: (_) {
+        _setBlockDragging(false);
+      },
+      onDragCompleted: () {
+        _setBlockDragging(false);
+      },
+      onDraggableCanceled: (_, __) {
+        _setBlockDragging(false);
+      },
+      childWhenDragging: Opacity(
+        opacity: 0.3,
+        child: handler,
+      ),
+      child: handler,
+    );
+  }
+
+  Widget _buildMobileDraggableBlock(Widget child) {
+    return LongPressDraggable<_BlockDragData>(
+      data: _BlockDragData(blockId: getBlockId()),
+      feedback: _buildDragFeedback(),
+      feedbackOffset: DragDropStyle.editorFeedbackOffset,
+      onDragStarted: () {
+        _setBlockDragging(true);
+      },
+      onDragEnd: (_) {
+        _setBlockDragging(false);
+      },
+      onDragCompleted: () {
+        _setBlockDragging(false);
+      },
+      onDraggableCanceled: (_, __) {
+        _setBlockDragging(false);
+      },
+      childWhenDragging: Opacity(
+        opacity: 0.35,
+        child: child,
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildDragFeedback() {
+    return Material(
+      elevation: DragDropFeedbackStyle.elevation,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: DragDropFeedbackStyle.blockMaxWidth),
+        padding: DragDropFeedbackStyle.blockPadding,
+        decoration: BoxDecoration(
+          color: DragDropFeedbackStyle.backgroundColor,
+          borderRadius: BorderRadius.circular(DragDropFeedbackStyle.borderRadius),
+          border: Border.all(color: DragDropFeedbackStyle.borderColor, width: DragDropFeedbackStyle.borderWidth),
+        ),
+        child: Text(
+          widget.texts.getPlainText(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: DragDropFeedbackStyle.blockFontSize,
+            color: DragDropFeedbackStyle.textColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDragTargetWrapper(Widget child) {
+    if(widget.readOnly) {
+      return child;
+    }
+    return DragTarget<_BlockDragData>(
+      onWillAcceptWithDetails: (details) {
+        return details.data.blockId != getBlockId();
+      },
+      onMove: (details) {
+        _updateDropPosition(details.offset);
+      },
+      onAcceptWithDetails: (details) {
+        _handleDrop(details.data.blockId);
+      },
+      onLeave: (_) {
+        if(_dropPosition != null) {
+          setState(() {
+            _dropPosition = null;
+            _dropLevel = null;
+          });
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHovering = candidateData.isNotEmpty;
+        final level = _getDropIndicatorLevel(widget.texts.getBlockLevel());
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if(isHovering && _dropPosition == _EditorDropPosition.above)
+              _buildDropLine(level),
+            Container(
+              key: _dragTargetKey,
+              child: child,
+            ),
+            if(isHovering && _dropPosition == _EditorDropPosition.below)
+              _buildDropLine(level),
+            if(isHovering && _dropPosition == _EditorDropPosition.asChild)
+              _buildDropLine(level),
+          ],
+        );
+      },
+    );
+  }
+
+  void _updateDropPosition(Offset globalOffset) {
+    final renderBox = _dragTargetKey.currentContext?.findRenderObject() as RenderBox?;
+    if(renderBox == null) {
+      return;
+    }
+    final local = renderBox.globalToLocal(globalOffset);
+    final h = renderBox.size.height;
+    final currentLevel = widget.texts.getBlockLevel();
+    final maxLevel = widget.controller.setting.blockMaxLevel;
+    final calculatedLevel = (local.dx / Constants.tabWidth).floor().clamp(0, maxLevel);
+
+    _EditorDropPosition nextPos;
+    if(widget.texts.isTitle()) {
+      nextPos = _EditorDropPosition.below;
+    } else {
+      final relativeY = local.dy - 10.0;
+      if(relativeY < h * 0.33) {
+        nextPos = _EditorDropPosition.above;
+      } else if(relativeY > h * 0.67) {
+        nextPos = calculatedLevel > currentLevel ? _EditorDropPosition.asChild : _EditorDropPosition.below;
+      } else {
+        nextPos = calculatedLevel > currentLevel ? _EditorDropPosition.asChild : _EditorDropPosition.above;
+      }
+    }
+    if(nextPos != _dropPosition || calculatedLevel != _dropLevel) {
+      setState(() {
+        _dropPosition = nextPos;
+        _dropLevel = calculatedLevel;
+      });
+    }
+  }
+
+  int _resolveDropLevel(ParagraphDesc targetPara, _EditorDropPosition dropPos) {
+    final maxLevel = widget.controller.setting.blockMaxLevel;
+    final targetLevel = targetPara.getBlockLevel();
+    final rawLevel = _dropLevel ?? targetLevel;
+    switch(dropPos) {
+      case _EditorDropPosition.above:
+      case _EditorDropPosition.below:
+        return rawLevel.clamp(0, targetLevel);
+      case _EditorDropPosition.asChild:
+        return (targetLevel + 1).clamp(0, maxLevel);
+    }
+  }
+
+  int _findAncestorOrSelfIndexAtLevel(int startIndex, int targetLevel) {
+    final paragraphs = widget.texts.parent.paragraphs;
+    for(int i = startIndex; i >= 1; i--) {
+      if(paragraphs[i].getBlockLevel() == targetLevel) {
+        return i;
+      }
+    }
+    return 1;
+  }
+
+  int _findSubtreeEndExclusive(int rootIndex) {
+    final paragraphs = widget.texts.parent.paragraphs;
+    final rootLevel = paragraphs[rootIndex].getBlockLevel();
+    for(int i = rootIndex + 1; i < paragraphs.length; i++) {
+      if(paragraphs[i].getBlockLevel() <= rootLevel) {
+        return i;
+      }
+    }
+    return paragraphs.length;
+  }
+
+  int _resolveInsertIndexForDrop(int targetIndex, ParagraphDesc targetPara, _EditorDropPosition dropPos, int newLevel) {
+    if(targetPara.isTitle()) {
+      return 1;
+    }
+    final targetLevel = targetPara.getBlockLevel();
+    switch(dropPos) {
+      case _EditorDropPosition.above:
+        if(newLevel >= targetLevel) {
+          return targetIndex;
+        }
+        return _findAncestorOrSelfIndexAtLevel(targetIndex, newLevel);
+      case _EditorDropPosition.below:
+        if(newLevel > targetLevel) {
+          return targetIndex + 1;
+        }
+        final anchorIndex = _findAncestorOrSelfIndexAtLevel(targetIndex, newLevel);
+        return _findSubtreeEndExclusive(anchorIndex);
+      case _EditorDropPosition.asChild:
+        return targetIndex + 1;
+    }
+  }
+
+  int _getDropIndicatorLevel(int currentLevel) {
+    final dropPos = _dropPosition;
+    if(dropPos == null) {
+      return currentLevel;
+    }
+    final rawLevel = _dropLevel ?? currentLevel;
+    switch(dropPos) {
+      case _EditorDropPosition.above:
+      case _EditorDropPosition.below:
+        return rawLevel.clamp(0, currentLevel);
+      case _EditorDropPosition.asChild:
+        return (currentLevel + 1).clamp(0, widget.controller.setting.blockMaxLevel);
+    }
+  }
+
+  void _handleDrop(String draggedBlockId) {
+    void clearDropState() {
+      if(_dropPosition != null && mounted) {
+        setState(() {
+          _dropPosition = null;
+          _dropLevel = null;
+        });
+      }
+    }
+
+    final doc = widget.controller.document;
+    if(doc == null) {
+      clearDropState();
+      return;
+    }
+    final draggedIndex = _findBlockIndex(draggedBlockId);
+    final targetIndex = _findBlockIndex(getBlockId());
+    if(draggedIndex <= 0 || targetIndex < 0) {
+      clearDropState();
+      return;
+    }
+    final draggedPara = doc.getParagraph(draggedBlockId);
+    final oldLevel = draggedPara?.getBlockLevel() ?? 0;
+
+    final targetPara = widget.texts;
+    final dropPos = _dropPosition ?? _EditorDropPosition.below;
+    final newLevel = targetPara.isTitle()? 0: _resolveDropLevel(targetPara, dropPos);
+    final insertIndex = _resolveInsertIndexForDrop(targetIndex, targetPara, dropPos, newLevel);
+    var finalIndex = insertIndex;
+    if(finalIndex < 1) {
+      finalIndex = 1;
+    }
+    if(finalIndex > doc.paragraphs.length) {
+      finalIndex = doc.paragraphs.length;
+    }
+    if(draggedIndex < finalIndex) {
+      finalIndex--;
+    }
+    final shouldFlashMoveTarget = finalIndex != draggedIndex || newLevel != oldLevel;
+
+    doc.moveParagraphToIndex(draggedBlockId, insertIndex);
+    final movedPara = doc.getParagraph(draggedBlockId);
+    if(movedPara != null && !movedPara.isTitle()) {
+      movedPara.setBlockLevel(newLevel);
+    }
+    controller.selectionController.hideSelectionHandles();
+    CallbackRegistry.rudelyCloseIME();
+    CallbackRegistry.refreshDoc(
+      activeBlockId: draggedBlockId,
+      position: 0,
+      flashBlockId: shouldFlashMoveTarget? draggedBlockId: null,
+    );
+    _triggerBlockModified();
+
+    clearDropState();
+  }
+
+  Widget _buildDropLine(int level) {
+    final segmentCount = level;
+    const gap = Constants.tabWidth - _dropLineSegmentWidth;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      height: _dropLineHeight,
+      child: Row(
+        children: [
+          ...List.generate(segmentCount, (_) {
+            return Row(
+              children: [
+                Container(
+                  width: _dropLineSegmentWidth,
+                  height: _dropLineHeight,
+                  decoration: BoxDecoration(
+                    color: _dropLineColor,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                ),
+                const SizedBox(width: gap),
+              ],
+            );
+          }),
+          Expanded(
+            child: Container(
+              height: _dropLineHeight,
+              decoration: BoxDecoration(
+                color: _dropLineColor,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -885,6 +1322,19 @@ class MindEditBlockState extends State<MindEditBlock> {
   }
 }
 
+class _BlockDragData {
+  final String blockId;
+  const _BlockDragData({
+    required this.blockId,
+  });
+}
+
+enum _EditorDropPosition {
+  above,
+  below,
+  asChild,
+}
+
 class BlockHandler extends StatefulWidget {
   final bool show;
   final Controller controller;
@@ -898,6 +1348,7 @@ class BlockHandler extends StatefulWidget {
   @override
   _BlockHandlerState createState() => _BlockHandlerState();
 }
+
 
 class _BlockHandlerState extends State<BlockHandler> {
   Color backgroundColor = Colors.transparent;

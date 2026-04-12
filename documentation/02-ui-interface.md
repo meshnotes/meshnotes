@@ -78,8 +78,14 @@ Two-pane layout for desktop:
 - Drag-and-drop reorder and move documents
 - Show network status and peer count
 - User info popup menu
+- Persist per-node collapse state locally across app restarts
 
 **Key components**:
+
+#### Main overflow menu (`MainMenu`)
+**Location**: [lib/page/menu.dart](../lib/page/menu.dart)
+- App bar “hamburger” actions (sync, version map, delete in editor, optional debug entries) use `IconButton` + `showMenu` instead of `PopupMenuButton`.
+- On iOS (including iPad), opening waits **200 ms** before calling `showMenu` so a follow-up synthetic touch from the system (known on **iPadOS 26+**, [flutter/flutter#177992](https://github.com/flutter/flutter/issues/177992)) does not immediately hit the menu barrier and dismiss the overlay.
 
 #### Document list
 ```dart
@@ -95,6 +101,8 @@ ListView.builder(
 )
 ```
 
+The navigator treats document nodes as expanded by default and only persists the ids of collapsed nodes through a local UI-state store backed by `SharedPreferences`. This keeps the stored state small and avoids mixing transient UI behavior into syncable document data.
+
 #### Drag-and-drop
 **New (2024-11)**:
 - Long-press to drag documents
@@ -105,6 +113,11 @@ ListView.builder(
   - As child
 - Indentation line indicates depth (every 20px)
 - Depth limit: document nesting is capped at 4 levels (`Constants.maxDocumentDepth`); drag-and-drop and create-child actions are blocked once the limit is reached (toast shown)
+- While dragging, the source document title stays visible in place with a light gray background, dashed outline, and faded content so the moved item is easy to identify
+- Drag state recovery: the dashed placeholder and `_draggingIndex` are applied on the frame after drag starts (avoids rebuilding `LongPressDraggable` during gesture startup). `onDraggableCanceled` and `onDragEnd` both call `_clearNavigatorDragState()` so releasing without moving or without an accepting target always resets the row and long-press drag keeps working ([lib/page/doc_navigator.dart](../lib/page/doc_navigator.dart))
+- While dragging, ~**2 seconds** on another **collapsed** row (has children, not the dragged item) expands it; logic runs in each row’s `DragTarget.onMove` (same hit test as the blue line; navigator uses `DragDropStyle.navigatorFeedbackOffset == Offset.zero` and `DragDropFeedbackStyle.navigatorFeedbackOpacity` on the floating card so the line stays visible). Timer clears on `onLeave` or drag end
+- The floating drag preview that follows the pointer now uses shared tokens from `lib/ui/app_style.dart`, so navigator and editor drag cards stay visually aligned
+- After a successful move, the destination title gets a semi-transparent `DragDropFeedbackStyle` tint and border (text stays readable), then fades out. Because `moveDocument` synchronously fires `triggerDocumentChangedEvent()` and the list reorders by index, per-row implicit animations were easy to lose; the fade is driven by an `AnimationController` on `DocumentNavigatorState` plus `FadeTransition`, and each row is wrapped in `KeyedSubtree(ValueKey(docId))` so reordering matches rows by document id
 
 ```dart
 Widget _buildDraggableDocItem(BuildContext context, int index) {

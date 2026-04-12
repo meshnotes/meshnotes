@@ -213,6 +213,45 @@ class Document {
     _flushDocStructure();
   }
 
+  /// Move an existing paragraph to a target index.
+  /// Title block(index 0) is fixed and cannot be moved.
+  void moveParagraphToIndex(String blockId, int targetIndex) {
+    final sourceIndex = paragraphs.indexWhere((p) => p.getBlockId() == blockId);
+    // index 0 is title block, which is fixed at top and should never be moved.
+    if(sourceIndex <= 0) {
+      return;
+    }
+    if(targetIndex < 1) {
+      targetIndex = 1;
+    }
+    if(targetIndex > paragraphs.length) {
+      targetIndex = paragraphs.length;
+    }
+    if(sourceIndex == targetIndex) {
+      return;
+    }
+
+    final moving = paragraphs.removeAt(sourceIndex);
+    if(sourceIndex < targetIndex) {
+      targetIndex--;
+    }
+    paragraphs.insert(targetIndex, moving);
+
+    // Refresh only affected range (plus one boundary on each side for prev/next links).
+    var start = sourceIndex < targetIndex ? sourceIndex : targetIndex;
+    var end = sourceIndex > targetIndex ? sourceIndex : targetIndex;
+    start = (start - 1).clamp(0, paragraphs.length - 1);
+    end = (end + 1).clamp(0, paragraphs.length - 1);
+    for(var i = start; i <= end; i++) {
+      final prev = i > 0 ? paragraphs[i - 1] : null;
+      final next = i < paragraphs.length - 1 ? paragraphs[i + 1] : null;
+      paragraphs[i].setPrevious(prev);
+      paragraphs[i].setNext(next);
+      paragraphs[i].flushDb();
+    }
+    _flushDocStructure();
+  }
+
   void updateTitle(String title) {
     var now = Util.getTimeStamp();
     // _db.storeDocTitle(id, title, now);

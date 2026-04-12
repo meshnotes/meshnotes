@@ -11,6 +11,7 @@ import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:mesh_note/mindeditor/document/document.dart';
 import 'package:mesh_note/mindeditor/document/document_manager.dart';
 import 'package:mesh_note/mindeditor/controller/selection_controller.dart';
+import 'package:mesh_note/local_state/local_state_store.dart';
 import 'package:mesh_note/net/net_controller.dart';
 import 'package:mesh_note/mindeditor/view/mind_edit_block.dart';
 import 'package:flutter/material.dart';
@@ -45,6 +46,7 @@ class Controller {
   final Environment environment = Environment();
   final Device device = Device();
   late final Setting setting; // = Setting.defaultSetting;
+  late final LocalStateStore localState; // Save some UI state
   // Mouse and gesture handler
   late final GestureHandler gestureHandler;
   late final NetworkController network;
@@ -96,6 +98,7 @@ class Controller {
     MyLogger.info('initAll: load settings from $confFile');
     setting = Setting(confFile);
     setting.load();
+    localState = await LocalStateStore.create();
 
     MyLogger.debug('initAll: init db');
     await dbHelper.init();

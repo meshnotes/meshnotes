@@ -213,7 +213,7 @@ class MindBlockImplRenderObject extends RenderBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     updateCurrentBox();
-    MyLogger.debug('paint: blockId=${texts.getBlockId()}, currentBox=$_currentBox, idx=${texts.getBlockIndex()}');
+    // MyLogger.debug('paint: blockId=${texts.getBlockId()}, currentBox=$_currentBox, idx=${texts.getBlockIndex()}');
     final canvas = context.canvas;
     final hasCursor = texts.hasCursor();
     var textSelection = texts.getTextSelection();
@@ -223,7 +223,7 @@ class MindBlockImplRenderObject extends RenderBox {
       var currentTextPos = TextPosition(offset: textSelection.extentOffset);
       // MyLogger.info('MindEditBlockImplRenderObject: currentTextPos=$currentTextPos, extent=${textSelection.extentOffset}');
       final currentCursorRect = _calculateCursorRectByPosition(currentTextPos, height: _lineHeight);
-      MyLogger.debug('paint: index=${texts.getBlockIndex()}, currentCursorRect=$currentCursorRect');
+      // MyLogger.debug('paint: index=${texts.getBlockIndex()}, currentCursorRect=$currentCursorRect');
       if(!textSelection.isCollapsed) {
         _drawSelectionBoxes(canvas, offset, textSelection, _lineHeight);
       }
