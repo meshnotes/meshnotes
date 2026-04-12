@@ -42,6 +42,7 @@ class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
 
 class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerProviderStateMixin {
   static const String watcherKey = 'doc_navigator';
+  static const Duration _dragHoverExpandCollapsedDuration = Duration(seconds: 2);
   static const double indentWidth = 20.0;
   static const double dropLineHeight = DragDropStyle.lineHeight;
   static const double dropLineSegmentWidth = DragDropStyle.navigatorLineSegmentWidth;
@@ -63,11 +64,17 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
   int? _draggingIndex; // The index of the document title being dragged
   int? _dragTargetIndex; // The index of the document title being dragged to
   _DropPosition? _dropPosition;
+  /// True from [LongPressDraggable.onDragStarted] until drag end/cancel; defers visual [setState] so the drag session is not torn down mid-start.
+  bool _navigatorDragActive = false;
   String? _flashDocId;
   late final AnimationController _docHighlightFadeController;
 
   // Collapse/expand state
   final Set<String> _collapsedDocIds = {};
+
+  /// Hover on a collapsed target row during drag: expand after [_dragHoverExpandCollapsedDuration].
+  Timer? _dragCollapsedHoverExpandTimer;
+  String? _dragHoverExpandTargetDocId;
 
   // Auto-scroll state
   final ScrollController _scrollController = ScrollController();
@@ -82,7 +89,11 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
     CallbackRegistry.registerDocumentChangedWatcher(watcherKey, refreshDocumentList);
     CallbackRegistry.registerNetworkStatusWatcher(_onNetworkStatusChanged);
     CallbackRegistry.registerPeerNodesChangedWatcher(_onPeerNodesChanged);
+    _collapsedDocIds.addAll(controller.localState.getCollapsedDocIds());
     totalList = controller.docManager.getFlattenedDocumentList();
+    if(_removeInvalidCollapsedDocIds(totalList)) {
+      controller.localState.setCollapsedDocIds(_collapsedDocIds);
+    }
     docList = _getFilteredDocumentList(totalList);
     final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
@@ -105,6 +116,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
     _scrollController.dispose();
     _autoScrollTimer?.cancel();
     _docMoveHighlightHoldTimer?.cancel();
+    _dragCollapsedHoverExpandTimer?.cancel();
     _docHighlightFadeController.dispose();
   }
 
@@ -154,8 +166,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
       titleListView = Expanded(
         child: Listener(
           onPointerMove: (event) {
-            // Only handle auto-scroll when dragging
-            if (_draggingIndex != null) {
+            if(_draggingIndex != null) {
               _handleAutoScroll(event.position);
             }
           },
@@ -330,6 +341,9 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
         _handleDrop(draggedIndex, index);
       },
       onMove: (details) {
+        // details.data: [LongPressDraggable.data] from the row where the drag *started* (source row index in docList).
+        // index (build param): this closure is on *this* row's DragTarget, so here it is always the *hover target* row index.
+        // They differ in general; equal only when hovering back over the source row.
         // Determine drop position based on vertical and horizontal position
         final RenderBox? renderBox = itemKey.currentContext?.findRenderObject() as RenderBox?;
         if (renderBox == null) {
@@ -340,6 +354,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
               _dropPosition = _DropPosition.above;
             });
           }
+          _updateDragHoverExpandOnTargetMove(draggedIndex: details.data, targetRowIndex: index);
           return;
         }
 
@@ -390,8 +405,10 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
             _dropPosition = newDropPosition;
           });
         }
+        _updateDragHoverExpandOnTargetMove(draggedIndex: details.data, targetRowIndex: index);
       },
       onLeave: (details) {
+        _cancelDragCollapsedHoverExpand();
         setState(() {
           _dragTargetIndex = null;
           _dropPosition = null;
@@ -400,14 +417,6 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
       builder: (context, candidateData, rejectedData) {
         // Show drop indicator when hovering
         final isHovering = candidateData.isNotEmpty;
-        void _onDragCompleted() { // Reset drag and drop state, reused by onDragEnd and onDragCompleted
-          _stopAutoScroll();
-          setState(() {
-            _draggingIndex = null;
-            _dragTargetIndex = null;
-            _dropPosition = null;
-          });
-        }
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -421,39 +430,41 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
               child: LongPressDraggable<int>(
                 data: index,
                 hapticFeedbackOnStart: true,
-                // Offset the feedback downward so it doesn't block the drop indicator
                 feedbackOffset: DragDropStyle.navigatorFeedbackOffset,
-                feedback: Material(
-                  elevation: DragDropFeedbackStyle.elevation,
-                  child: Container(
-                    width: DragDropFeedbackStyle.navigatorWidth,
-                    padding: DragDropFeedbackStyle.navigatorPadding,
-                    decoration: BoxDecoration(
-                      color: DragDropFeedbackStyle.backgroundColor,
-                      borderRadius: BorderRadius.circular(DragDropFeedbackStyle.borderRadius),
-                      border: Border.all(color: DragDropFeedbackStyle.borderColor, width: DragDropFeedbackStyle.borderWidth),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.description_outlined,
-                          size: DragDropFeedbackStyle.navigatorIconSize,
-                          color: DragDropFeedbackStyle.navigatorIconColor,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            docNode.title,
-                            style: const TextStyle(
-                              fontSize: DragDropFeedbackStyle.navigatorFontSize,
-                              color: DragDropFeedbackStyle.textColor,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                feedback: Opacity(
+                  opacity: DragDropFeedbackStyle.navigatorFeedbackOpacity,
+                  child: Material(
+                    elevation: DragDropFeedbackStyle.elevation,
+                    child: Container(
+                      width: DragDropFeedbackStyle.navigatorWidth,
+                      padding: DragDropFeedbackStyle.navigatorPadding,
+                      decoration: BoxDecoration(
+                        color: DragDropFeedbackStyle.backgroundColor,
+                        borderRadius: BorderRadius.circular(DragDropFeedbackStyle.borderRadius),
+                        border: Border.all(color: DragDropFeedbackStyle.borderColor, width: DragDropFeedbackStyle.borderWidth),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.description_outlined,
+                            size: DragDropFeedbackStyle.navigatorIconSize,
+                            color: DragDropFeedbackStyle.navigatorIconColor,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              docNode.title,
+                              style: const TextStyle(
+                                fontSize: DragDropFeedbackStyle.navigatorFontSize,
+                                color: DragDropFeedbackStyle.textColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -465,12 +476,20 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
                   ),
                 ),
                 onDragStarted: () {
-                  setState(() {
-                    _draggingIndex = index;
+                  _navigatorDragActive = true;
+                  final int startedIndex = index;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if(!mounted || !_navigatorDragActive) {
+                      return;
+                    }
+                    setState(() {
+                      _draggingIndex = startedIndex;
+                    });
                   });
                 },
-                onDragEnd: (_) => _onDragCompleted(),
-                onDragCompleted: _onDragCompleted,
+                onDragEnd: (_) => _clearNavigatorDragState(),
+                onDragCompleted: _clearNavigatorDragState,
+                onDraggableCanceled: (_, __) => _clearNavigatorDragState(),
                 child: _buildDocListTile(context, index, docNode, indentWidth: indentWidth),
               ),
             ),
@@ -939,10 +958,15 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
   }
 
   void refreshDocumentList() {
+    var shouldPersist = false;
     setState(() {
       totalList = controller.docManager.getFlattenedDocumentList();
+      shouldPersist = _removeInvalidCollapsedDocIds(totalList);
       docList = _getFilteredDocumentList(totalList);
     });
+    if(shouldPersist) {
+      controller.localState.setCollapsedDocIds(_collapsedDocIds);
+    }
   }
 
   /// Get filtered document list (respecting collapsed state)
@@ -988,6 +1012,62 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
       }
       docList = _getFilteredDocumentList(totalList);
     });
+    controller.localState.setCollapsedDocIds(_collapsedDocIds);
+  }
+
+  void _cancelDragCollapsedHoverExpand() {
+    _dragCollapsedHoverExpandTimer?.cancel();
+    _dragCollapsedHoverExpandTimer = null;
+    _dragHoverExpandTargetDocId = null;
+  }
+
+  /// [draggedIndex] is [LongPressDraggable.data]. [targetRowIndex] is this row’s [DragTarget] ([onMove] closure); same hit semantics as the blue line (navigator uses [DragDropStyle.navigatorFeedbackOffset] + semi-transparent feedback).
+  void _updateDragHoverExpandOnTargetMove({required int draggedIndex, required int targetRowIndex}) {
+    if(targetRowIndex < 0 || targetRowIndex >= docList.length) {
+      return;
+    }
+    final targetDoc = docList[targetRowIndex];
+    final eligible = targetDoc.hasChild() && _collapsedDocIds.contains(targetDoc.docId) && draggedIndex != targetRowIndex;
+    if(eligible) {
+      _armDragHoverExpandCollapsed(targetDoc.docId);
+      return;
+    }
+    if(_dragHoverExpandTargetDocId == targetDoc.docId) {
+      _cancelDragCollapsedHoverExpand();
+    }
+  }
+
+  void _armDragHoverExpandCollapsed(String docId) {
+    if(_dragHoverExpandTargetDocId == docId && (_dragCollapsedHoverExpandTimer?.isActive ?? false)) {
+      return;
+    }
+    _cancelDragCollapsedHoverExpand();
+    _dragHoverExpandTargetDocId = docId;
+    _dragCollapsedHoverExpandTimer = Timer(_dragHoverExpandCollapsedDuration, () {
+      _dragCollapsedHoverExpandTimer = null;
+      _dragHoverExpandTargetDocId = null;
+      if(!mounted || !_navigatorDragActive) {
+        return;
+      }
+      if(!_collapsedDocIds.contains(docId)) {
+        return;
+      }
+      setState(() {
+        _collapsedDocIds.remove(docId);
+        docList = _getFilteredDocumentList(totalList);
+      });
+      controller.localState.setCollapsedDocIds(_collapsedDocIds);
+    });
+  }
+
+  bool _removeInvalidCollapsedDocIds(List<DocTitleFlat> fullList) {
+    if(_collapsedDocIds.isEmpty) {
+      return false;
+    }
+    final validDocIds = fullList.map((doc) => doc.docId).toSet();
+    final originalCount = _collapsedDocIds.length;
+    _collapsedDocIds.removeWhere((docId) => !validDocIds.contains(docId));
+    return originalCount != _collapsedDocIds.length;
   }
 
   void _triggerDocMoveHighlight(String docId) {
@@ -1087,6 +1167,20 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
     _autoScrollTimer?.cancel();
     _autoScrollTimer = null;
     _currentScrollDelta = 0.0;
+  }
+
+  void _clearNavigatorDragState() {
+    _navigatorDragActive = false;
+    _stopAutoScroll();
+    _cancelDragCollapsedHoverExpand();
+    if(!mounted) {
+      return;
+    }
+    setState(() {
+      _draggingIndex = null;
+      _dragTargetIndex = null;
+      _dropPosition = null;
+    });
   }
 
   void _onNetworkStatusChanged(NetworkStatus status) {

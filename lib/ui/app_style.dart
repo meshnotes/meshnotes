@@ -9,8 +9,8 @@ class DragDropStyle {
   static const double navigatorLineSegmentWidth = 15.0;
   // Length of each leading segment in editor drop indicators.
   static const double editorLineSegmentWidth = 12.0;
-  // Offset applied to navigator drag feedback so the drop line stays visible.
-  static const Offset navigatorFeedbackOffset = Offset(0, -50);
+  // Navigator drag hit-test uses the pointer position; semi-transparent feedback keeps the drop line readable.
+  static const Offset navigatorFeedbackOffset = Offset(0, -20);
   // Offset applied to editor drag feedback so the dragged preview does not cover the target line.
   static const Offset editorFeedbackOffset = Offset(0, -36);
 }
@@ -42,6 +42,8 @@ class DragDropFeedbackStyle {
   static const Color textColor = Colors.black87;
   // Font size of the navigator drag preview title.
   static const double navigatorFontSize = 15.0;
+  // Floating navigator preview opacity so the blue drop line can show through under the pointer.
+  static const double navigatorFeedbackOpacity = 0.5;
   // Font size of the editor block drag preview title.
   static const double blockFontSize = 14.0;
 }
