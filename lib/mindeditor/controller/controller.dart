@@ -198,6 +198,7 @@ class Controller {
     }
     if(environment.isIos()) {
       var data = await deviceInfoPlugin.iosInfo;
+      environment.applyIosDeviceInfo(data);
       return data.identifierForVendor;
     }
     if(environment.isMac()) {
@@ -214,6 +215,7 @@ class Controller {
     }
     return null;
   }
+
   EncryptedUserPrivateInfo? _loadUserInfo(Setting _setting) {
     final userInfo = _setting.getSetting(Constants.settingKeyUserInfo);
     final encryptedPassword = _setting.getSetting(Constants.settingKeyPassword)?? '';

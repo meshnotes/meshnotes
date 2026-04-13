@@ -66,11 +66,10 @@ class MainMenu extends StatelessWidget {
     if(value == null || !menuContext.mounted) return;
     _onSelected(menuContext, value);
   }
-  
+
   /// Whether the window is laid out as a tablet-sized iOS device (e.g. iPad). Uses [MediaQuery] shortest side ≥ 600, not model ID.
-  static bool _isIosTabletLayout(BuildContext context) {
-    if(kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return false;
-    return MediaQuery.sizeOf(context).shortestSide >= 600;
+  bool _isIosTabletLayout(BuildContext context) {
+    return !kIsWeb && controller.environment.iosReportsAsPad;
   }
 
   /// Anchor for the overflow menu: button width under the icon, top edge below the button (same convention as [PopupMenuButton] + [showMenu]).

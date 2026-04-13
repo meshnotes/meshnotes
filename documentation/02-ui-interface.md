@@ -165,36 +165,39 @@ Widget _buildNetworkIcon() {
 
 ### 4. DocumentView
 
-**Location**: [lib/page/document_view.dart](../lib/page/document_view.dart)
+**Location**: [lib/page/doc_view.dart](../lib/page/doc_view.dart)
 
 **Structure**:
-```dart
-Column(
-  children: [
-    _buildTitleBar(),       // Title bar
-    _buildToolbar(),        // Toolbar
-    Expanded(
-      child: MindEditField(), // Editor body
-    ),
-  ],
-)
-```
+- `Scaffold` with `AppBar` (`DocumentTitleBar`, optional back `leading`, `MainMenu` actions, hairline `bottom`) and `body: MindEditor()`.
+- `smallView` is a **constructor flag** (not read from `MediaQuery` each frame); the parent (`StackPageView` or routes) chooses layout from `Environment.isSmallView(context)` (window width vs `Constants.widthThreshold`).
 
-#### Title bar
-- Editable document title
-- Back button (mobile)
-- Sync status indicator
+#### Title bar (app bar)
+- Center: `DocumentTitleBar` — [lib/page/title_bar.dart](../lib/page/title_bar.dart) (document title path / sync ring in small view when applicable).
+- Trailing: `MainMenu` — [lib/page/menu.dart](../lib/page/menu.dart) (`MenuType.editor`).
+- **Small view only**: leading back (`CupertinoButton` + `Icons.arrow_back_ios`) calls `jumpAction` or `Navigator.pop`.
 
-#### Toolbar
-- Text styles (bold, italic, underline, strikethrough)
-- Heading levels (H1, H2, H3)
-- List styles (bulleted, checkbox)
-- Indent/outdent
-- Plugin buttons (AI assistant, etc.)
+#### Small-view back button vs iPadOS 26+ windowed multitasking
+
+On **iPad in a floating / Stage Manager–style window**, the system draws window controls in the top-leading chrome. From **iPadOS / iOS 26** onward, Flutter often still reports `MediaQuery.padding.left` and `viewPadding.left` as **0**, so the back control can overlap system hit targets.
+
+**Why not use window size (“tablet heuristic”)**  
+`MediaQuery.size` reflects the **current window**, not the physical device. A narrow iPad window can be smaller than typical “tablet” breakpoints; device class must come from elsewhere.
+
+**What the app does** ([lib/page/doc_view.dart](../lib/page/doc_view.dart)):
+
+1. Prefer `max(viewPadding.left, padding.left)` when either is non-zero.
+2. Else, if startup **`Environment`** — [lib/mindeditor/controller/environment.dart](../lib/mindeditor/controller/environment.dart) — says **`iosReportsAsPad`** (from `IosDeviceInfo` via `Environment.applyIosDeviceInfo`) **and** **`iosSystemMajorVersion` ≥ 26**, apply a fixed leading start inset (64 logical px) and widen `AppBar.leadingWidth` (`kToolbarHeight + inset`) so the back button shifts right into usable space.
+3. iPhone and iPad on OS &lt; 26 skip the fixed inset so behavior stays unchanged where the issue was not observed.
+
+A debug `MyLogger.info` line in `_buildAppBar` logs applied inset and raw `MediaQuery` values; remove or gate if logs are too noisy.
+
+#### Toolbar (editor chrome)
+
+Editor formatting chrome lives inside **MindEditor** (not in `DocumentView`): styles, headings, lists, plugins, etc. See [Editor UI](#editor-ui) below.
 
 ### 5. StackPageView
 
-**Location**: [lib/page/stack_page_view.dart](../lib/page/stack_page_view.dart)
+**Location**: [lib/page/stack_page.dart](../lib/page/stack_page.dart)
 
 Custom single-page stack navigation container that replaces Navigator 2.0.
 

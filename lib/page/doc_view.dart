@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 import '../mindeditor/controller/controller.dart';
 
 class DocumentView extends StatelessWidget with ResizableViewMixin {
+  static const double _iosTabletWindowLeadingInset = 64;
+  static const int _iosWindowCaptionLeadingWorkaroundMinMajor = 26;
+
   final Function()? jumpAction;
   @override
   bool get expectedSmallView => smallView;
@@ -61,18 +64,25 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
     var actionBar = <Widget>[
       MainMenu(controller: controller, menuType: MenuType.editor),
     ];
-    final leading = smallView? Center(
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        alignment: Alignment.center,
-        child: const Icon(Icons.arrow_back_ios),
-        onPressed: () {
-          if(jumpAction != null) {
-            jumpAction!();
-          } else {
-            Navigator.of(context).pop();
-          }
-        },
+    final mediaQuery = MediaQuery.of(context);
+    // iPadOS 26+ windowed mode: system window controls on the leading edge; offset back button (see _documentLeadingStartInset).
+    final double leadingSafeStart = smallView? _documentLeadingStartInset(context, mediaQuery) : 0;
+    final leading = smallView? Padding(
+      padding: EdgeInsetsDirectional.only(start: leadingSafeStart),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          alignment: Alignment.center,
+          child: const Icon(Icons.arrow_back_ios),
+          onPressed: () {
+            if(jumpAction != null) {
+              jumpAction!();
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
       ),
     ) : null;
     final titleSpacing = smallView? 0.0 : null; // On small view, there will be an icon on the left, so spacing is not necessary
@@ -82,7 +92,8 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
       backgroundColor: Colors.white,
       elevation: 0,
       toolbarHeight: 48,
-      leading: leading, 
+      leading: leading,
+      leadingWidth: smallView? kToolbarHeight + leadingSafeStart : null,
       title: titleBar,
       actions: actionBar,
       bottom: PreferredSize(
@@ -93,5 +104,13 @@ class DocumentView extends StatelessWidget with ResizableViewMixin {
         )
       ),
     );
+  }
+
+  double _documentLeadingStartInset(BuildContext context, MediaQueryData mq) {
+    final double fromEngine = mq.viewPadding.left > mq.padding.left ? mq.viewPadding.left : mq.padding.left;
+    if(fromEngine > 0) return fromEngine;
+    if(!controller.environment.iosReportsAsPad) return 0;
+    if(controller.environment.iosSystemMajorVersion < _iosWindowCaptionLeadingWorkaroundMinMajor) return 0;
+    return _iosTabletWindowLeadingInset;
   }
 }
