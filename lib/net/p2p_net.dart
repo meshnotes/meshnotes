@@ -5,6 +5,7 @@ import 'package:libp2p/libp2p.dart';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:libp2p/overlay/villager_node.dart';
 import 'package:my_log/my_log.dart';
+import 'package:path_provider/path_provider.dart';
 
 startOverlay({bool asRoot=false}) async {
   startListening(8081);
@@ -24,7 +25,8 @@ Future<Village> startVillage({
   bool useMulticast = false,
 }) async {
   VillageDbHelper db = VillageDbHelper();
-  db.init();
+  final directory = await getApplicationDocumentsDirectory();
+  await db.init(directory.path);
 
   int _localPort = int.tryParse(localPort)?? 0;
   var sponsors = _parseSponsors(serverList);

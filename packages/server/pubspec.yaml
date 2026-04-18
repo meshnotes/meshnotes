@@ -10,7 +10,14 @@ environment:
 dependencies:
   libp2p:
     path: ../libp2p
-#   path: ^1.8.0
+  keygen:
+    path: ../keygen
+  my_log:
+    path: ../my_log
+  args: ^2.5.0
+  path: ^1.9.0
+  yaml: ^3.1.2
+  yaml_writer: ^2.0.0
 
 dev_dependencies:
   lints: ^2.0.0

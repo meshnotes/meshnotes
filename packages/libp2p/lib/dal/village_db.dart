@@ -1,6 +1,5 @@
 import 'package:my_log/my_log.dart';
 import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'village_db_script.dart';
 
@@ -30,12 +29,11 @@ class VillageDbHelper {
   //   return DynamicLibrary.open(libraryNextToScript.path);
   // }
 
-  Future<void> init() async {
+  Future<void> init(String directoryPath) async {
     // open.overrideFor(OperatingSystem.linux, _openOnLinux);
     // open.overrideFor(OperatingSystem.windows, _openOnWindows);
-    final directory = await getApplicationDocumentsDirectory();
-    final dbFile = join(directory.path, dbFileName);
-    MyLogger.debug('VillageDB: start opening db: $dbFile');
+    final dbFile = join(directoryPath, dbFileName);
+    MyLogger.info('VillageDB: start opening db: $dbFile');
     final db = sqlite3.open(dbFile);
     MyLogger.debug('VillageDB: finish loading sqlite3');
     _database = db;
