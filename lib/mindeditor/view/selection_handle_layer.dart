@@ -7,6 +7,7 @@ import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/controller/selection_controller.dart';
+import 'package:mesh_note/mindeditor/setting/constants.dart';
 
 class SelectionHandleLayer {
   Widget? _handleOfStart;
@@ -464,18 +465,18 @@ class _DragMagnifierState extends State<_DragMagnifier> {
           clipBehavior: Clip.hardEdge,
           decoration: MagnifierDecoration(
             opacity: 1,
-            shadows: const [
+            shadows: [
               BoxShadow(
-                blurRadius: 10,
-                color: Color(0x33000000),
-                offset: Offset(0, 4),
+                blurRadius: UiConstants.magnifierShadowBlurRadius,
+                color: const Color(UiConstants.magnifierShadowColor),
+                offset: const Offset(0, UiConstants.magnifierShadowOffsetY),
               ),
             ],
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: const BorderSide(
-                color: Color(0xAAFFFFFF),
-                width: 1.4,
+              borderRadius: BorderRadius.circular(UiConstants.magnifierBorderRadius),
+              side: BorderSide(
+                color: const Color(UiConstants.magnifierBorderColor),
+                width: UiConstants.magnifierBorderWidth,
               ),
             ),
           ),

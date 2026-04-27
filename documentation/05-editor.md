@@ -973,6 +973,8 @@ Implementation detail:
 - The magnifier is inserted at the bottom of the selection floating stack, so selection handles remain visually above it and are not sampled into the magnified content.
 - `_DragMagnifier` uses `RawMagnifier` with a dynamic `focalPointOffset`, so the lens stays above the finger while shifting its sampling point near screen edges to keep left/right text content visible.
 - During dragging, handle dots are hidden completely and restored after the drag ends, avoiding duplicate dots both inside and outside the magnifier.
+- Magnifier border radius, border width/color, and shadow values are centralized in `lib/mindeditor/setting/constants.dart` (`UiConstants`) so iOS-like lens styling can be tuned consistently without editing view logic.
+- Double-tapping at the visual end of a block is guarded in `lib/mindeditor/view/mind_edit_block.dart`: render caret positions can equal the text length, so word selection clamps the sampled character index and returns an empty range for empty blocks instead of reading past the string.
 
 ## Block Dragging Feedback
 

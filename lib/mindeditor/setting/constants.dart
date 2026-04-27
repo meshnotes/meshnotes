@@ -112,4 +112,12 @@ class UiConstants {
   static const double menuItemPadding = 8;
   static const double menuItemBorderRadius = 8;
   static const double menuItemHeight = 36;
+
+  // Mobile drag magnifier style
+  static const double magnifierBorderRadius = 18;
+  static const double magnifierBorderWidth = 2.0;
+  static const int magnifierBorderColor = 0xFF448AFF;
+  static const double magnifierShadowBlurRadius = 12;
+  static const double magnifierShadowOffsetY = 4;
+  static const int magnifierShadowColor = 0x33000000;
 }
