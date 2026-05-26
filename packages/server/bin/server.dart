@@ -8,6 +8,7 @@ import 'package:libp2p/dal/village_db.dart';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:my_log/my_log.dart';
 import 'package:server/relay_application.dart';
+import 'package:server/server_db.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
@@ -100,6 +101,9 @@ Future<void> _startServer(int port, String dataDir, String configPath) async {
   final db = VillageDbHelper();
   await db.init(dataDir); // Initialize with data directory
 
+  final serverDb = ServerDbHelper();
+  await serverDb.init(dataDir);
+
   final overlay = VillageOverlay(
     userInfo: userInfo,
     sponsors: [], // No sponsors for server by default, or could be added via args
@@ -107,13 +111,16 @@ Future<void> _startServer(int port, String dataDir, String configPath) async {
     deviceId: deviceId,
     useMulticast: false,
     onNodeChanged: (node) {
-      MyLogger.info('Node changed: ${node.nodeId}');
+      MyLogger.info('Node changed: ${node.nodeId}, status: ${node.getStatus()}');
+      final ip = node.ip?.address ?? '';
+      serverDb.upsertClient(node.nodeId, node.publicKey, ip, node.port, DateTime.now().millisecondsSinceEpoch);
     },
   );
 
   final relayApp = RelayApplication(
     overlay: overlay,
     db: db,
+    serverDb: serverDb,
     upperAppName: 'mesh_notes',
   );
 
