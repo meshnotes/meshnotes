@@ -1,1 +1,1 @@
-Refer to CLAUDE.md and follow the instructions.
+Refer to AGENTS.md and follow the instructions.
