@@ -58,6 +58,7 @@ SQLite3 with tables: `documents`, `blocks`, `versions`, `objects`, `conflicts`
 - Use fvm(or try fvm.exe in windows environment) to run flutter or dart command
 - Do not use dart format
 - Run tests: `fvm flutter test` + `fvm flutter test packages/*/test/`
+- **Task Tracking**: Keep `project_todo.md` updated. Any future features, optimizations, or requirements identified during implementation must be added there as unchecked tasks (`- [ ]`), and completed ones must be marked as checked (`- [x]`).
 
 ## Documentation
 
