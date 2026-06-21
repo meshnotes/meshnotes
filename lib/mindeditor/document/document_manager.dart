@@ -184,6 +184,10 @@ class DocumentManager {
     return _currentVersion;
   }
 
+  int getLatestVersionTimestamp() {
+    return _currentVersionTimestamp;
+  }
+
   void genNewVersionTree({String? parent}) {
     if(!hasModified()) return;
     if(isGenerating() || isSyncing()) return;

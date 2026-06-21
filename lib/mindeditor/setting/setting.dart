@@ -109,6 +109,13 @@ class Setting {
       comment: Constants.settingCommentPassword,
       needDisplay: false,
     ),
+    SettingData(
+      name: Constants.settingKeyAllowSendingToPublicServer,
+      displayName: Constants.settingNameAllowSendingToPublicServer,
+      comment: Constants.settingCommentAllowSendingToPublicServer,
+      defaultValue: Constants.settingDefaultAllowSendingToPublicServer,
+      type: SettingType.bool,
+    ),
     SettingData( //TODO should use more precise privilege control mechanism, instead of this global setting
       name: Constants.settingKeyAllowSendingNotesToPlugins,
       displayName: Constants.settingNameAllowSendingNotesToPlugins,
@@ -198,6 +205,7 @@ class Setting {
     }
     return groups;
   }
+
   // Return trimmed value of setting or default value, or null if not found
   String? getSetting(String key) {
     final setting = _settingMap[key];
@@ -207,6 +215,14 @@ class Setting {
     }
     return value?.trim();
   }
+
+  // Return bool value of setting
+  bool getBooleanSetting(String key, bool valueIfNotFound) {
+    final value = getSetting(key);
+    if(value == null) return valueIfNotFound;
+    return value.toLowerCase() == 'true';
+  }
+
   bool saveSettings(List<SettingData> settings) {
     var toBeSave = <String, String>{}; //TODO Maybe not necessary
     for(var item in settings) {
@@ -221,6 +237,7 @@ class Setting {
     Controller().eventTasksManager.triggerSettingChanged();
     return true;
   }
+
   static String _genSettingLines(Map<String, SettingData> settings) {
     String result = '';
     for(var e in settings.entries) {
@@ -232,6 +249,7 @@ class Setting {
     }
     return result;
   }
+
   void addAdditionalSettings(List<SettingData> settings) {
     for(var item in settings) {
       bool valid = true;

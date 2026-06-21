@@ -362,10 +362,12 @@ class Controller {
     if(network.isAlone()) return;
     if(docManager.hasModified() || docManager.isBusy()) return;
     var latestVersion = docManager.getLatestVersion();
-    MyLogger.info('sendVersionBroadcast: latestVersion=$latestVersion');
     if(latestVersion.isEmpty) return;
+    
+    var latestVersionTimestamp = docManager.getLatestVersionTimestamp();
+    MyLogger.info('sendVersionBroadcast: latestVersion=$latestVersion, timestamp=$latestVersionTimestamp');
 
-    network.sendVersionBroadcast(latestVersion, stats);
+    network.sendVersionBroadcast(latestVersion, latestVersionTimestamp, stats);
   }
   bool tryToSaveAndSendVersionTree() {
     // If there is no modification, or is currently syncing, don't generate new version tree

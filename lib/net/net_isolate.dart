@@ -108,6 +108,7 @@ class VersionChainVillager {
           connectedCallback: _nodeChanged,
           messageHandler: handler,
           useMulticast: parameter.useMulticast,
+          allowSendingToPublicServer: parameter.allowSendingToPublicServer,
         );
         _sendPort.send(Message(cmd: Command.networkStatus, parameter: NetworkStatus.running, stats: msg.stats));
         _sendPort.send(Message(cmd: Command.villageStarted, parameter: null, stats: msg.stats));

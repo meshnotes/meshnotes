@@ -35,6 +35,8 @@ class VillageOverlay implements ApplicationController {
   // Callback function(s)
   OnNodeChangedCallbackType onNodeChanged;
 
+  final bool allowSendingToPublicServer;
+
   VillageOverlay({
     required this.userInfo,
     required List<String> sponsors,
@@ -42,6 +44,7 @@ class VillageOverlay implements ApplicationController {
     String deviceId = '',
     int port = 0,
     this.useMulticast = false,
+    this.allowSendingToPublicServer = false,
   }): _localPort = port, _deviceId = deviceId {
     registerApplication(_appName, this); // Make overlay itself as the first application
 
@@ -118,11 +121,14 @@ class VillageOverlay implements ApplicationController {
     peer.sendData(utf8.encode(jsonStr));
   }
   void sendToAllNodesOfUser(String appKey, ApplicationController app, String type, String data) {
-    //TODO should change to only find the nodes with same user id(public key)
     final nodes = getAllNodes();
     MyLogger.info('${logPrefix} sendToAllNodesOfUser: find nodes: $nodes');
     for(var node in nodes) {
-      MyLogger.info('${logPrefix} sendToAllNodesOfUser: send to node: $node, type: $type, data: ${data.substring(0, 100)}');
+      if(!allowSendingToPublicServer && node.publicKey != userInfo.publicKey) {
+        MyLogger.debug('${logPrefix} sendToAllNodesOfUser: skip sending to node $node because public key does not match and allowSendingToPublicServer is false');
+        continue;
+      }
+      MyLogger.info('${logPrefix} sendToAllNodesOfUser: send to node: $node, type: $type, data: ${shortenString(data)}');
       sendData(appKey, app, node, type, data);
     }
   }

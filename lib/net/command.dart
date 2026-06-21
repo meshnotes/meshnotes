@@ -40,6 +40,7 @@ class StartVillageParameter {
   UserPrivateInfo userInfo;
   bool useMulticast;
   String? logPath;
+  bool allowSendingToPublicServer;
 
   StartVillageParameter({
     required this.localPort,
@@ -48,6 +49,7 @@ class StartVillageParameter {
     required this.userInfo,
     required this.useMulticast,
     this.logPath,
+    this.allowSendingToPublicServer = false,
   });
 }
 

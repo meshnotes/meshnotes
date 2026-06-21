@@ -23,6 +23,7 @@ Future<Village> startVillage({
   required Function(VillagerNode) connectedCallback,
   required VillageMessageHandler messageHandler,
   bool useMulticast = false,
+  bool allowSendingToPublicServer = false,
 }) async {
   VillageDbHelper db = VillageDbHelper();
   final directory = await getApplicationDocumentsDirectory();
@@ -37,6 +38,7 @@ Future<Village> startVillage({
     deviceId: deviceId,
     onNodeChanged: connectedCallback,
     useMulticast: useMulticast,
+    allowSendingToPublicServer: allowSendingToPublicServer,
   );
   final village = Village(
     sponsors: sponsors,

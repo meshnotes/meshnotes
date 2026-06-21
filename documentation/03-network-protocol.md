@@ -255,6 +255,8 @@ class BonjourDiscovery {
 
 #### 2. Manual peers (Sponsor)
 
+The `Allow sending data to public server` (`allow_sending_to_public_server`) setting controls whether peer-to-peer business sync data is allowed to be transmitted to nodes with different user public keys. If disabled, the client filters outgoing messages to only send to peers having matching user public keys. Standalone relay servers pass the overlay option as enabled so the server side can store/query data for any user public key, while app-side receive/merge handling still keeps the default current-user-only data boundary.
+
 ```dart
 class SponsorManager {
   List<Sponsor> sponsors = [];  // Manually configured peers
@@ -422,12 +424,20 @@ String encrypt(int timestamp, String content) {
 **1. Version broadcast**:
 
 ```dart
-// Broadcast version hash every 30s
+// Broadcast version hash and its app-side version timestamp every 30s
 Timer.periodic(Duration(seconds: 30), (timer) {
   final currentVersionHash = _getCurrentVersionHash();
-  _village.publish('version-hash', currentVersionHash);
+  final currentVersionTimestamp = _getCurrentVersionTimestamp();
+  _village.publish(jsonEncode({
+    'messages': {
+      'latest_version': currentVersionHash,
+      'latest_version_timestamp': currentVersionTimestamp.toString(),
+    }
+  }));
 });
 ```
+
+Standalone relay servers use `latest_version_timestamp` only as an announced version-tree timestamp for comparison. If a repeated publish has the same `latest_version`, and the stored encrypted `version_tree` resource has the same resource timestamp, the server skips re-querying the version tree to avoid repeated fetch loops.
 
 **2. Version request**:
 
@@ -907,3 +917,28 @@ class NetworkStats {
 4. **Priority queue**: prioritize important messages
 5. **Adaptive bandwidth**: adjust rate to network quality
 6. **Relay nodes**: relay through third-party peers
+
+## Standalone Relay Server Unified Storage
+
+The standalone relay server acts as a persistent bootstrap and storage peer that does not require an active sponsor. It implements unified object storage:
+
+1. **Provide Message (`provideAppType`)**:
+   - Parses incoming `SignedResources`.
+   - Stores each resource inside the `objects` table under the joint primary key `(user_public_key, key)`.
+   - If the resource key is `version_tree`, it upserts (overwrites) the old value.
+   - For all other keys (representing immutable versions or blocks), it inserts with `OR IGNORE` (does not overwrite existing).
+   - Retains the full outer `SignedResources` JSON (envelope) for each resource so it can be returned verbatim without server re-signing.
+
+2. **Query Message (`queryAppType`)**:
+   - Parses incoming query wrapping a `RequireVersions` list inside a `SignedMessage`.
+   - Resolves all database records matching `userPublicId` and any of the requested keys.
+   - Returns the original matching `SignedResources` envelopes (as multiple messages if necessary) back to the querying peer.
+
+3. **Publish Message (`publishAppType`)**:
+   - Parses `SignedMessage` wrapping a `BroadcastMessages`.
+   - Records the `latest_version` in the `latest_versions` table. Its `updated_at` remains the server receive/update time, not the app-side version-tree timestamp.
+   - Uses the published `latest_version_timestamp` only for comparison against the stored `version_tree` resource timestamp.
+   - If a repeated publish has the same `latest_version`, and the stored encrypted `version_tree` resource timestamp equals the published `latest_version_timestamp`, it skips querying the tree again.
+   - Otherwise, when the corresponding latest version object is not cached, it sends an app-compatible `queryAppType` request for `version_tree` back to the publishing peer.
+   - The query format is identical to MeshNotes app: `SignedMessage.user` is the querying user's public key, `SignedMessage.data` is `RequireVersions { versions }`, and `SignedMessage.sign` verifies against that same user key.
+   - Does not relay the publish payload to other peers yet, to avoid relay storms until forwarded `latest_version` tracking is implemented.

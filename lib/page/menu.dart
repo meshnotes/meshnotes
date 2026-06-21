@@ -38,7 +38,7 @@ class MainMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showDebug = controller.setting.getSetting(Constants.settingKeyShowDebugMenu)?.toLowerCase() == 'true';
+    final showDebug = controller.setting.getBooleanSetting(Constants.settingKeyShowDebugMenu, false);
     return Builder(
       builder: (BuildContext buttonContext) {
         return IconButton(

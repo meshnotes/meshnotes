@@ -101,6 +101,12 @@ class Constants {
   static const String settingCommentAllowSendingNotesToPlugins = 'To make plugins(like AI assistant) have knowledge of your notes(except for the private notes)';
   static const String settingDefaultAllowSendingNotesToPlugins = 'false';
 
+  // Settings for whether allow sending data to public server or not
+  static const String settingKeyAllowSendingToPublicServer = 'allow_sending_to_public_server';
+  static const String settingNameAllowSendingToPublicServer = 'Allow sending data to public nodes';
+  static const String settingCommentAllowSendingToPublicServer = 'Allow sending data to nodes with different public keys, data is encrypted';
+  static const String settingDefaultAllowSendingToPublicServer = 'true';
+
   // static const String userNameAndKeyOfGuest = 'guest';
 
   static const String resourceKeyVersionTree = 'version_tree';

@@ -220,6 +220,26 @@ class StackPageView extends StatefulWidget {
 - Search page
 - Detail pages
 
+### 6. Settings page
+
+**Location**: [lib/page/setting_page_large_screen.dart](../lib/page/setting_page_large_screen.dart), [lib/page/setting_page_small_screen.dart](../lib/page/setting_page_small_screen.dart)
+
+**Purpose**:
+- Edit the changeable settings declared in [lib/mindeditor/setting/setting.dart](../lib/mindeditor/setting/setting.dart)
+- Two layouts (large/small screen) sharing the same `SettingGroup`/`SettingData` model
+
+**How items are rendered**:
+- The page is built from `Controller().setting.getSettingsByGroup()`, which returns settings grouped by `settingGroupName` and skips entries with `needDisplay == false`.
+- Each `SettingData` renders by `type`:
+  - `SettingType.bool` → a `CupertinoSwitch`
+  - `SettingType.string` / `SettingType.number` → a `CupertinoTextField` (number uses `digitsOnly` formatter, with the default value shown as placeholder)
+- A `comment` shows as a `help_outline` tooltip next to the label; changed-but-unsaved items are marked with a leading `*`.
+
+**Save flow**:
+- Edits are buffered locally; **Save** is enabled only after a change (`everChanged`) and calls `Setting.saveSettings()`, which persists to the settings file and fires `triggerSettingChanged()`. **Exit** discards unsaved edits.
+
+> The business meaning of individual settings (e.g. `Allow sending data to public server`, which gates whether sync data may be sent to nodes with a different user public key such as public servers/relays) is documented with the network behavior. See [03-network-protocol.md](03-network-protocol.md).
+
 ## Editor UI
 
 ### 1. MindEditField

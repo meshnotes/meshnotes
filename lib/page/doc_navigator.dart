@@ -260,7 +260,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
   }
 
   Widget _buildSystemButtons(BuildContext context) {
-    final showDebug = controller.setting.getSetting(Constants.settingKeyShowDebugMenu)?.toLowerCase() == 'true';
+    final showDebug = controller.setting.getBooleanSetting(Constants.settingKeyShowDebugMenu, false);
     return Container(
       color: Colors.white,
       width: double.infinity,

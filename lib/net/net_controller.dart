@@ -40,6 +40,7 @@ class NetworkController {
     final rawServerList = settings.getSetting(Constants.settingKeyServerList)?? Constants.settingDefaultServerList;
     final cleanedServerList = rawServerList.replaceAll('，', ',').replaceAll('：', ':');
     final localPort = settings.getSetting(Constants.settingKeyLocalPort)?? Constants.settingDefaultLocalPort;
+    final allowSendingToPublicServer = settings.getBooleanSetting(Constants.settingKeyAllowSendingToPublicServer, false);
     _servicePort = int.parse(localPort);
     _deviceId = deviceId;
     _networkStatus = NetworkStatus.starting;
@@ -48,7 +49,7 @@ class NetworkController {
       if(data is SendPort) {
         MyLogger.info('Get SendPort from network isolate, start village protocol, using Bonjour=$_useBonjour');
         _sendPort = data;
-        _gracefulStartVillage(localPort, cleanedServerList, deviceId, userPrivateInfo, useMulticast, logPath);
+        _gracefulStartVillage(localPort, cleanedServerList, deviceId, userPrivateInfo, useMulticast, logPath, allowSendingToPublicServer);
       } else if(data is Message) {
         if(_sendPort != null) {
           _onMessage(data);
@@ -64,10 +65,11 @@ class NetworkController {
     }
   }
 
-  void sendVersionBroadcast(String latestVersion, TimeCostStatistics stats) {
+  void sendVersionBroadcast(String latestVersion, int latestVersionTimestamp, TimeCostStatistics stats) {
     var msg = BroadcastMessages(
       messages: {
         'latest_version': latestVersion,
+        'latest_version_timestamp': latestVersionTimestamp.toString(),
       }
     );
     stats.transportTime = Util.getTimeStamp();
@@ -246,7 +248,7 @@ class NetworkController {
     }
   }
 
-  void _gracefulStartVillage(String localPort, String serverList, String deviceId, UserPrivateInfo userPrivateInfo, bool useMulticast, String? logPath) {
+  void _gracefulStartVillage(String localPort, String serverList, String deviceId, UserPrivateInfo userPrivateInfo, bool useMulticast, String? logPath, bool allowSendingToPublicServer) {
     _sendPort?.send(
       Message(
         cmd: Command.startVillage,
@@ -257,6 +259,7 @@ class NetworkController {
           userInfo: userPrivateInfo,
           useMulticast: useMulticast,
           logPath: logPath,
+          allowSendingToPublicServer: allowSendingToPublicServer,
         ),
         stats: TimeCostStatistics(), // Never used
       )
