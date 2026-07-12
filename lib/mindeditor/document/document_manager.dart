@@ -257,8 +257,7 @@ class DocumentManager {
         continue;
       }
       final json = object.data;
-      final versionContent = VersionContent.fromJson(jsonDecode(json));
-      Map<String, RelatedObject> requiredObjects = DocUtils.genRequiredObjects(versionContent, _db);
+      final requiredObjects = _getOrGenerateVersionRequiredObjects(versionHash, json);
 
       var node = SendVersions(
           versionHash: versionHash,
@@ -270,6 +269,22 @@ class DocumentManager {
       result.add(node);
     }
     return result;
+  }
+
+  Map<String, RelatedObject> _getOrGenerateVersionRequiredObjects(String versionHash, String versionJson) {
+    if(_db.hasVersionRequiredObjects(versionHash)) {
+      return _db.getVersionRequiredObjects(versionHash);
+    }
+
+    try {
+      final versionContent = VersionContent.fromJson(jsonDecode(versionJson));
+      final requiredObjects = DocUtils.genRequiredObjects(versionContent, _db);
+      _db.storeVersionRequiredObjects(versionHash, requiredObjects);
+      return requiredObjects;
+    } catch(e, s) {
+      MyLogger.err('_getOrGenerateVersionRequiredObjects error: versionHash=$versionHash, error=$e\n$s');
+      return {};
+    }
   }
 
   /// Assemble resources, and try to merge if all required resources are ready

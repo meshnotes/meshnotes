@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/dal_version/db_script.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
-import 'package:sqlite3/sqlite3.dart';
+import 'package:mesh_note/net/version_chain_api.dart';
 import 'package:my_log/my_log.dart';
+import 'package:sqlite3/sqlite3.dart';
+
 import '../../../util/idgen.dart';
 import 'doc_data_model.dart';
 
@@ -20,6 +24,7 @@ class DbHelper {
   static final Map<int, DbUpgradeInfo> _upgradeStrategy = {
     1: DbUpgradeInfo(2, DbVersion2().upgradeDb),
   };
+  bool _initialized = false;
 
   // static DynamicLibrary _openOnLinux() {
   //   return _tryToLoadLibrary('libsqlite3-dev.so');
@@ -44,7 +49,18 @@ class DbHelper {
   //   throw lastError;
   // }
 
+  DbHelper({Database? database}) {
+    if(database != null) {
+      _database = database;
+      _initialized = true;
+      _upgradeDbIfNecessary(_database);
+      _createDbIfNecessary(_database);
+      _setVersion(_database, dbScript.version);
+    }
+  }
+
   Future<bool> init() async {
+    if(_initialized) return true;
     // open.overrideFor(OperatingSystem.linux, _openOnLinux);
     // open.overrideFor(OperatingSystem.windows, _openOnWindows);
     final dbFile = await Controller().environment.getExistFileFromLibraryPathsByEnvironment(dbFileName);
@@ -52,6 +68,7 @@ class DbHelper {
     final db = sqlite3.open(dbFile);
     MyLogger.debug('MeshNotesDB: finish loading sqlite3');
     _database = db;
+    _initialized = true;
 
     final upgradeResult = _upgradeDbIfNecessary(_database);
     if(!upgradeResult) {
@@ -375,6 +392,42 @@ class DbHelper {
     const sqlObjects = 'INSERT OR REPLACE INTO objects(obj_hash, data, updated_at, created_from, status) '
         'SELECT obj_hash, data, updated_at, created_from, ${ModelConstants.statusAvailable} FROM sync_objects';
     _database.execute(sqlObjects);
+  }
+
+  void storeVersionRequiredObjects(String versionHash, Map<String, RelatedObject> requiredObjects) {
+    final hashes = requiredObjects.keys.toList()..sort();
+    final objHashesJson = jsonEncode(hashes);
+    const sql = 'INSERT INTO version_required_objects(version_hash, obj_hashes) VALUES(?, ?) '
+        'ON CONFLICT(version_hash) DO UPDATE SET obj_hashes=excluded.obj_hashes';
+    _database.execute(sql, [versionHash, objHashesJson]);
+  }
+
+  bool hasVersionRequiredObjects(String versionHash) {
+    const sql = 'SELECT COUNT(*) FROM version_required_objects WHERE version_hash=?';
+    final resultSet = _database.select(sql, [versionHash]);
+    if(resultSet.isEmpty) return false;
+    return (resultSet.first[0] as int) > 0;
+  }
+
+  Map<String, RelatedObject> getVersionRequiredObjects(String versionHash) {
+    const sql = 'SELECT obj_hashes FROM version_required_objects WHERE version_hash=?';
+    final manifestRows = _database.select(sql, [versionHash]);
+    final Map<String, RelatedObject> result = {};
+    if(manifestRows.isEmpty) return result;
+
+    final decoded = jsonDecode(manifestRows.first['obj_hashes'] as String);
+    if(decoded is! List) return result;
+    for(final item in decoded) {
+      if(item is! String) continue;
+      final object = getObject(item);
+      if(object == null) continue;
+      result[item] = RelatedObject(
+        objHash: object.key,
+        objContent: object.data,
+        createdAt: object.timestamp,
+      );
+    }
+    return result;
   }
 
   List<String> findUnavailableSyncingVersions() {

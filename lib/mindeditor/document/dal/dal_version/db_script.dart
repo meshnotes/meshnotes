@@ -51,8 +51,9 @@ class DbVersion2 extends DbScript {
   static const int ver = 2;
   static Map<String, String> sql = {
     ...DbVersion1.sql,
-    // The only change is the documents table
+    // Version 2 adds document ordering columns. Extra tables can be added here with CREATE IF NOT EXISTS without bumping the DB version.
     'Create documents': 'CREATE TABLE IF NOT EXISTS documents(doc_id TEXT PRIMARY KEY, parent_doc_id TEXT DEFAULT NULL, order_id INTEGER DEFAULT 0, doc_content TEXT, doc_hash TEXT, is_private INTEGER, updated_at INTEGER)',
+    'Create version_required_objects': 'CREATE TABLE IF NOT EXISTS version_required_objects(version_hash TEXT PRIMARY KEY, obj_hashes TEXT)',
   };
   DbVersion2(): super(version: ver, createSql: sql);
 

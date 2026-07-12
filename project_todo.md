@@ -21,7 +21,9 @@
 - [x] **Time Cost Statistics**: Added isolate-to-application roundtrip time monitoring (`TimeCostStatistics`) for latency analysis.
 - [x] **Allow sending data to public server**: Added setting to allow sending data to public servers (nodes with different public keys) and filter outgoing business sync data when the option is disabled.
 - [ ] **Optional Cross-Public-Key App Storage**: Add an explicit app-side option for P2P-style mode where an app may store data signed by other public keys; default should remain saving only the current user's data.
-- [ ] **Relay Server Sync Manifest**: Add a signed, server-readable manifest for version trees so standalone servers without user decryption keys can know every version/content object ID that must be stored and verify download completeness.
+- [x] **Version Required Object Manifest Cache**: Persist each version's required object list as a local database text manifest so `SendVersions` can read dependencies without recalculating doc/block traversal.
+- [ ] **Relay Server Version List Request**: After sending a version tree to a standalone server, add a server-specific request/manifest so the server can know all version hashes it should hold without decrypting user data; do not add this extra payload for same-user devices that already have the key, because the data may be large.
+
 
 ## 2. Standalone Relay Server CLI (packages/server)
 - [ ] **WAL (Write-Ahead Logging) Mode**: Enable SQLite WAL mode in `ServerDbHelper` to prevent database locking during high-concurrency client updates.

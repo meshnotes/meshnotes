@@ -1012,6 +1012,14 @@ void addMergeTask(String versionHash) {
 }
 ```
 
+## Required Object Manifest Cache
+
+`lib/mindeditor/document/dal/dal_version/db_script.dart` creates `version_required_objects(version_hash, obj_hashes)` to cache the doc/block object hashes required by each available version. `obj_hashes` is a JSON text list, so each version uses one manifest row instead of one database row per object.
+
+When `lib/mindeditor/document/document_manager.dart` builds `SendVersions`, it asks `lib/mindeditor/document/dal/db_helper.dart` for the cached required-object list instead of recalculating the version -> document -> block dependency traversal every time. If there is no cached row for a requested version, `document_manager.dart` parses the version object, calls `DocUtils.genRequiredObjects(...)`, stores the generated manifest, and then uses it.
+
+This is a local send-side optimization only: it does not change the network payload shape, object encryption/signing, or transfer size.
+
 ## Known Limitations
 
 1. **Large documents**: slow transfer for very large docs
