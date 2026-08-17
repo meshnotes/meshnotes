@@ -1,5 +1,7 @@
 import 'package:keygen/keygen.dart';
 
+const String versionChainBroadcastType = 'version_chain';
+
 class VersionNode {
   String versionHash;
   int createdAt;
@@ -142,23 +144,30 @@ class RelatedObject {
 }
 
 class BroadcastMessages {
+  String type; // 2) Identify the published payload type, currently versionChainBroadcastType
   Map<String, String> messages;
 
   BroadcastMessages({
+    required this.type,
     required this.messages,
   });
 
-  BroadcastMessages.fromJson(Map<String, dynamic> map): messages = _buildMessages(map['messages']);
+  BroadcastMessages.fromJson(Map<String, dynamic> map):
+        type = map['type']?? versionChainBroadcastType,
+        messages = _buildMessages(map['messages']);
+  
   Map<String, dynamic> toJson() {
     return {
+      'type': type,
       'messages': messages,
     };
   }
 
-  static Map<String, String> _buildMessages(Map<String, dynamic> map) {
+  static Map<String, String> _buildMessages(Map<String, dynamic>? map) {
     final result = <String, String>{};
+    if(map == null) return result;
     for(var e in map.entries) {
-      result[e.key] = e.value;
+      result[e.key] = e.value.toString();
     }
     return result;
   }

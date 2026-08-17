@@ -73,12 +73,28 @@ class Village implements ApplicationController {
         } else {
           _onDefaultQuery(data);
         }
+        break;
       case AppMessageType.publishAppType:
         if(upperAppName == appName) {
           messageHandler.handlePublish?.call(data, stats);
         } else {
           _onDefaultPublish(data);
         }
+        break;
+      case AppMessageType.offerAppType:
+        if(upperAppName == appName) {
+          messageHandler.handleOffer?.call(data, stats);
+        } else {
+          _onDefaultOffer(data);
+        }
+        break;
+      case AppMessageType.applyAppType:
+        if(upperAppName == appName) {
+          messageHandler.handleApply?.call(data, stats);
+        } else {
+          _onDefaultApply(data);
+        }
+        break;
     }
   }
 
@@ -105,6 +121,14 @@ class Village implements ApplicationController {
     MyLogger.info('sendVersions: Preparing to send versions: ${sendVersions.substring(0, 100)}');
     //TODO Optimize the code below to only send message to selected nodes
     _sendToAllNodesOfUser(AppMessageType.provideAppType, sendVersions, stats);
+  }
+  void sendOffer(String offerJson, TimeCostStatistics stats) {
+    MyLogger.info('sendOffer: Preparing to send offer: ${offerJson.substring(0, offerJson.length > 100? 100 : offerJson.length)}');
+    _sendToAllNodesOfUser(AppMessageType.offerAppType, offerJson, stats);
+  }
+  void sendApply(String applyJson, TimeCostStatistics stats) {
+    MyLogger.info('sendApply: Preparing to send apply: ${applyJson.substring(0, applyJson.length > 100? 100 : applyJson.length)}');
+    _sendToAllNodesOfUser(AppMessageType.applyAppType, applyJson, stats);
   }
   void _sendToAllNodesOfUser(AppMessageType type, String data, TimeCostStatistics stats) {
     _overlay.sendToAllNodesOfUser(upperAppName, this, type.value, data);
@@ -150,6 +174,12 @@ class Village implements ApplicationController {
   }
   ///Not implemented yet
   void _onDefaultPublish(String data) {
+  }
+  ///Not implemented yet
+  void _onDefaultOffer(String data) {
+  }
+  ///Not implemented yet
+  void _onDefaultApply(String data) {
   }
 
   void _updateTimeCostStatistics(TimeCostStatistics stats) {

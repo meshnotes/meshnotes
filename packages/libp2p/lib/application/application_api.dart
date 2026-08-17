@@ -6,30 +6,38 @@ enum AppMessageType {
   provideAppType('provide'), // Provider other nodes the version tree
   queryAppType('query'), // Query other nodes for version
   // searchAppType('search'), // Ask for the location of resource
-  publishAppType('publish'); // Publish newest resource to other nodes
+  publishAppType('publish'), // Publish newest resource to other nodes
+  offerAppType('offer'), // Generic offer message, currently used for storage
+  applyAppType('apply'); // Client apply for storage to server
 
   final String value;
   const AppMessageType(this.value);
 }
 
+const String offerTypeStorage = 'storage';
+const String applyTypeVersion = 'version';
+const String applyTypeVersionsKey = 'versions';
+
 class VillageMessageHandler {
   OnHandleStringFunction? handleProvide;
   OnHandleStringFunction? handleQuery;
   OnHandleStringFunction? handlePublish;
+  OnHandleStringFunction? handleOffer;
+  OnHandleStringFunction? handleApply;
 }
 
-class SignedMessage {
+class UncipherMessage {
   String userPublicId;
   String data;
   String signature;
 
-  SignedMessage({
+  UncipherMessage({
     required this.userPublicId,
     required this.data,
     required this.signature,
   });
 
-  SignedMessage.fromJson(Map<String, dynamic> map):
+  UncipherMessage.fromJson(Map<String, dynamic> map):
         userPublicId = map['user'],
         data = map['data'],
         signature = map['sign'];
@@ -69,14 +77,14 @@ class UnsignedResource {
   }
 }
 
-class SignedResource {
+class CipherMessage {
   String key;
   String subKey;
   int timestamp;
   String data;
   String signature;
 
-  SignedResource({
+  CipherMessage({
     required this.key,
     required this.subKey,
     required this.timestamp,
@@ -84,13 +92,13 @@ class SignedResource {
     required this.signature,
   });
 
-  SignedResource.fromRaw(UnsignedResource raw, String signature):
+  CipherMessage.fromRaw(UnsignedResource raw, String signature):
         key = raw.key,
         subKey = raw.subKey,
         timestamp = raw.timestamp,
         data = raw.data,
         signature = signature;
-  SignedResource.fromJson(Map<String, dynamic> map):
+  CipherMessage.fromJson(Map<String, dynamic> map):
         key = map['key'],
         subKey = map['sub_key'],
         timestamp = map['timestamp'],
@@ -113,18 +121,18 @@ class SignedResource {
   }
 }
 
-class SignedResources {
+class CipherMessages {
   String userPublicId;
-  List<SignedResource> resources;
+  List<CipherMessage> resources;
   String signature;
 
-  SignedResources({
+  CipherMessages({
     required this.userPublicId,
     required this.resources,
     required this.signature,
   });
 
-  static String getFeature(List<SignedResource> resources) {
+  static String getFeature(List<CipherMessage> resources) {
     String feature = '';
     for(var r in resources) {
       String json = jsonEncode(r);
@@ -133,7 +141,7 @@ class SignedResources {
     return feature;
   }
 
-  SignedResources.fromJson(Map<String, dynamic> map):
+  CipherMessages.fromJson(Map<String, dynamic> map):
         userPublicId = map['user'],
         resources = _recursiveList(map['resources']),
         signature = map['sign'];
@@ -146,11 +154,11 @@ class SignedResources {
     };
   }
 
-  static List<SignedResource> _recursiveList(List<dynamic> list) {
-    List<SignedResource> result = [];
+  static List<CipherMessage> _recursiveList(List<dynamic> list) {
+    List<CipherMessage> result = [];
     for(var item in list) {
-      SignedResource signedResource = SignedResource.fromJson(item);
-      result.add(signedResource);
+      CipherMessage cipherMessage = CipherMessage.fromJson(item);
+      result.add(cipherMessage);
     }
     return result;
   }
@@ -273,4 +281,50 @@ class TimeCostStatistics {
     this.requiredVersionsCost = 0,
     this.versionCost = 0,
   });
+}
+
+class Offer {
+  String type;
+  String target;
+  Map<String, dynamic> data;
+
+  Offer({
+    required this.type,
+    required this.target,
+    required this.data,
+  });
+
+  Offer.fromJson(Map<String, dynamic> map):
+        type = map['type']?? '',
+        target = map['target']?? '',
+        data = Map<String, dynamic>.from(map['data'] as Map);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'target': target,
+      'data': data,
+    };
+  }
+}
+
+class Apply {
+  String type;
+  Map<String, dynamic> data;
+
+  Apply({
+    required this.type,
+    required this.data,
+  });
+
+  Apply.fromJson(Map<String, dynamic> map):
+        type = map['type']?? '',
+        data = Map<String, dynamic>.from(map['data'] as Map);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'data': data,
+    };
+  }
 }

@@ -138,14 +138,14 @@ void main() {
     node.nodeId = 'node_1';
 
     // 1. Send provideAppType
-    final resource1 = SignedResource(
+    final resource1 = CipherMessage(
       key: 'key1',
       subKey: '',
       timestamp: 100,
       data: 'encrypted_data1',
       signature: 'sig1',
     );
-    final resourcesList = SignedResources(
+    final resourcesList = CipherMessages(
       userPublicId: 'user1',
       resources: [resource1],
       signature: 'outer_sig',
@@ -161,12 +161,12 @@ void main() {
 
     // 2. Send queryAppType
     final requireVersions = RequireVersions(requiredVersions: ['key1']);
-    final signedQuery = SignedMessage(
+    final uncipherQuery = UncipherMessage(
       userPublicId: 'user1',
       data: jsonEncode(requireVersions),
       signature: 'query_sig',
     );
-    final queryPayload = jsonEncode(signedQuery);
+    final queryPayload = jsonEncode(uncipherQuery);
 
     app.onData(node, 'mesh_notes', AppMessageType.queryAppType.value, queryPayload);
 
@@ -189,12 +189,12 @@ void main() {
       }
     };
     final serverUser = signing.getCompressedPublicKey();
-    final signedPublish = SignedMessage(
+    final uncipherPublish = UncipherMessage(
       userPublicId: serverUser,
       data: jsonEncode(broadcast),
       signature: 'publish_sig',
     );
-    final publishPayload = jsonEncode(signedPublish);
+    final publishPayload = jsonEncode(uncipherPublish);
 
     // Send publish from node (node_1)
     app.onData(node, 'mesh_notes', AppMessageType.publishAppType.value, publishPayload);
@@ -202,15 +202,43 @@ void main() {
     expect(dbHelper.getLatestVersion(serverUser, 'latest_version'), 'latest_version_hash_123');
     expect(dbHelper.getLatestVersionTimestamp(serverUser, 'latest_version'), isNotNull);
 
-    // Verify publish is not relayed to node2, and server queries the sender for the version tree instead.
+    // Verify publish is not relayed to node2, and server sends an offer(type=storage) to the sender instead.
+    expect(mockOverlay.sentData.length, 1);
+    expect(mockOverlay.sentData[0]['node'], node);
+    expect(mockOverlay.sentData[0]['type'], AppMessageType.offerAppType.value);
+    final offerMsg = UncipherMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
+    expect(offerMsg.userPublicId, signing.getCompressedPublicKey());
+    final offer = Offer.fromJson(jsonDecode(offerMsg.data));
+    expect(offer.type, offerTypeStorage);
+    expect(offer.target, serverUser);
+    final offerData = offer.data;
+    expect(offerData['limit'], 100);
+
+    // Client responds with apply
+    mockOverlay.sentData.clear();
+    final apply = Apply(
+      type: applyTypeVersion,
+      data: {
+        'versions': ['version_tree'],
+      },
+    );
+    final applyData = jsonEncode(apply);
+    final uncipherApply = UncipherMessage(
+      userPublicId: serverUser,
+      data: applyData,
+      signature: signing.sign(HashUtil.hashText(applyData)),
+    );
+    app.onData(node, 'mesh_notes', AppMessageType.applyAppType.value, jsonEncode(uncipherApply));
+
+    // Verify server queries the sender for the missing versions
     expect(mockOverlay.sentData.length, 1);
     expect(mockOverlay.sentData[0]['node'], node);
     expect(mockOverlay.sentData[0]['type'], AppMessageType.queryAppType.value);
-    final queryAfterPublish = SignedMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
-    expect(queryAfterPublish.userPublicId, serverUser);
-    expect(VerifyingWrapper.loadKey(queryAfterPublish.userPublicId).ver(HashUtil.hashText(queryAfterPublish.data), queryAfterPublish.signature), isTrue);
-    final requiredAfterPublish = RequireVersions.fromJson(jsonDecode(queryAfterPublish.data));
-    expect(requiredAfterPublish.requiredVersions, ['version_tree']);
+    final queryAfterApply = UncipherMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
+    expect(queryAfterApply.userPublicId, signing.getCompressedPublicKey());
+    expect(VerifyingWrapper.loadKey(queryAfterApply.userPublicId).ver(HashUtil.hashText(queryAfterApply.data), queryAfterApply.signature), isTrue);
+    final requiredAfterApply = RequireVersions.fromJson(jsonDecode(queryAfterApply.data));
+    expect(requiredAfterApply.requiredVersions, ['version_tree']);
 
     mockOverlay.sentData.clear();
     dbHelper.saveObject(
@@ -240,7 +268,7 @@ void main() {
         'latest_version': 'already_cached_version_hash',
       }
     };
-    final cachedPublish = SignedMessage(
+    final cachedPublish = UncipherMessage(
       userPublicId: serverUser,
       data: jsonEncode(cachedBroadcast),
       signature: 'publish_sig_cached',
@@ -255,19 +283,48 @@ void main() {
         'latest_version': 'other_user_version_hash',
       }
     };
-    final otherUserPublish = SignedMessage(
-      userPublicId: 'other_user',
+    final otherUserSigning = SigningWrapper.random();
+    final otherUserPublicKey = otherUserSigning.getCompressedPublicKey();
+    final otherUserPublish = UncipherMessage(
+      userPublicId: otherUserPublicKey,
       data: jsonEncode(otherUserBroadcast),
       signature: 'other_publish_sig',
     );
     app.onData(node, 'mesh_notes', AppMessageType.publishAppType.value, jsonEncode(otherUserPublish));
 
-    expect(dbHelper.getLatestVersion('other_user', 'latest_version'), 'other_user_version_hash');
+    expect(dbHelper.getLatestVersion(otherUserPublicKey, 'latest_version'), 'other_user_version_hash');
+    expect(mockOverlay.sentData.length, 1);
+    expect(mockOverlay.sentData[0]['node'], node);
+    expect(mockOverlay.sentData[0]['type'], AppMessageType.offerAppType.value);
+    final otherUserOfferMsg = UncipherMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
+    expect(otherUserOfferMsg.userPublicId, signing.getCompressedPublicKey());
+    final otherUserOffer = Offer.fromJson(jsonDecode(otherUserOfferMsg.data));
+    expect(otherUserOffer.type, offerTypeStorage);
+    expect(otherUserOffer.target, otherUserPublicKey);
+    final otherUserOfferData = otherUserOffer.data;
+    expect(otherUserOfferData['limit'], 100);
+
+    // Respond with apply for other_user
+    mockOverlay.sentData.clear();
+    final otherUserApply = Apply(
+      type: applyTypeVersion,
+      data: {
+        'versions': ['version_tree'],
+      },
+    );
+    final otherUserApplyData = jsonEncode(otherUserApply);
+    final otherUserUncipherApply = UncipherMessage(
+      userPublicId: otherUserPublicKey,
+      data: otherUserApplyData,
+      signature: otherUserSigning.sign(HashUtil.hashText(otherUserApplyData)),
+    );
+    app.onData(node, 'mesh_notes', AppMessageType.applyAppType.value, jsonEncode(otherUserUncipherApply));
+
     expect(mockOverlay.sentData.length, 1);
     expect(mockOverlay.sentData[0]['node'], node);
     expect(mockOverlay.sentData[0]['type'], AppMessageType.queryAppType.value);
-    final otherUserQuery = SignedMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
-    expect(otherUserQuery.userPublicId, serverUser);
+    final otherUserQuery = UncipherMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
+    expect(otherUserQuery.userPublicId, signing.getCompressedPublicKey());
     expect(VerifyingWrapper.loadKey(otherUserQuery.userPublicId).ver(HashUtil.hashText(otherUserQuery.data), otherUserQuery.signature), isTrue);
     final otherUserRequired = RequireVersions.fromJson(jsonDecode(otherUserQuery.data));
     expect(otherUserRequired.requiredVersions, ['version_tree']);

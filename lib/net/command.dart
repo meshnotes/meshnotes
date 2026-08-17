@@ -19,6 +19,8 @@ enum Command {
   receiveBroadcast,
   receiveProvide,
   receiveQuery,
+  receiveOffer, // 6) Received generic offer message, currently type=storage
+  sendApply, // 7) Send storage apply
 }
 
 class Message {

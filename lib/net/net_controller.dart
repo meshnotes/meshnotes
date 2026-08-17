@@ -67,6 +67,7 @@ class NetworkController {
 
   void sendVersionBroadcast(String latestVersion, int latestVersionTimestamp, TimeCostStatistics stats) {
     var msg = BroadcastMessages(
+      type: versionChainBroadcastType, // 2) Publish version chain state instead of only the latest hash
       messages: {
         'latest_version': latestVersion,
         'latest_version_timestamp': latestVersionTimestamp.toString(),
@@ -77,6 +78,18 @@ class NetworkController {
       Message(
         cmd: Command.sendBroadcast,
         parameter: msg,
+        stats: stats,
+      ),
+    );
+  }
+
+  void sendApply(String applyDataStr, TimeCostStatistics stats) {
+    if(!isStarted()) return;
+    stats.transportTime = Util.getTimeStamp();
+    _sendPort?.send(
+      Message(
+        cmd: Command.sendApply, // 7) send apply
+        parameter: applyDataStr,
         stats: stats,
       ),
     );
@@ -191,6 +204,7 @@ class NetworkController {
       case Command.sendVersionTree:
       case Command.sendRequireVersions:
       case Command.sendVersions:
+      case Command.sendApply: // 7) sendApply is handled in net_isolate
         // Do nothing, these parts are in net_isolate
         break;
       case Command.villageStarted: // Only start bonjour after village started
@@ -244,6 +258,11 @@ class NetworkController {
         controller.receiveRequireVersions(param.requiredObjects, msg.stats);
         processingTimer.stop();
         msg.stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
+        break;
+      case Command.receiveOffer: // 6) handle receiveOffer from server
+        final param = msg.parameter as UncipherMessage;
+        msg.stats.receiveTime = Util.getTimeStamp();
+        controller.receiveOffer(param, msg.stats);
         break;
     }
   }

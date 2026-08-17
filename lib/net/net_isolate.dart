@@ -46,6 +46,7 @@ class VersionChainVillager {
   VerifyingWrapper? _verify;
   EncryptWrapper? _encrypt;
   UserPrivateInfo? userPrivateInfo;
+  bool _allowSendingToPublicServer = false;
 
   VersionChainVillager({
     required SendPort sendPort,
@@ -89,6 +90,7 @@ class VersionChainVillager {
           MyLogger.resetOutputToFile(path: parameter.logPath!);
         }
         userPrivateInfo = parameter.userInfo;
+        _allowSendingToPublicServer = parameter.allowSendingToPublicServer;
         _signing = SigningWrapper.loadKey(userPrivateInfo!.privateKey);
         _encrypt = EncryptWrapper(key: _signing!.key);
         _verify = VerifyingWrapper.loadKey(userPrivateInfo!.publicKey);
@@ -96,9 +98,11 @@ class VersionChainVillager {
         // ..handleNewVersionTree = _handleNewVersionTree
         // ..handleRequireVersions = _handleRequireVersions
         // ..handleSendVersions = _handleSendVersions
-          ..handleProvide = _handleProvide
-          ..handleQuery = _handleQuery
-          ..handlePublish = _handlePublish
+          ..handleProvide = _onReceivedProvide
+          ..handleQuery = _onReceivedQuery
+          ..handlePublish = _onReceivedPublish
+          ..handleOffer = _onReceivedOffer
+          ..handleApply = _onReceivedApply
         ;
         _village = await startVillage(
           localPort: parameter.localPort,
@@ -124,6 +128,7 @@ class VersionChainVillager {
       case Command.receiveBroadcast:
       case Command.receiveProvide:
       case Command.receiveQuery:
+      case Command.receiveOffer: // Handled in net_controller
       // Do nothing, these commands are handled in net_controller
         break;
       case Command.sendBroadcast:
@@ -141,6 +146,10 @@ class VersionChainVillager {
       case Command.sendVersions:
         final sendVersions = msg.parameter as SendVersionsParameter;
         _onSendVersions(sendVersions.versions, msg.stats);
+        break;
+      case Command.sendApply: // 7) sendApply is handled in net_isolate
+        final applyDataStr = msg.parameter as String;
+        _onSendApply(applyDataStr, msg.stats);
         break;
     }
   }
@@ -188,7 +197,7 @@ class VersionChainVillager {
     _nodes.clear();
   }
 
-  void _handleProvide(String data, TimeCostStatistics stats) {
+  void _onReceivedProvide(String data, TimeCostStatistics stats) {
     /// 1. Check public key is the same
     /// 2. Verify message and every single resource
     /// 3. Decrypt resources
@@ -196,15 +205,15 @@ class VersionChainVillager {
     final processingTimer = Stopwatch()..start();
     final processStartTime = DateTime.now().microsecondsSinceEpoch;
 
-    final signedResources = SignedResources.fromJson(jsonDecode(data));
-    final publicKey = signedResources.userPublicId;
+    final cipherMessages = CipherMessages.fromJson(jsonDecode(data));
+    final publicKey = cipherMessages.userPublicId;
     if(publicKey != _signing!.getCompressedPublicKey()) {
       MyLogger.info('Receive provide message from other user: $publicKey');
       processingTimer.stop();
       return;
     }
-    String feature = SignedResources.getFeature(signedResources.resources);
-    final ok = _verifySignature(feature, signedResources.signature);
+    String feature = CipherMessages.getFeature(cipherMessages.resources);
+    final ok = _verifySignature(feature, cipherMessages.signature);
     if(!ok) {
       MyLogger.info('Verify provide message failed');
       processingTimer.stop();
@@ -216,7 +225,7 @@ class VersionChainVillager {
     int totalDataSize = 0;
     int decryptCount = 0;
 
-    for(var resource in signedResources.resources) {
+    for(var resource in cipherMessages.resources) {
       UnsignedResource rawResource = UnsignedResource(
         key: resource.key,
         subKey: resource.subKey,
@@ -238,7 +247,7 @@ class VersionChainVillager {
     final decryptDuration = decryptEndTime - decryptStartTime;
     final totalProcessDuration = decryptEndTime - processStartTime;
 
-    if (totalDataSize > 10240) { // Log only if > 10KB
+    if(totalDataSize > 10240) { // Log only if > 10KB
       MyLogger.debug('[NetIsolate] _handleProvide: '
           'resources=$decryptCount, '
           'size=${(totalDataSize / 1024).toStringAsFixed(2)}KB, '
@@ -262,24 +271,27 @@ class VersionChainVillager {
     ));
   }
 
-  void _handleQuery(String data, TimeCostStatistics stats) {
+  void _onReceivedQuery(String data, TimeCostStatistics stats) {
     /// 1. Check public key is the same
     /// 2. Verify message
     /// 3. Send to port to notify upper layer
     final processingTimer = Stopwatch()..start();
-    SignedMessage signedMessage = SignedMessage.fromJson(jsonDecode(data));
-    final publicKey = signedMessage.userPublicId;
+    UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
+    final publicKey = uncipherMessage.userPublicId;
     if(publicKey != _signing!.getCompressedPublicKey()) {
-      MyLogger.info('Receive verify message from other user: $publicKey');
-      processingTimer.stop();
-      return;
-    }
-    if(!_verifySignature(signedMessage.data, signedMessage.signature)) {
+      // 4) Query is an unciphered data request. In public-server mode a storage node with a different public key may query this user's data.
+      // Gate that cross-user query path behind allowSendingToPublicServer, then verify with the requester's public key.
+      if(!_allowSendingToPublicServer || !_verifySignatureWithKey(publicKey, uncipherMessage.data, uncipherMessage.signature)) {
+        MyLogger.info('Receive rejected query message from other user: $publicKey');
+        processingTimer.stop();
+        return;
+      }
+    } else if(!_verifySignature(uncipherMessage.data, uncipherMessage.signature)) {
       MyLogger.info('Verify query message failed');
       processingTimer.stop();
       return;
     }
-    var requiredVersions = RequireVersions.fromJson(jsonDecode(signedMessage.data));
+    var requiredVersions = RequireVersions.fromJson(jsonDecode(uncipherMessage.data));
     processingTimer.stop();
     stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
     stats.transportTime = Util.getTimeStamp();
@@ -292,21 +304,21 @@ class VersionChainVillager {
     ));
   }
 
-  void _handlePublish(String data, TimeCostStatistics stats) {
+  void _onReceivedPublish(String data, TimeCostStatistics stats) {
     /// 1. Check public key is the same
     /// 2. Verify message
     /// 3. Send to port to notify upper layer
-    SignedMessage signedMessage = SignedMessage.fromJson(jsonDecode(data));
-    final publicKey = signedMessage.userPublicId;
+    UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
+    final publicKey = uncipherMessage.userPublicId;
     if(publicKey != _signing!.getCompressedPublicKey()) {
       MyLogger.info('Receive verify message from other user: $publicKey');
       return;
     }
-    if(!_verifySignature(signedMessage.data, signedMessage.signature)) {
+    if(!_verifySignature(uncipherMessage.data, uncipherMessage.signature)) {
       MyLogger.info('Verify publish message failed');
       return;
     }
-    var brdMsg = BroadcastMessages.fromJson(jsonDecode(signedMessage.data));
+    var brdMsg = BroadcastMessages.fromJson(jsonDecode(uncipherMessage.data));
     stats.transportTime = Util.getTimeStamp();
     _sendPort.send(Message(
       cmd: Command.receiveBroadcast,
@@ -324,9 +336,9 @@ class VersionChainVillager {
     stats.receiveTime = Util.getTimeStamp();
     String json = jsonEncode(msg);
     String signature = _genSignature(json);
-    SignedMessage signedMessage = SignedMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
-    String signedMessageJson = jsonEncode(signedMessage);
-    _village?.sendPublish(signedMessageJson, stats);
+    UncipherMessage uncipherMessage = UncipherMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
+    String uncipherMessageJson = jsonEncode(uncipherMessage);
+    _village?.sendPublish(uncipherMessageJson, stats);
   }
 
   void _onSendVersionTree(VersionChain versionChain, int timestamp, TimeCostStatistics stats) {
@@ -341,15 +353,15 @@ class VersionChainVillager {
       data: encryptedChainJson,
     );
     String signature = _genSignature(rawResource.getFeature());
-    var signedResource = SignedResource.fromRaw(rawResource, signature);
+    var cipherMessage = CipherMessage.fromRaw(rawResource, signature);
 
-    List<SignedResource> resourceList = [signedResource];
-    String signatureOfList = _genSignature(SignedResources.getFeature(resourceList));
-    SignedResources signedResources = SignedResources(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signatureOfList);
-    String signedResourcesJson = jsonEncode(signedResources);
+    List<CipherMessage> resourceList = [cipherMessage];
+    String signatureOfList = _genSignature(CipherMessages.getFeature(resourceList));
+    CipherMessages cipherMessages = CipherMessages(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signatureOfList);
+    String cipherMessagesJson = jsonEncode(cipherMessages);
     processingTimer.stop();
     stats.versionTreeCost += processingTimer.elapsedMilliseconds;
-    _village?.sendVersionTree(signedResourcesJson, stats);
+    _village?.sendVersionTree(cipherMessagesJson, stats);
   }
 
   void _onSendRequireVersions(List<String> versions, TimeCostStatistics stats) {
@@ -358,17 +370,17 @@ class VersionChainVillager {
     var requiredVersions = RequireVersions(requiredVersions: versions);
     String json = jsonEncode(requiredVersions);
     String signature = _genSignature(json);
-    SignedMessage signedMessage = SignedMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
-    String signedMessageJson = jsonEncode(signedMessage);
+    UncipherMessage uncipherMessage = UncipherMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
+    String uncipherMessageJson = jsonEncode(uncipherMessage);
     processingTimer.stop();
     stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
-    _village?.sendRequireVersions(signedMessageJson, stats);
+    _village?.sendRequireVersions(uncipherMessageJson, stats);
   }
 
   void _onSendVersions(List<SendVersions> versions, TimeCostStatistics stats) {
     final processingTimer = Stopwatch()..start();
     stats.receiveTime = Util.getTimeStamp();
-    List<SignedResource> resourceList = [];
+    List<CipherMessage> resourceList = [];
     for(var version in versions) {
       String encryptedContent = _encrypt!.encrypt(version.createdAt, version.versionContent);
       UnsignedResource unsignedResource = UnsignedResource(
@@ -378,9 +390,9 @@ class VersionChainVillager {
         data: encryptedContent,
       );
       String signature = _genSignature(unsignedResource.getFeature());
-      SignedResource signedResource = SignedResource.fromRaw(unsignedResource, signature);
+      CipherMessage cipherMessage = CipherMessage.fromRaw(unsignedResource, signature);
 
-      resourceList.add(signedResource);
+      resourceList.add(cipherMessage);
 
       for(var item in version.requiredObjects.entries) {
         String hash = item.key;
@@ -393,14 +405,14 @@ class VersionChainVillager {
           data: encryptedContent,
         );
         String signature = _genSignature(rawObject.getFeature());
-        SignedResource signedObject = SignedResource.fromRaw(rawObject, signature);
+        CipherMessage cipherObject = CipherMessage.fromRaw(rawObject, signature);
 
-        resourceList.add(signedObject);
+        resourceList.add(cipherObject);
       }
     }
-    String signature = _genSignature(SignedResources.getFeature(resourceList));
-    final signedResources = SignedResources(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signature);
-    String json = jsonEncode(signedResources);
+    String signature = _genSignature(CipherMessages.getFeature(resourceList));
+    final cipherMessages = CipherMessages(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signature);
+    String json = jsonEncode(cipherMessages);
 
     processingTimer.stop();
     stats.versionCost += processingTimer.elapsedMilliseconds;
@@ -412,5 +424,71 @@ class VersionChainVillager {
   }
   bool _verifySignature(String text, String stringSignature) {
     return _verify!.ver(HashUtil.hashText(text), stringSignature);
+  }
+
+  void _onReceivedOffer(String data, TimeCostStatistics stats) {
+    try {
+      UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
+      final serverPublicKey = uncipherMessage.userPublicId;
+      if(!_verifySignatureWithKey(serverPublicKey, uncipherMessage.data, uncipherMessage.signature)) {
+        MyLogger.info('Verify offer message signature failed');
+        return;
+      }
+      final offer = Offer.fromJson(jsonDecode(uncipherMessage.data));
+      if(offer.type != offerTypeStorage) {
+        MyLogger.info('Ignore unsupported offer type: ${offer.type}');
+        return;
+      }
+      if(offer.target != _signing!.getCompressedPublicKey()) {
+        MyLogger.info('Ignore offer for another target: ${offer.target}');
+        return;
+      }
+      stats.transportTime = Util.getTimeStamp();
+      _sendPort.send(Message(
+        cmd: Command.receiveOffer,
+        parameter: uncipherMessage,
+        stats: stats,
+      ));
+    } catch(e) {
+      MyLogger.warn('Failed to handle offer: $e');
+    }
+  }
+
+  void _onReceivedApply(String data, TimeCostStatistics stats) {
+    // 7) handle storage apply (normally server handles this, but verify signature for completeness)
+    try {
+      UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
+      final clientPublicKey = uncipherMessage.userPublicId;
+      if(!_verifySignatureWithKey(clientPublicKey, uncipherMessage.data, uncipherMessage.signature)) {
+        MyLogger.info('Verify apply message signature failed');
+        return;
+      }
+      MyLogger.info('Receive apply message from client: $clientPublicKey. Only handle it in server mode, ignore it in app mode');
+      return;
+    } catch(e) {
+      MyLogger.warn('Failed to handle apply: $e');
+    }
+  }
+
+  void _onSendApply(String applyDataStr, TimeCostStatistics stats) {
+    stats.receiveTime = Util.getTimeStamp();
+    String signature = _genSignature(applyDataStr);
+    UncipherMessage uncipherMessage = UncipherMessage(
+      userPublicId: _signing!.getCompressedPublicKey(),
+      data: applyDataStr,
+      signature: signature,
+    );
+    String uncipherMessageJson = jsonEncode(uncipherMessage);
+    _village?.sendApply(uncipherMessageJson, stats);
+  }
+
+  bool _verifySignatureWithKey(String publicKey, String data, String signature) {
+    try {
+      final verifier = VerifyingWrapper.loadKey(publicKey);
+      return verifier.ver(HashUtil.hashText(data), signature);
+    } catch(e) {
+      MyLogger.warn('Failed to verify signature with key $publicKey: $e');
+      return false;
+    }
   }
 }

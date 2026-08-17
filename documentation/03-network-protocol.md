@@ -378,36 +378,42 @@ class PublishMessage {
 
 #### Message format
 
-All messages are signed and encrypted:
+All messages are signed. Uncipher messages are unencrypted control envelopes, while Cipher messages contain encrypted resource payloads:
+
+- **UncipherMessage**: Used for unencrypted control messages (e.g. `publish`, `query`, `offer`, `apply`).
+- **CipherMessage**: Used for encrypted resources (e.g. `provide` containing encrypted versions or objects).
 
 ```dart
-class SignedMessage {
-  String userPublicId;      // Sender public key
-  String data;              // Payload (JSON)
-  String signature;         // signature = sign(hash(data))
+class UncipherMessage {
+  String userPublicId;      // Sender public key ('user' in JSON)
+  String data;              // Payload (JSON string)
+  String signature;         // signature = sign(hash(data)) ('sign' in JSON)
 }
 ```
 
 **Verification**:
 ```dart
-bool verify(SignedMessage msg) {
+bool verify(UncipherMessage msg) {
   final hash = HashUtil.hashText(msg.data);
   return VerifyingWrapper(msg.userPublicId).verify(hash, msg.signature);
 }
 ```
 
-#### Resource format
+#### Resource format (CipherMessage)
 
 ```dart
-class SignedResources {
+class CipherMessages {
   String userPublicId;
-  List<SignedResource> resources;
+  List<CipherMessage> resources;
   String signature;         // signature = sign(hash(resources))
 }
 
-class SignedResource {
-  String id;                // Resource ID (hash)
-  String encryptedContent;  // Encrypted payload = encrypt(timestamp + content)
+class CipherMessage {
+  String key;               // Resource key (hash)
+  String subKey;            // Sub-key
+  int timestamp;            // Resource timestamp
+  String data;              // Encrypted content (using AES)
+  String signature;         // signature = sign(hash(features))
 }
 ```
 
@@ -421,14 +427,17 @@ String encrypt(int timestamp, String content) {
 
 #### Sync flow
 
-**1. Version broadcast**:
-
+**1. Version broadcast (publish)**:
+`publish` is used for unencrypted broadcasting. It includes a `type` field (currently `versionChainBroadcastType`, because the announced latest hash is the entry point of the version chain).
 ```dart
+const String versionChainBroadcastType = 'version_chain';
+
 // Broadcast version hash and its app-side version timestamp every 30s
 Timer.periodic(Duration(seconds: 30), (timer) {
   final currentVersionHash = _getCurrentVersionHash();
   final currentVersionTimestamp = _getCurrentVersionTimestamp();
   _village.publish(jsonEncode({
+    'type': versionChainBroadcastType,
     'messages': {
       'latest_version': currentVersionHash,
       'latest_version_timestamp': currentVersionTimestamp.toString(),
@@ -437,9 +446,49 @@ Timer.periodic(Duration(seconds: 30), (timer) {
 });
 ```
 
-Standalone relay servers use `latest_version_timestamp` only as an announced version-tree timestamp for comparison. If a repeated publish has the same `latest_version`, and the stored encrypted `version_tree` resource has the same resource timestamp, the server skips re-querying the version tree to avoid repeated fetch loops.
+Standalone relay servers use `latest_version_timestamp` only as an announced version-tree timestamp for comparison. If a repeated publish has the same `latest_version`, and the stored encrypted `version_tree` resource has the same resource timestamp, the server skips initiating offer/apply to avoid repeated sync loops.
 
-**2. Version request**:
+**2. Offer**:
+`offer` is a generic, signed, unencrypted message. The outer `UncipherMessage.data` contains a generic `Offer` JSON string. This implementation currently uses `offerTypeStorage`; storage-specific fields such as `limit` and `extra` are stored directly in `Offer.data` as a JSON map.
+
+When a standalone relay server receives a `publish` message, it checks if it needs to sync the client's latest versions. If yes, it sends an `offer` message to the client (not encrypted):
+```dart
+const String offerTypeStorage = 'storage';
+const String applyTypeVersion = 'version';
+
+class Offer {
+  String type; // offerTypeStorage
+  String target; // data owner's public key
+  Map<String, dynamic> data; // {'limit': 100, 'extra': ''}
+}
+```
+
+`Offer.target` always names the **data owner** (the user whose version chain this offer is about), not the peer that currently holds a copy.
+
+- **App only**: MeshNotes stores only the current user's data, so the app additionally requires `target` to equal the local user's public key before answering (`lib/net/net_isolate.dart` `_handleOffer` and `lib/mindeditor/controller/controller.dart` `receiveOffer`). Offers for any other `target` are ignored.
+- **Server-to-server**: a relay stores objects for many users. `target` is still the data owner, **not** the receiving server's own public key. The receiving server must not require `target == self`; it uses `target` to select which owner's data to apply.
+
+**3. Apply**:
+When the MeshNotes app receives an `offer` with `type == offerTypeStorage` and `target` equal to the local user's public key, it reads storage fields directly from `Offer.data`, calculates all version hashes in its local DAG, and replies with an `Apply` message (not encrypted) containing all versions:
+```dart
+class Apply {
+  String type; // applyTypeVersion
+  Map<String, dynamic> data; // {'versions': [...]} all version hashes in the local DAG for applyTypeVersion
+}
+```
+
+**4. Storage Query**:
+Upon receiving the `Apply` message, the server checks which version hashes are missing from its database, and requests them from the client using `query` (not encrypted):
+```dart
+class RequireVersions {
+  List<String> requiredVersions;
+}
+```
+
+**5. Storage Provide**:
+The client receives the query and sends back the missing encrypted versions/objects using `provide` (`CipherMessages` containing `CipherMessage` items).
+
+**6. Legacy Version request (fallback)**:
 
 ```dart
 // When receiving a version hash
@@ -632,21 +681,21 @@ void sendMessage(String message) {
   final signature = _signing.sign(hash);
 
   // 4. Build signed message
-  final signedMessage = SignedMessage(
+  final uncipherMessage = UncipherMessage(
     userPublicId: _publicKey,
     data: data,
     signature: signature,
   );
 
   // 5. Publish
-  _village.publish('message', signedMessage.encode());
+  _village.publish('message', uncipherMessage.encode());
 }
 ```
 
 #### Receive message
 
 ```dart
-void onMessageReceived(SignedMessage msg) {
+void onMessageReceived(UncipherMessage msg) {
   // 1. Verify signature
   final hash = HashUtil.hashText(msg.data);
   final verifying = VerifyingWrapper(msg.userPublicId);
@@ -672,7 +721,7 @@ void sendResource(String id, String content) {
   final encryptedContent = _encrypt.encrypt(timestamp, content);
 
   // 2. Build resource
-  final resource = SignedResource(
+  final resource = CipherMessage(
     id: id,
     encryptedContent: encryptedContent,
   );
@@ -682,20 +731,20 @@ void sendResource(String id, String content) {
   final signature = _signing.sign(hash);
 
   // 4. Send
-  final signedResources = SignedResources(
+  final cipherMessages = CipherMessages(
     userPublicId: _publicKey,
     resources: [resource],
     signature: signature,
   );
 
-  _village.provide(signedResources.encode());
+  _village.provide(cipherMessages.encode());
 }
 ```
 
 #### Receive resource
 
 ```dart
-void onResourceReceived(SignedResources res) {
+void onResourceReceived(CipherMessages res) {
   // 1. Verify signature
   final hash = HashUtil.hashText(jsonEncode(res.resources));
   final verifying = VerifyingWrapper(res.userPublicId);
@@ -923,22 +972,23 @@ class NetworkStats {
 The standalone relay server acts as a persistent bootstrap and storage peer that does not require an active sponsor. It implements unified object storage:
 
 1. **Provide Message (`provideAppType`)**:
-   - Parses incoming `SignedResources`.
+   - Parses incoming `CipherMessages`.
    - Stores each resource inside the `objects` table under the joint primary key `(user_public_key, key)`.
    - If the resource key is `version_tree`, it upserts (overwrites) the old value.
    - For all other keys (representing immutable versions or blocks), it inserts with `OR IGNORE` (does not overwrite existing).
-   - Retains the full outer `SignedResources` JSON (envelope) for each resource so it can be returned verbatim without server re-signing.
+   - Retains the full outer `CipherMessages` JSON (envelope) for each resource so it can be returned verbatim without server re-signing.
 
 2. **Query Message (`queryAppType`)**:
-   - Parses incoming query wrapping a `RequireVersions` list inside a `SignedMessage`.
+   - Parses incoming query wrapping a `RequireVersions` list inside a `UncipherMessage`.
    - Resolves all database records matching `userPublicId` and any of the requested keys.
-   - Returns the original matching `SignedResources` envelopes (as multiple messages if necessary) back to the querying peer.
+   - Returns the original matching `CipherMessages` envelopes (as multiple messages if necessary) back to the querying peer.
 
 3. **Publish Message (`publishAppType`)**:
-   - Parses `SignedMessage` wrapping a `BroadcastMessages`.
+   - Parses `UncipherMessage` wrapping a `BroadcastMessages`.
    - Records the `latest_version` in the `latest_versions` table. Its `updated_at` remains the server receive/update time, not the app-side version-tree timestamp.
    - Uses the published `latest_version_timestamp` only for comparison against the stored `version_tree` resource timestamp.
    - If a repeated publish has the same `latest_version`, and the stored encrypted `version_tree` resource timestamp equals the published `latest_version_timestamp`, it skips querying the tree again.
-   - Otherwise, when the corresponding latest version object is not cached, it sends an app-compatible `queryAppType` request for `version_tree` back to the publishing peer.
-   - The query format is identical to MeshNotes app: `SignedMessage.user` is the querying user's public key, `SignedMessage.data` is `RequireVersions { versions }`, and `SignedMessage.sign` verifies against that same user key.
+   - Otherwise, when the corresponding latest version object is not cached, it sends an `offerAppType` request with `Offer(type: offerTypeStorage, target: data owner / publishing user, data: {'limit': 100, 'extra': ''})`. `target` is the owner's public key even when the peer is another relay, not the receiving server's key.
+   - After the client answers with `applyAppType`, the server sends an app-compatible `queryAppType` request for only the missing version hashes.
+   - The query format is identical to MeshNotes app: `UncipherMessage.user` is the querying server's public key, `UncipherMessage.data` is `RequireVersions { versions }`, and `UncipherMessage.sign` verifies against that same server key.
    - Does not relay the publish payload to other peers yet, to avoid relay storms until forwarded `latest_version` tracking is implemented.

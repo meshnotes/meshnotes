@@ -475,6 +475,41 @@ class Controller {
     MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length > 10? versions.sublist(0, 10) : versions}');
     network.sendVersions(versions, newStats);
   }
+  void receiveOffer(UncipherMessage msg, TimeCostStatistics stats) {
+    stats.finishTime = Util.getTimeStamp();
+    _updateTimeCostStatistics(stats);
+    MyLogger.info('Controller receiveOffer: receive offer from server');
+    try {
+      final offer = Offer.fromJson(jsonDecode(msg.data) as Map<String, dynamic>);
+      if(offer.type != offerTypeStorage) {
+        MyLogger.info('Controller ignore unsupported offer type: ${offer.type}');
+        return;
+      }
+      final myPublicKey = getUserPrivateInfo()?.publicKey;
+      if(myPublicKey == null || offer.target != myPublicKey) { // May be removed since the net_isolate has already checked the target
+        MyLogger.info('Controller ignore offer for another target: ${offer.target}');
+        return;
+      }
+      //TODO Should check the limit of the offer
+      MyLogger.info('Controller parsed offer: type=${offer.type}, target=${offer.target}, limit=${offer.data['limit']}MB');
+
+      final versionHashes = docManager.getCurrentValidVersionTree().map((v) => v.versionHash).toList();
+      final applyObj = Apply(
+        type: applyTypeVersion,
+        data: {
+          applyTypeVersionsKey: versionHashes,
+        },
+      );
+      final applyDataStr = jsonEncode(applyObj);
+
+      final newStats = TimeCostStatistics(
+        startTime: Util.getTimeStamp(),
+      );
+      network.sendApply(applyDataStr, newStats);
+    } catch(e) {
+      MyLogger.warn('Controller failed to handle offer/send apply: $e');
+    }
+  }
   void receiveResources(List<UnsignedResource> resources, TimeCostStatistics stats) {
     MyLogger.info('receiveResources: receive resources: $resources');
     List<VersionChain> versionChains = [];

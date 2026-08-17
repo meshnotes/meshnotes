@@ -174,7 +174,7 @@ class VersionChainVillager {
   void _broadcastVersionHash() {
     final currentHash = _getCurrentVersionHash();
 
-    final message = SignedMessage(
+    final message = UncipherMessage(
       userPublicId: _publicKey,
       data: jsonEncode({
         'type': 'version-hash',
@@ -188,6 +188,31 @@ class VersionChainVillager {
   }
 }
 ```
+
+Standalone relay servers do not immediately query version data after every publish. When the relay is missing the announced latest version, it sends an unencrypted signed `offer` control message back to the publishing peer. The signed `UncipherMessage.data` is a generic `Offer` JSON object:
+
+```dart
+const String offerTypeStorage = 'storage';
+const String applyTypeVersion = 'version';
+
+class Offer {
+  String type; // offerTypeStorage
+  String target; // data owner's public key
+  Map<String, dynamic> data; // {'limit': 100, 'extra': ''}
+}
+
+class Apply {
+  String type; // applyTypeVersion
+  Map<String, dynamic> data; // {'versions': [...]} all version hashes in the local DAG for applyTypeVersion
+}
+```
+
+`Offer.target` always names the **data owner**, not the peer that currently holds a copy.
+
+- **App only**: MeshNotes stores only the current user's data, so the app additionally requires `target` to equal the local user's public key before answering (`lib/net/net_isolate.dart` `_handleOffer` and `lib/mindeditor/controller/controller.dart` `receiveOffer`). Offers for any other `target` are ignored. After that check, the app reads storage fields from `offer.data` and replies with an unencrypted signed `Apply` containing local version hashes in `Apply.data['versions']`.
+- **Server-to-server**: a relay stores objects for many users. `target` is still the data owner, **not** the receiving server's own public key. The receiving server must not require `target == self`; it uses `target` to select which owner's data to apply.
+
+The relay then queries only the missing hashes through the normal `query`/`provide` path.
 
 ### 3. Version request
 
@@ -236,7 +261,7 @@ void onVersionTreeQuery(String hash, String fromNodeId) {
   final versionData = jsonEncode(version.toJson());
   final encryptedVersion = _encrypt.encrypt(timestamp, versionData);
 
-  final resource = SignedResource(
+  final resource = CipherMessage(
     id: 'version-tree:$hash',
     encryptedContent: encryptedVersion,
   );
@@ -246,14 +271,14 @@ void onVersionTreeQuery(String hash, String fromNodeId) {
     HashUtil.hashText(jsonEncode([resource.toJson()])),
   );
 
-  final signedResources = SignedResources(
+  final cipherMessages = CipherMessages(
     userPublicId: _publicKey,
     resources: [resource],
     signature: signature,
   );
 
   // 5. Send
-  _village.provide(signedResources.encode(), targetNode: fromNodeId);
+  _village.provide(cipherMessages.encode(), targetNode: fromNodeId);
 
   // 6. Send missing objects
   _sendObjects(missingObjects, fromNodeId);
@@ -264,7 +289,7 @@ void _sendObjects(List<String> hashes, String targetNode) {
 
   for (var i = 0; i < hashes.length; i += batchSize) {
     final batch = hashes.skip(i).take(batchSize).toList();
-    final resources = <SignedResource>[];
+    final resources = <CipherMessage>[];
 
     for (var hash in batch) {
       final content = _db.getObject(hash);
@@ -272,7 +297,7 @@ void _sendObjects(List<String> hashes, String targetNode) {
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final encrypted = _encrypt.encrypt(timestamp, content);
 
-        resources.add(SignedResource(
+        resources.add(CipherMessage(
           id: hash,
           encryptedContent: encrypted,
         ));
@@ -285,7 +310,7 @@ void _sendObjects(List<String> hashes, String targetNode) {
       );
 
       _village.provide(
-        SignedResources(
+        CipherMessages(
           userPublicId: _publicKey,
           resources: resources,
           signature: signature,
@@ -300,19 +325,19 @@ void _sendObjects(List<String> hashes, String targetNode) {
 ### 5. Version receive
 
 ```dart
-void onVersionTreeReceived(SignedResources signedRes) {
+void onVersionTreeReceived(CipherMessages cipherMsgs) {
   // 1. Verify signature
   final hash = HashUtil.hashText(
-    jsonEncode(signedRes.resources.map((e) => e.toJson()).toList()),
+    jsonEncode(cipherMsgs.resources.map((e) => e.toJson()).toList()),
   );
-  final verifying = VerifyingWrapper(signedRes.userPublicId);
-  if (!verifying.verify(hash, signedRes.signature)) {
+  final verifying = VerifyingWrapper(cipherMsgs.userPublicId);
+  if (!verifying.verify(hash, cipherMsgs.signature)) {
     MyLogger.warn('Invalid signature for version tree');
     return;
   }
 
   // 2. Decrypt version tree
-  for (var resource in signedRes.resources) {
+  for (var resource in cipherMsgs.resources) {
     if (!resource.id.startsWith('version-tree:')) continue;
 
     final timestamp = _extractTimestamp(resource.encryptedContent);
@@ -341,19 +366,19 @@ void onVersionTreeReceived(SignedResources signedRes) {
   }
 }
 
-void onObjectsReceived(SignedResources signedRes) {
+void onObjectsReceived(CipherMessages cipherMsgs) {
   // 1. Verify signature
   final hash = HashUtil.hashText(
-    jsonEncode(signedRes.resources.map((e) => e.toJson()).toList()),
+    jsonEncode(cipherMsgs.resources.map((e) => e.toJson()).toList()),
   );
-  final verifying = VerifyingWrapper(signedRes.userPublicId);
-  if (!verifying.verify(hash, signedRes.signature)) {
+  final verifying = VerifyingWrapper(cipherMsgs.userPublicId);
+  if (!verifying.verify(hash, cipherMsgs.signature)) {
     MyLogger.warn('Invalid signature for objects');
     return;
   }
 
   // 2. Decrypt and store objects
-  for (var resource in signedRes.resources) {
+  for (var resource in cipherMsgs.resources) {
     final timestamp = _extractTimestamp(resource.encryptedContent);
     final content = _encrypt.decrypt(timestamp, resource.encryptedContent);
 
