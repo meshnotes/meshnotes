@@ -329,4 +329,61 @@ void main() {
     final otherUserRequired = RequireVersions.fromJson(jsonDecode(otherUserQuery.data));
     expect(otherUserRequired.requiredVersions, ['version_tree']);
   });
+
+  test('RelayApplication - limits query versions per apply from config', () async {
+    final mockOverlay = MockVillageOverlay();
+    final villageDb = VillageDbHelper();
+    await villageDb.init(tempDir.path);
+    final signing = SigningWrapper.random();
+    final userSigning = SigningWrapper.random();
+    final userPublicKey = userSigning.getCompressedPublicKey();
+
+    final app = RelayApplication(
+      overlay: mockOverlay,
+      db: villageDb,
+      serverDb: dbHelper,
+      signing: signing,
+      upperAppName: 'mesh_notes',
+      maxQueryVersionsPerApply: 2,
+    );
+    final node = VillagerNode(host: '127.0.0.1', port: 8080);
+    node.nodeId = 'node_1';
+
+    final apply = Apply(
+      type: applyTypeVersion,
+      data: {
+        'versions': ['v1', 'v2', 'v3'],
+      },
+    );
+    final applyData = jsonEncode(apply);
+    final uncipherApply = UncipherMessage(
+      userPublicId: userPublicKey,
+      data: applyData,
+      signature: userSigning.sign(HashUtil.hashText(applyData)),
+    );
+
+    app.onData(node, 'mesh_notes', AppMessageType.applyAppType.value, jsonEncode(uncipherApply));
+
+    expect(mockOverlay.sentData.length, 1);
+    expect(mockOverlay.sentData[0]['type'], AppMessageType.queryAppType.value);
+    final queryAfterApply = UncipherMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
+    final requiredAfterApply = RequireVersions.fromJson(jsonDecode(queryAfterApply.data));
+    expect(requiredAfterApply.requiredVersions, ['v1', 'v2']);
+
+    mockOverlay.sentData.clear();
+    final providedResources = CipherMessages(
+      userPublicId: userPublicKey,
+      resources: [
+        CipherMessage(key: 'v1', subKey: '', timestamp: 1, data: 'data1', signature: 'sig1'),
+        CipherMessage(key: 'v2', subKey: '', timestamp: 2, data: 'data2', signature: 'sig2'),
+      ],
+      signature: 'provide_sig',
+    );
+    app.onData(node, 'mesh_notes', AppMessageType.provideAppType.value, jsonEncode(providedResources));
+
+    expect(mockOverlay.sentData.length, 1);
+    final nextQuery = UncipherMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
+    final nextRequired = RequireVersions.fromJson(jsonDecode(nextQuery.data));
+    expect(nextRequired.requiredVersions, ['v3']);
+  });
 }

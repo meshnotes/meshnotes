@@ -14,10 +14,13 @@ class RelayApplication implements ApplicationController {
   static const versionTreeKey = 'version_tree';
   static const latestVersionKey = 'latest_version';
   static const latestVersionTimestampKey = 'latest_version_timestamp';
+  static const defaultMaxQueryVersionsPerApply = 2;
   final VillageOverlay _overlay;
   final ServerDbHelper _serverDb;
   final SigningWrapper _signing;
   final String upperAppName;
+  final int maxQueryVersionsPerApply;
+  final Map<String, List<String>> _pendingMissingVersionsByUser = {};
   final Map<String, AppMessageType> _mapOfAppMessageType = {};
 
   RelayApplication({
@@ -26,7 +29,11 @@ class RelayApplication implements ApplicationController {
     required ServerDbHelper serverDb,
     required SigningWrapper signing,
     required this.upperAppName,
-  })  : _overlay = overlay, _serverDb = serverDb, _signing = signing {
+    int maxQueryVersionsPerApply = defaultMaxQueryVersionsPerApply,
+  })  : _overlay = overlay,
+        _serverDb = serverDb,
+        _signing = signing,
+        maxQueryVersionsPerApply = maxQueryVersionsPerApply <= 0? defaultMaxQueryVersionsPerApply : maxQueryVersionsPerApply {
     MyLogger.info('$logPrefix register app=relay_village');
     _overlay.registerApplication('relay_village', this, setDefault: true);
     _overlay.registerApplication(upperAppName, this);
@@ -64,6 +71,7 @@ class RelayApplication implements ApplicationController {
               envelope: data,
             );
           }
+          _sendNextMissingVersionQuery(userPublicKey, appName, node);
         } catch(e) {
           MyLogger.warn('$logPrefix Failed to parse provideAppType data: $e');
         }
@@ -163,12 +171,9 @@ class RelayApplication implements ApplicationController {
               missingVersions.add(version);
             }
           }
+          _pendingMissingVersionsByUser[userPublicKey] = missingVersions;
           MyLogger.info('$logPrefix Total versions in apply: ${versionHashes.length}, missing: ${missingVersions.length}');
-          if(missingVersions.isNotEmpty) {
-            // 8) Query missing versions after apply, then reuse the provide flow to store them on the server.
-            final queryPayload = _buildQueryPayload(missingVersions);
-            _overlay.sendData(appName, this, node, AppMessageType.queryAppType.value, queryPayload);
-          }
+          _sendNextMissingVersionQuery(userPublicKey, appName, node);
         } catch(e) {
           MyLogger.warn('$logPrefix Failed to handle applyAppType: $e');
         }
@@ -188,6 +193,30 @@ class RelayApplication implements ApplicationController {
       signature: _signing.sign(HashUtil.hashText(data)),
     );
     return jsonEncode(uncipherMessage);
+  }
+
+  void _sendNextMissingVersionQuery(String userPublicKey, String appName, VillagerNode node) {
+    final pending = _pendingMissingVersionsByUser[userPublicKey];
+    if(pending == null || pending.isEmpty) {
+      _pendingMissingVersionsByUser.remove(userPublicKey);
+      return;
+    }
+    pending.removeWhere((version) => _serverDb.hasObject(userPublicKey, version));
+    if(pending.isEmpty) {
+      _pendingMissingVersionsByUser.remove(userPublicKey);
+      MyLogger.info('$logPrefix All pending versions cached for user $userPublicKey.');
+      return;
+    }
+    final batchSize = pending.length < maxQueryVersionsPerApply? pending.length : maxQueryVersionsPerApply;
+    final queryVersions = pending.sublist(0, batchSize);
+    pending.removeRange(0, batchSize);
+    if(pending.isEmpty) {
+      _pendingMissingVersionsByUser.remove(userPublicKey);
+    }
+    final pendingTotalAfterSend = _pendingMissingVersionsByUser.values.fold<int>(0, (total, versions) => total + versions.length);
+    MyLogger.info('$logPrefix Query missing versions for user $userPublicKey: query_now=${queryVersions.length}, pending_for_user_after_send=${pending.length}, pending_total_after_send=$pendingTotalAfterSend, pending_users=${_pendingMissingVersionsByUser.length}');
+    final queryPayload = _buildQueryPayload(queryVersions);
+    _overlay.sendData(appName, this, node, AppMessageType.queryAppType.value, queryPayload);
   }
 
   List<String> _stringListFromApplyData(dynamic data) {

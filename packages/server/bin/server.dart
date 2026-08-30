@@ -14,14 +14,16 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
 void main(List<String> args) async {
-  MyLogger.initForConsoleTest(name: 'server', debug: true);
   final parser = ArgParser()
     ..addFlag('help', abbr: 'h', help: 'Show this help message', negatable: false)
     ..addFlag('gen-key', abbr: 'g', help: 'Generate a new private key and save to config', negatable: false)
+    ..addFlag('debug', help: 'Enable debug logs', negatable: false)
     ..addOption('port', abbr: 'p', help: 'Port to listen on')
     ..addOption('dir', abbr: 'd', help: 'Directory to store server data', defaultsTo: './server_data');
 
   final argResults = parser.parse(args);
+  final debug = argResults['debug'] as bool;
+  MyLogger.initForConsoleTest(name: 'server', debug: debug);
 
   if(argResults['help']) {
     print(parser.usage);
@@ -66,6 +68,7 @@ Future<void> _generateKey(String dataDir, String configPath) async {
     'public_key': publicKey,
     'device_id': 'server_${DateTime.now().millisecondsSinceEpoch}',
     'user_name': 'relay_server',
+    'max_query_versions_per_apply': RelayApplication.defaultMaxQueryVersionsPerApply,
   };
 
   final file = File(configPath);
@@ -87,6 +90,10 @@ Future<void> _startServer(int port, String dataDir, String configPath) async {
   final publicKey = configYaml['public_key'] as String;
   final userName = configYaml['user_name'] as String;
   final privateKey = configYaml['private_key'] as String;
+  final maxQueryVersionsPerApply = _readPositiveIntConfig(
+    configYaml['max_query_versions_per_apply'],
+    RelayApplication.defaultMaxQueryVersionsPerApply,
+  );
   final signing = SigningWrapper.loadKey(privateKey);
   if(signing.getCompressedPublicKey() != publicKey) {
     print('Config public_key does not match private_key. Please regenerate server_config.yaml.');
@@ -133,8 +140,16 @@ Future<void> _startServer(int port, String dataDir, String configPath) async {
     serverDb: serverDb,
     signing: signing,
     upperAppName: 'mesh_notes',
+    maxQueryVersionsPerApply: maxQueryVersionsPerApply,
   );
 
   await relayApp.start();
-  print('Relay server started on port $port with deviceId $deviceId');
+  print('Relay server started on port $port with deviceId $deviceId, maxQueryVersionsPerApply=$maxQueryVersionsPerApply');
+}
+
+int _readPositiveIntConfig(dynamic value, int defaultValue) {
+  if(value == null) return defaultValue;
+  final parsed = value is int? value : int.tryParse(value.toString());
+  if(parsed == null || parsed <= 0) return defaultValue;
+  return parsed;
 }
