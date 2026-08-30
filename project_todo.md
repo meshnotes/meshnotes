@@ -44,3 +44,6 @@
 ## 4. Multi-Platform Support
 - [ ] **Multi-Window Sync**: Verify real-time database reactivity and UI refresh when editing the same document in multi-window environments.
 - [x] **iPad OS 26+ Multitasking Layout Inset Validation**: Implemented Stage Manager/iPad windowed multitasking padding offset fallback adjustments.
+- [x] **Android Release Build Hang Fix**: Injected a `flutter` extension into plugin subprojects in `android/build.gradle` so plugins built for Flutter 3.27+ (`record_android` 1.5.2, ...) can read `flutter.compileSdkVersion` under Flutter 3.24.
+- [ ] **Flutter SDK Upgrade (3.27+)**: Upgrade the pinned fvm Flutter version so plugin projects get the `flutter` extension natively. The shim in `android/build.gradle` disables itself once that happens, but it should still be deleted during the upgrade.
+- [ ] **Kotlin Incremental Cache Warnings on Windows**: Android builds log `Could not close incremental caches ... this and base files have different roots` because the pub cache lives on `C:` while the build output lives on `E:`. Kotlin falls back to non-incremental compilation, which slows every build; consider relocating `PUB_CACHE` onto the same drive as the project.

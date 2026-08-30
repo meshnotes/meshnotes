@@ -713,6 +713,45 @@ sudo apt-get install clang cmake ninja-build pkg-config libgtk-3-dev
 sudo apt-get install libavahi-client-dev
 ```
 
+### 6. Android build hangs at "Running Gradle task 'assembleRelease'"
+
+**Location**: `android/build.gradle`
+
+**Symptom**: `flutter build apk` prints `Running Gradle task 'assembleRelease'...` and never finishes. The Gradle daemon burns 100% of one CPU core with a flat memory footprint, and no error is ever printed.
+
+**Cause**: Flutter 3.24's Gradle plugin creates the `flutter` extension only on the `:app` project (`FlutterExtension` in `packages/flutter_tools/gradle/src/main/groovy/flutter.groovy`). Plugins published for Flutter 3.27+ read `flutter.compileSdkVersion` inside their own `android { }` block, for example `record_android >= 1.4.3` (pulled in by `record: 6.2.0`) and `shared_preferences_android >= 2.4.15`. Configuring such a plugin throws `MissingPropertyException: Could not get unknown property 'flutter' for extension 'android'`. Gradle then hangs in `DefaultExceptionAnalyser.findDeepestRootException` while building the failure report, so the underlying error is never reported — the build only *looks* like it is stuck downloading or compiling.
+
+**Solution**: `android/build.gradle` injects a `flutter` extra property into every non-`app` subproject before it is evaluated, mirroring the values `android/app/build.gradle` uses (and the values Flutter 3.27's own `FlutterExtension` vends).
+
+```gradle
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+subprojects { subproject ->
+    if(subproject.name != "app" && subproject.extensions.findByName("flutter") == null) {
+        subproject.ext.flutter = [
+            compileSdkVersion: 35,
+            minSdkVersion    : 26,
+            targetSdkVersion : 35,
+            ndkVersion       : "23.1.7779620",
+        ]
+    }
+}
+```
+
+The block order is load-bearing. Evaluating `:app` is what runs Flutter's `configurePluginProject()`, which on 3.27+ calls `pluginProject.extensions.create("flutter", FlutterExtension)` for every plugin project. Placing the shim after `evaluationDependsOn(":app")` means the `findByName` guard sees that real extension and skips, so the shim disables itself as soon as the SDK is upgraded and no cleanup is required.
+
+Order matters because a Gradle extra property shadows a same-named extension during dynamic property lookup — an unguarded shim on 3.27+ would silently replace the SDK's own `FlutterExtension` rather than fail. Verified on this project: forcing `ext.flutter` onto `:app` (which does own a real extension) makes `project.flutter` resolve to the map and the build dies with `Must provide Flutter source directory`.
+
+**Diagnosing similar hangs**: because Gradle swallows configuration failures this way, use [tools/gradle_diagnose_init.gradle](../tools/gradle_diagnose_init.gradle), which prints the failure the moment it happens instead of waiting for Gradle's own report. From `android/`:
+
+```bash
+./gradlew :<plugin_project>:properties -I ../tools/gradle_diagnose_init.gradle
+```
+
+This is worth reaching for whenever an Android build hangs with no output — any plugin that starts reading `flutter.compileSdkVersion` reproduces the same silent hang. See [08-tools.md](08-tools.md#gradle_diagnose_initgradle---android-configuration-failure-diagnostics) for details.
+
 ## Testing and Debugging
 
 ### Platform-specific tests
