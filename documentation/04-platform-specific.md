@@ -514,14 +514,14 @@ Future<bool> requestPhotoPermission() async {
 
 ```gradle
 android {
-    compileSdkVersion 34
+    compileSdk = 36  // Must be >= targetSdk. Google Play requires targetSdk 36 as of 2026-08-31.
 
     defaultConfig {
-        applicationId "com.example.meshnotes"
-        minSdkVersion 21    // Android 5.0+
-        targetSdkVersion 34
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        applicationId "xyz.meshnotes.meshnotes"
+        minSdk = 26    // Android 8.0+
+        targetSdk = 36  // Required by Google Play (Android 16)
+        versionCode flutter.versionCode
+        versionName flutter.versionName
     }
 
     buildTypes {
@@ -533,6 +533,10 @@ android {
     }
 }
 ```
+
+Google Play requires phone/tablet app updates to target Android 16 (API 36) from 2026-08-31. `compileSdk` must be at least as high as `targetSdk`. `minSdk` stays at 26 — targeting 36 does not drop older-device support. Plugin subprojects get the same 36 values from the `flutter` shim in `android/build.gradle` (see [Android build hangs](#6-android-build-hangs-at-running-gradle-task-assemblerelease) below).
+
+Targeting 36 turns on Android 16 behavior changes. Mesh Notes already runs edge-to-edge (`SystemUiOverlayStyle` in `lib/init.dart`) and does not lock orientation, so the large-screen orientation/resizability change does not apply. Test camera, microphone, WebRTC, and LAN discovery on an Android 16 device or emulator before shipping the Play production update.
 
 ### iOS
 
@@ -731,9 +735,9 @@ subprojects {
 subprojects { subproject ->
     if(subproject.name != "app" && subproject.extensions.findByName("flutter") == null) {
         subproject.ext.flutter = [
-            compileSdkVersion: 35,
+            compileSdkVersion: 36,
             minSdkVersion    : 26,
-            targetSdkVersion : 35,
+            targetSdkVersion : 36,
             ndkVersion       : "23.1.7779620",
         ]
     }

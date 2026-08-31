@@ -27,9 +27,9 @@ subprojects {
 subprojects { subproject ->
     if(subproject.name != "app" && subproject.extensions.findByName("flutter") == null) {
         subproject.ext.flutter = [
-            compileSdkVersion: 35,
+            compileSdkVersion: 36,
             minSdkVersion    : 26,
-            targetSdkVersion : 35,
+            targetSdkVersion : 36,
             ndkVersion       : "23.1.7779620",
         ]
     }
