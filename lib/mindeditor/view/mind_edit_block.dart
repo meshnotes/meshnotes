@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
@@ -990,14 +991,18 @@ class MindEditBlockState extends State<MindEditBlock> {
     var pos = _getRender()!.getPositionByOffset(offset);
     MyLogger.info('getWordPosRange: pos=$pos');
     var plainText = widget.texts.getPlainText();
-    var currentChar = plainText.codeUnitAt(pos);
+    if(plainText.isEmpty) {
+      return (0, 0);
+    }
+    var charPos = min(max(pos, 0), plainText.length - 1);
+    var currentChar = plainText.codeUnitAt(charPos);
     if(_isAlphabet(currentChar)) { // Find English word
-      return _findWord(plainText, pos);
+      return _findWord(plainText, charPos);
     } else { // Return current position
       if(pos == 0) {
         return (0, 1);
       }
-      return (pos - 1, pos);
+      return (charPos, charPos + 1);
     }
   }
   bool _isAlphabet(int c) {
