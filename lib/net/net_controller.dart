@@ -67,7 +67,9 @@ class NetworkController {
 
   void sendVersionBroadcast(String latestVersion, int latestVersionTimestamp, TimeCostStatistics stats) {
     var msg = BroadcastMessages(
-      type: versionChainBroadcastType, // 2) Publish version chain state instead of only the latest hash
+      type: versionChainBroadcastType, // Publish version chain state instead of only the latest hash
+      userPublicId: '', // Leave them empty for now, will be filled in the Villager implementation
+      signature: '',
       messages: {
         'latest_version': latestVersion,
         'latest_version_timestamp': latestVersionTimestamp.toString(),
