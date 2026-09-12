@@ -15,7 +15,8 @@ android {
     namespace = "xyz.meshnotes.meshnotes"
     // compileSdk = flutter.compileSdkVersion
     compileSdk = 36  // Must be >= targetSdk
-    ndkVersion = flutter.ndkVersion
+    // Flutter 3.35 still defaults to NDK r27; r28 emits 16 KB ELF alignment by default (Google Play).
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -23,7 +24,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -37,6 +38,12 @@ android {
         targetSdk = 36  // Required by Google Play (Android 16)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
     signingConfigs {
         release {

@@ -356,8 +356,8 @@ When modifying `ParagraphDesc` or `Document`:
 
 ## Tech Stack
 
-- **Flutter**: 3.24.0+
-- **Dart**: 3.5.0+
+- **Flutter**: 3.35.2+
+- **Dart**: 3.9.0+
 - **Database**: SQLite3
 - **Network**: UDP + custom protocol
 - **Crypto**: Ed25519 (signature) + AES (encryption)

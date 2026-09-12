@@ -30,8 +30,29 @@ subprojects { subproject ->
             compileSdkVersion: 36,
             minSdkVersion    : 26,
             targetSdkVersion : 36,
-            ndkVersion       : "23.1.7779620",
+            ndkVersion       : "28.2.13676358",
         ]
+    }
+}
+
+// mp_audio_stream 0.2.2 pins `ndkVersion "21.1.6352462"` in its own android/build.gradle, so CMake
+// still builds libmp_audio_stream.so with NDK r21 even when :app uses r28. r21's linker can write
+// p_align=16KB without a Play-compliant LOAD layout (Google Play flagged this exact file). Force
+// every Android module onto the same r28 as the app.
+subprojects { subproject ->
+    def forceNdkR28 = {
+        def androidExt = subproject.extensions.findByName("android")
+        if(androidExt == null) return
+        androidExt.ndkVersion = "28.2.13676358"
+        // NDK r28 refuses minSdk 16 (mp_audio_stream's default). The app is already minSdk 26.
+        if(subproject.name == "mp_audio_stream") {
+            androidExt.defaultConfig.minSdk = 21
+        }
+    }
+    if(subproject.state.executed) {
+        forceNdkR28()
+    } else {
+        subproject.afterEvaluate { forceNdkR28() }
     }
 }
 

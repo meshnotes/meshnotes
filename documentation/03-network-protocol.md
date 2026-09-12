@@ -231,24 +231,33 @@ enum VillagerStatus {
 
 ```dart
 class BonjourDiscovery {
-  void startAdvertising() {
+  Future<void> startAdvertising() async {
     // Broadcast our service
-    _service = BonsoirService(
+    final service = BonsoirService(
       name: _deviceId,
       type: '_meshnotes._udp',
       port: _port,
     );
-    _service.start();
+    final broadcast = BonsoirBroadcast(service: service);
+    await broadcast.initialize();
+    await broadcast.start();
   }
 
-  void startDiscovery() {
+  Future<void> startDiscovery() async {
     // Listen for other services
-    _discovery = BonsoirDiscovery(type: '_meshnotes._udp');
-    _discovery.listen((event) {
-      if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
-        _onServiceFound(event.service);
+    final discovery = BonsoirDiscovery(type: '_meshnotes._udp');
+    await discovery.initialize();
+    discovery.eventStream!.listen((event) {
+      switch(event) {
+        case BonsoirDiscoveryServiceFoundEvent():
+          event.service.resolve(discovery.serviceResolver);
+        case BonsoirDiscoveryServiceResolvedEvent():
+          _onServiceFound(event.service);
+        default:
+          break;
       }
     });
+    await discovery.start();
   }
 }
 ```

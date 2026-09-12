@@ -43,7 +43,7 @@ sudo apt install -f
 
 安装cmdline-tools
 
-## 2. 下载并切换到 Flutter 3.24.0
+## 2. 下载并切换到 Flutter 3.35.2
 
 官方推荐通过 Git 仓库来管理 Flutter SDK，这样可以轻松切换不同版本。
 
@@ -56,17 +56,17 @@ cd ~
 git clone https://github.com/flutter/flutter.git
 ```
 
-进入 Flutter 目录并切换到标签 3.24.0（确保该标签存在，如有疑问可使用 `git tag` 检查所有可用版本）：
+进入 Flutter 目录并切换到标签 3.35.2（确保该标签存在，如有疑问可使用 `git tag` 检查所有可用版本）：
 
 bash
 
 ```bash
 cd flutter
 git fetch --tags
-git checkout 3.24.0
+git checkout 3.35.2
 ```
 
-*提示：* 如果你打算以后持续更新，也可以选择某个分支（如 stable），但这里你要求的是 3.24.0，所以明确切换到此版本。
+*提示：* 如果你打算以后持续更新，也可以选择某个分支（如 stable），但这里你要求的是 3.35.2，所以明确切换到此版本。
 
 ## 3. 配置 Flutter 环境变量
 
@@ -100,8 +100,8 @@ flutter doctor
 ```bash
 flutter doctor
 Doctor summary (to see all details, run flutter doctor -v):
-[!] Flutter (Channel [user-branch], 3.24.0, on Ubuntu 24.04.2 LTS 6.11.0-17-generic, locale en_US.UTF-8)
-    ! Flutter version 3.24.0 on channel [user-branch] at /home/kali/github/flutter
+[!] Flutter (Channel [user-branch], 3.35.2, on Ubuntu 24.04.2 LTS 6.11.0-17-generic, locale en_US.UTF-8)
+    ! Flutter version 3.35.2 on channel [user-branch] at /home/kali/github/flutter
       Currently on an unknown channel. Run `flutter channel` to switch to an official channel.
       If that doesn't fix the issue, reinstall Flutter by following instructions at https://flutter.dev/setup.
     ! Upstream repository unknown source is not a standard remote.
