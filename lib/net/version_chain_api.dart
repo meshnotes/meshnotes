@@ -144,21 +144,29 @@ class RelatedObject {
 }
 
 class BroadcastMessages {
-  String type; // 2) Identify the published payload type, currently versionChainBroadcastType
+  String type; // Identify the published payload type, currently versionChainBroadcastType
+  String userPublicId;
+  String signature;
   Map<String, String> messages;
 
   BroadcastMessages({
     required this.type,
+    required this.userPublicId,
+    required this.signature,
     required this.messages,
   });
 
   BroadcastMessages.fromJson(Map<String, dynamic> map):
         type = map['type']?? versionChainBroadcastType,
+        userPublicId = map['user'],
+        signature = map['sign'],
         messages = _buildMessages(map['messages']);
   
   Map<String, dynamic> toJson() {
     return {
       'type': type,
+      'user': userPublicId,
+      'sign': signature,
       'messages': messages,
     };
   }

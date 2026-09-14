@@ -64,6 +64,7 @@ Adapting for Windows, macOS, Linux, iOS, Android.
 - Permissions
 - Build configs (Android, iOS, macOS, Windows, Linux)
 - Icons and splash
+- Known platform issues and workarounds (including the Android release build hang)
 
 **For**: full-stack, mobile, and desktop engineers
 
@@ -126,11 +127,12 @@ Plugin architecture and AI integration.
 ---
 
 ### [08. Build Tools](08-tools.md)
-Build and distribution tools for macOS.
+Build and distribution tools: macOS packaging plus Android build diagnostics.
 
 **Includes**:
 - DMG creation tool (build_dmg.sh)
 - Signing and notarization tool (sign_and_notarize_dmg.sh)
+- Gradle configuration failure diagnostics (gradle_diagnose_init.gradle)
 - Complete build workflow
 - Prerequisites and setup
 - Troubleshooting guide

@@ -328,23 +328,31 @@ class BonjourDiscovery {
     }
   }
 
-  void _startAdvertising() {
-    _service = BonsoirService(
+  Future<void> _startAdvertising() async {
+    final service = BonsoirService(
       name: _deviceId,
       type: '_meshnotes._udp',
       port: _port,
     );
-    _service!.start();
+    final broadcast = BonsoirBroadcast(service: service);
+    await broadcast.initialize();
+    await broadcast.start();
   }
 
-  void _startDiscovery() {
-    _discovery = BonsoirDiscovery(type: '_meshnotes._udp');
-    _discovery!.listen((event) {
-      if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
-        _onServiceFound(event.service!);
+  Future<void> _startDiscovery() async {
+    final discovery = BonsoirDiscovery(type: '_meshnotes._udp');
+    await discovery.initialize();
+    discovery.eventStream!.listen((event) {
+      switch(event) {
+        case BonsoirDiscoveryServiceFoundEvent():
+          event.service.resolve(discovery.serviceResolver);
+        case BonsoirDiscoveryServiceResolvedEvent():
+          _onServiceFound(event.service);
+        default:
+          break;
       }
     });
-    _discovery!.start();
+    await discovery.start();
   }
 }
 ```
@@ -514,14 +522,14 @@ Future<bool> requestPhotoPermission() async {
 
 ```gradle
 android {
-    compileSdkVersion 34
+    compileSdk = 36  // Must be >= targetSdk. Google Play requires targetSdk 36 as of 2026-08-31.
 
     defaultConfig {
-        applicationId "com.example.meshnotes"
-        minSdkVersion 21    // Android 5.0+
-        targetSdkVersion 34
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        applicationId "xyz.meshnotes.meshnotes"
+        minSdk = 26    // Android 8.0+
+        targetSdk = 36  // Required by Google Play (Android 16)
+        versionCode flutter.versionCode
+        versionName flutter.versionName
     }
 
     buildTypes {
@@ -533,6 +541,27 @@ android {
     }
 }
 ```
+
+Google Play requires phone/tablet app updates to target Android 16 (API 36) from 2026-08-31. `compileSdk` must be at least as high as `targetSdk`. `minSdk` stays at 26 — targeting 36 does not drop older-device support. Plugin subprojects get the same 36 values from Flutter 3.35's per-plugin `flutter` extension (the `android/build.gradle` shim is a no-op on this SDK; see [Android build hangs](#6-android-build-hangs-at-running-gradle-task-assemblerelease) below).
+
+Targeting 36 turns on Android 16 behavior changes. Mesh Notes already runs edge-to-edge (`SystemUiOverlayStyle` in `lib/init.dart`) and does not lock orientation, so the large-screen orientation/resizability change does not apply. Test camera, microphone, WebRTC, and LAN discovery on an Android 16 device or emulator before shipping the Play production update.
+
+### Google Play 16 KB page sizes
+
+Play rejects Android 15+ 64-bit uploads whose native `.so` ELF `LOAD` segments are still 4 KB-aligned. This project meets that by:
+
+- Pinning Flutter **3.35.2** (16 KB-aligned `libflutter.so` / `libapp.so`)
+- Android Gradle Plugin **8.9.1** + Gradle **8.11.1** (16 KB ZIP alignment of uncompressed JNI libs)
+- NDK **28.2.13676358** in `android/app/build.gradle` (r28 emits 16 KB ELF alignment by default; Flutter 3.35's `flutter.ndkVersion` is still r27)
+- `packaging.jniLibs.useLegacyPackaging = false` so `.so` files stay uncompressed and zip-aligned
+- `sqlite3_flutter_libs` 0.5.39 (16 KB since 0.5.25)
+- `android/build.gradle` forces every Android library module onto NDK r28. `mp_audio_stream` 0.2.2 otherwise pins `ndkVersion "21.1.6352462"` and ships `libmp_audio_stream.so` that Play rejects even when `p_align` reads as 16 KB (built with NDK r21b; second `LOAD` at file offset `0x505a8`)
+
+Verified on a release APK: every `arm64-v8a` / `x86_64` library reports `align 2**14` or higher, and `zipalign -c -P 16 -v 4` succeeds. 32-bit `armeabi-v7a` is out of scope for this Play check. Rebuild `mp_audio_stream` after changing NDK (delete `build/mp_audio_stream` and the plugin's `android/.cxx`) so CMake does not keep the r21 cache.
+
+### Kotlin incremental compilation on Windows
+
+Pub cache lives on `C:` while the project lives on `E:`. Kotlin 2.1's incremental compiler then fails with `this and base files have different roots`. `android/gradle.properties` sets `kotlin.incremental=false` until `PUB_CACHE` is moved onto the same drive.
 
 ### iOS
 
@@ -712,6 +741,45 @@ sudo apt-get install clang cmake ninja-build pkg-config libgtk-3-dev
 # Network discovery dependencies
 sudo apt-get install libavahi-client-dev
 ```
+
+### 6. Android build hangs at "Running Gradle task 'assembleRelease'"
+
+**Location**: `android/build.gradle`
+
+**Symptom**: `flutter build apk` prints `Running Gradle task 'assembleRelease'...` and never finishes. The Gradle daemon burns 100% of one CPU core with a flat memory footprint, and no error is ever printed.
+
+**Cause**: Flutter 3.24's Gradle plugin creates the `flutter` extension only on the `:app` project (`FlutterExtension` in `packages/flutter_tools/gradle/src/main/groovy/flutter.groovy`). Plugins published for Flutter 3.27+ read `flutter.compileSdkVersion` inside their own `android { }` block, for example `record_android >= 1.4.3` (pulled in by `record: 6.2.0`) and `shared_preferences_android >= 2.4.15`. Configuring such a plugin throws `MissingPropertyException: Could not get unknown property 'flutter' for extension 'android'`. Gradle then hangs in `DefaultExceptionAnalyser.findDeepestRootException` while building the failure report, so the underlying error is never reported — the build only *looks* like it is stuck downloading or compiling.
+
+**Solution**: `android/build.gradle` injects a `flutter` extra property into every non-`app` subproject before it is evaluated, mirroring the values `android/app/build.gradle` uses (and the values Flutter 3.27's own `FlutterExtension` vends).
+
+```gradle
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+subprojects { subproject ->
+    if(subproject.name != "app" && subproject.extensions.findByName("flutter") == null) {
+        subproject.ext.flutter = [
+            compileSdkVersion: 36,
+            minSdkVersion    : 26,
+            targetSdkVersion : 36,
+            ndkVersion       : "28.2.13676358",
+        ]
+    }
+}
+```
+
+The block order is load-bearing. Evaluating `:app` is what runs Flutter's `configurePluginProject()`, which on 3.27+ calls `pluginProject.extensions.create("flutter", FlutterExtension)` for every plugin project. Placing the shim after `evaluationDependsOn(":app")` means the `findByName` guard sees that real extension and skips. This project is on Flutter 3.35.2, so the shim is currently a no-op safety net rather than the active source of SDK versions.
+
+Order matters because a Gradle extra property shadows a same-named extension during dynamic property lookup — an unguarded shim on 3.27+ would silently replace the SDK's own `FlutterExtension` rather than fail. Verified on this project: forcing `ext.flutter` onto `:app` (which does own a real extension) makes `project.flutter` resolve to the map and the build dies with `Must provide Flutter source directory`.
+
+**Diagnosing similar hangs**: because Gradle swallows configuration failures this way, use [tools/gradle_diagnose_init.gradle](../tools/gradle_diagnose_init.gradle), which prints the failure the moment it happens instead of waiting for Gradle's own report. From `android/`:
+
+```bash
+./gradlew :<plugin_project>:properties -I ../tools/gradle_diagnose_init.gradle
+```
+
+This is worth reaching for whenever an Android build hangs with no output — any plugin that starts reading `flutter.compileSdkVersion` reproduces the same silent hang. See [08-tools.md](08-tools.md#gradle_diagnose_initgradle---android-configuration-failure-diagnostics) for details.
 
 ## Testing and Debugging
 

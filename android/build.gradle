@@ -9,8 +9,51 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+// Flutter 3.24's Gradle plugin only creates the `flutter` extension on :app, but plugins published for Flutter 3.27+
+// (record_android >= 1.4.3, shared_preferences_android >= 2.4.15, ...) read `flutter.compileSdkVersion` in their own
+// build.gradle. Without this shim they fail with "Could not get unknown property 'flutter'", and Gradle then spins
+// forever in its exception analyser instead of reporting the error.
+//
+// This block MUST stay after the evaluationDependsOn(":app") block above: evaluating :app is what runs Flutter's
+// configurePluginProject(), which on 3.27+ creates the real `flutter` extension on every plugin project. Only then
+// does the findByName check below mean anything, so the shim disables itself automatically after an SDK upgrade.
+// It matters because an extra property shadows a same-named extension in Gradle's dynamic lookup, so a shim left
+// active on 3.27+ would silently override the SDK's own values instead of failing.
+subprojects { subproject ->
+    if(subproject.name != "app" && subproject.extensions.findByName("flutter") == null) {
+        subproject.ext.flutter = [
+            compileSdkVersion: 36,
+            minSdkVersion    : 26,
+            targetSdkVersion : 36,
+            ndkVersion       : "28.2.13676358",
+        ]
+    }
+}
+
+// mp_audio_stream 0.2.2 pins `ndkVersion "21.1.6352462"` in its own android/build.gradle, so CMake
+// still builds libmp_audio_stream.so with NDK r21 even when :app uses r28. r21's linker can write
+// p_align=16KB without a Play-compliant LOAD layout (Google Play flagged this exact file). Force
+// every Android module onto the same r28 as the app.
+subprojects { subproject ->
+    def forceNdkR28 = {
+        def androidExt = subproject.extensions.findByName("android")
+        if(androidExt == null) return
+        androidExt.ndkVersion = "28.2.13676358"
+        // NDK r28 refuses minSdk 16 (mp_audio_stream's default). The app is already minSdk 26.
+        if(subproject.name == "mp_audio_stream") {
+            androidExt.defaultConfig.minSdk = 21
+        }
+    }
+    if(subproject.state.executed) {
+        forceNdkR28()
+    } else {
+        subproject.afterEvaluate { forceNdkR28() }
+    }
 }
 
 tasks.register("clean", Delete) {

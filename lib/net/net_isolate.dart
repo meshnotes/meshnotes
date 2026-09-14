@@ -44,6 +44,7 @@ class VersionChainVillager {
   Timer? _timer;
   SigningWrapper? _signing;
   VerifyingWrapper? _verify;
+  final Map<String, VerifyingWrapper> _verifyMap = {};
   EncryptWrapper? _encrypt;
   UserPrivateInfo? userPrivateInfo;
   bool _allowSendingToPublicServer = false;
@@ -197,7 +198,7 @@ class VersionChainVillager {
     _nodes.clear();
   }
 
-  void _onReceivedProvide(String data, TimeCostStatistics stats) {
+  void _onReceivedProvide(String senderPublicKey, String data, TimeCostStatistics stats) {
     /// 1. Check public key is the same
     /// 2. Verify message and every single resource
     /// 3. Decrypt resources
@@ -206,16 +207,15 @@ class VersionChainVillager {
     final processStartTime = DateTime.now().microsecondsSinceEpoch;
 
     final cipherMessages = CipherMessages.fromJson(jsonDecode(data));
-    final publicKey = cipherMessages.userPublicId;
-    if(publicKey != _signing!.getCompressedPublicKey()) {
-      MyLogger.info('Receive provide message from other user: $publicKey');
+    if(cipherMessages.userPublicId != senderPublicKey) {
+      MyLogger.info('Receive PROVIDE message not signed by its sender');
       processingTimer.stop();
       return;
     }
     String feature = CipherMessages.getFeature(cipherMessages.resources);
-    final ok = _verifySignature(feature, cipherMessages.signature);
+    final ok = _verifySignatureWithKey(senderPublicKey, feature, cipherMessages.signature);
     if(!ok) {
-      MyLogger.info('Verify provide message failed');
+      MyLogger.info('Verify PROVIDE message failed');
       processingTimer.stop();
       return;
     }
@@ -233,7 +233,7 @@ class VersionChainVillager {
         data: resource.data, // currently encrypted data
       );
       if(!_verifySignature(rawResource.getFeature(), resource.signature)) {
-        MyLogger.info('Verify resource failed: ${rawResource.key}');
+        MyLogger.info('Verify PROVIDE resource failed: ${rawResource.key}');
         continue;
       }
       var plainText = _encrypt!.decrypt(rawResource.timestamp, rawResource.data);
@@ -271,23 +271,26 @@ class VersionChainVillager {
     ));
   }
 
-  void _onReceivedQuery(String data, TimeCostStatistics stats) {
+  void _onReceivedQuery(String senderPublicKey, String data, TimeCostStatistics stats) {
     /// 1. Check public key is the same
     /// 2. Verify message
     /// 3. Send to port to notify upper layer
     final processingTimer = Stopwatch()..start();
     UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
     final publicKey = uncipherMessage.userPublicId;
-    if(publicKey != _signing!.getCompressedPublicKey()) {
+    if(publicKey != senderPublicKey) {
+      MyLogger.info('Receive QUERY message not signed by its sender');
+      return;
+    }
+    if(publicKey != _signing!.getCompressedPublicKey() && !_allowSendingToPublicServer) {
       // 4) Query is an unciphered data request. In public-server mode a storage node with a different public key may query this user's data.
       // Gate that cross-user query path behind allowSendingToPublicServer, then verify with the requester's public key.
-      if(!_allowSendingToPublicServer || !_verifySignatureWithKey(publicKey, uncipherMessage.data, uncipherMessage.signature)) {
-        MyLogger.info('Receive rejected query message from other user: $publicKey');
-        processingTimer.stop();
-        return;
-      }
-    } else if(!_verifySignature(uncipherMessage.data, uncipherMessage.signature)) {
-      MyLogger.info('Verify query message failed');
+      MyLogger.info('Receive QUERY message from other user, and it is not allowed');
+      processingTimer.stop();
+      return;
+    }
+    if(!_verifySignatureWithKey(senderPublicKey, uncipherMessage.data, uncipherMessage.signature)) {
+      MyLogger.info('Verify QUERY message failed');
       processingTimer.stop();
       return;
     }
@@ -304,21 +307,33 @@ class VersionChainVillager {
     ));
   }
 
-  void _onReceivedPublish(String data, TimeCostStatistics stats) {
+  void _onReceivedPublish(String senderPublicKey, String data, TimeCostStatistics stats) {
     /// 1. Check public key is the same
-    /// 2. Verify message
-    /// 3. Send to port to notify upper layer
+    /// 2. Verify the hole message by the sender's public key
+    /// 3. Verify the data by the data owner's signature
+    /// 4. Send to port to notify upper layer
     UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
     final publicKey = uncipherMessage.userPublicId;
-    if(publicKey != _signing!.getCompressedPublicKey()) {
-      MyLogger.info('Receive verify message from other user: $publicKey');
+    if(publicKey != senderPublicKey) {
+      MyLogger.info('Receive PUBLISH message not signed by its sender');
       return;
     }
-    if(!_verifySignature(uncipherMessage.data, uncipherMessage.signature)) {
-      MyLogger.info('Verify publish message failed');
+    if(!_verifySignatureWithKey(senderPublicKey, uncipherMessage.data, uncipherMessage.signature)) {
+      MyLogger.info('Verify PUBLISH message failed');
       return;
     }
     var brdMsg = BroadcastMessages.fromJson(jsonDecode(uncipherMessage.data));
+    final ownerPublicKey = brdMsg.userPublicId;
+    if(ownerPublicKey != _signing!.getCompressedPublicKey()) {
+      MyLogger.info('Drop PUBLISH message from other user');
+      return;
+    }
+    final dataOwnerSignature = brdMsg.signature;
+    brdMsg.signature = '';
+    if(!_verifySignature(uncipherMessage.data, dataOwnerSignature)) {
+      MyLogger.info('Verify PUBLISH message with the data owner\'s signature failed');
+      return;
+    }
     stats.transportTime = Util.getTimeStamp();
     _sendPort.send(Message(
       cmd: Command.receiveBroadcast,
@@ -327,15 +342,12 @@ class VersionChainVillager {
     ));
   }
 
-  void _onNewNodeDiscovered(String host, int port, String deviceId) {
-    MyLogger.info('New node detected: $host:$port, deviceId=$deviceId');
-    _village?.newNodeDiscovered(host, port, deviceId);
-  }
-
   void _onSendBroadcast(BroadcastMessages msg, TimeCostStatistics stats) {
     stats.receiveTime = Util.getTimeStamp();
+    msg.userPublicId = _signing!.getCompressedPublicKey();
+    msg.signature = _genSignature(jsonEncode(msg)); // This is the signature of the data owner
     String json = jsonEncode(msg);
-    String signature = _genSignature(json);
+    String signature = _genSignature(json); // This is the signature of the sender. Sometimes they are different, for example, in the server mode.
     UncipherMessage uncipherMessage = UncipherMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
     String uncipherMessageJson = jsonEncode(uncipherMessage);
     _village?.sendPublish(uncipherMessageJson, stats);
@@ -419,6 +431,11 @@ class VersionChainVillager {
     _village?.sendVersions(json, stats);
   }
 
+  void _onNewNodeDiscovered(String host, int port, String deviceId) {
+    MyLogger.info('New node detected: $host:$port, deviceId=$deviceId');
+    _village?.newNodeDiscovered(host, port, deviceId);
+  }
+
   String _genSignature(String text) {
     return _signing!.sign(HashUtil.hashText(text));
   }
@@ -426,21 +443,25 @@ class VersionChainVillager {
     return _verify!.ver(HashUtil.hashText(text), stringSignature);
   }
 
-  void _onReceivedOffer(String data, TimeCostStatistics stats) {
+  void _onReceivedOffer(String senderPublicKey, String data, TimeCostStatistics stats) {
     try {
       UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
       final serverPublicKey = uncipherMessage.userPublicId;
+      if(serverPublicKey != senderPublicKey) {
+        MyLogger.info('Receive OFFER message not signed by its sender');
+        return;
+      }
       if(!_verifySignatureWithKey(serverPublicKey, uncipherMessage.data, uncipherMessage.signature)) {
-        MyLogger.info('Verify offer message signature failed');
+        MyLogger.info('Verify OFFER message signature failed');
         return;
       }
       final offer = Offer.fromJson(jsonDecode(uncipherMessage.data));
       if(offer.type != offerTypeStorage) {
-        MyLogger.info('Ignore unsupported offer type: ${offer.type}');
+        MyLogger.info('Ignore unsupported OFFER type: ${offer.type}');
         return;
       }
       if(offer.target != _signing!.getCompressedPublicKey()) {
-        MyLogger.info('Ignore offer for another target: ${offer.target}');
+        MyLogger.info('Ignore OFFER for another target: ${offer.target}');
         return;
       }
       stats.transportTime = Util.getTimeStamp();
@@ -450,23 +471,27 @@ class VersionChainVillager {
         stats: stats,
       ));
     } catch(e) {
-      MyLogger.warn('Failed to handle offer: $e');
+      MyLogger.warn('Failed to handle OFFER: $e');
     }
   }
 
-  void _onReceivedApply(String data, TimeCostStatistics stats) {
+  void _onReceivedApply(String senderPublicKey, String data, TimeCostStatistics stats) {
     // 7) handle storage apply (normally server handles this, but verify signature for completeness)
     try {
       UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
       final clientPublicKey = uncipherMessage.userPublicId;
-      if(!_verifySignatureWithKey(clientPublicKey, uncipherMessage.data, uncipherMessage.signature)) {
-        MyLogger.info('Verify apply message signature failed');
+      if(clientPublicKey != senderPublicKey) {
+        MyLogger.info('Receive APPLY message not signed by its sender');
         return;
       }
-      MyLogger.info('Receive apply message from client: $clientPublicKey. Only handle it in server mode, ignore it in app mode');
+      if(!_verifySignatureWithKey(clientPublicKey, uncipherMessage.data, uncipherMessage.signature)) {
+        MyLogger.info('Verify APPLY message signature failed');
+        return;
+      }
+      MyLogger.info('Receive APPLY message from client: $clientPublicKey. Only handle it in server mode, ignore it in app mode');
       return;
     } catch(e) {
-      MyLogger.warn('Failed to handle apply: $e');
+      MyLogger.warn('Failed to handle APPLY: $e');
     }
   }
 
@@ -484,7 +509,11 @@ class VersionChainVillager {
 
   bool _verifySignatureWithKey(String publicKey, String data, String signature) {
     try {
-      final verifier = VerifyingWrapper.loadKey(publicKey);
+      var verifier = _verifyMap[publicKey];
+      if(verifier == null) {
+        verifier = VerifyingWrapper.loadKey(publicKey);
+        _verifyMap[publicKey] = verifier;
+      }
       return verifier.ver(HashUtil.hashText(data), signature);
     } catch(e) {
       MyLogger.warn('Failed to verify signature with key $publicKey: $e');

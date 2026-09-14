@@ -67,7 +67,9 @@ class NetworkController {
 
   void sendVersionBroadcast(String latestVersion, int latestVersionTimestamp, TimeCostStatistics stats) {
     var msg = BroadcastMessages(
-      type: versionChainBroadcastType, // 2) Publish version chain state instead of only the latest hash
+      type: versionChainBroadcastType, // Publish version chain state instead of only the latest hash
+      userPublicId: '', // Leave them empty for now, will be filled in the Villager implementation
+      signature: '',
       messages: {
         'latest_version': latestVersion,
         'latest_version_timestamp': latestVersionTimestamp.toString(),
@@ -314,36 +316,36 @@ class NetworkController {
 
     // And now we can broadcast it :
     BonsoirBroadcast broadcast = BonsoirBroadcast(service: service);
-    await broadcast.ready;
+    await broadcast.initialize();
     await broadcast.start();
     _bonjourBroadcast = broadcast;
   }
 
   Future<void> _startBonjourDiscovery() async {
     BonsoirDiscovery discovery = BonsoirDiscovery(type: _bonjourType);
-    await discovery.ready;
+    await discovery.initialize();
 
     discovery.eventStream!.listen((event) {
-      // `eventStream` is not null as the discovery instance is "ready" !
-      if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
-        MyLogger.info('Bonjour service found : ${event.service?.toJson()}');
-        event.service!.resolve(discovery.serviceResolver); // Should be called when the user wants to connect to this service.
-      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved) {
-        MyLogger.info('Bonjour service resolved : ${event.service?.toJson()}');
-        final service = event.service as ResolvedBonsoirService?;
-        if(service == null) return;
+      // `eventStream` is not null as the discovery instance is initialized.
+      switch(event) {
+        case BonsoirDiscoveryServiceFoundEvent():
+          MyLogger.info('Bonjour service found : ${event.service.toJson()}');
+          event.service.resolve(discovery.serviceResolver); // Should be called when the user wants to connect to this service.
+        case BonsoirDiscoveryServiceResolvedEvent():
+          MyLogger.info('Bonjour service resolved : ${event.service.toJson()}');
+          final service = event.service;
+          final host = service.host; // May be the host name, should be resolved to ip address
+          final port = service.port;
+          final deviceId = service.attributes['device'];
+          if(host == null || deviceId == null) return;
+          MyLogger.info('Bonjour node resolved: $host:$port, deviceId=$deviceId, current deviceId=$_deviceId');
+          if(deviceId == _deviceId) return; // Ignore self
 
-        final host = service.host; // May be the host name, should be resolved to ip address
-        final port = service.port;
-        final attributes = service.attributes;
-        final deviceId = attributes['device'];
-        if(host == null || deviceId == null) return;
-        MyLogger.info('Bonjour node resolved: $host:$port, deviceId=$deviceId, current deviceId=$_deviceId');
-        if(deviceId == _deviceId) return; // Ignore self
-
-        _onDiscoverNewNode(host, port, deviceId);
-      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceLost) {
-        MyLogger.info('Bonjour service lost : ${event.service?.toJson()}');
+          _onDiscoverNewNode(host, port, deviceId);
+        case BonsoirDiscoveryServiceLostEvent():
+          MyLogger.info('Bonjour service lost : ${event.service.toJson()}');
+        default:
+          break;
       }
     });
     // Start the discovery **after** listening to discovery events :

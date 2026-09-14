@@ -59,38 +59,39 @@ class Village implements ApplicationController {
       MyLogger.warn('onData: receive unrecognized app type: $type, data=$data');
       return;
     }
+    String senderPublicKey = node.publicKey;
     switch(appType) {
       case AppMessageType.provideAppType:
         if(upperAppName == appName) {
-          messageHandler.handleProvide?.call(data, stats);
+          messageHandler.handleProvide?.call(senderPublicKey, data, stats);
         } else {
           _onDefaultProvide(data);
         }
         break;
       case AppMessageType.queryAppType:
         if(upperAppName == appName) {
-          messageHandler.handleQuery?.call(data, stats);
+          messageHandler.handleQuery?.call(senderPublicKey, data, stats);
         } else {
           _onDefaultQuery(data);
         }
         break;
       case AppMessageType.publishAppType:
         if(upperAppName == appName) {
-          messageHandler.handlePublish?.call(data, stats);
+          messageHandler.handlePublish?.call(senderPublicKey, data, stats);
         } else {
           _onDefaultPublish(data);
         }
         break;
       case AppMessageType.offerAppType:
         if(upperAppName == appName) {
-          messageHandler.handleOffer?.call(data, stats);
+          messageHandler.handleOffer?.call(senderPublicKey, data, stats);
         } else {
           _onDefaultOffer(data);
         }
         break;
       case AppMessageType.applyAppType:
         if(upperAppName == appName) {
-          messageHandler.handleApply?.call(data, stats);
+          messageHandler.handleApply?.call(senderPublicKey, data, stats);
         } else {
           _onDefaultApply(data);
         }

@@ -472,7 +472,8 @@ class Controller {
     );
     //TODO should make the log shorter
     var versions = docManager.assembleRequireVersions(requiredVersions);
-    MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length > 10? versions.sublist(0, 10) : versions}');
+    // MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length > 10? versions.sublist(0, 10) : versions}');
+    MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length} versions, ${jsonEncode(versions).length} bytes');
     network.sendVersions(versions, newStats);
   }
   void receiveOffer(UncipherMessage msg, TimeCostStatistics stats) {

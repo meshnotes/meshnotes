@@ -2,11 +2,46 @@
 
 ## Overview
 
-This document describes the build and distribution tools for Mesh Notes, specifically for macOS DMG creation, signing, and notarization.
+This document describes the build and distribution tools for Mesh Notes: macOS DMG creation, signing and notarization, plus a Gradle diagnostic script for Android builds.
 
 **Location**: [tools/](../tools/)
 
 ## Tools
+
+### gradle_diagnose_init.gradle - Android Configuration Failure Diagnostics
+
+Reports Gradle configuration-phase failures immediately instead of letting them be swallowed.
+
+**Location**: [tools/gradle_diagnose_init.gradle](../tools/gradle_diagnose_init.gradle)
+
+**When to use it**: `flutter build apk`/`appbundle` prints `Running Gradle task 'assembleRelease'...` and never finishes, with no error message. Check whether the Gradle daemon is pinning one CPU core at a flat memory footprint — that means the build already failed and Gradle is stuck in `DefaultExceptionAnalyser.findDeepestRootException` building the failure report, so the real error will never be printed.
+
+**Usage** (from `android/`):
+```bash
+# Reproduce with a cheap configuration-only task first
+./gradlew :<plugin_project>:properties -I ../tools/gradle_diagnose_init.gradle
+
+# Or during a real build
+./gradlew :app:assembleRelease -I ../tools/gradle_diagnose_init.gradle
+```
+
+On Windows use `gradlew.bat`; if the wrapper cannot find a JDK, point `JAVA_HOME` at the one bundled with Android Studio:
+```powershell
+$env:JAVA_HOME="D:\Program Files\Android\Android Studio\jbr"
+```
+
+**Output**: search for `#### DIAG FAILURE`. The failure is printed as a numbered cause chain, including suppressed exceptions (often the actual cause, and the reason Gradle hangs in the first place) and a circular-cause guard so the script cannot loop the way Gradle does.
+
+**Example** — this is how the `record_android` 1.5.2 build hang was traced to its root cause (see [04-platform-specific.md](04-platform-specific.md#6-android-build-hangs-at-running-gradle-task-assemblerelease)):
+```
+#### DIAG FAILURE: project :record_android
+#### [0] org.gradle.api.ProjectConfigurationException: A problem occurred configuring project ':record_android'.
+#### [1] org.gradle.api.GradleScriptException: A problem occurred evaluating project ':record_android'.
+#### [2] groovy.lang.MissingPropertyException: Could not get unknown property 'flutter' for extension 'android' of type com.android.build.gradle.LibraryExtension.
+#### END DIAG (depth=3)
+```
+
+The script only runs when passed explicitly with `-I`, so it never affects normal builds.
 
 ### build_dmg.sh - DMG Creation Tool
 

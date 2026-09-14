@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-typedef OnHandleStringFunction = Function(String data, TimeCostStatistics stats);
+typedef OnHandleStringWithPublicKeyFunction = Function(String senderPublicKey, String data, TimeCostStatistics stats);
 
 enum AppMessageType {
   provideAppType('provide'), // Provider other nodes the version tree
@@ -19,11 +19,11 @@ const String applyTypeVersion = 'version';
 const String applyTypeVersionsKey = 'versions';
 
 class VillageMessageHandler {
-  OnHandleStringFunction? handleProvide;
-  OnHandleStringFunction? handleQuery;
-  OnHandleStringFunction? handlePublish;
-  OnHandleStringFunction? handleOffer;
-  OnHandleStringFunction? handleApply;
+  OnHandleStringWithPublicKeyFunction? handleProvide;
+  OnHandleStringWithPublicKeyFunction? handleQuery;
+  OnHandleStringWithPublicKeyFunction? handlePublish;
+  OnHandleStringWithPublicKeyFunction? handleOffer;
+  OnHandleStringWithPublicKeyFunction? handleApply;
 }
 
 class UncipherMessage {

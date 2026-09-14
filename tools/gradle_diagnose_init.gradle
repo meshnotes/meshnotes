@@ -1,0 +1,49 @@
+// Gradle init script that reports configuration-phase failures immediately.
+//
+// Why this exists: when a project fails to configure, Gradle can spin forever in
+// DefaultExceptionAnalyser.findDeepestRootException while assembling its failure report, especially when the
+// exception carries deeply nested suppressed exceptions. The build then looks like it is stuck (the Flutter tool
+// keeps printing "Running Gradle task 'assembleRelease'..." and one CPU core stays pinned) and the real error is
+// never printed. This listener prints the failure the moment it happens, before Gradle's own reporting runs.
+//
+// Usage, from the android/ directory:
+//   ./gradlew :app:assembleRelease -I ../tools/gradle_diagnose_init.gradle
+//
+// Configuration failures usually reproduce with a much cheaper task, which avoids a full build:
+//   ./gradlew :<plugin_project>:properties -I ../tools/gradle_diagnose_init.gradle
+//
+// On Windows use gradlew.bat, and set JAVA_HOME to the JDK bundled with Android Studio if the wrapper cannot find
+// a JDK, for example: $env:JAVA_HOME="D:\Program Files\Android\Android Studio\jbr"
+//
+// Look for "#### DIAG FAILURE" in the output. Findings are reported as a numbered cause chain; suppressed
+// exceptions are printed too, because they are often the actual cause and are what makes Gradle hang.
+
+import org.gradle.api.ProjectEvaluationListener
+import org.gradle.api.ProjectState
+
+// Guards against a self-referential cause chain, which would otherwise make this script loop forever too.
+def dumpChain = { String tag, Throwable failure ->
+  println "\n#### DIAG FAILURE: ${tag}"
+  def seen = new IdentityHashMap()
+  int depth = 0
+  for(Throwable current = failure; current != null; current = current.cause) {
+    if(seen.put(current, Boolean.TRUE) != null) {
+      println "#### CIRCULAR CAUSE CHAIN at depth ${depth}: ${current.getClass().name}"
+      break
+    }
+    println "#### [${depth}] ${current.getClass().name}: ${current.message}"
+    current.stackTrace.take(6).each { frame -> println "####       at ${frame}" }
+    current.suppressed.each { s -> println "####     SUPPRESSED: ${s.getClass().name}: ${s.message}" }
+    depth++
+  }
+  println "#### END DIAG (depth=${depth})\n"
+}
+
+gradle.addProjectEvaluationListener(new ProjectEvaluationListener() {
+  void beforeEvaluate(Project project) {}
+  void afterEvaluate(Project project, ProjectState state) {
+    if(state.failure != null) {
+      dumpChain("project ${project.path}", state.failure)
+    }
+  }
+})

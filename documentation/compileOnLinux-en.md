@@ -35,7 +35,7 @@ Install Android SDK
 
 Install cmdline-tools
 
-2\. Download and switch to Flutter 3.24.0
+2\. Download and switch to Flutter 3.35.2
 -----------------------------------------
 
 Officially, it is recommended to manage the Flutter SDK through a Git repository to easily switch between different versions.
@@ -47,13 +47,13 @@ cd ~
 git clone https://github.com/flutter/flutter.git
 ```
 
-Enter the Flutter directory and switch to tag 3.24.0 (ensure that the tag exists, and use `git tag` to check all available versions if in doubt):
+Enter the Flutter directory and switch to tag 3.35.2 (ensure that the tag exists, and use `git tag` to check all available versions if in doubt):
 
 
 ```bash
 cd flutter
 git fetch --tags
-git checkout 3.24.0
+git checkout 3.35.2
 ```
 3\. Configure Flutter environment variables
 -------------------------------------------
@@ -75,8 +75,8 @@ Next, run the following command to check the Flutter environment configuration a
 ```bash
 flutter doctor
 Doctor summary (to see all details, run flutter doctor -v):
-[!] Flutter (Channel [user-branch], 3.24.0, on Ubuntu 24.04.2 LTS 6.11.0-17-generic, locale en_US.UTF-8)
-! Flutter version 3.24.0 on channel [user-branch] at /home/kali/github/flutter
+[!] Flutter (Channel [user-branch], 3.35.2, on Ubuntu 24.04.2 LTS 6.11.0-17-generic, locale en_US.UTF-8)
+! Flutter version 3.35.2 on channel [user-branch] at /home/kali/github/flutter
 Currently on an unknown channel. Run `flutter channel` to switch to an official channel.
 If that doesn't fix the issue, reinstall Flutter by following instructions at https://flutter.dev/setup.
 ! Upstream repository unknown source is not a standard remote.
