@@ -4,6 +4,7 @@ import 'package:android_id/android_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
+import 'package:libp2p/application/version_chain_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/environment.dart';
 import 'package:mesh_note/mindeditor/document/collaborate/merge_task.dart';
@@ -20,7 +21,6 @@ import 'package:mesh_note/tasks/ui_event_manager.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import '../../net/init.dart';
-import '../../net/version_chain_api.dart';
 import '../../plugin/plugin_manager.dart';
 import '../document/paragraph_desc.dart';
 import '../setting/constants.dart';
@@ -411,7 +411,7 @@ class Controller {
     final stats = TimeCostStatistics(
       startTime: Util.getTimeStamp(),
     );
-    network.sendRequireVersionTree(Constants.resourceKeyVersionTree, stats);
+    network.sendRequireVersionTree(resourceKeyVersionTree, stats);
   }
 
   void receiveVersionBroadcast(String latestVersion, TimeCostStatistics stats) {
@@ -462,7 +462,7 @@ class Controller {
     for(final item in requiredVersions) {
       //TODO Currently only send version tree if there is any resource with the key 'version_tree'.
       //TODO Maybe should make ordinary resources and version_tree coexist
-      if(item == Constants.resourceKeyVersionTree) {
+      if(item == resourceKeyVersionTree) {
         _sendCurrentVersionTree(TimeCostStatistics(startTime: Util.getTimeStamp()));
         return;
       }
@@ -519,7 +519,7 @@ class Controller {
       final key = res.key;
       // Gather version_tree resources together and solve it in the end.
       // This scenario is caused by receiving version broadcast, and then require entire version tree
-      if(key == Constants.resourceKeyVersionTree) {
+      if(key == resourceKeyVersionTree) {
         var versionChain = VersionChain.fromJson(jsonDecode(res.data));
         versionChains.add(versionChain);
       } else {

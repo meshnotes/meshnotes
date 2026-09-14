@@ -1,9 +1,9 @@
 import 'dart:convert';
 
+import 'package:libp2p/application/version_chain_api.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/dal_version/db_script.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
-import 'package:mesh_note/net/version_chain_api.dart';
 import 'package:my_log/my_log.dart';
 import 'package:sqlite3/sqlite3.dart';
 

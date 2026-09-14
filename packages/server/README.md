@@ -20,6 +20,9 @@ public_key: "..."
 device_id: "server_..."
 user_name: "relay_server"
 max_query_versions_per_apply: 2
+publish_interval_seconds: 300
 ```
 
 `max_query_versions_per_apply` limits how many missing versions the server requests per query after a client `apply`. Default is `2`; the server requests the next batch after it stores the previous `provide` response, so smaller batches avoid making the app assemble/encrypt too much data at once.
+
+`publish_interval_seconds` controls how often the server re-sends the latest stored publish payload to connected nodes with the same user key. Default is `300` seconds; set it lower during testing, or set `0` to disable periodic publish forwarding.

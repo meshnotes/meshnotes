@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:isolate';
 import 'package:bonsoir/bonsoir.dart';
 import 'package:libp2p/application/application_api.dart';
+import 'package:libp2p/application/version_chain_api.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/document/dal/doc_data_model.dart';
 import 'package:mesh_note/util/util.dart';
@@ -14,7 +15,6 @@ import '../mindeditor/setting/constants.dart';
 import '../mindeditor/setting/setting.dart';
 import 'command.dart';
 import 'status.dart';
-import 'version_chain_api.dart';
 
 class NetworkController {
   static const _bonjourName = 'VillageProtocol';
@@ -246,7 +246,7 @@ class NetworkController {
         msg.stats.receiveTime = Util.getTimeStamp();
         controller.receiveResources(param.resources, msg.stats);
         processingTimer.stop();
-        final hasVersionTree = param.resources.any((resource) => resource.key == Constants.resourceKeyVersionTree);
+        final hasVersionTree = param.resources.any((resource) => resource.key == resourceKeyVersionTree);
         if(hasVersionTree) {
           msg.stats.versionTreeCost += processingTimer.elapsedMilliseconds;
         } else {

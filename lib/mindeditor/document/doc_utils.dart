@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:mesh_note/net/version_chain_api.dart';
+import 'package:libp2p/application/version_chain_api.dart';
 import 'package:my_log/my_log.dart';
 
 import 'dal/db_helper.dart';

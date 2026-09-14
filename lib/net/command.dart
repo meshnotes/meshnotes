@@ -1,5 +1,5 @@
 import 'package:libp2p/application/application_api.dart';
-import 'package:mesh_note/net/version_chain_api.dart';
+import 'package:libp2p/application/version_chain_api.dart';
 
 enum Command {
   terminate,

@@ -108,8 +108,6 @@ class Constants {
   static const String settingDefaultAllowSendingToPublicServer = 'true';
 
   // static const String userNameAndKeyOfGuest = 'guest';
-
-  static const String resourceKeyVersionTree = 'version_tree';
 }
 
 class UiConstants {

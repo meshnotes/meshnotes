@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/villager_node.dart';
-import 'package:mesh_note/net/version_chain_api.dart';
+import 'package:libp2p/application/version_chain_api.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import '../mindeditor/setting/constants.dart';
@@ -255,7 +255,7 @@ class VersionChainVillager {
           'total=${(totalProcessDuration / 1000).toStringAsFixed(2)}ms');
     }
     processingTimer.stop();
-    final hasVersionTree = unsignedResourceList.any((resource) => resource.key == Constants.resourceKeyVersionTree);
+    final hasVersionTree = unsignedResourceList.any((resource) => resource.key == resourceKeyVersionTree);
     if(hasVersionTree) {
       stats.versionTreeCost += processingTimer.elapsedMilliseconds;
     } else {
@@ -359,7 +359,7 @@ class VersionChainVillager {
     String chainJson = jsonEncode(versionChain);
     String encryptedChainJson = _encrypt!.encrypt(timestamp, chainJson);
     var rawResource = UnsignedResource(
-      key: Constants.resourceKeyVersionTree,
+      key: resourceKeyVersionTree,
       subKey: '',
       timestamp: timestamp,
       data: encryptedChainJson,

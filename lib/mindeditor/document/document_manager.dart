@@ -19,7 +19,7 @@ import 'doc_utils.dart';
 import 'version_tree_status.dart';
 import 'package:mesh_note/mindeditor/document/text_desc.dart';
 import 'package:my_log/my_log.dart';
-import '../../net/version_chain_api.dart';
+import 'package:libp2p/application/version_chain_api.dart';
 import '../../util/util.dart';
 import '../setting/constants.dart';
 import 'collaborate/diff_manager.dart';

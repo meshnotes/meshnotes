@@ -1,6 +1,5 @@
-import 'package:keygen/keygen.dart';
-
 const String versionChainBroadcastType = 'version_chain';
+const String resourceKeyVersionTree = 'version_tree';
 
 class VersionNode {
   String versionHash;
@@ -108,8 +107,9 @@ class SendVersions {
 
   @override
   String toString() {
-    final keys = requiredObjects.keys.toList();
-    return '${HashUtil.formatHash(versionHash)}: ${keys.length>10? keys.sublist(0, 10) : keys}';
+    // final keys = requiredObjects.keys.toList();
+    // return '${HashUtil.formatHash(versionHash)}: ${keys.length>10? keys.sublist(0, 10) : keys}';
+    return 'Version($versionHash)';
   }
 }
 
@@ -139,7 +139,8 @@ class RelatedObject {
 
   @override
   String toString() {
-    return '${HashUtil.formatHash(objHash)}/$createdAt';
+    // return '${HashUtil.formatHash(objHash)}/$createdAt';
+    return '$objHash/$createdAt';
   }
 }
 

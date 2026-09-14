@@ -69,6 +69,7 @@ Future<void> _generateKey(String dataDir, String configPath) async {
     'device_id': 'server_${DateTime.now().millisecondsSinceEpoch}',
     'user_name': 'relay_server',
     'max_query_versions_per_apply': RelayApplication.defaultMaxQueryVersionsPerApply,
+    'publish_interval_seconds': RelayApplication.defaultPublishIntervalSeconds,
   };
 
   final file = File(configPath);
@@ -93,6 +94,10 @@ Future<void> _startServer(int port, String dataDir, String configPath) async {
   final maxQueryVersionsPerApply = _readPositiveIntConfig(
     configYaml['max_query_versions_per_apply'],
     RelayApplication.defaultMaxQueryVersionsPerApply,
+  );
+  final publishIntervalSeconds = _readNonNegativeIntConfig(
+    configYaml['publish_interval_seconds'],
+    RelayApplication.defaultPublishIntervalSeconds,
   );
   final signing = SigningWrapper.loadKey(privateKey);
   if(signing.getCompressedPublicKey() != publicKey) {
@@ -141,15 +146,23 @@ Future<void> _startServer(int port, String dataDir, String configPath) async {
     signing: signing,
     upperAppName: 'mesh_notes',
     maxQueryVersionsPerApply: maxQueryVersionsPerApply,
+    publishIntervalSeconds: publishIntervalSeconds,
   );
 
   await relayApp.start();
-  print('Relay server started on port $port with deviceId $deviceId, maxQueryVersionsPerApply=$maxQueryVersionsPerApply');
+  print('Relay server started on port $port with deviceId $deviceId, maxQueryVersionsPerApply=$maxQueryVersionsPerApply, publishIntervalSeconds=$publishIntervalSeconds');
 }
 
 int _readPositiveIntConfig(dynamic value, int defaultValue) {
   if(value == null) return defaultValue;
   final parsed = value is int? value : int.tryParse(value.toString());
   if(parsed == null || parsed <= 0) return defaultValue;
+  return parsed;
+}
+
+int _readNonNegativeIntConfig(dynamic value, int defaultValue) {
+  if(value == null) return defaultValue;
+  final parsed = value is int? value : int.tryParse(value.toString());
+  if(parsed == null || parsed < 0) return defaultValue;
   return parsed;
 }

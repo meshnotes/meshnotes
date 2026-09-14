@@ -3,7 +3,7 @@ import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
-import 'package:mesh_note/net/version_chain_api.dart';
+import 'package:libp2p/application/version_chain_api.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import '../dal/db_helper.dart';
