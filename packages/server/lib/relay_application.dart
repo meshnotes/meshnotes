@@ -160,8 +160,7 @@ class RelayApplication implements ApplicationController {
       final uncipherData = uncipherMessage.data;
       final brdMsg = BroadcastMessages.fromJson(jsonDecode(uncipherData));
       final ownerPublicKey = brdMsg.userPublicId;
-      final ownerSignature = brdMsg.signature;
-      if(!_verifyUncipherMessageWithSenderPublicKey(uncipherData, ownerSignature, ownerPublicKey)) {
+      if(!_verifyUncipherMessageWithSenderPublicKey(brdMsg.toSignableString(), brdMsg.signature, ownerPublicKey)) {
         MyLogger.warn('$logPrefix Failed to verify publishAppType signature for owner $ownerPublicKey');
         return;
       }

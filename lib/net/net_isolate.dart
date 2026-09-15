@@ -10,7 +10,6 @@ import 'package:libp2p/overlay/villager_node.dart';
 import 'package:libp2p/application/version_chain_api.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
-import '../mindeditor/setting/constants.dart';
 import 'p2p_net.dart';
 import 'package:libp2p/application/application_layer.dart';
 import 'command.dart';
@@ -328,9 +327,7 @@ class VersionChainVillager {
       MyLogger.info('Drop PUBLISH message from other user');
       return;
     }
-    final dataOwnerSignature = brdMsg.signature;
-    brdMsg.signature = '';
-    if(!_verifySignature(uncipherMessage.data, dataOwnerSignature)) {
+    if(!_verifySignature(brdMsg.toSignableString(), brdMsg.signature)) {
       MyLogger.info('Verify PUBLISH message with the data owner\'s signature failed');
       return;
     }
@@ -345,7 +342,7 @@ class VersionChainVillager {
   void _onSendBroadcast(BroadcastMessages msg, TimeCostStatistics stats) {
     stats.receiveTime = Util.getTimeStamp();
     msg.userPublicId = _signing!.getCompressedPublicKey();
-    msg.signature = _genSignature(jsonEncode(msg)); // This is the signature of the data owner
+    msg.signature = _genSignature(msg.toSignableString()); // This is the signature of the data owner
     String json = jsonEncode(msg);
     String signature = _genSignature(json); // This is the signature of the sender. Sometimes they are different, for example, in the server mode.
     UncipherMessage uncipherMessage = UncipherMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);

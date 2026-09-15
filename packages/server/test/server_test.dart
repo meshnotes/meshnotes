@@ -41,6 +41,22 @@ class MockVillageOverlay extends VillageOverlay {
   Future<void> start() async {}
 }
 
+UncipherMessage _signedBroadcast(SigningWrapper signing, Map<String, String> messages) {
+  final broadcast = BroadcastMessages(
+    type: versionChainBroadcastType,
+    userPublicId: signing.getCompressedPublicKey(),
+    signature: '',
+    messages: messages,
+  );
+  broadcast.signature = signing.sign(HashUtil.hashText(broadcast.toSignableString()));
+  final data = jsonEncode(broadcast);
+  return UncipherMessage(
+    userPublicId: signing.getCompressedPublicKey(),
+    data: data,
+    signature: signing.sign(HashUtil.hashText(data)),
+  );
+}
+
 void main() {
   MyLogger.initForConsoleTest(name: 'server_test', debug: true);
   late Directory tempDir;
@@ -215,18 +231,12 @@ void main() {
     node2.nodeId = 'node_2';
     mockOverlay.mockNodes.addAll([node, node2]);
 
-    final broadcast = {
-      'messages': {
-        'latest_version': 'latest_version_hash_123',
-        'latest_version_timestamp': '123456',
-      }
-    };
     final serverUser = signing.getCompressedPublicKey();
-    final uncipherPublish = UncipherMessage(
-      userPublicId: serverUser,
-      data: jsonEncode(broadcast),
-      signature: 'publish_sig',
-    );
+    node.publicKey = serverUser;
+    final uncipherPublish = _signedBroadcast(signing, {
+      'latest_version': 'latest_version_hash_123',
+      'latest_version_timestamp': '123456',
+    });
     final publishPayload = jsonEncode(uncipherPublish);
 
     // Send publish from node (node_1)
@@ -328,33 +338,16 @@ void main() {
       data: 'cached_data',
       signature: 'cached_sig',
     );
-    final cachedBroadcast = {
-      'messages': {
-        'latest_version': 'already_cached_version_hash',
-      }
-    };
-    final cachedPublish = UncipherMessage(
-      userPublicId: serverUser,
-      data: jsonEncode(cachedBroadcast),
-      signature: 'publish_sig_cached',
-    );
+    final cachedPublish = _signedBroadcast(signing, {'latest_version': 'already_cached_version_hash'});
     app.onData(node, 'mesh_notes', AppMessageType.publishAppType.value, jsonEncode(cachedPublish));
 
     expect(mockOverlay.sentData, isEmpty);
 
     mockOverlay.sentData.clear();
-    final otherUserBroadcast = {
-      'messages': {
-        'latest_version': 'other_user_version_hash',
-      }
-    };
     final otherUserSigning = SigningWrapper.random();
     final otherUserPublicKey = otherUserSigning.getCompressedPublicKey();
-    final otherUserPublish = UncipherMessage(
-      userPublicId: otherUserPublicKey,
-      data: jsonEncode(otherUserBroadcast),
-      signature: 'other_publish_sig',
-    );
+    node.publicKey = otherUserPublicKey;
+    final otherUserPublish = _signedBroadcast(otherUserSigning, {'latest_version': 'other_user_version_hash'});
     app.onData(node, 'mesh_notes', AppMessageType.publishAppType.value, jsonEncode(otherUserPublish));
 
     expect(dbHelper.getLatestVersion(otherUserPublicKey, 'latest_version'), 'other_user_version_hash');
@@ -489,17 +482,7 @@ void main() {
     otherUserNode.setConnected();
     mockOverlay.mockNodes.addAll([sourceNode, sameUserNode, otherUserNode]);
 
-    final broadcast = {
-      'messages': {
-        'latest_version': 'v1',
-      }
-    };
-    final broadcastData = jsonEncode(broadcast);
-    final publish = UncipherMessage(
-      userPublicId: userPublicKey,
-      data: broadcastData,
-      signature: userSigning.sign(HashUtil.hashText(broadcastData)),
-    );
+    final publish = _signedBroadcast(userSigning, {'latest_version': 'v1'});
     final publishPayload = jsonEncode(publish);
 
     app.onData(sourceNode, 'mesh_notes', AppMessageType.publishAppType.value, publishPayload);
@@ -541,6 +524,11 @@ void main() {
     expect(mockOverlay.sentData.length, 1);
     expect(mockOverlay.sentData[0]['node'], sameUserNode);
     expect(mockOverlay.sentData[0]['type'], AppMessageType.publishAppType.value);
-    expect(mockOverlay.sentData[0]['data'], publishPayload);
+    final relayed = UncipherMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
+    expect(relayed.userPublicId, signing.getCompressedPublicKey());
+    expect(VerifyingWrapper.loadKey(relayed.userPublicId).ver(HashUtil.hashText(relayed.data), relayed.signature), isTrue);
+    expect(relayed.data, publish.data);
+    final relayedBroadcast = BroadcastMessages.fromJson(jsonDecode(relayed.data));
+    expect(VerifyingWrapper.loadKey(userPublicKey).ver(HashUtil.hashText(relayedBroadcast.toSignableString()), relayedBroadcast.signature), isTrue);
   });
 }

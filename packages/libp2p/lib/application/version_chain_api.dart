@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 const String versionChainBroadcastType = 'version_chain';
 const String resourceKeyVersionTree = 'version_tree';
 
@@ -170,6 +172,14 @@ class BroadcastMessages {
       'sign': signature,
       'messages': messages,
     };
+  }
+
+  String toSignableString() {
+    return jsonEncode({
+      'type': type,
+      'user': userPublicId,
+      'messages': messages,
+    });
   }
 
   static Map<String, String> _buildMessages(Map<String, dynamic>? map) {
