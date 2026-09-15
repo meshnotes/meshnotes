@@ -20,27 +20,28 @@ class DocUtils {
   }
 
   /// Used in requestor
-  static Map<String, RelatedObject> genDependingObjects(VersionContent versionContent, DbHelper _db, {bool findSyncingObject = false}) {
-    Map<String, RelatedObject> result = {};
+  static (Map<String, RelatedObject>, Map<String, RelatedObject>) genDependingObjects(VersionContent versionContent, DbHelper _db, {bool findSyncingObject = false}) {
+    final dependingBlocks = <String, RelatedObject>{};
+    final dependingDocuments = <String, RelatedObject>{};
     for(var item in versionContent.table) {
       var docId = item.docId;
       var docHash = item.docHash;
       var docObject = _db.getObject(docHash)?? (findSyncingObject? _db.getSyncingObject(docHash): null);
       if(docObject == null) {
         MyLogger.info('genDependingObjects: document is missing! docId=$docId, docHash=$docHash');
-        result[docHash] = RelatedObject(objHash: docHash, objContent: '', createdAt: 0); // Different from genRequiredObjects
+        dependingDocuments[docHash] = RelatedObject(objHash: docHash, objContent: '', createdAt: 0); // Different from genRequiredObjects
         continue;
       }
       MyLogger.info('genDependingObjects: docId=$docId, docHash=$docHash, docStr=$docObject');
-      result[docHash] = RelatedObject(objHash: docHash, objContent: docObject.data, createdAt: docObject.timestamp);
+      dependingDocuments[docHash] = RelatedObject(objHash: docHash, objContent: docObject.data, createdAt: docObject.timestamp);
 
       //TODO should load history document by docHash
       var docContent = DocContent.fromJson(jsonDecode(docObject.data));
       for(var block in docContent.contents) {
-        _recursiveGenDependingBlocks(block, result, _db, findSyncingObject);
+        _recursiveGenDependingBlocks(block, dependingBlocks, _db, findSyncingObject);
       }
     }
-    return result;
+    return (dependingDocuments, dependingBlocks);
   }
   static void _recursiveGenDependingBlocks(DocContentItem block, Map<String, RelatedObject> map, DbHelper _db, bool findSyncingObject) {
     var blockHash = block.blockHash;
