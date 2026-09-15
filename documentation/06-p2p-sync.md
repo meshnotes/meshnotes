@@ -214,6 +214,8 @@ class Apply {
 
 The relay then queries only the missing hashes through the normal `query`/`provide` path.
 
+During merge, `lib/mindeditor/document/collaborate/merge_task.dart` tracks missing objects by hash and type (`version`, `document`, or `block`). Receiving a version discovers its document hashes, and receiving a document discovers its block hashes. Each query requests at most two hashes; once the queue is empty, the syncing versions become available and merge normally. This staged model lets peers return the exact objects needed without repeatedly sending an enclosing version.
+
 ### 3. Version request
 
 ```dart
