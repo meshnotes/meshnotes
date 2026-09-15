@@ -130,8 +130,8 @@ Plugin architecture and AI integration.
 Build and distribution tools: macOS packaging plus Android build diagnostics.
 
 **Includes**:
-- DMG creation tool (build_dmg.sh)
-- Signing and notarization tool (sign_and_notarize_dmg.sh)
+- End-to-end macOS DMG packaging, signing, and Apple notarization (`package_macos_dmg.sh`)
+- Gitignored release credential setup
 - Gradle configuration failure diagnostics (gradle_diagnose_init.gradle)
 - Complete build workflow
 - Prerequisites and setup
