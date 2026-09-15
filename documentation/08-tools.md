@@ -59,7 +59,7 @@ xcrun stapler validate dist/MeshNotes-<version>-macos-<arch>.dmg
 spctl --assess --type open --context context:primary-signature -vv dist/MeshNotes-<version>-macos-<arch>.dmg
 ```
 
-If `codesign` reports `errSecInternalComponent` while the identity appears in `security find-identity -v -p codesigning`, unlock the login keychain and confirm the certificate has an accessible private key.
+If `codesign` reports `errSecInternalComponent` while the identity appears in `security find-identity -v -p codesigning`, the package script prints generic SSH/keychain recovery commands. Unlock the current user's login keychain, ensure it is available in that user's keychain search list, and confirm the signing certificate has an accessible private key. If necessary, use `security set-key-partition-list` to allow `codesign` to access that key.
 
 ## Android Gradle configuration diagnostics
 

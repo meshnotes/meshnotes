@@ -160,7 +160,16 @@ preflight_codesign_identity() {
   if ! codesign --force --options runtime --timestamp --sign "$identity" "$temporary_binary"; then
     rm -f "$temporary_binary"
     echo "The identity exists, but codesign cannot use its private key: $identity" >&2
-    echo "Unlock the login keychain and confirm the certificate has its private key." >&2
+    echo "This usually happens in SSH/non-GUI shells when login.keychain is locked or codesign is not allowed to read the private key." >&2
+    echo "Try these commands in the same SSH shell, then rerun this package script:" >&2
+    echo "  security unlock-keychain ~/Library/Keychains/login.keychain-db" >&2
+    echo "  security set-keychain-settings -lut 21600 ~/Library/Keychains/login.keychain-db" >&2
+    echo "  security list-keychains -d user -s ~/Library/Keychains/login.keychain-db" >&2
+    echo "  security default-keychain -d user -s ~/Library/Keychains/login.keychain-db" >&2
+    echo "If it still fails, allow codesign to access the private key:" >&2
+    echo "  security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k '<macOS login password>' ~/Library/Keychains/login.keychain-db" >&2
+    echo "Quick preflight check:" >&2
+    echo "  tmp=\$(mktemp /tmp/codesign-check.XXXXXX); echo test > \"\$tmp\"; codesign --force --sign '$identity' --timestamp --options runtime \"\$tmp\"; rm -f \"\$tmp\"" >&2
     exit 2
   fi
   codesign --verify --strict "$temporary_binary"
@@ -321,13 +330,22 @@ fi
 
 echo "Submitting DMG to Apple's notarization service (this can take several minutes) ..."
 fill_notary_args
+NOTARY_SUBMIT_LOG="$(mktemp "${TMPDIR:-/tmp}/meshnotes-notary-submit.XXXXXX")"
 set +e
-xcrun notarytool submit "$DMG_PATH" --wait "${NOTARY_ARGS[@]}"
-NOTARY_EXIT=$?
+xcrun notarytool submit "$DMG_PATH" --wait --output-format json "${NOTARY_ARGS[@]}" | tee "$NOTARY_SUBMIT_LOG"
+NOTARY_EXIT=${PIPESTATUS[0]}
 set -e
-if [ "$NOTARY_EXIT" -ne 0 ]; then
-  echo "Notarization did not succeed. Use the submission ID printed above with 'xcrun notarytool log' and the same authentication method." >&2
-  exit "$NOTARY_EXIT"
+NOTARY_STATUS="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("status", ""))' "$NOTARY_SUBMIT_LOG" 2>/dev/null || true)"
+NOTARY_ID="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id", ""))' "$NOTARY_SUBMIT_LOG" 2>/dev/null || true)"
+rm -f "$NOTARY_SUBMIT_LOG"
+if [ "$NOTARY_EXIT" -ne 0 ] || [ "$NOTARY_STATUS" != "Accepted" ]; then
+  echo "Notarization did not succeed; status: ${NOTARY_STATUS:-unknown}." >&2
+  if [ -n "$NOTARY_ID" ]; then
+    echo "View Apple's rejection details with:" >&2
+    echo "  xcrun notarytool log $NOTARY_ID <same notary auth args>" >&2
+  fi
+  echo "Skipping stapler because rejected submissions have no notarization ticket to staple." >&2
+  exit 2
 fi
 
 echo "Stapling the notarization ticket ..."
