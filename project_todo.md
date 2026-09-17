@@ -22,6 +22,7 @@
 - [x] **Allow sending data to public server**: Added setting to allow sending data to public servers (nodes with different public keys) and filter outgoing business sync data when the option is disabled.
 - [ ] **Optional Cross-Public-Key App Storage**: Add an explicit app-side option for P2P-style mode where an app may store data signed by other public keys; default should remain saving only the current user's data.
 - [x] **Version Required Object Manifest Cache**: Persist each version's required object list as a local database text manifest so `SendVersions` can read dependencies without recalculating doc/block traversal.
+- [x] **Staged Missing-Object Expansion**: `_findWaitingOrMissingVersions` no longer skips a version already in `_missingObjects`. After the version JSON arrives it expands document/block hashes instead of merging with an incomplete object set. Already-arrived hashes are dropped by `_removeAvailableObjectsFromMissingObjects`.
 - [ ] **Relay Server Version List Request**: After sending a version tree to a standalone server, add a server-specific request/manifest so the server can know all version hashes it should hold without decrypting user data; do not add this extra payload for same-user devices that already have the key, because the data may be large.
 
 

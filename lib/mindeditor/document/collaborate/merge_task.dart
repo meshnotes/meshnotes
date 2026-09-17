@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'package:libp2p/application/application_api.dart';
 import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/mindeditor/document/doc_content.dart';
 import 'package:mesh_note/mindeditor/setting/constants.dart';
 import 'package:libp2p/application/version_chain_api.dart';
 import 'package:mesh_note/util/util.dart';
 import 'package:my_log/my_log.dart';
 import '../dal/db_helper.dart';
 import '../dal/doc_data_model.dart';
-import '../doc_content.dart';
 import '../doc_utils.dart';
 import 'version_manager.dart';
 
@@ -151,36 +151,33 @@ class MergeTask {
 
   _findWaitingOrMissingVersions(Map<String, DagNode> map) {
     /// Check whether every version in map:
-    /// 1. Whether it exists in versions table
-    /// 2. Whether its status is available
-    ///   2.1. If yes, that means this version is ready, skip it
-    ///   2.2. If not, recursively check whether any object(including doc and block) in version is missing
-    ///     2.2.1. If missing, add to missing list and enqueue the version for staged object discovery
-    ///     2.2.2. If not missing, set the status of version to be available
+    /// 1. Skip versions that are already available
+    /// 2. If the version JSON is missing, enqueue the version hash only
+    /// 3. If the version JSON exists, expand missing documents/blocks. Do not re-enqueue the version;
+    ///    `_removeAvailableObjectsFromMissingObjects` drops it after the object arrives.
+    /// 4. If no document/block is missing, mark the version available
     for(final e in map.entries) {
       final node = e.value;
       if(node.status == ModelConstants.statusAvailable) continue;
 
       final versionHash = e.key;
-      if(_missingObjects.containsKey(versionHash)) continue;
-      
       final versionObject = _db.getObject(versionHash)?? _db.getSyncingObject(versionHash);
       if(versionObject == null) {
         _enqueueMissingObject(versionHash, MissingObjectType.version);
-      } else {
-        final (missingDocuments, missingBlocks) = _findMissingObjects(versionObject);
-        if(missingDocuments.isNotEmpty || missingBlocks.isNotEmpty) {
-          _enqueueMissingObject(versionHash, MissingObjectType.version);
-          for(final objHash in missingDocuments) {
-            _enqueueMissingObject(objHash, MissingObjectType.document);
-          }
-          for(final objHash in missingBlocks) {
-            _enqueueMissingObject(objHash, MissingObjectType.block);
-          }
-        } else {
-          node.status = ModelConstants.statusAvailable;
-          _db.updateSyncingVersionStatus(versionHash, ModelConstants.statusAvailable);
+        continue;
+      }
+
+      final (missingDocuments, missingBlocks) = _findMissingObjects(versionObject);
+      if(missingDocuments.isNotEmpty || missingBlocks.isNotEmpty) {
+        for(final objHash in missingDocuments) {
+          _enqueueMissingObject(objHash, MissingObjectType.document);
         }
+        for(final objHash in missingBlocks) {
+          _enqueueMissingObject(objHash, MissingObjectType.block);
+        }
+      } else {
+        node.status = ModelConstants.statusAvailable;
+        _db.updateSyncingVersionStatus(versionHash, ModelConstants.statusAvailable);
       }
     }
     final totalCount = map.length;
@@ -213,30 +210,18 @@ class MergeTask {
     _missingObjects.putIfAbsent(hash, () => MissingObject(hash: hash, type: type));
   }
 
-  /// Try to consume new coming resources to update the missing objects list
+  /// Try to consume new coming resources(if they are in the db now) to update the missing objects list
   /// If no new coming resources, try to traverse all the missing objects
-  /// Only remove available objects.
-  /// New missing objects will be added in the previous _findWaitingOrMissingVersions() method.
   void _removeAvailableObjectsFromMissingObjects(List<String> newComingResources) {
-    final toBeDeleted = <String>[];
-    if(newComingResources.isNotEmpty) {
-      for(final hash in newComingResources) {
-        final m = _missingObjects[hash];
-        if(m != null) toBeDeleted.add(hash);
+    final toCheck = newComingResources.isNotEmpty ? newComingResources : _missingObjects.keys.toList();
+    for(final k in toCheck) {
+      final m = _missingObjects[k];
+      if(m != null) {
+        final object = _db.getObject(k)?? _db.getSyncingObject(k);
+        if(object != null) {
+          _missingObjects.remove(k);
+        }
       }
-    } else {
-      for(final item in _missingObjects.values) {
-        final object = _db.getObject(item.hash)?? _db.getSyncingObject(item.hash);
-        if(object == null) continue;
-
-        // The missing object is available now
-        // So calculate the related objects of it, and remove it from the missing objects list
-        final key = item.hash;
-        toBeDeleted.add(key);
-      }
-    }
-    for(final key in toBeDeleted) {
-      _missingObjects.remove(key);
     }
   }
 
@@ -254,13 +239,6 @@ class MergeTask {
       }
     }
     return result;
-  }
-
-  void _enqueueBlocks(List<DocContentItem> blocks) {
-    for(final block in blocks) {
-      _enqueueMissingObject(block.blockHash, MissingObjectType.block);
-      _enqueueBlocks(block.children);
-    }
   }
 
   List<String> _storeResourcesToSyncDb(List<UnsignedResource> resources) {
