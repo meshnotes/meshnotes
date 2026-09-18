@@ -131,7 +131,7 @@ Future<void> _startServer(int port, String dataDir, String configPath) async {
       final connectionKey = '${node.ip?.address ?? node.host}:${node.port}';
       if(node.getStatus() == VillagerStatus.keepInTouch && activeConnections.add(connectionKey)) {
         MyLogger.info('Server accepted connection: $connectionKey, nodeId=${node.nodeId}');
-      } else if(node.getStatus() == VillagerStatus.lostContact && activeConnections.remove(connectionKey)) {
+      } else if(node.getStatus() != VillagerStatus.keepInTouch && activeConnections.remove(connectionKey)) {
         MyLogger.info('Server connection closed: $connectionKey, nodeId=${node.nodeId}');
       }
       final ip = node.ip?.address ?? '';

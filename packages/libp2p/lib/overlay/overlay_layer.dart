@@ -181,7 +181,7 @@ class VillageOverlay implements ApplicationController {
       // final tasks = _taskQueue.popAllWithType(TaskType.connect);
       for(var v in nodes) {
         final status = v.getStatus();
-        if(status == VillagerStatus.unknown) {
+        if(status == VillagerStatus.unknown || status == VillagerStatus.lostContact) {
           _tryToResolve(v);
         } else if(status == VillagerStatus.resolved) {
           _tryToConnect(v);
@@ -219,7 +219,7 @@ class VillageOverlay implements ApplicationController {
         return;
       }
     } else { // No node found, create a new one
-      node = VillagerNode(host: host, port: port, isUpper: true)
+      node = VillagerNode(host: host, port: port)
         ..ip = _c.ip;
     }
     // When run here, the node is either not in _villagers list or has an invalid connection. So update it

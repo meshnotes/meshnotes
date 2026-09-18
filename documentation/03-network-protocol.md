@@ -315,6 +315,10 @@ Timer.periodic(Duration(seconds: 5), (timer) {
 
 #### Reconnect
 
+Configured sponsor nodes are upper nodes and reconnect after either an initial failure or a lost connection. Nodes created from inbound connections are not upper nodes,
+so disconnecting them removes them instead of making the accepting peer reconnect back. Standalone relay servers likewise remove an active-connection entry whenever
+its node leaves `keepInTouch`, regardless of the specific failure status.
+
 ```dart
 void _attemptReconnect(VillagerNode node) {
   if (node.address != null && node.port != null) {

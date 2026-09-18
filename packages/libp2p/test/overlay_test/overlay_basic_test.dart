@@ -43,10 +43,10 @@ class IsolateTester {
             MyLogger.info('Starting isolate($_name2)');
 
             Future(() async {
-              await func2();
+              final inboundIsUpper = await func2();
 
               MyLogger.info('Isolate($_name2) finished');
-              sendPort.send('func2_done');
+              sendPort.send(inboundIsUpper);
             });
           } else {
             MyLogger.debug('Receive unrecognized message: $data');
@@ -72,7 +72,8 @@ class IsolateTester {
           MyLogger.info('Isolate($name1) finished');
           completer1.complete(true);
         });
-      } else if(data == 'func2_done') {
+      } else if(data is bool) {
+        expect(data, isFalse);
         completer2.complete(true);
       }
     });
@@ -121,11 +122,13 @@ class IsolateTester {
     );
     overlay.start();
   }
-  static Future<void> func2() async {
+  static Future<bool> func2() async {
+    bool? inboundIsUpper;
     var overlay = VillageOverlay(
       userInfo: UserPublicInfo(publicKey: 'test_key', userName: 'test', timestamp: 0),
       sponsors: [],
       onNodeChanged: (VillagerNode _node) {
+        inboundIsUpper ??= _node.isUpper;
         MyLogger.info('New incoming connection(${_node.ip.toString()}:${_node.port.toString()}, ${_node.id}, ${_node.getStatus()})');
       },
       deviceId: deviceId2,
@@ -133,5 +136,6 @@ class IsolateTester {
     );
     overlay.start();
     await Future.delayed(Duration(seconds: 20));
+    return inboundIsUpper!;
   }
 }
