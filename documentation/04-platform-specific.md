@@ -572,6 +572,8 @@ IPHONEOS_DEPLOYMENT_TARGET = 12.0
 SWIFT_VERSION = 5.0
 ```
 
+**UIScene (required on iOS 27 / Xcode 27):** Apps built with the iOS 27 SDK abort at launch unless they adopt the UIScene lifecycle. Without `UIApplicationSceneManifest`, debug stays on the launch storyboard and release flashes then exits before Dart starts. `ios/Runner/Info.plist` declares a `UIWindowScene` that uses `SceneDelegate` and `Main.storyboard`. `ios/Runner/AppDelegate.swift` still registers plugins in `didFinishLaunchingWithOptions` (Flutter 3.35.2 launch engine). `SceneDelegate` loads the storyboard `FlutterViewController` so that engine is attached. Full `FlutterImplicitEngineDelegate` migration is available from Flutter 3.38; do that when FVM is upgraded. See https://docs.flutter.dev/release/breaking-changes/uiscenedelegate.
+
 **Location**: `ios/Podfile`
 
 ```ruby
