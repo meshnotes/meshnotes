@@ -149,9 +149,18 @@ class PacketBye extends Packet {
 
 ### Reliability
 
-**Location**: [packages/libp2p/lib/network/protocol/sotp_network_layer.dart](../packages/libp2p/lib/network/protocol/sotp_network_layer.dart)
+**Location**: [packages/libp2p/lib/network/network_layer.dart](../packages/libp2p/lib/network/network_layer.dart)
 
 #### Connection management
+
+For an incoming `connect` at the same IP/UDP port, compare its `sourceConnectionId` with the existing peer's **destination** ID:
+- Same ID: ignore a duplicate on an established session; resend `connectAck` on an establishing session.
+- Different ID: remove the old session, clear its handshake retries and notify its disconnect callback before creating a fresh peer. Do not send `bye` during replacement.
+- An invalid/shutdown record must not block a new handshake, even with the same ID. A simultaneous outgoing handshake whose remote ID is still zero is reused and learns the incoming ID.
+
+`connectAck`/`connected` must match the endpoint and session IDs, so delayed old handshake packets cannot establish or retarget the replacement.
+Connection-pool removal checks peer identity; overlay disconnect callbacks also match the peer instance, not merely its address.
+This avoids waiting for heartbeat expiry after a client restarts on the same UDP endpoint. Connection IDs are not authentication or replay protection.
 
 ```dart
 class Connection {

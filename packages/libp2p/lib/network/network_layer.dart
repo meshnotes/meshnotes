@@ -180,12 +180,24 @@ class SOTPNetworkLayer {
   /// 3. Set peer's connection status to establishing
   /// 4. Send connect_ack
   void _onConnect(InternetAddress peerIp, int peerPort, PacketConnect packet) {
-    // If already connected, ignore it
-    if(connectionPool.getConnection(peerIp, peerPort) != null) {
-      MyLogger.warn('${logPrefix} Already connected to $peerIp:$peerPort, ignore incoming connect message');
-      return;
+    final existing = connectionPool.getConnection(peerIp, peerPort);
+    if(existing != null) {
+      if(existing.getStatus() == ConnectionStatus.established && existing.getDestinationId() == packet.sourceConnectionId) {
+        return; // Duplicate from the same session, including delayed simultaneous connect.
+      }
+      // Retire the old session before notifying overlay or installing its replacement. Do not send bye to the new session.
+      connectionPool.removeConnection(existing);
+      existing.controlQueue.clearAll();
+      existing.onClose();
     }
     var peer = incompletePool.getConnection(peerIp, peerPort);
+    if(peer != null && (peer.getStatus() != ConnectionStatus.establishing ||
+        (peer.getDestinationId() != 0 && peer.getDestinationId() != packet.sourceConnectionId))) {
+      incompletePool.removeConnection(peerIp, peerPort);
+      peer.controlQueue.clearAll();
+      peer.onClose();
+      peer = null;
+    }
     if(peer == null) {
       var originalId = packet.sourceConnectionId;
       peer = Peer(ip: peerIp, port: peerPort, transport: _sendDelegate)
@@ -194,6 +206,8 @@ class SOTPNetworkLayer {
       peer.setDestinationId(originalId);
       incompletePool.addConnection(peerIp, peerPort, peer);
     }
+    // A simultaneous outgoing handshake has not learned the remote ID yet.
+    peer.setDestinationId(packet.sourceConnectionId);
     peer.onConnect(packet);
   }
   /// 1. Only client will receive connect_ack, so find connection by ip, port, and source_connection_id
@@ -211,6 +225,8 @@ class SOTPNetworkLayer {
         return;
       }
     }
+    if(peer.ip != ip || peer.port != port || peer.getSourceId() != originalId ||
+        (peer.getDestinationId() != 0 && peer.getDestinationId() != packet.sourceConnectionId)) return;
     if(peer.onConnectAck(packet) && fromIncomplete) {
       incompletePool.removeConnection(ip, port);
       connectionPool.addConnection(peer);
@@ -232,6 +248,7 @@ class SOTPNetworkLayer {
         return;
       }
     }
+    if(peer.ip != ip || peer.port != port || peer.getSourceId() != packet.header.destConnectionId || peer.getDestinationId() != originalId) return;
     if(peer.onConnected(packet)) { // If peer is already established, here will return false
       incompletePool.removeConnection(ip, port);
       connectionPool.addConnection(peer);

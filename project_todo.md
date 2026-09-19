@@ -10,12 +10,15 @@
 ---
 
 ## 1. P2P Sync & Network Layer (packages/libp2p & lib/net)
+- [x] **Same-Endpoint UDP Reconnect**: Distinguish duplicate connects from new source IDs, retire stale peers before replacement, and reject old-session handshake packets; cover reconnect and cleanup with loopback UDP regression tests.
+- [ ] **Mobile Reconnect Smoke Test**: On a real phone, disconnect/reopen on the same UDP endpoint before heartbeat expiry and verify reconnect plus sync (manual validation by user).
 - [x] **Relay Server Node-to-Node Sync**: Implement `publishAppType` handling to broadcast and relay document version updates among peer nodes.
 - [x] **Relay Server Query Resolution**: Implement `queryAppType` handling to reply to client queries for missing version trees or version data.
 - [ ] **Relay Publish Forward Deduplication**: Before re-enabling relay server publish forwarding, record which `latest_version` announcements have already been forwarded to avoid relay storms.
 - [ ] **Overlay Node Bootstrapping (Sponsors)**: Expose command-line flags or YAML configurations to specify sponsor/bootstrapping nodes for standalone relay servers.
 - [ ] **Network Transmission Performance**: Refactor P2P message broadcast in `application_layer.dart` to support targeted unicast instead of user-wide broadcast.
 - [ ] **Graceful Node Termination**: Complete the termination listener in P2P isolate (`net_isolate.dart`) and ensure clean release of UDP socket and SQLite DB resources.
+- [ ] **Heartbeat Test Callback**: Fix the pre-existing `heartbeat_test.dart` timeout: heartbeat failure calls `onConnectionFail`, but `Disconnect while heartbeat timeout 5 times` waits for `onDisconnect` (also reproduced at `877cf5a`).
 - [ ] **Keep-Alive and Peer Health Checks**: Maintain connection health with at least one active peer node.
 - [x] **Network Sliding Windows Expansion**: Increased `initialSendingWindow` and `initialReceivingWindow` from 64 to 256 to allow larger in-flight payloads.
 - [x] **Time Cost Statistics**: Added isolate-to-application roundtrip time monitoring (`TimeCostStatistics`) for latency analysis.

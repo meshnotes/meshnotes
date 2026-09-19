@@ -443,7 +443,9 @@ class ConnectionPool {
 
   void removeConnection(Peer c) {
     var sourceConnectionId = c.getSourceId();
-    _connectionIdMap.remove(sourceConnectionId);
+    if(identical(_connectionIdMap[sourceConnectionId], c)) {
+      _connectionIdMap.remove(sourceConnectionId);
+    }
   }
 
   List<Peer> getAllConnections() {
