@@ -46,6 +46,8 @@
 - [x] **Mobile Magnifier**: Supported mobile magnifier feature for dragging selection handles in `SelectionHandleLayer`.
 
 ## 4. Multi-Platform Support
+- [x] **macOS arm64 Build Settings Inheritance**: Set project-level Debug/Profile/Release `ARCHS = arm64` in `macos/Runner.xcodeproj/project.pbxproj` so `Flutter Assemble` inherits the same architecture as Runner; align Pods in `macos/Podfile`. Verified all three configurations via `xcodebuild -showBuildSettings`.
+- [x] **macOS arm64 Release Build Validation**: Full `fvm flutter build macos --release` succeeds after the project/Pods architecture fix without modifying the Flutter SDK; the resulting MeshNotes executable is arm64.
 - [x] **macOS DMG Packaging and Notarization**: Added a single release script that builds with FVM, signs the app and DMG, submits through Apple's `notarytool`, staples the ticket, and reads credentials only from a gitignored env file.
 - [ ] **Multi-Window Sync**: Verify real-time database reactivity and UI refresh when editing the same document in multi-window environments.
 - [x] **iPad OS 26+ Multitasking Layout Inset Validation**: Implemented Stage Manager/iPad windowed multitasking padding offset fallback adjustments.

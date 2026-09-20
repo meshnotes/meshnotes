@@ -12,6 +12,21 @@ This document describes Mesh Notes build and distribution tools: the end-to-end 
 
 The script uses [`macos/Runner/Release.entitlements`](../macos/Runner/Release.entitlements) when signing the top-level app so the release retains MeshNotes' sandbox, network, microphone, and JIT capabilities. Nested dylibs, frameworks, and app extensions are signed inside-out before the app bundle; `codesign --deep` is intentionally not used.
 
+### macOS architecture policy
+
+macOS builds support Apple Silicon (`arm64`) only. `macos/Runner.xcodeproj/project.pbxproj` sets `ARCHS = arm64` at the **project level** for Debug, Profile, and Release, as well as on Runner. The `Flutter Assemble` aggregate target inherits project settings, not Runner settings; limiting Runner alone leaves Flutter's unpack step requesting `arm64 x86_64`. This avoids the Flutter 3.35.2 / Xcode 27 multi-architecture `release_unpack_macos` verification failure even when `lipo -info` reports both slices, without modifying the Flutter SDK.
+
+`macos/Podfile` also sets every Pods target/configuration to `arm64` in `post_install`, keeping native dependencies consistent. After changing it, run `(cd macos && pod install --no-repo-update)` and verify settings without building:
+
+```bash
+for configuration in Debug Profile Release; do
+  xcodebuild -project macos/Runner.xcodeproj -alltargets \
+    -configuration "$configuration" -showBuildSettings -json
+done
+```
+
+Both `Runner` and `Flutter Assemble` must report `ARCHS: arm64` in every configuration. Do not override `ARCHS` with a universal value on the command line. Intel macOS artifacts are not supported by this configuration.
+
 ### One-time setup
 
 Run on macOS with Xcode command-line tools, FVM, and a **Developer ID Application** certificate (including its private key) installed in the current user's keychain. If the script is invoked from an automation environment whose `HOME` points at a sandbox, it switches to the real macOS user home before calling `security`, `codesign`, `notarytool`, and FVM so the login keychain and Flutter cache are visible.
