@@ -63,7 +63,7 @@ The normal flow runs `fvm flutter build macos --release`, signs `build/macos/Bui
 
 The env parser accepts blank lines, comments, and quoted or unquoted `KEY=VALUE` entries. Secrets are not accepted as command-line flags, which avoids putting them in shell history. Environment values are loaded from the explicitly selected `--env-file`; use that option only for another protected local file.
 
-Notarization uses the supported `xcrun notarytool submit --wait` flow. Apple progress and the submission ID remain visible. A failed submission exits before stapling; use the printed ID with `xcrun notarytool log` and the same authentication method. A successful submission is stapled and validated with `xcrun stapler`.
+Notarization uses `xcrun notarytool submit --wait --progress` with the default `normal` output format so Apple's upload percentage stays visible. `--output-format json` is not used because it is incompatible with `--progress` and would only print a final JSON object after the upload finishes. A failed submission exits before stapling; use the printed ID with `xcrun notarytool log` and the same authentication method. A successful submission is stapled and validated with `xcrun stapler`.
 
 Useful verification commands:
 

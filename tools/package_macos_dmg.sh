@@ -201,6 +201,21 @@ fill_notary_args() {
   NOTARY_ARGS=(--apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID")
 }
 
+# notarytool --progress rewrites the current line with CR and may wrap the session in a PTY typescript.
+# Strip those so the last "id:" / "status:" values can be read after submit finishes.
+parse_notary_log_field() {
+  local field="$1"
+  local file="$2"
+  /usr/bin/python3 -c '
+import re, sys
+field, path = sys.argv[1], sys.argv[2]
+raw = open(path, "rb").read().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+raw = re.sub(br"\x1b\[[0-9;?]*[ -/]*[@-~]", b"", raw)
+matches = re.findall(r"(?m)^\s*" + re.escape(field) + r":\s*(\S+)\s*$", raw.decode("utf-8", "replace"))
+print(matches[-1] if matches else "")
+' "$field" "$file" 2>/dev/null || true
+}
+
 sign_macho() {
   codesign --force --options runtime --timestamp --sign "$MACOS_CODESIGN_IDENTITY" "$1"
 }
@@ -328,15 +343,16 @@ if [ "$SKIP_NOTARIZE" -eq 1 ]; then
   exit 0
 fi
 
-echo "Submitting DMG to Apple's notarization service (this can take several minutes) ..."
+echo "Submitting DMG to Apple's notarization service (upload percentage is shown; waiting for Apple can take several minutes) ..."
 fill_notary_args
 NOTARY_SUBMIT_LOG="$(mktemp "${TMPDIR:-/tmp}/meshnotes-notary-submit.XXXXXX")"
 set +e
-xcrun notarytool submit "$DMG_PATH" --wait --output-format json "${NOTARY_ARGS[@]}" | tee "$NOTARY_SUBMIT_LOG"
-NOTARY_EXIT=${PIPESTATUS[0]}
+# json/plist suppress --progress. script gives notarytool a TTY so the upload percentage is drawn, and records the session for parsing.
+/usr/bin/script -qe "$NOTARY_SUBMIT_LOG" xcrun notarytool submit "$DMG_PATH" --wait --progress "${NOTARY_ARGS[@]}"
+NOTARY_EXIT=$?
 set -e
-NOTARY_STATUS="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("status", ""))' "$NOTARY_SUBMIT_LOG" 2>/dev/null || true)"
-NOTARY_ID="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id", ""))' "$NOTARY_SUBMIT_LOG" 2>/dev/null || true)"
+NOTARY_STATUS="$(parse_notary_log_field status "$NOTARY_SUBMIT_LOG")"
+NOTARY_ID="$(parse_notary_log_field id "$NOTARY_SUBMIT_LOG")"
 rm -f "$NOTARY_SUBMIT_LOG"
 if [ "$NOTARY_EXIT" -ne 0 ] || [ "$NOTARY_STATUS" != "Accepted" ]; then
   echo "Notarization did not succeed; status: ${NOTARY_STATUS:-unknown}." >&2
