@@ -4,6 +4,25 @@
 
 Mesh Notes uses a custom P2P protocol built on UDP with a reliability layer. The stack has three layers: network, overlay, and application.
 
+## Relay version-tree conflict handshake
+
+Implemented in `packages/libp2p/lib/application/version_chain_api.dart`, `packages/server/lib/relay_application.dart`, and `packages/server/lib/server_db.dart`.
+All messages below use the existing `publish` application type and signed `UncipherMessage` transport envelope; the transport signature remains `sign(hash(data))`.
+
+- A first owner-signed `version_chain` publish, a repeated publish of the accepted head, or a `version_tree_resolve` whose `resolved_version` is the accepted head, is recorded in `pending_version_claims`. This is not the steady head. `latest_versions`, `latest_publish_payloads`, and `version_trees` stay as they are, and the relay queries the claimed `version_tree` (and still offers when the version object is missing).
+- A different ordinary publish is rejected without changing accepted metadata, raw publish, or tree. The relay signs a reply body:
+  `{"type":"version_tree_conflict","conflict_version":"current-head","owner":"owner-public-key"}`.
+- On each fresh conflict, the App checks its current head's DAG (including deprecated ancestors), not mere presence in the local database. It retains no conflict for later publishes. Only if the conflict is included may it send a resolve with a publish for that same checked head:
+  `{"type":"version_tree_resolve","resolved_version":"current-head","publish":"<complete original owner-signed version_chain JSON string>"}`.
+  `publish` is a string (including the original `sign`), not a reconstructed object. Do not add `resolved_version` to the inner publish or its messages.
+- Otherwise the App requests `version_tree`, synchronizes missing objects, and merges before publishing a DAG that contains the conflict.
+- The relay verifies the transport sender against the connected node and the inner signature/owner. A resolve whose `resolved_version` is not the accepted head gets a fresh conflict and does not become pending. A resolve cannot initialize an empty relay.
+- While a pending claim is unfinished, another version is ignored. The claim is cancelled when it is older than 10 minutes or 5 `version_tree` queries have already been sent (`pendingTimeoutMs` and `maxPendingQueries` on `RelayApplication`). The next valid publish can then start a new claim. The periodic relay timer also expires claims and retries the query while the owner is still connected.
+- The steady head, raw publish, and `version_tree` are replaced together only when a `version_tree` provide matches the pending claim (`sub_key` and, when the claim has one, timestamp). Until that provide arrives, peers can still sync the previously stored tree. Delayed or unapproved tree provides cannot replace it.
+- Relay `provide` validates both batch and resource owner signatures; `query` and `apply` also require a valid signature and connected-node owner match.
+
+Compatibility: Apps uploading trees to this relay must populate `version_tree.sub_key`; legacy empty-sub-key uploads are rejected rather than risking rollback. Ordinary same-user App publish behavior is unchanged.
+
 ## Protocol Stack
 
 ```
@@ -996,7 +1015,7 @@ The standalone relay server acts as a persistent bootstrap and storage peer that
 1. **Provide Message (`provideAppType`)**:
    - Parses incoming `CipherMessages`.
    - Stores each resource inside the `objects` table under the joint primary key `(user_public_key, key)`.
-   - If the resource key is `version_tree`, it upserts (overwrites) the old value.
+   - If the resource key is `version_tree` and it matches the owner's pending claim, one transaction replaces `latest_versions`, `latest_publish_payloads`, and `version_trees`, then clears the claim. A tree for the already accepted head upserts `version_trees` only. Any other tree is ignored, so a new publish does not delete the stored tree.
    - For all other keys (representing immutable versions or blocks), it inserts with `OR IGNORE` (does not overwrite existing).
    - Retains the full outer `CipherMessages` JSON (envelope) for each resource so it can be returned verbatim without server re-signing.
 
@@ -1007,7 +1026,7 @@ The standalone relay server acts as a persistent bootstrap and storage peer that
 
 3. **Publish Message (`publishAppType`)**:
    - Parses `UncipherMessage` wrapping a `BroadcastMessages`.
-   - Records the `latest_version` in the `latest_versions` table. Its `updated_at` remains the server receive/update time, not the app-side version-tree timestamp.
+   - Records a pending claim in `pending_version_claims` instead of updating `latest_versions`. `updated_at` on the steady head remains the time the matching `version_tree` provide committed, not the app-side version-tree timestamp.
    - Uses the published `latest_version_timestamp` only for comparison against the stored `version_tree` resource timestamp.
    - If a repeated publish has the same `latest_version`, and the stored encrypted `version_tree` resource timestamp equals the published `latest_version_timestamp`, it skips querying the tree again.
    - Otherwise, when the corresponding latest version object is not cached, it sends an `offerAppType` request with `Offer(type: offerTypeStorage, target: data owner / publishing user, data: {'limit': 100, 'extra': ''})`. `target` is the owner's public key even when the peer is another relay, not the receiving server's key.

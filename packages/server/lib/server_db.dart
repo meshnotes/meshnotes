@@ -20,6 +20,40 @@ class LatestPublishRecord {
   });
 }
 
+class PendingVersionClaim {
+  final String userPublicKey;
+  final String claimedVersion;
+  final int? claimedTimestamp;
+  final String payload;
+  final String? resolvedVersion;
+  final int startedAt;
+  final int queryAttempts;
+
+  PendingVersionClaim({
+    required this.userPublicKey,
+    required this.claimedVersion,
+    required this.claimedTimestamp,
+    required this.payload,
+    required this.resolvedVersion,
+    required this.startedAt,
+    required this.queryAttempts,
+  });
+}
+
+class PublishAdmission {
+  final String? conflictVersion;
+  final bool pending;
+  final bool steady;
+  final bool busy;
+
+  PublishAdmission._({this.conflictVersion, this.pending = false, this.steady = false, this.busy = false});
+
+  factory PublishAdmission.conflict(String version) => PublishAdmission._(conflictVersion: version);
+  factory PublishAdmission.pending() => PublishAdmission._(pending: true);
+  factory PublishAdmission.steady() => PublishAdmission._(steady: true);
+  factory PublishAdmission.busy() => PublishAdmission._(busy: true);
+}
+
 class ServerDbHelper {
   late Database _database;
   static const dbFileName = 'server_village.db';
@@ -71,6 +105,14 @@ class ServerDbHelper {
         'latest_version_timestamp INT, '
         'payload TEXT, '
         'updated_at INT)');
+    db.execute('CREATE TABLE IF NOT EXISTS pending_version_claims('
+        'user_public_key TEXT PRIMARY KEY, '
+        'claimed_version TEXT, '
+        'claimed_timestamp INT, '
+        'payload TEXT, '
+        'resolved_version TEXT, '
+        'started_at INT, '
+        'query_attempts INT)');
     _addColumnIfMissing(db, 'latest_publish_payloads', 'latest_version_timestamp', 'INT');
   }
 
@@ -148,6 +190,114 @@ class ServerDbHelper {
 
   CipherMessage _cipherMessageFromEnvelopeData(String envelopeData) {
     return CipherMessage.fromJson(jsonDecode(envelopeData) as Map<String, dynamic>);
+  }
+
+  /// Decide whether this publish may be recorded as a pending claim.
+  /// The stored head, payload, and version tree stay in place until [tryPromotePendingClaim].
+  PublishAdmission tryAdmitPublish(String owner, String version, int? timestamp, String payload, String? resolvedVersion, {required int timeoutMs, required int maxQueries}) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final existing = getPendingClaim(owner);
+    if(existing != null && _pendingExpired(existing, now, timeoutMs, maxQueries)) {
+      _database.execute('DELETE FROM pending_version_claims WHERE user_public_key=?', [owner]);
+    }
+    _database.execute('BEGIN IMMEDIATE');
+    try {
+      final pending = getPendingClaim(owner);
+      if(pending != null) {
+        if(pending.claimedVersion != version || pending.claimedTimestamp != timestamp) {
+          _database.execute('ROLLBACK');
+          return PublishAdmission.busy();
+        }
+        _database.execute('ROLLBACK');
+        return PublishAdmission.pending();
+      }
+      final current = getLatestVersion(owner, 'latest_version');
+      if((resolvedVersion != null && resolvedVersion != current) || (resolvedVersion == null && current != null && current != version)) {
+        _database.execute('ROLLBACK');
+        return PublishAdmission.conflict(current ?? ''); // A resolve cannot initialize an empty relay.
+      }
+      final storedTimestamp = getLatestPublishVersionTimestamp(owner);
+      if(current == version && (timestamp == null || storedTimestamp == timestamp)) {
+        _database.execute('ROLLBACK');
+        return PublishAdmission.steady();
+      }
+      const sql = 'INSERT INTO pending_version_claims(user_public_key, claimed_version, claimed_timestamp, payload, resolved_version, started_at, query_attempts) VALUES(?, ?, ?, ?, ?, ?, 0)';
+      _database.execute(sql, [owner, version, timestamp, payload, resolvedVersion, now]);
+      _database.execute('COMMIT');
+      return PublishAdmission.pending();
+    } catch(e) {
+      _database.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
+  /// Replace the stored head, payload, and version tree when [versionTree] matches the pending claim.
+  /// Returns false when the tree belongs to some other version; the stored head is left unchanged.
+  bool tryPromotePendingClaim({required String userPublicKey, required CipherMessage versionTree}) {
+    _database.execute('BEGIN IMMEDIATE');
+    try {
+      final pending = getPendingClaim(userPublicKey);
+      if(pending == null || pending.claimedVersion != versionTree.subKey || (pending.claimedTimestamp != null && pending.claimedTimestamp != versionTree.timestamp)) {
+        _database.execute('ROLLBACK');
+        return false;
+      }
+      final current = getLatestVersion(userPublicKey, 'latest_version');
+      if(pending.resolvedVersion != null && pending.resolvedVersion != current) {
+        _database.execute('ROLLBACK');
+        return false;
+      }
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final timestamp = pending.claimedTimestamp ?? versionTree.timestamp;
+      saveLatestVersion(userPublicKey, 'latest_version', pending.claimedVersion, now);
+      saveLatestPublishPayload(userPublicKey, pending.claimedVersion, timestamp, pending.payload, now);
+      saveVersionTree(userPublicKey: userPublicKey, resource: versionTree);
+      _database.execute('DELETE FROM pending_version_claims WHERE user_public_key=?', [userPublicKey]);
+      _database.execute('COMMIT');
+      return true;
+    } catch(e) {
+      _database.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
+  PendingVersionClaim? getPendingClaim(String userPublicKey) {
+    const sql = 'SELECT user_public_key, claimed_version, claimed_timestamp, payload, resolved_version, started_at, query_attempts FROM pending_version_claims WHERE user_public_key=? LIMIT 1';
+    final resultSet = _database.select(sql, [userPublicKey]);
+    if(resultSet.isEmpty) return null;
+    return _pendingFromRow(resultSet.first);
+  }
+
+  List<PendingVersionClaim> getPendingClaims() {
+    const sql = 'SELECT user_public_key, claimed_version, claimed_timestamp, payload, resolved_version, started_at, query_attempts FROM pending_version_claims';
+    return _database.select(sql).map(_pendingFromRow).toList();
+  }
+
+  void recordPendingQuery(String userPublicKey) {
+    _database.execute('UPDATE pending_version_claims SET query_attempts=query_attempts+1 WHERE user_public_key=?', [userPublicKey]);
+  }
+
+  void expirePendingClaims(int now, int timeoutMs, int maxQueries) {
+    for(final claim in getPendingClaims()) {
+      if(_pendingExpired(claim, now, timeoutMs, maxQueries)) {
+        _database.execute('DELETE FROM pending_version_claims WHERE user_public_key=?', [claim.userPublicKey]);
+      }
+    }
+  }
+
+  bool _pendingExpired(PendingVersionClaim pending, int now, int timeoutMs, int maxQueries) {
+    return pending.queryAttempts >= maxQueries || now - pending.startedAt >= timeoutMs;
+  }
+
+  PendingVersionClaim _pendingFromRow(Row row) {
+    return PendingVersionClaim(
+      userPublicKey: row['user_public_key'] as String,
+      claimedVersion: row['claimed_version'] as String,
+      claimedTimestamp: row['claimed_timestamp'] as int?,
+      payload: row['payload'] as String,
+      resolvedVersion: row['resolved_version'] as String?,
+      startedAt: row['started_at'] as int,
+      queryAttempts: row['query_attempts'] as int,
+    );
   }
 
   void saveLatestVersion(String userPublicKey, String key, String latestVersion, int updatedAt) {

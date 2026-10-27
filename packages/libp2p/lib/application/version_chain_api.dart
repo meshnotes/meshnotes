@@ -2,6 +2,30 @@ import 'dart:convert';
 
 const String versionChainBroadcastType = 'version_chain';
 const String resourceKeyVersionTree = 'version_tree';
+const String versionTreeConflictType = 'version_tree_conflict';
+const String versionTreeResolveType = 'version_tree_resolve';
+const String resolvedVersionKey = 'resolved_version';
+
+/// The original owner-signed version_chain JSON is an opaque string, never rebuilt.
+class VersionTreeResolve {
+  final String resolvedVersion;
+  final String publish;
+  VersionTreeResolve({required this.resolvedVersion, required this.publish});
+  VersionTreeResolve.fromJson(Map<String, dynamic> map): resolvedVersion = map[resolvedVersionKey], publish = map['publish'] {
+    if(map['type'] != versionTreeResolveType || resolvedVersion.isEmpty || publish.isEmpty) throw FormatException('Invalid resolve');
+  }
+  Map<String, dynamic> toJson() => {'type': versionTreeResolveType, resolvedVersionKey: resolvedVersion, 'publish': publish};
+}
+
+class VersionTreeConflict {
+  final String conflictVersion;
+  final String owner;
+  VersionTreeConflict({required this.conflictVersion, required this.owner});
+  VersionTreeConflict.fromJson(Map<String, dynamic> map): conflictVersion = map['conflict_version'], owner = map['owner'] {
+    if(map['type'] != versionTreeConflictType || conflictVersion.isEmpty || owner.isEmpty) throw FormatException('Invalid conflict');
+  }
+  Map<String, dynamic> toJson() => {'type': versionTreeConflictType, 'conflict_version': conflictVersion, 'owner': owner};
+}
 
 class VersionNode {
   String versionHash;

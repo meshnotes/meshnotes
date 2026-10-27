@@ -17,6 +17,7 @@ enum Command {
   sendVersions,
   // receiveVersions,
   receiveBroadcast,
+  receiveVersionTreeConflict,
   receiveProvide,
   receiveQuery,
   receiveOffer, // 6) Received generic offer message, currently type=storage
@@ -82,11 +83,20 @@ class NewVersionParameter {
 class SendVersionTreeParameter {
   VersionChain versionChain;
   int timestamp;
+  String latestVersion;
 
   SendVersionTreeParameter({
     required this.versionChain,
     required this.timestamp,
+    this.latestVersion = '',
   });
+}
+
+class SendBroadcastParameter {
+  final BroadcastMessages message;
+  final String? resolvedVersion;
+  final String? targetPublicKey;
+  SendBroadcastParameter({required this.message, this.resolvedVersion, this.targetPublicKey});
 }
 
 class SendRequireVersionsParameter {

@@ -126,18 +126,19 @@ class VersionChainVillager {
       case Command.networkStatus:
       case Command.nodeStatus:
       case Command.receiveBroadcast:
+      case Command.receiveVersionTreeConflict:
       case Command.receiveProvide:
       case Command.receiveQuery:
       case Command.receiveOffer: // Handled in net_controller
       // Do nothing, these commands are handled in net_controller
         break;
       case Command.sendBroadcast:
-        final brdMsg = msg.parameter as BroadcastMessages;
+        final brdMsg = msg.parameter as SendBroadcastParameter;
         _onSendBroadcast(brdMsg, msg.stats);
         break;
       case Command.sendVersionTree:
         final param = msg.parameter as SendVersionTreeParameter;
-        _onSendVersionTree(param.versionChain, param.timestamp, msg.stats);
+        _onSendVersionTree(param.versionChain, param.timestamp, msg.stats, param.latestVersion);
         break;
       case Command.sendRequireVersions:
         final param = msg.parameter as SendRequireVersionsParameter;
@@ -321,43 +322,62 @@ class VersionChainVillager {
       MyLogger.info('Verify PUBLISH message failed');
       return;
     }
-    var brdMsg = BroadcastMessages.fromJson(jsonDecode(uncipherMessage.data));
-    final ownerPublicKey = brdMsg.userPublicId;
-    if(ownerPublicKey != _signing!.getCompressedPublicKey()) {
-      MyLogger.info('Drop PUBLISH message from other user');
-      return;
+    final body = jsonDecode(uncipherMessage.data) as Map<String, dynamic>;
+    switch(body['type']) {
+      case versionTreeConflictType:
+        final conflict = VersionTreeConflict.fromJson(body);
+        if(!_allowSendingToPublicServer || conflict.owner != _signing!.getCompressedPublicKey()) {
+          return;
+        }
+        stats.transportTime = Util.getTimeStamp();
+        _sendPort.send(Message(cmd: Command.receiveVersionTreeConflict, parameter: uncipherMessage, stats: stats));
+        return;
+      case versionChainBroadcastType:
+        var brdMsg = BroadcastMessages.fromJson(body);
+        final ownerPublicKey = brdMsg.userPublicId;
+        if(ownerPublicKey != _signing!.getCompressedPublicKey()) {
+          MyLogger.info('Drop PUBLISH message from other user');
+          return;
+        }
+        if(!_verifySignature(brdMsg.toSignableString(), brdMsg.signature)) {
+          MyLogger.info('Verify PUBLISH message with the data owner\'s signature failed');
+          return;
+        }
+        stats.transportTime = Util.getTimeStamp();
+        _sendPort.send(Message(
+          cmd: Command.receiveBroadcast,
+          parameter: brdMsg,
+          stats: stats,
+        ));
+        return;
+      default:
+        return;
     }
-    if(!_verifySignature(brdMsg.toSignableString(), brdMsg.signature)) {
-      MyLogger.info('Verify PUBLISH message with the data owner\'s signature failed');
-      return;
-    }
-    stats.transportTime = Util.getTimeStamp();
-    _sendPort.send(Message(
-      cmd: Command.receiveBroadcast,
-      parameter: brdMsg,
-      stats: stats,
-    ));
   }
 
-  void _onSendBroadcast(BroadcastMessages msg, TimeCostStatistics stats) {
+  void _onSendBroadcast(SendBroadcastParameter parameter, TimeCostStatistics stats) {
+    final msg = parameter.message;
     stats.receiveTime = Util.getTimeStamp();
     msg.userPublicId = _signing!.getCompressedPublicKey();
-    msg.signature = _genSignature(msg.toSignableString()); // This is the signature of the data owner
+    msg.signature = _genSignature(msg.toSignableString());
     String json = jsonEncode(msg);
+    if(parameter.resolvedVersion != null) {
+      json = jsonEncode(VersionTreeResolve(resolvedVersion: parameter.resolvedVersion!, publish: json));
+    }
     String signature = _genSignature(json); // This is the signature of the sender. Sometimes they are different, for example, in the server mode.
     UncipherMessage uncipherMessage = UncipherMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
     String uncipherMessageJson = jsonEncode(uncipherMessage);
-    _village?.sendPublish(uncipherMessageJson, stats);
+    _village?.sendPublish(uncipherMessageJson, stats, parameter.targetPublicKey);
   }
 
-  void _onSendVersionTree(VersionChain versionChain, int timestamp, TimeCostStatistics stats) {
+  void _onSendVersionTree(VersionChain versionChain, int timestamp, TimeCostStatistics stats, String latestVersion) {
     final processingTimer = Stopwatch()..start();
     stats.receiveTime = Util.getTimeStamp();
     String chainJson = jsonEncode(versionChain);
     String encryptedChainJson = _encrypt!.encrypt(timestamp, chainJson);
     var rawResource = UnsignedResource(
       key: resourceKeyVersionTree,
-      subKey: '',
+      subKey: latestVersion,
       timestamp: timestamp,
       data: encryptedChainJson,
     );

@@ -97,6 +97,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
     docList = _getFilteredDocumentList(totalList);
     final _netStatus = controller.network.getNetworkStatus();
     _networkStatus = _convertStatus(_netStatus);
+    _peerCount = controller.network.getNetworkDetails().where((node) => node.status == NodeStatus.inContact).length;
     controller.eventTasksManager.addSyncingTask(_updateSyncing);
     controller.eventTasksManager.addUserInfoChangedTask(_onUserInfoChanged);
     _docHighlightFadeController = AnimationController(

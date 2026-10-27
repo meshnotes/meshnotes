@@ -84,7 +84,14 @@ class WidgetTemplate {
           children: [
             Icon(icon, color: textColor, size: textSize,),
             const SizedBox(width: 8.0,),
-            Text(label, style: TextStyle(color: textColor, fontSize: textSize)),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: textColor, fontSize: textSize),
+              ),
+            ),
           ],
         ),
       ),

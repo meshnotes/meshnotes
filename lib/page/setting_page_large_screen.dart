@@ -181,7 +181,14 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text((changedSettings.contains(settingItem)? '*': '') + settingItem.displayName!),
+                Flexible(
+                  child: Text(
+                    (changedSettings.contains(settingItem)? '*': '') + settingItem.displayName!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                  ),
+                ),
                 if (settingItem.comment != null && settingItem.comment!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
@@ -236,7 +243,14 @@ class _SettingPageLargeScreenState extends State<SettingPageLargeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text((changedSettings.contains(settingItem)? '*': '') + settingItem.displayName!),
+                Flexible(
+                  child: Text(
+                    (changedSettings.contains(settingItem)? '*': '') + settingItem.displayName!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                  ),
+                ),
                 if (settingItem.comment != null && settingItem.comment!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),

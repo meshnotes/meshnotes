@@ -57,6 +57,16 @@ UncipherMessage _signedBroadcast(SigningWrapper signing, Map<String, String> mes
   );
 }
 
+String _signedProvide(SigningWrapper signing, CipherMessages message) {
+  message.userPublicId = signing.getCompressedPublicKey();
+  for(final resource in message.resources) {
+    final raw = UnsignedResource(key: resource.key, subKey: resource.subKey, timestamp: resource.timestamp, data: resource.data);
+    resource.signature = signing.sign(HashUtil.hashText(raw.getFeature()));
+  }
+  message.signature = signing.sign(HashUtil.hashText(CipherMessages.getFeature(message.resources)));
+  return jsonEncode(message);
+}
+
 void main() {
   MyLogger.initForConsoleTest(name: 'server_test', debug: true);
   late Directory tempDir;
@@ -192,22 +202,23 @@ void main() {
       resources: [resource1],
       signature: 'outer_sig',
     );
-    final providePayload = jsonEncode(resourcesList);
+    node.publicKey = signing.getCompressedPublicKey();
+    final providePayload = _signedProvide(signing, resourcesList);
 
     app.onData(node, 'mesh_notes', AppMessageType.provideAppType.value, providePayload);
 
     // Verify it is saved in DB as a single cipher resource, not the full provide envelope
-    final storedObjects = dbHelper.getObjects('user1', ['key1']);
+    final storedObjects = dbHelper.getObjects(node.publicKey, ['key1']);
     expect(storedObjects.length, 1);
     expect(storedObjects.first.data, 'encrypted_data1');
-    expect(storedObjects.first.signature, 'sig1');
+    expect(storedObjects.first.signature, resource1.signature);
 
     // 2. Send queryAppType
     final requireVersions = RequireVersions(requiredVersions: ['key1']);
     final uncipherQuery = UncipherMessage(
-      userPublicId: 'user1',
+      userPublicId: node.publicKey,
       data: jsonEncode(requireVersions),
-      signature: 'query_sig',
+      signature: signing.sign(HashUtil.hashText(jsonEncode(requireVersions))),
     );
     final queryPayload = jsonEncode(uncipherQuery);
 
@@ -242,9 +253,10 @@ void main() {
     // Send publish from node (node_1)
     app.onData(node, 'mesh_notes', AppMessageType.publishAppType.value, publishPayload);
 
-    expect(dbHelper.getLatestVersion(serverUser, 'latest_version'), 'latest_version_hash_123');
-    expect(dbHelper.getLatestVersionTimestamp(serverUser, 'latest_version'), isNotNull);
-    expect(dbHelper.getLatestPublishVersionTimestamp(serverUser), 123456);
+    expect(dbHelper.getLatestVersion(serverUser, 'latest_version'), isNull);
+    final pendingClaim = dbHelper.getPendingClaim(serverUser);
+    expect(pendingClaim!.claimedVersion, 'latest_version_hash_123');
+    expect(pendingClaim.claimedTimestamp, 123456);
 
     // Verify publish is not relayed to node2, and server queries version_tree plus sends an offer(type=storage) to the sender.
     expect(mockOverlay.sentData.length, 2);
@@ -325,9 +337,21 @@ void main() {
     expect(returnedVersionTree.resources.first.data, 'encrypted_tree_newer');
     expect(returnedVersionTree.resources.first.signature, 'tree_sig_newer');
 
+    final committedTree = CipherMessages(
+      userPublicId: serverUser,
+      resources: [
+        CipherMessage(key: resourceKeyVersionTree, subKey: 'latest_version_hash_123', timestamp: 123456, data: 'encrypted_tree_committed', signature: ''),
+      ],
+      signature: '',
+    );
+    app.onData(node, 'mesh_notes', AppMessageType.provideAppType.value, _signedProvide(signing, committedTree));
+    expect(dbHelper.getLatestVersion(serverUser, 'latest_version'), 'latest_version_hash_123');
+    expect(dbHelper.getLatestVersionTimestamp(serverUser, 'latest_version'), isNotNull);
+    expect(dbHelper.getLatestPublishVersionTimestamp(serverUser), 123456);
+
     mockOverlay.sentData.clear();
     app.onData(node, 'mesh_notes', AppMessageType.publishAppType.value, publishPayload);
-    expect(mockOverlay.sentData, isEmpty);
+    expect(mockOverlay.sentData.single['type'], AppMessageType.offerAppType.value); // Missing version object must still be repaired.
 
     mockOverlay.sentData.clear();
     dbHelper.saveObject(
@@ -341,7 +365,8 @@ void main() {
     final cachedPublish = _signedBroadcast(signing, {'latest_version': 'already_cached_version_hash'});
     app.onData(node, 'mesh_notes', AppMessageType.publishAppType.value, jsonEncode(cachedPublish));
 
-    expect(mockOverlay.sentData, isEmpty);
+    expect(mockOverlay.sentData.single['type'], AppMessageType.publishAppType.value); // A different cached version still conflicts.
+    expect(dbHelper.getLatestVersion(serverUser, 'latest_version'), 'latest_version_hash_123');
 
     mockOverlay.sentData.clear();
     final otherUserSigning = SigningWrapper.random();
@@ -350,7 +375,8 @@ void main() {
     final otherUserPublish = _signedBroadcast(otherUserSigning, {'latest_version': 'other_user_version_hash'});
     app.onData(node, 'mesh_notes', AppMessageType.publishAppType.value, jsonEncode(otherUserPublish));
 
-    expect(dbHelper.getLatestVersion(otherUserPublicKey, 'latest_version'), 'other_user_version_hash');
+    expect(dbHelper.getLatestVersion(otherUserPublicKey, 'latest_version'), isNull);
+    expect(dbHelper.getPendingClaim(otherUserPublicKey)!.claimedVersion, 'other_user_version_hash');
     expect(mockOverlay.sentData.length, 2);
     expect(mockOverlay.sentData[0]['node'], node);
     expect(mockOverlay.sentData[0]['type'], AppMessageType.queryAppType.value);
@@ -426,6 +452,7 @@ void main() {
       signature: userSigning.sign(HashUtil.hashText(applyData)),
     );
 
+    node.publicKey = userPublicKey;
     app.onData(node, 'mesh_notes', AppMessageType.applyAppType.value, jsonEncode(uncipherApply));
 
     expect(mockOverlay.sentData.length, 1);
@@ -443,7 +470,7 @@ void main() {
       ],
       signature: 'provide_sig',
     );
-    app.onData(node, 'mesh_notes', AppMessageType.provideAppType.value, jsonEncode(providedResources));
+    app.onData(node, 'mesh_notes', AppMessageType.provideAppType.value, _signedProvide(userSigning, providedResources));
 
     expect(mockOverlay.sentData.length, 1);
     final nextQuery = UncipherMessage.fromJson(jsonDecode(mockOverlay.sentData[0]['data'] as String));
@@ -519,7 +546,19 @@ void main() {
       ],
       signature: 'provide_sig',
     );
-    app.onData(sourceNode, 'mesh_notes', AppMessageType.provideAppType.value, jsonEncode(providedResources));
+    app.onData(sourceNode, 'mesh_notes', AppMessageType.provideAppType.value, _signedProvide(userSigning, providedResources));
+    expect(dbHelper.getLatestVersion(userPublicKey, 'latest_version'), isNull);
+    expect(mockOverlay.sentData.where((message) => message['type'] == AppMessageType.publishAppType.value), isEmpty);
+
+    mockOverlay.sentData.clear();
+    final versionTree = CipherMessages(
+      userPublicId: userPublicKey,
+      resources: [
+        CipherMessage(key: resourceKeyVersionTree, subKey: 'v1', timestamp: 1, data: 'tree-v1', signature: ''),
+      ],
+      signature: '',
+    );
+    app.onData(sourceNode, 'mesh_notes', AppMessageType.provideAppType.value, _signedProvide(userSigning, versionTree));
 
     expect(mockOverlay.sentData.length, 1);
     expect(mockOverlay.sentData[0]['node'], sameUserNode);

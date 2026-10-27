@@ -14,6 +14,8 @@ import 'version_manager.dart';
 
 enum MissingObjectType { version, document, block }
 
+enum _SyncRequestState { idle, waitingTree, fetchingObjects, merging }
+
 class MissingObject {
   final String hash;
   final MissingObjectType type;
@@ -24,24 +26,42 @@ class MissingObject {
 class MergeTask {
   static const int _checkInterval = 15000; // 15 seconds
   static const int _sendMissingRequestInterval = 120000; // 2 minutes
+  static const int syncRequestTimeout = 180000; // 3 minutes without progress; no additional timer
   final DbHelper _db;
   final Controller controller = Controller();
   final void Function(List<String>) _sendRequireVersions;
+  final bool Function() _mergeVersionTree;
+  final int Function() _now;
+  _SyncRequestState _syncRequestState = _SyncRequestState.idle;
+  int _lastSyncProgressTimestamp = 0;
   int _lastCheckTimeStamp = 0;
   int _lastSentMissingRequestTimeStamp = 0;
   int _progress = 0;
   final Map<String, MissingObject> _missingObjects = {};
 
-  MergeTask({required DbHelper db, void Function(List<String>)? sendRequireVersions}):
+  MergeTask({required DbHelper db, void Function(List<String>)? sendRequireVersions, bool Function()? mergeVersionTree, int Function()? now}):
         _db = db,
+        _now = now?? Util.getTimeStamp,
+        _mergeVersionTree = mergeVersionTree?? Controller().mergeVersionTree,
         _sendRequireVersions = sendRequireVersions?? Controller().sendRequireVersions {
     controller.eventTasksManager.addTimerTask('mergeTask', () {
       check();
     }, _checkInterval);
   }
 
+  bool tryBeginVersionTreeRequest() {
+    final now = _now();
+    if(_syncRequestState != _SyncRequestState.idle && now - _lastSyncProgressTimestamp < syncRequestTimeout) {
+      return false;
+    }
+    // Expire only suppression, not downloaded objects or pending merge work.
+    _syncRequestState = _SyncRequestState.waitingTree;
+    _lastSyncProgressTimestamp = now;
+    return true;
+  }
+
   void check() {
-    int now = Util.getTimeStamp();
+    int now = _now();
     if(now - _lastCheckTimeStamp < _checkInterval) return; // Not enough time passed, do nothing
     _lastCheckTimeStamp = now;
 
@@ -57,19 +77,28 @@ class MergeTask {
 
   void addVersionTree(List<VersionNode> dag) {
     controller.eventTasksManager.triggerUpdateSyncing(true, _progress);
-    _storeVersionToSyncDb(dag);
+    final addedVersions = _storeVersionToSyncDb(dag);
+    if(dag.isNotEmpty && (addedVersions || _syncRequestState == _SyncRequestState.waitingTree)) {
+      _syncRequestState = _SyncRequestState.fetchingObjects;
+      _lastSyncProgressTimestamp = _now();
+    }
+    if(dag.isEmpty) return; // An empty response is not progress.
     _tryToMerge();
   }
 
   void addResources(List<UnsignedResource> resources) {
     final addedResources = _storeResourcesToSyncDb(resources);
-    if(addedResources.isNotEmpty) { // If no new resource added, do nothing
+    if(addedResources.isNotEmpty) { // New objects arrived: refresh progress and continue the merge.
+      if(addedResources.any(_missingObjects.containsKey)) _lastSyncProgressTimestamp = _now();
       _lastSentMissingRequestTimeStamp = 0;
       _tryToMerge(addedResources: addedResources);
     }
   }
 
   void clearSyncingTasks() {
+    _syncRequestState = _SyncRequestState.idle;
+    _lastSyncProgressTimestamp = 0;
+    _lastSentMissingRequestTimeStamp = 0;
     _db.clearSyncingTables();
     _missingObjects.clear();
     _progress = 0;
@@ -90,7 +119,7 @@ class MergeTask {
       final hashes = _takeProperMissingHashes(2, 50);
       MyLogger.info('_tryToMerge: missing objects: $hashes');
       _sendRequireVersions(hashes);
-      _lastSentMissingRequestTimeStamp = Util.getTimeStamp();
+      _lastSentMissingRequestTimeStamp = _now();
     } else {
       for(final node in localDagMap.values) {
         if(node.status == ModelConstants.statusAvailable) continue;
@@ -106,22 +135,36 @@ class MergeTask {
       MyLogger.info('_tryToMerge: store syncing versions to db');
       _storeSyncingVersionsToDb(localDagMap);
       MyLogger.info('_tryToMerge: try to merge versions');
-      controller.mergeVersionTree();
+      if(_syncRequestState != _SyncRequestState.merging) {
+        _syncRequestState = _SyncRequestState.merging;
+        _lastSyncProgressTimestamp = _now();
+      }
+      try {
+        if(!_mergeVersionTree()) return; // Busy is not success: keep the existing sync work for retry.
+      } catch(_) {
+        _syncRequestState = _SyncRequestState.idle;
+        rethrow;
+      }
       MyLogger.info('_tryToMerge: clear syncing tables');
       clearSyncingTasks();
     }
   }
 
-  void _storeVersionToSyncDb(List<VersionNode> versionDag) {
+  bool _storeVersionToSyncDb(List<VersionNode> versionDag) {
+    var added = false;
     for(var node in versionDag) {
       String versionHash = node.versionHash;
       String parents = DocUtils.buildParents(node.parents);
       int timestamp = node.createdAt;
-      if(_db.getVersionData(versionHash) == null && _db.getSyncingVersionData(versionHash) == null) {
+      // Cached versions may still be outside the current DAG (e.g. after a busy skip).
+      // Stage them too so their document/block dependencies are checked before merging.
+      if(_db.getSyncingVersionData(versionHash) == null) {
         _db.storeSyncingVersion(versionHash, parents, timestamp, Constants.createdFromPeer, ModelConstants.statusWaiting);
+        added = true;
       }
       _enqueueMissingObject(versionHash, MissingObjectType.version);
     }
+    return added;
   }
 
   Map<String, DagNode> _genVersionMapFromSyncingDb() {

@@ -9,7 +9,11 @@
 
 ---
 
+- [x] **Stateless Conflict Retry**: Handle fresh conflicts against the current DAG including deprecated ancestors, remove cached conflicts/publish hash lists, and reuse merge before the next publish/conflict. MergeTask suppresses duplicate acquisition using progress timestamps and a configurable timeout without a new timer; DocumentManager busy semantics remain unchanged.
 ## 1. P2P Sync & Network Layer (packages/libp2p & lib/net)
+- [x] **Relay Version Tree Conflict Handshake**: Reject different ordinary publishes with `version_tree_conflict`; resolve only from a proposal DAG containing the conflicting head, otherwise sync/merge first. Preserve the original signed publish inside `version_tree_resolve`. A publish that contains the accepted head is a pending claim in `pending_version_claims` and does not replace the stored head, payload, or version tree. Commit those together when the matching `version_tree` provide arrives. Ignore other versions while the claim is open; cancel it after 10 minutes or 5 queries. Reject stale tree provides, and repair missing content on equal-version publishes.
+- [ ] **Version Tree Conflict Device Smoke Test**: With two same-user Apps and a relay, validate concurrent offline branches, merge/resolve, reconnect, and delayed tree delivery on real devices (no service restart performed during automated verification).
+- [ ] **Existing App Test Failures**: Repair `conflict_manager_test.dart` mixed-operation count, `find_operations_test.dart` move order, `merge_task_test.dart` batch-size expectation, and the stale import in `version_required_objects_test.dart`; all four failures reproduced on isolated HEAD as well as this feature worktree.
 - [x] **Same-Endpoint UDP Reconnect**: Distinguish duplicate connects from new source IDs, retire stale peers before replacement, and reject old-session handshake packets; cover reconnect and cleanup with loopback UDP regression tests.
 - [ ] **Mobile Reconnect Smoke Test**: On a real phone, disconnect/reopen on the same UDP endpoint before heartbeat expiry and verify reconnect plus sync (manual validation by user).
 - [x] **Relay Server Node-to-Node Sync**: Implement `publishAppType` handling to broadcast and relay document version updates among peer nodes.
@@ -27,6 +31,7 @@
 - [x] **Version Required Object Manifest Cache**: Persist each version's required object list as a local database text manifest so `SendVersions` can read dependencies without recalculating doc/block traversal.
 - [x] **Staged Missing-Object Expansion**: `_findWaitingOrMissingVersions` no longer skips a version already in `_missingObjects`. After the version JSON arrives it expands document/block hashes instead of merging with an incomplete object set. Already-arrived hashes are dropped by `_removeAvailableObjectsFromMissingObjects`.
 - [ ] **Relay Server Version List Request**: After sending a version tree to a standalone server, add a server-specific request/manifest so the server can know all version hashes it should hold without decrypting user data; do not add this extra payload for same-user devices that already have the key, because the data may be large.
+- [ ] **Missing Dependent Object After Version Is Stored**: Version A can be stored while a dependent object B under A fails signature verification. B is a document or a block, not another version. This round does not query B again. The next `publish` only sees that version A is already in `objects` and skips it, so B is never requested again, in this round or on a later `publish`.
 
 
 ## 2. Standalone Relay Server CLI (packages/server)

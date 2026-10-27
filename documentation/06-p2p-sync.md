@@ -12,6 +12,19 @@ Mesh Notes uses a Version Chain-based P2P sync mechanism that supports offline e
 
 ## Version Chain Protocol
 
+### Relay conflicts and merge-before-resolve
+
+`lib/net/net_controller.dart` forwards each conflict to `lib/mindeditor/controller/controller.dart`; it does not retain conflicts or receive DAG hash lists with ordinary publishes. The controller checks the current head's DAG, including reachable deprecated nodes. If it contains the conflicting head, it sends a targeted resolve containing a publish for that same current head and the unchanged `resolved_version`. Database hash existence alone is not proof of coverage.
+Otherwise it requests the version tree and returns. Existing object synchronization and merge proceed independently. Merge completion does not send resolve: a later ordinary publish and fresh conflict trigger a new DAG check. The existing publish timer attempts every 30 seconds, subject to readiness/busy checks and the head's 15-second age threshold.
+
+`lib/mindeditor/document/collaborate/merge_task.dart` owns request suppression across waiting for a tree, fetching objects, and merging. State plus a last-progress timestamp suppress duplicate tree requests; `MergeTask.syncRequestTimeout` defaults to 180000 milliseconds (3 minutes). Expiry is checked on request attempts without a new timer. Valid tree/object progress renews the timestamp; duplicate conflicts and retry sends do not. Completion clears suppression; expiry permits another request without deleting downloaded work. `DocumentManager.isBusy()` is unchanged. A busy-skipped merge retains existing sync work for the existing retry check; cached orphan versions are staged again to validate their dependencies.
+
+`lib/net/net_isolate.dart` signs the current head's `version_chain` when sending a resolve, embeds that signed JSON in `publish`, and signs the outer envelope. Conflict replies must have a valid sender signature, name the local owner, and respect the public-server sending setting.
+The relay keeps the last complete head while a newer claim is pending in `pending_version_claims`. Compare-and-swap commits only when that claim's `version_tree` provide arrives, so a disconnected client cannot replace the stored tree or payload. Another version is ignored until the claim times out or its query budget is spent. Accepted trees carry their head in signed `sub_key`; old in-flight trees are rejected. Equal-version announcements still repair a missing version object.
+See [relay handshake and message fields](03-network-protocol.md#relay-version-tree-conflict-handshake).
+
+Regression coverage: `test/version_tree_conflict_test.dart` checks DAG membership, locally cached orphan handling, merge retry, and independent relays; `packages/server/test/version_tree_conflict_test.dart` checks CAS, raw signed payload preservation, delayed trees, signatures, ownership, and content repair.
+
 ### Core concepts
 
 **Version**:

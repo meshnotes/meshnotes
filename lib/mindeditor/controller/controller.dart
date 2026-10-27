@@ -102,8 +102,7 @@ class Controller {
 
     MyLogger.debug('initAll: init db');
     await dbHelper.init();
-    _docManager = DocumentManager(db: dbHelper);
-    _mergeTaskRunner = MergeTask(db: dbHelper);
+    initializeDocumentSync();
 
     // Will failed in flutter test mode, so disabled it
     await _genDeviceId();
@@ -131,6 +130,11 @@ class Controller {
     MyLogger.info('initAll: finish initialization');
     // eventTasksManager.triggerAfterReady();
     return true;
+  }
+
+  void initializeDocumentSync() {
+    _docManager = DocumentManager(db: dbHelper);
+    _mergeTaskRunner = MergeTask(db: dbHelper);
   }
 
   void setLoggingInState() {
@@ -369,6 +373,20 @@ class Controller {
 
     network.sendVersionBroadcast(latestVersion, latestVersionTimestamp, stats);
   }
+
+  void receiveVersionTreeConflict(String server, String conflictVersion, TimeCostStatistics stats) {
+    // No await: the ancestry check and embedded publish refer to the same current head.
+    // Reachable deprecated ancestors count; an unrelated cached DB version does not.
+    final latestVersion = docManager.getLatestVersion();
+    final timestamp = docManager.getLatestVersionTimestamp();
+    final dag = docManager.getCurrentValidVersionTree();
+    if(latestVersion.isNotEmpty && dag.any((node) => node.versionHash == conflictVersion)) {
+      network.sendVersionResolve(latestVersion, timestamp, server, conflictVersion, stats);
+      return;
+    }
+    sendRequireVersionTree(conflictVersion);
+  }
+
   bool tryToSaveAndSendVersionTree() {
     // If there is no modification, or is currently syncing, don't generate new version tree
     if(!docManager.hasModified() || docManager.isBusy()) return false;
@@ -396,7 +414,7 @@ class Controller {
       return false;
     }
     MyLogger.info('sendVersionTree: $versionData');
-    network.sendNewVersionTree(versionData, timestamp, stats);
+    network.sendNewVersionTree(versionData, timestamp, stats, docManager.getLatestVersion());
     docManager.markCurrentVersionAsSyncing();
     return true;
   }
@@ -406,7 +424,9 @@ class Controller {
     );
     network.sendRequireVersions(missingVersions, stats);
   }
+
   void sendRequireVersionTree(String latestVersion) {
+    if(_mergeTaskRunner?.tryBeginVersionTreeRequest() != true) return;
     //TODO Currently ignore latestVersion, but later should support specified version
     final stats = TimeCostStatistics(
       startTime: Util.getTimeStamp(),
@@ -448,12 +468,13 @@ class Controller {
     // MyLogger.info('receiveVersionTree: receive version tree: $dag');
     // docManager.assembleVersionTree(dag);
   }
-  void mergeVersionTree() {
+  bool mergeVersionTree() {
     if(docManager.isBusy()) {
       MyLogger.info('mergeVersionTree: too busy to merging');
-      return;
+      return false;
     }
     docManager.mergeVersionTree();
+    return true;
   }
   void receiveRequireVersions(List<String> requiredVersions, TimeCostStatistics stats) {
     stats.finishTime = Util.getTimeStamp();

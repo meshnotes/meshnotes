@@ -17,12 +17,16 @@ class RelayApplication implements ApplicationController {
   static const latestVersionTimestampKey = 'latest_version_timestamp';
   static const defaultMaxQueryVersionsPerApply = 2;
   static const defaultPublishIntervalSeconds = 300;
+  static const defaultPendingTimeoutMs = 600000;
+  static const defaultMaxPendingQueries = 5;
   final VillageOverlay _overlay;
   final ServerDbHelper _serverDb;
   final SigningWrapper _signing;
   final String upperAppName;
   final int maxQueryVersionsPerApply;
   final int publishIntervalSeconds;
+  final int pendingTimeoutMs;
+  final int maxPendingQueries;
   final Map<String, List<String>> _pendingMissingVersionsByUser = {};
   final Map<String, String> _lastForwardedLatestVersionByUser = {};
   Timer? _publishTimer;
@@ -36,11 +40,15 @@ class RelayApplication implements ApplicationController {
     required this.upperAppName,
     int maxQueryVersionsPerApply = defaultMaxQueryVersionsPerApply,
     int publishIntervalSeconds = defaultPublishIntervalSeconds,
+    int pendingTimeoutMs = defaultPendingTimeoutMs,
+    int maxPendingQueries = defaultMaxPendingQueries,
   })  : _overlay = overlay,
         _serverDb = serverDb,
         _signing = signing,
         maxQueryVersionsPerApply = maxQueryVersionsPerApply <= 0? defaultMaxQueryVersionsPerApply : maxQueryVersionsPerApply,
-        publishIntervalSeconds = publishIntervalSeconds < 0? defaultPublishIntervalSeconds : publishIntervalSeconds {
+        publishIntervalSeconds = publishIntervalSeconds < 0? defaultPublishIntervalSeconds : publishIntervalSeconds,
+        pendingTimeoutMs = pendingTimeoutMs < 0? defaultPendingTimeoutMs : pendingTimeoutMs,
+        maxPendingQueries = maxPendingQueries <= 0? defaultMaxPendingQueries : maxPendingQueries {
     MyLogger.info('$logPrefix register app=relay_village');
     _overlay.registerApplication('relay_village', this, setDefault: true);
     _overlay.registerApplication(upperAppName, this);
@@ -84,10 +92,30 @@ class RelayApplication implements ApplicationController {
       final decoded = jsonDecode(data);
       final cipherMessages = CipherMessages.fromJson(decoded);
       final userPublicKey = cipherMessages.userPublicId;
+      if(userPublicKey != node.publicKey) {
+        MyLogger.warn('$logPrefix Drop provide because its user does not match the connected node: message_user=$userPublicKey, ${_nodeLabel(node)}');
+        return;
+      }
+      if(!_verifyUncipherMessageWithSenderPublicKey(CipherMessages.getFeature(cipherMessages.resources), cipherMessages.signature, userPublicKey)) {
+        MyLogger.warn('$logPrefix Drop provide because the batch signature failed: message_user=$userPublicKey, resource_count=${cipherMessages.resources.length}, ${_nodeLabel(node)}');
+        return;
+      }
     
       for(var resource in cipherMessages.resources) {
+        final feature = UnsignedResource(key: resource.key, subKey: resource.subKey, timestamp: resource.timestamp, data: resource.data).getFeature();
+        if(!_verifyUncipherMessageWithSenderPublicKey(feature, resource.signature, userPublicKey)) {
+          continue;
+        }
         if(resource.key == resourceKeyVersionTree) {
-          _serverDb.saveVersionTree(userPublicKey: userPublicKey, resource: resource);
+          // A matching pending claim becomes the steady head only after its tree arrives.
+          // Until then the previously stored tree stays available.
+          if(!_serverDb.tryPromotePendingClaim(userPublicKey: userPublicKey, versionTree: resource)) {
+            final current = _serverDb.getLatestVersion(userPublicKey, latestVersionKey);
+            if(current == null || resource.subKey != current || resource.timestamp != _serverDb.getLatestPublishVersionTimestamp(userPublicKey)) {
+              continue;
+            }
+            _serverDb.saveVersionTree(userPublicKey: userPublicKey, resource: resource);
+          }
         } else {
           _serverDb.saveObject(
             userPublicKey: userPublicKey,
@@ -113,6 +141,9 @@ class RelayApplication implements ApplicationController {
       final uncipherMessage = UncipherMessage.fromJson(decoded);
       final userPublicKey = uncipherMessage.userPublicId;
       final requireVersions = RequireVersions.fromJson(jsonDecode(uncipherMessage.data));
+      if(userPublicKey != node.publicKey || !_verifyUncipherMessage(uncipherMessage)) {
+        return;
+      }
       final keys = requireVersions.requiredVersions;
       final requestsVersionTree = keys.contains(resourceKeyVersionTree);
       if(requestsVersionTree) {
@@ -143,6 +174,22 @@ class RelayApplication implements ApplicationController {
     }
   }
 
+  /// A version_chain is used as-is. A version_tree_resolve is unwrapped once to its signed publish.
+  ({String payload, Map<String, dynamic> broadcast, String? resolvedVersion})? _readVersionPublish(String data) {
+    final body = jsonDecode(data) as Map<String, dynamic>;
+    if(body['type'] == versionChainBroadcastType) {
+      if(body.containsKey(resolvedVersionKey)) return null;
+      return (payload: data, broadcast: body, resolvedVersion: null);
+    }
+    if(body['type'] != versionTreeResolveType) return null;
+    final resolve = VersionTreeResolve.fromJson(body);
+    final broadcast = jsonDecode(resolve.publish) as Map<String, dynamic>;
+    if(broadcast['type'] != versionChainBroadcastType || broadcast.containsKey(resolvedVersionKey)) {
+      return null;
+    }
+    return (payload: resolve.publish, broadcast: broadcast, resolvedVersion: resolve.resolvedVersion);
+  }
+
   void _handlePublish(String senderPublicKey, String data, VillagerNode node, String appName) {
     MyLogger.info('$logPrefix Received publishAppType data. Storing/Handling...');
     try {
@@ -157,16 +204,20 @@ class RelayApplication implements ApplicationController {
         MyLogger.warn('$logPrefix Failed to verify publishAppType signature for sender $senderPublicKey');
         return;
       }
-      final uncipherData = uncipherMessage.data;
-      final brdMsg = BroadcastMessages.fromJson(jsonDecode(uncipherData));
+      final parsed = _readVersionPublish(uncipherMessage.data);
+      if(parsed == null) return;
+      final uncipherData = parsed.payload;
+      final resolvedVersion = parsed.resolvedVersion;
+      final brdMsg = BroadcastMessages.fromJson(parsed.broadcast);
       final ownerPublicKey = brdMsg.userPublicId;
+      if(ownerPublicKey != senderPublicKey) return;
       if(!_verifyUncipherMessageWithSenderPublicKey(brdMsg.toSignableString(), brdMsg.signature, ownerPublicKey)) {
         MyLogger.warn('$logPrefix Failed to verify publishAppType signature for owner $ownerPublicKey');
         return;
       }
       final messages = brdMsg.messages;
       if(messages.isNotEmpty) {  final latestVersion = messages[latestVersionKey];
-        if(latestVersion != null) {
+        if(latestVersion != null && latestVersion.isNotEmpty) {
           final latestVersionTimestamp = int.tryParse(messages[latestVersionTimestampKey]?.toString() ?? '');
           final oldLatestVersion = _serverDb.getLatestVersion(ownerPublicKey, latestVersionKey);
           final oldLatestPublishVersionTimestamp = _serverDb.getLatestPublishVersionTimestamp(ownerPublicKey);
@@ -176,17 +227,35 @@ class RelayApplication implements ApplicationController {
           final hasLatestVersionObject = _serverDb.hasObject(ownerPublicKey, latestVersion);
           final samePublishVersion = oldLatestVersion == latestVersion && (latestVersionTimestamp == null || oldLatestPublishVersionTimestamp == latestVersionTimestamp);
           MyLogger.info('$logPrefix Publish latest_version received: user=$ownerPublicKey, node=${_nodeLabel(node)}, latest_version=$latestVersion, publish_timestamp=$latestVersionTimestamp, old_latest_version=$oldLatestVersion, old_publish_timestamp=$oldLatestPublishVersionTimestamp, same_publish_version=$samePublishVersion, stored_version_tree_timestamp=$versionTreeTimestamp, has_latest_version_object=$hasLatestVersionObject');
-          _serverDb.saveLatestVersion(
-            ownerPublicKey,
-            latestVersionKey,
-            latestVersion,
-            DateTime.now().millisecondsSinceEpoch,
-          );
-          _serverDb.saveLatestPublishPayload(ownerPublicKey, latestVersion, latestVersionTimestamp, uncipherData, DateTime.now().millisecondsSinceEpoch);
-          if(_shouldRequestVersionTree(latestVersionTimestamp, versionTreeTimestamp)) {
+          final admission = _serverDb.tryAdmitPublish(ownerPublicKey, latestVersion, latestVersionTimestamp, uncipherData, resolvedVersion, timeoutMs: pendingTimeoutMs, maxQueries: maxPendingQueries);
+          if(admission.conflictVersion != null) {
+            if(admission.conflictVersion!.isNotEmpty) {
+              final body = jsonEncode(VersionTreeConflict(conflictVersion: admission.conflictVersion!, owner: ownerPublicKey));
+              final reply = UncipherMessage(
+                userPublicId: _signing.getCompressedPublicKey(),
+                data: body,
+                signature: _signing.sign(HashUtil.hashText(body)),
+              );
+              _overlay.sendData(appName, this, node, AppMessageType.publishAppType.value, jsonEncode(reply));
+            }
+            return;
+          }
+          if(admission.busy) {
+            MyLogger.info('$logPrefix Ignore publish while a pending version claim is in progress: user=$ownerPublicKey, claimed_version=$latestVersion');
+            return;
+          }
+          if(admission.pending) {
+            _sendVersionTreeQuery(appName, node, ownerPublicKey, latestVersionTimestamp, versionTreeTimestamp);
+            _serverDb.recordPendingQuery(ownerPublicKey);
+            if(!hasLatestVersionObject) {
+              _sendStorageOffer(appName, node, ownerPublicKey, latestVersion, latestVersionTimestamp);
+            }
+            return;
+          }
+          if(oldLatestVersion != latestVersion || _shouldRequestVersionTree(latestVersionTimestamp, versionTreeTimestamp)) {
             _sendVersionTreeQuery(appName, node, ownerPublicKey, latestVersionTimestamp, versionTreeTimestamp);
           }
-          if(samePublishVersion && latestVersionTimestamp != null && versionTreeTimestamp == latestVersionTimestamp) {
+          if(hasLatestVersionObject && samePublishVersion && latestVersionTimestamp != null && versionTreeTimestamp == latestVersionTimestamp) {
             MyLogger.info('$logPrefix Latest version unchanged for user $ownerPublicKey and version tree timestamp matches publish timestamp. Skip sending offer.');
             if(_serverDb.hasObject(ownerPublicKey, latestVersion)) {
               _forwardPublishToSameUserNodes(ownerPublicKey, uncipherData, sourceNode: node);
@@ -195,25 +264,7 @@ class RelayApplication implements ApplicationController {
             return;
           }
           if(!hasLatestVersionObject) {
-            final offer = Offer(
-              type: offerTypeStorage,
-              target: ownerPublicKey,
-              data: {
-                'limit': 100,
-                'extra': '',
-              },
-            );
-            final offerData = jsonEncode(offer);
-            final uncipherOffer = UncipherMessage(
-              userPublicId: _signing.getCompressedPublicKey(),
-              data: offerData,
-              signature: _signing.sign(HashUtil.hashText(offerData)),
-            );
-            final offerPayload = jsonEncode(uncipherOffer);
-            final timestampText = latestVersionTimestamp == null? '' : '(timestamp=$latestVersionTimestamp)';
-            MyLogger.info('$logPrefix Missing version $latestVersion$timestampText for user $ownerPublicKey.'
-                ' Sending offer(type=$offerTypeStorage) to ${node.nodeId}.');
-            _overlay.sendData(appName, this, node, AppMessageType.offerAppType.value, offerPayload);
+            _sendStorageOffer(appName, node, ownerPublicKey, latestVersion, latestVersionTimestamp);
           } else {
             _forwardPublishToSameUserNodes(ownerPublicKey, uncipherData, sourceNode: node);
             _lastForwardedLatestVersionByUser[ownerPublicKey] = latestVersion;
@@ -232,7 +283,7 @@ class RelayApplication implements ApplicationController {
       final decoded = jsonDecode(data);
       final uncipherMessage = UncipherMessage.fromJson(decoded);
       final userPublicKey = uncipherMessage.userPublicId;
-      if(!_verifyUncipherMessage(uncipherMessage)) {
+      if(userPublicKey != node.publicKey || !_verifyUncipherMessage(uncipherMessage)) {
         MyLogger.warn('$logPrefix Failed to verify applyAppType signature for user $userPublicKey');
         return;
       }
@@ -288,6 +339,28 @@ class RelayApplication implements ApplicationController {
     return storedVersionTreeTimestamp != publishTimestamp;
   }
 
+  void _sendStorageOffer(String appName, VillagerNode node, String ownerPublicKey, String latestVersion, int? latestVersionTimestamp) {
+    final offer = Offer(
+      type: offerTypeStorage,
+      target: ownerPublicKey,
+      data: {
+        'limit': 100,
+        'extra': '',
+      },
+    );
+    final offerData = jsonEncode(offer);
+    final uncipherOffer = UncipherMessage(
+      userPublicId: _signing.getCompressedPublicKey(),
+      data: offerData,
+      signature: _signing.sign(HashUtil.hashText(offerData)),
+    );
+    final offerPayload = jsonEncode(uncipherOffer);
+    final timestampText = latestVersionTimestamp == null? '' : '(timestamp=$latestVersionTimestamp)';
+    MyLogger.info('$logPrefix Missing version $latestVersion$timestampText for user $ownerPublicKey.'
+        ' Sending offer(type=$offerTypeStorage) to ${node.nodeId}.');
+    _overlay.sendData(appName, this, node, AppMessageType.offerAppType.value, offerPayload);
+  }
+
   void _sendVersionTreeQuery(String appName, VillagerNode node, String userPublicKey, int? publishTimestamp, int? storedVersionTreeTimestamp) {
     MyLogger.info('$logPrefix Query version_tree from publish source: user=$userPublicKey, node=${_nodeLabel(node)}, publish_timestamp=$publishTimestamp, stored_version_tree_timestamp=$storedVersionTreeTimestamp');
     final queryPayload = _buildQueryPayload([resourceKeyVersionTree]);
@@ -340,6 +413,24 @@ class RelayApplication implements ApplicationController {
     MyLogger.info('$logPrefix Forward stored publish after cache ready: user=$userPublicKey, latest_version=$latestVersion, source=${_nodeLabel(sourceNode)}');
     _forwardPublishToSameUserNodes(userPublicKey, records.first.payload, sourceNode: sourceNode);
     _lastForwardedLatestVersionByUser[userPublicKey] = latestVersion;
+  }
+
+  void _expireAndRetryPendingClaims() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _serverDb.expirePendingClaims(now, pendingTimeoutMs, maxPendingQueries);
+    for(final claim in _serverDb.getPendingClaims()) {
+      VillagerNode? target;
+      for(final node in _overlay.getAllNodes()) {
+        if(node.publicKey == claim.userPublicKey && node.getStatus() == VillagerStatus.keepInTouch) {
+          target = node;
+          break;
+        }
+      }
+      if(target == null) continue;
+      MyLogger.info('$logPrefix Retry pending version claim: user=${claim.userPublicKey}, claimed_version=${claim.claimedVersion}, query_attempts=${claim.queryAttempts}');
+      _sendVersionTreeQuery(upperAppName, target, claim.userPublicKey, claim.claimedTimestamp, _serverDb.getVersionTreeTimestamp(claim.userPublicKey));
+      _serverDb.recordPendingQuery(claim.userPublicKey);
+    }
   }
 
   void _broadcastLatestPublishesToSameUserNodes() {
@@ -437,7 +528,10 @@ class RelayApplication implements ApplicationController {
     await _overlay.start();
     if(publishIntervalSeconds > 0) {
       _publishTimer?.cancel();
-      _publishTimer = Timer.periodic(Duration(seconds: publishIntervalSeconds), (_) => _broadcastLatestPublishesToSameUserNodes());
+      _publishTimer = Timer.periodic(Duration(seconds: publishIntervalSeconds), (_) {
+        _expireAndRetryPendingClaims();
+        _broadcastLatestPublishesToSameUserNodes();
+      });
       MyLogger.info('$logPrefix Started periodic publish forwarding: interval=${publishIntervalSeconds}s');
     }
     MyLogger.info('$logPrefix Started relay application overlay.');

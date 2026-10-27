@@ -103,10 +103,18 @@ class Village implements ApplicationController {
     _overlay.newNodeDiscovered(host, port, deviceId);
   }
 
-  void sendPublish(String msgJson, TimeCostStatistics stats) {
+  void sendPublish(String msgJson, TimeCostStatistics stats, String? targetPublicKey) {
     MyLogger.info('sendPublish: Preparing to send publish: ${msgJson.substring(0, 100)}');
-    //TODO Optimize the code below to only send message to selected nodes
-    _sendToAllNodesOfUser(AppMessageType.publishAppType, msgJson, stats);
+
+    if(targetPublicKey == null) {
+      _sendToAllNodesOfUser(AppMessageType.publishAppType, msgJson, stats);
+    } else {
+      for(final node in _overlay.getAllNodes()) {
+        if(node.publicKey == targetPublicKey && node.getStatus() == VillagerStatus.keepInTouch) {
+          _overlay.sendData(upperAppName, this, node, AppMessageType.publishAppType.value, msgJson);
+        }
+      }
+    }
   }
   void sendVersionTree(String resourceJson, TimeCostStatistics stats) {
     MyLogger.info('sendVersionTree: Preparing to send version tree: ${resourceJson.substring(0, 100)}');

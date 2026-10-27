@@ -2,6 +2,7 @@
 /// Contact with net_isolate using isolate port
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:isolate';
 import 'package:bonsoir/bonsoir.dart';
 import 'package:libp2p/application/application_api.dart';
@@ -65,8 +66,8 @@ class NetworkController {
     }
   }
 
-  void sendVersionBroadcast(String latestVersion, int latestVersionTimestamp, TimeCostStatistics stats) {
-    var msg = BroadcastMessages(
+  BroadcastMessages _buildVersionPublish(String latestVersion, int latestVersionTimestamp) {
+    return BroadcastMessages(
       type: versionChainBroadcastType, // Publish version chain state instead of only the latest hash
       userPublicId: '', // Leave them empty for now, will be filled in the Villager implementation
       signature: '',
@@ -75,13 +76,28 @@ class NetworkController {
         'latest_version_timestamp': latestVersionTimestamp.toString(),
       }
     );
+  }
+
+  void sendVersionBroadcast(String latestVersion, int latestVersionTimestamp, TimeCostStatistics stats) {
+    final msg = _buildVersionPublish(latestVersion, latestVersionTimestamp);
+    stats.transportTime = Util.getTimeStamp();
+    _sendPort?.send(Message(cmd: Command.sendBroadcast, parameter: SendBroadcastParameter(message: msg), stats: stats));
+
+  }
+
+  void sendVersionResolve(String latestVersion, int timestamp, String server, String version, TimeCostStatistics stats) {
+    final publish = _buildVersionPublish(latestVersion, timestamp);
     stats.transportTime = Util.getTimeStamp();
     _sendPort?.send(
       Message(
         cmd: Command.sendBroadcast,
-        parameter: msg,
-        stats: stats,
-      ),
+        parameter: SendBroadcastParameter(
+          message: publish,
+          resolvedVersion: version,
+          targetPublicKey: server
+        ),
+        stats: stats
+      )
     );
   }
 
@@ -98,7 +114,7 @@ class NetworkController {
   }
 
   /// Pack versionData in VersionChain, encrypt it, and sign it
-  void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp, TimeCostStatistics stats) {
+  void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp, TimeCostStatistics stats, String latestVersion) {
     if(!isStarted()) return;
     var dag = _buildDag(versionData);
     VersionChain versionChain = VersionChain(
@@ -111,6 +127,7 @@ class NetworkController {
         parameter: SendVersionTreeParameter(
           versionChain: versionChain,
           timestamp: timestamp,
+          latestVersion: latestVersion,
         ),
         stats: stats,
       )
@@ -231,6 +248,11 @@ class NetworkController {
           MyLogger.info('Get node list: $list');
           _updateNodeList(list);
         }
+        break;
+      case Command.receiveVersionTreeConflict:
+        final envelope = msg.parameter as UncipherMessage;
+        final conflict = VersionTreeConflict.fromJson(jsonDecode(envelope.data));
+        controller.receiveVersionTreeConflict(envelope.userPublicId, conflict.conflictVersion, msg.stats);
         break;
       case Command.receiveBroadcast:
         final param = msg.parameter as BroadcastMessages;
