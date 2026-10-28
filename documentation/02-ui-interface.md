@@ -4,6 +4,13 @@
 
 The Mesh Notes UI follows Material Design 3 with a custom multi-layer rendering system and stack-based navigation. Layouts are responsive for both desktop and mobile.
 
+## Home-Screen Widget
+
+- Android: 4×2, up to three titles. iOS: medium (4×2, three titles) and large (4×4, six titles).
+- English labels and neutral grays: **Recent notes** at top left, **MeshNotes** at top right, **New note** at the bottom.
+- Recently opened notes first, then recently modified notes. Tap to open or create a note; normal sign-in/unlock still applies.
+- Refreshes when notes change; shows cached titles while the app is closed, without independent syncing.
+
 ## App Entry
 
 **Location**: [lib/page/mesh_app.dart](../lib/page/mesh_app.dart)

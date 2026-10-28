@@ -1,0 +1,22 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="14dp" android:background="@drawable/widget_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="20dp"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="Recent notes" android:textSize="12sp" android:textColor="@color/widget_secondary" android:fontFamily="sans-serif-medium"
+            android:maxLines="1" android:ellipsize="end" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp"
+            android:text="MeshNotes" android:textSize="10sp" android:textColor="@color/widget_secondary" android:maxLines="1" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical">
+        <TextView android:id="@+id/note_1" style="@style/WidgetNoteRow" />
+        <TextView android:id="@+id/note_2" style="@style/WidgetNoteRow" />
+        <TextView android:id="@+id/note_3" style="@style/WidgetNoteRow" />
+        <TextView android:id="@+id/empty_notes" android:layout_width="match_parent" android:layout_height="match_parent"
+            android:gravity="center_vertical" android:text="No notes yet. Start writing." android:textSize="14sp" android:textColor="@color/widget_secondary" />
+    </LinearLayout>
+    <TextView android:id="@+id/new_note" android:layout_width="match_parent" android:layout_height="32dp"
+        android:gravity="center_vertical" android:text="＋  New note" android:textSize="14sp" android:textColor="@color/widget_accent"
+        android:fontFamily="sans-serif-medium" android:background="?android:attr/selectableItemBackground" />
+</LinearLayout>

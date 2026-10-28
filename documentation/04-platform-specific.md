@@ -10,6 +10,14 @@ Mesh Notes uses Flutter for cross-platform support with platform-specific adapta
 - iPadOS
 - Android
 
+## Home-Screen Recent Notes Widget
+
+- Flutter publishes IDs/titles through `lib/platform/recent_notes_widget.dart`; widgets do not access SQLite or P2P networking.
+- Android uses app-private preferences and `android/app/src/main/kotlin/xyz/meshnotes/meshnotes/RecentNotesWidget.kt`. Final dimensions depend on the launcher.
+- iOS 15+ uses `ios/RecentNotesWidget/RecentNotesWidget.swift`. Runner and the extension require App Group `group.xyz.meshnotes.meshnotes` in their signing profiles.
+- Cold/warm launch actions: `meshnotes://widget/new` and `meshnotes://widget/open/<encoded-document-id>`.
+- Tests: `fvm flutter test --no-pub test/widget_test.dart`. Home-screen behavior and iOS App Group access still need device verification.
+
 ## Platform Detection
 
 **Location**: [lib/mindeditor/controller/environment.dart](../lib/mindeditor/controller/environment.dart)

@@ -1,0 +1,17 @@
+<resources>
+    <color name="widget_surface">#FAFAFA</color>
+    <color name="widget_text">#212121</color>
+    <color name="widget_secondary">#757575</color>
+    <color name="widget_accent">#666666</color>
+    <style name="WidgetNoteRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/widget_text</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
+    </style>
+</resources>

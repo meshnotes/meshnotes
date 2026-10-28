@@ -1,0 +1,4 @@
+<resources>
+    <string name="recent_notes_widget_name">Recent notes</string>
+    <string name="recent_notes_widget_description">Quickly open recent notes or create a new note.</string>
+</resources>

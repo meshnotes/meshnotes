@@ -318,6 +318,9 @@ class Controller {
   void openDocument(String docId, {bool needSyncVersionTree = true}) {
     _docManager!.openDocument(docId, needSyncVersionTree: needSyncVersionTree);
     _refreshDocumentView();
+    if(environment.isMobile() && _docManager!.currentDocId == docId) {
+      localState.recordRecentDocument(docId).then((_) => CallbackRegistry.triggerDocumentChangedEvent());
+    }
   }
   void newDocument({String? parentDocId}) {
     var docId = _docManager!.newDocument(parentDocId: parentDocId);

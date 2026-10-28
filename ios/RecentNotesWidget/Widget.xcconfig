@@ -1,0 +1,2 @@
+// Share the app's generated version without pulling Flutter/Pods into the extension.
+#include "../Flutter/Generated.xcconfig"

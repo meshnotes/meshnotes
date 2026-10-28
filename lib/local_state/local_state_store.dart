@@ -12,6 +12,14 @@ class LocalStateStore {
     return LocalStateStore._(preferences);
   }
 
+  List<String> getRecentDocumentIds() => _preferences.getStringList('widget.recent_document_ids') ?? [];
+
+  Future<void> recordRecentDocument(String docId) async {
+    if(docId.isEmpty) return;
+    final ids = [docId, ...getRecentDocumentIds().where((id) => id != docId)].take(20).toList();
+    await _preferences.setStringList('widget.recent_document_ids', ids);
+  }
+
   Set<String> getCollapsedDocIds() {
     final ids = _preferences.getStringList(_collapsedDocIdsKey) ?? const <String>[];
     return ids.where((item) => item.isNotEmpty).toSet();

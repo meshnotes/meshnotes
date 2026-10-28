@@ -1,0 +1,6 @@
+<resources>
+    <color name="widget_surface">#212121</color>
+    <color name="widget_text">#F2F2F2</color>
+    <color name="widget_secondary">#A6A6A6</color>
+    <color name="widget_accent">#CCCCCC</color>
+</resources>

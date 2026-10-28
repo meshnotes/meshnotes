@@ -10,6 +10,7 @@ import 'users_page/sign_in_page.dart';
 import '../mindeditor/controller/controller.dart';
 import 'doc_navigator.dart';
 import 'doc_view.dart';
+import '../platform/recent_notes_widget.dart';
 
 class StackPageView extends StatefulWidget {
   const StackPageView({super.key});
@@ -27,11 +28,62 @@ class _StackPageViewState extends State<StackPageView> {
   int position = 0;
   double savedScreenWidth = 0;
   bool canPop = true;
+  RecentNotesWidgetBridge? _homeWidget;
+  WidgetNoteAction? _pendingWidgetAction;
+  Timer? _widgetRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     CallbackRegistry.registerShowToast(_showMainToast);
+    if(controller.environment.isMobile()) {
+      _homeWidget = RecentNotesWidgetBridge();
+      CallbackRegistry.registerDocumentChangedWatcher('home_widget', _scheduleWidgetRefresh);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if(!mounted) return;
+        await _homeWidget?.initialize((action) {
+          _pendingWidgetAction = action;
+          _openWidgetAction();
+        });
+        _scheduleWidgetRefresh();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _widgetRefreshTimer?.cancel();
+    if(_homeWidget != null) CallbackRegistry.unregisterDocumentChangedWatcher('home_widget');
+    _homeWidget?.dispose();
+    super.dispose();
+  }
+
+  void _scheduleWidgetRefresh() {
+    _widgetRefreshTimer?.cancel();
+    _widgetRefreshTimer = Timer(const Duration(milliseconds: 250), () {
+      if(!mounted) return;
+      final notes = controller.isRunning()
+        ? buildRecentNotesSnapshot(controller.docManager.getAllFlatDocumentTitlesUnsorted(), controller.localState.getRecentDocumentIds())
+        : <Map<String, String>>[];
+      _homeWidget?.update(notes);
+    });
+  }
+
+  void _openWidgetAction() {
+    if(!mounted || !controller.isRunning() || _pendingWidgetAction == null) return;
+    final action = _pendingWidgetAction!;
+    _pendingWidgetAction = null;
+    if(action.isNew) {
+      controller.newDocument();
+    } else {
+      if(controller.docManager.getDocument(action.documentId!) == null) {
+        CallbackRegistry.showToast('This note was deleted or is currently unavailable.');
+        _scheduleWidgetRefresh();
+        return;
+      }
+      controller.openDocument(action.documentId!);
+    }
+    _switchToDocumentView();
   }
 
   @override
@@ -72,7 +124,14 @@ class _StackPageViewState extends State<StackPageView> {
         return _buildSignInView(context);
       }
     }
+    final wasRunning = controller.isRunning();
     controller.setRunningState();
+    if(!wasRunning && _homeWidget != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openWidgetAction();
+        _scheduleWidgetRefresh();
+      });
+    }
     Widget view;
     if(smallView) {
       view = _buildForSmallView(context);
