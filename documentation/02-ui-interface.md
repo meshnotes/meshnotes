@@ -95,6 +95,9 @@ Two-pane layout for desktop:
 - On **iPad-sized iOS**, `_isIosTabletLayout` (shortest side ≥ 600) chooses `_showOverflowMenuIpadosBarrierWorkaround` instead of `_showOverflowMenuWithShowMenu`; both paths share `_overflowMenuPlacement` (same `RelativeRect` as `showMenu`). The workaround uses `showGeneralDialog` with **`barrierDismissible: false`** and a custom layer (grace period on outside taps) because **iPadOS 26+** can dismiss `showMenu`’s barrier via spurious pointers ([flutter/flutter#177992](https://github.com/flutter/flutter/issues/177992)). When fixed upstream, remove the `if` in `_openMenu` and always call `_showOverflowMenuWithShowMenu`.
 
 #### Document list
+
+- New-document creation refreshes the navigator after opening the document. `refreshDocumentList()` resolves the selected row from `currentDocId`, so the highlight follows the newly opened note instead of retaining the previous row index.
+
 ```dart
 ListView.builder(
   itemCount: docList.length + 1,
@@ -237,6 +240,7 @@ class StackPageView extends StatefulWidget {
 
 **How items are rendered**:
 - The page is built from `Controller().setting.getSettingsByGroup()`, which returns settings grouped by `settingGroupName` and skips entries with `needDisplay == false`.
+- `User private key` and `Password` remain hidden both after startup and after saving account information. `Controller.setUserPrivateInfo()` preserves `needDisplay: false` when replacing these settings, so creating/importing/switching accounts or editing account information does not expose them in Settings.
 - Each `SettingData` renders by `type`:
   - `SettingType.bool` → a `CupertinoSwitch`
   - `SettingType.string` / `SettingType.number` → a `CupertinoTextField` (number uses `digitsOnly` formatter, with the default value shown as placeholder)

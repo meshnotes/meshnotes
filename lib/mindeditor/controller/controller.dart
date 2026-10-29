@@ -246,12 +246,14 @@ class Controller {
       displayName: Constants.settingNameUserInfo,
       comment: Constants.settingCommentUserInfo,
       value: base64Str,
+      needDisplay: false,
     );
     final userPasswordSetting = SettingData(
       name: Constants.settingKeyPassword,
       displayName: Constants.settingNamePassword,
       comment: Constants.settingCommentPassword,
       value: encryptedPassword,
+      needDisplay: false,
     );
     setting.saveSettings([userNameSetting, userPasswordSetting]);
     eventTasksManager.triggerUserInfoChanged();
@@ -326,11 +328,11 @@ class Controller {
     var docId = _docManager!.newDocument(parentDocId: parentDocId);
     // var doc = _docManager!.getCurrentDoc();
     // _currentEditorState!.refresh();
-    refreshDocNavigator();
     eventTasksManager.addAfterDocumentOpenedOnceTask(() {
       selectionController.selectTitle();
     });
     openDocument(docId, needSyncVersionTree: false);
+    refreshDocNavigator();
   }
 
   void closeDocument() {

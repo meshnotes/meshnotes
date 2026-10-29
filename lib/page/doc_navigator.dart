@@ -964,6 +964,8 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
       totalList = controller.docManager.getFlattenedDocumentList();
       shouldPersist = _removeInvalidCollapsedDocIds(totalList);
       docList = _getFilteredDocumentList(totalList);
+      final selectedIndex = docList.indexWhere((doc) => doc.docId == controller.docManager.currentDocId);
+      selected = selectedIndex < 0 ? null : selectedIndex;
     });
     if(shouldPersist) {
       controller.localState.setCollapsedDocIds(_collapsedDocIds);
