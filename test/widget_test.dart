@@ -10,6 +10,8 @@ import 'package:mesh_note/mindeditor/setting/setting.dart';
 import 'package:mesh_note/mindeditor/user/encrypted_user_private_info.dart';
 import 'package:mesh_note/net/net_controller.dart';
 import 'package:mesh_note/page/doc_navigator.dart';
+import 'package:mesh_note/page/sync_progress_widget.dart';
+import 'package:mesh_note/tasks/event_tasks.dart';
 import 'package:my_log/my_log.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +24,18 @@ import 'package:mesh_note/platform/recent_notes_widget.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   DocTitleMeta note(String id, int timestamp, {String? title}) => DocTitleMeta(docId: id, title: title ?? id, isPrivate: 0, timestamp: timestamp, orderId: 0);
+
+  testWidgets('sync indicator places only the current direction below percentage', (tester) async {
+    for(final direction in SyncDirection.values) {
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SyncProgressWidget(progress: 10, direction: direction))));
+      final icon = direction == SyncDirection.upload ? Icons.arrow_upward : Icons.arrow_downward;
+      expect(find.text('10%'), findsOneWidget);
+      expect(find.byIcon(icon), findsOneWidget);
+      expect(find.byIcon(direction == SyncDirection.upload ? Icons.arrow_downward : Icons.arrow_upward), findsNothing);
+      expect(tester.getCenter(find.byIcon(icon)).dy, greaterThan(tester.getCenter(find.text('10%')).dy));
+      expect(tester.takeException(), isNull);
+    }
+  });
 
   testWidgets('creating a document moves navigator highlight to the opened document', (tester) async {
     MyLogger.initForConsoleTest(name: 'navigator');
@@ -74,6 +88,18 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.edit_square));
     await tester.pump();
+    controller.eventTasksManager.triggerUpdateUploading(42, 10, 100, false);
+    await tester.pump();
+    expect(find.text('10%'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+    controller.eventTasksManager.triggerUpdateSyncing(true, 25);
+    await tester.pump();
+    expect(find.text('25%'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+    controller.eventTasksManager.triggerUpdateSyncing(false, 0);
+    controller.eventTasksManager.triggerUpdateUploading(42, 100, 100, true);
+    await tester.pump();
+    expect(find.byType(SyncProgressWidget), findsNothing);
     final state = tester.state<DocumentNavigatorState>(find.byType(DocumentNavigator));
     final newId = controller.docManager.currentDocId;
     expect(newId, isNot(oldId));

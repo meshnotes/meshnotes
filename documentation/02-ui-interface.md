@@ -11,6 +11,10 @@ The Mesh Notes UI follows Material Design 3 with a custom multi-layer rendering 
 - Recently opened notes first, then recently modified notes. Tap to open or create a note; normal sign-in/unlock still applies.
 - Refreshes when notes change; shows cached titles while the app is closed, without independent syncing.
 
+## Sync Indicator
+
+`lib/page/sync_progress_widget.dart` is shared by the navigator (`doc_navigator.dart`) and small-screen title bar (`title_bar.dart`). While syncing, the circular indicator contains an object-count percentage above a single direction arrow: upload ↑, download ↓. Direction changes trigger a repaint even when the percentage stays the same. Finished/failed uploads and completed downloads restore the idle UI. See [object-count semantics and local submission](06-p2p-sync.md#sync-progress).
+
 ## App Entry
 
 **Location**: [lib/page/mesh_app.dart](../lib/page/mesh_app.dart)

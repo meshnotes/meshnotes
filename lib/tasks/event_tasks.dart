@@ -1,7 +1,12 @@
 import 'dart:async';
 import 'package:mesh_note/util/util.dart';
 
+enum SyncDirection { download, upload }
+
 class EvenTasksManager {
+  bool _downloading = false;
+  int _downloadProgress = 0;
+  final Map<int, (int, int)> _uploads = {};
   final List<Function()> _afterReadyTasks = [];
   final List<Function()> _idleTasks = [];
   final List<Function()> _userClickTasks = []; // Tasks when user clicks in the editor area
@@ -9,7 +14,7 @@ class EvenTasksManager {
   final List<Function()> _userSwitchToNavigator = []; // Tasks when user switches to navigator(in small screen mode)
   final List<Function()> _settingChangedTasks = []; // Tasks when user changes settings
   final List<Function()> _userInfoChangedTasks = []; // Tasks when user changes user info
-  final List<Function(bool isSyncing, int progress)> _syncingTasks = []; // Tasks when syncing
+  final List<Function(bool isSyncing, int progress, SyncDirection direction)> _syncingTasks = []; // Tasks when syncing
   final List<Function()> _afterDocumentOpenedOnceTasks = []; // Tasks when document is opened, which should be triggered only once
   final Map<String, _TimerTask> _timerTaskMap = {};
   Timer? _timer;
@@ -98,17 +103,36 @@ class EvenTasksManager {
     }
   }
 
-  void addSyncingTask(Function(bool isSyncing, int progress) task) {
+  void addSyncingTask(Function(bool isSyncing, int progress, SyncDirection direction) task) {
     if(!_syncingTasks.contains(task)) {
       _syncingTasks.add(task);
     }
   }
-  void removeSyncingTask(Function(bool isSyncing, int progress) task) {
+  void removeSyncingTask(Function(bool isSyncing, int progress, SyncDirection direction) task) {
     _syncingTasks.remove(task);
   }
   void triggerUpdateSyncing(bool isSyncing, int progress) {
+    _downloading = isSyncing;
+    _downloadProgress = progress;
+    _notifySyncing();
+  }
+
+  void triggerUpdateUploading(int transferId, int sent, int total, bool finished) {
+    if(finished) {
+      _uploads.remove(transferId);
+    } else {
+      _uploads[transferId] = (sent, total);
+    }
+    _notifySyncing();
+  }
+
+  void _notifySyncing() {
+    final uploading = !_downloading && _uploads.isNotEmpty;
+    final sent = _uploads.values.fold(0, (sum, item) => sum + item.$1);
+    final total = _uploads.values.fold(0, (sum, item) => sum + item.$2);
+    final progress = uploading && total > 0 ? sent * 100 ~/ total : _downloadProgress;
     for(final task in _syncingTasks) {
-      task.call(isSyncing, progress);
+      task.call(_downloading || uploading, progress, uploading ? SyncDirection.upload : SyncDirection.download);
     }
   }
 

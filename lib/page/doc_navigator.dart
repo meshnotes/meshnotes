@@ -21,6 +21,7 @@ import '../mindeditor/document/doc_title_node.dart';
 import '../mindeditor/setting/constants.dart';
 import 'users_page/user_info_setting_menu.dart';
 import 'sync_progress_widget.dart';
+import '../tasks/event_tasks.dart';
 
 class DocumentNavigator extends StatefulWidget with ResizableViewMixin {
   final Function()? jumpAction;
@@ -57,6 +58,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
   final controller = Controller();
   bool _isSyncing = false;
   int _syncProgress = 0;
+  SyncDirection _syncDirection = SyncDirection.download;
   final userInfoSettingLayerKey = GlobalKey<FloatingStackViewState>();
   bool _isUserInfoPopupVisible = false;
 
@@ -218,6 +220,7 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
           children: [
             _isSyncing ? SyncProgressWidget(
               progress: _syncProgress,
+              direction: _syncDirection,
               size: 32,
             ) : const SizedBox(width: 16, height: 16),
             const SizedBox(width: 8),
@@ -1216,13 +1219,14 @@ class DocumentNavigatorState extends State<DocumentNavigator> with SingleTickerP
     });
   }
 
-  void _updateSyncing(bool isSyncing, int progress) {
-    if(isSyncing == _isSyncing && progress == _syncProgress) {
+  void _updateSyncing(bool isSyncing, int progress, SyncDirection direction) {
+    if(isSyncing == _isSyncing && progress == _syncProgress && direction == _syncDirection) {
       return;
     }
     setState(() {
       _isSyncing = isSyncing;
       _syncProgress = progress;
+      _syncDirection = direction;
     });
   }
   void _onUserInfoChanged() {

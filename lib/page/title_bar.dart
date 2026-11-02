@@ -2,6 +2,7 @@ import 'package:mesh_note/mindeditor/controller/callback_registry.dart';
 import 'package:flutter/material.dart';
 import '../mindeditor/controller/controller.dart';
 import 'sync_progress_widget.dart';
+import '../tasks/event_tasks.dart';
 
 class DocumentTitleBar extends StatefulWidget {
   final Controller controller;
@@ -18,6 +19,7 @@ class DocumentTitleBar extends StatefulWidget {
 class DocumentTitleBarState extends State<DocumentTitleBar> {
   bool _isSyncing = false;
   int _syncProgress = 0;
+  SyncDirection _syncDirection = SyncDirection.download;
   List<String>? titles;
 
   @override
@@ -53,6 +55,7 @@ class DocumentTitleBarState extends State<DocumentTitleBar> {
               padding: const EdgeInsets.only(right: 8.0),
               child: SyncProgressWidget(
                 progress: _syncProgress,
+              direction: _syncDirection,
                 size: 32,
               ),
             ),
@@ -87,13 +90,14 @@ class DocumentTitleBarState extends State<DocumentTitleBar> {
     });
   }
 
-  void _updateSyncing(bool syncing, int progress) {
-    if(syncing == _isSyncing && progress == _syncProgress) {
+  void _updateSyncing(bool syncing, int progress, SyncDirection direction) {
+    if(syncing == _isSyncing && progress == _syncProgress && direction == _syncDirection) {
       return;
     }
     setState(() {
       _isSyncing = syncing;
       _syncProgress = progress;
+      _syncDirection = direction;
     });
   }
 }

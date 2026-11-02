@@ -38,6 +38,8 @@ class MergeTask {
   int _lastSentMissingRequestTimeStamp = 0;
   int _progress = 0;
   final Map<String, MissingObject> _missingObjects = {};
+  final Set<String> _downloadObjects = {};
+  final Set<String> _requestedObjects = {};
 
   MergeTask({required DbHelper db, void Function(List<String>)? sendRequireVersions, bool Function()? mergeVersionTree, int Function()? now}):
         _db = db,
@@ -71,6 +73,7 @@ class MergeTask {
     }
     controller.eventTasksManager.triggerUpdateSyncing(true, _progress);
     if(now - _lastSentMissingRequestTimeStamp >= _sendMissingRequestInterval) {
+      _requestedObjects.clear(); // Existing retry cadence also retries lost in-flight objects.
       _tryToMerge();
     }
   }
@@ -90,8 +93,8 @@ class MergeTask {
     final addedResources = _storeResourcesToSyncDb(resources);
     if(addedResources.isNotEmpty) { // New objects arrived: refresh progress and continue the merge.
       if(addedResources.any(_missingObjects.containsKey)) _lastSyncProgressTimestamp = _now();
-      _lastSentMissingRequestTimeStamp = 0;
-      _tryToMerge(addedResources: addedResources);
+      _requestedObjects.removeAll(addedResources);
+      if(_db.hasSyncingVersion()) _tryToMerge(addedResources: addedResources);
     }
   }
 
@@ -101,6 +104,8 @@ class MergeTask {
     _lastSentMissingRequestTimeStamp = 0;
     _db.clearSyncingTables();
     _missingObjects.clear();
+    _downloadObjects.clear();
+    _requestedObjects.clear();
     _progress = 0;
     controller.eventTasksManager.triggerUpdateSyncing(false, 0);
   }
@@ -115,11 +120,17 @@ class MergeTask {
     Map<String, DagNode> localDagMap = _genVersionMapFromSyncingDb();
     _findWaitingOrMissingVersions(localDagMap);
     _removeAvailableObjectsFromMissingObjects(addedResources?? []);
+    final total = _downloadObjects.length;
+    _progress = total == 0 ? 100 : (total - _missingObjects.length) * 100 ~/ total;
+    controller.eventTasksManager.triggerUpdateSyncing(true, _progress);
     if(_missingObjects.isNotEmpty) { //TODO: Ignore some missing objects after too many retries, unless it's needed by the leaf version
       final hashes = _takeProperMissingHashes(2, 50);
-      MyLogger.info('_tryToMerge: missing objects: $hashes');
-      _sendRequireVersions(hashes);
-      _lastSentMissingRequestTimeStamp = _now();
+      if(hashes.isNotEmpty) {
+        MyLogger.info('_tryToMerge: missing objects: $hashes');
+        _requestedObjects.addAll(hashes);
+        _sendRequireVersions(hashes);
+        _lastSentMissingRequestTimeStamp = _now();
+      }
     } else {
       for(final node in localDagMap.values) {
         if(node.status == ModelConstants.statusAvailable) continue;
@@ -223,14 +234,6 @@ class MergeTask {
         _db.updateSyncingVersionStatus(versionHash, ModelConstants.statusAvailable);
       }
     }
-    final totalCount = map.length;
-    final availableCount = map.values.where((node) => node.status == ModelConstants.statusAvailable).length;
-    MyLogger.info('_findWaitingOrMissingVersions: progress: $availableCount / $totalCount');
-    if(totalCount == 0) {
-      _progress = 100;
-    } else {
-      _progress = (availableCount / totalCount * 100).toInt();
-    }
   }
 
   (Set<String>, Set<String>) _findMissingObjects(ObjectDataModel versionObject) {
@@ -250,6 +253,8 @@ class MergeTask {
   }
 
   void _enqueueMissingObject(String hash, MissingObjectType type) {
+    if(_db.hasObject(hash) || _db.hasSyncingObject(hash)) return;
+    _downloadObjects.add(hash);
     _missingObjects.putIfAbsent(hash, () => MissingObject(hash: hash, type: type));
   }
 
@@ -271,7 +276,7 @@ class MergeTask {
   /// Take maxObjectCount normal objects at maximum.
   /// But version objects are much larger, so only take maxVersionCount version objects.
   List<String> _takeProperMissingHashes(int maxVersionCount, int maxObjectCount) {
-    final missing = _missingObjects.values.take(maxObjectCount).toList();
+    final missing = _missingObjects.values.where((object) => !_requestedObjects.contains(object.hash)).take(maxObjectCount).toList();
     final result = <String>[];
     int versionCount = 0;
     for(final m in missing) {

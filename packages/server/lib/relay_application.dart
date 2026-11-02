@@ -387,6 +387,8 @@ class RelayApplication implements ApplicationController {
     }
     final pendingTotalAfterSend = _pendingMissingVersionsByUser.values.fold<int>(0, (total, versions) => total + versions.length);
     MyLogger.info('$logPrefix Query missing versions for user $userPublicKey: query_now=${queryVersions.length}, pending_for_user_after_send=${pending.length}, pending_total_after_send=$pendingTotalAfterSend, pending_users=${_pendingMissingVersionsByUser.length}');
+    // TEMPORARY LOG: Full hashes for sync diagnosis; remove after investigation.
+    MyLogger.info('$logPrefix Query version hashes: user=$userPublicKey, target=${_nodeLabel(node)}, versions=${jsonEncode(queryVersions)}');
     final queryPayload = _buildQueryPayload(queryVersions);
     _overlay.sendData(appName, this, node, AppMessageType.queryAppType.value, queryPayload);
   }

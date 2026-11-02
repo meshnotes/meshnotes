@@ -128,6 +128,7 @@ class VersionChainVillager {
       case Command.receiveBroadcast:
       case Command.receiveVersionTreeConflict:
       case Command.receiveProvide:
+      case Command.uploadProgress:
       case Command.receiveQuery:
       case Command.receiveOffer: // Handled in net_controller
       // Do nothing, these commands are handled in net_controller
@@ -295,6 +296,8 @@ class VersionChainVillager {
       return;
     }
     var requiredVersions = RequireVersions.fromJson(jsonDecode(uncipherMessage.data));
+    // TEMPORARY LOG: Full hashes for sync diagnosis; remove after investigation.
+    MyLogger.info('Received query version hashes: sender=$senderPublicKey, versions=${jsonEncode(requiredVersions.requiredVersions)}');
     processingTimer.stop();
     stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
     stats.transportTime = Util.getTimeStamp();
@@ -406,6 +409,8 @@ class VersionChainVillager {
     _village?.sendRequireVersions(uncipherMessageJson, stats);
   }
 
+  int _nextUploadId = 0;
+
   void _onSendVersions(List<SendVersions> versions, TimeCostStatistics stats) {
     final processingTimer = Stopwatch()..start();
     stats.receiveTime = Util.getTimeStamp();
@@ -439,13 +444,37 @@ class VersionChainVillager {
         resourceList.add(cipherObject);
       }
     }
-    String signature = _genSignature(CipherMessages.getFeature(resourceList));
-    final cipherMessages = CipherMessages(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signature);
-    String json = jsonEncode(cipherMessages);
-
+    // Count unique objects submitted locally; upload progress does not wait for transport ACKs.
+    final objects = {for(final resource in resourceList) resource.key: resource}.values.toList();
     processingTimer.stop();
     stats.versionCost += processingTimer.elapsedMilliseconds;
-    _village?.sendVersions(json, stats);
+    if(objects.isEmpty || _village == null) return;
+    final transferId = _nextUploadId++;
+    final versionHashes = versions.map((version) => version.versionHash).toSet();
+    // TEMPORARY LOG: Full hashes for sync diagnosis; remove after investigation.
+    MyLogger.info('Sending version hashes: transfer=$transferId, versions=${jsonEncode(versionHashes.toList())}, object_count=${objects.length}');
+    var sent = 0;
+    void report(bool done) {
+      _sendPort.send(Message(cmd: Command.uploadProgress,
+        parameter: UploadProgressParameter(transferId, sent, objects.length, done), stats: TimeCostStatistics()));
+    }
+    report(false);
+    try {
+      for(final resource in objects) {
+        final resources = [resource];
+        final signature = _genSignature(CipherMessages.getFeature(resources));
+        final message = CipherMessages(userPublicId: _signing!.getCompressedPublicKey(), resources: resources, signature: signature);
+        if(versionHashes.contains(resource.key)) {
+          // TEMPORARY LOG: Full hashes for sync diagnosis; remove after investigation.
+          MyLogger.info('Sending provide version hash: transfer=$transferId, hash=${resource.key}');
+        }
+        _village!.sendVersions(jsonEncode(message), stats);
+        sent++;
+        report(false);
+      }
+    } finally {
+      report(true);
+    }
   }
 
   void _onNewNodeDiscovered(String host, int port, String deviceId) {

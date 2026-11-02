@@ -275,6 +275,10 @@ class NetworkController {
           msg.stats.versionCost += processingTimer.elapsedMilliseconds;
         }
         break;
+      case Command.uploadProgress:
+        final progress = msg.parameter as UploadProgressParameter;
+        controller.eventTasksManager.triggerUpdateUploading(progress.transferId, progress.sent, progress.total, progress.finished);
+        break;
       case Command.receiveQuery:
         final param = msg.parameter as ReceiveQueryParameter;
         final processingTimer = Stopwatch()..start();

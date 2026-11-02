@@ -20,6 +20,7 @@ enum Command {
   receiveVersionTreeConflict,
   receiveProvide,
   receiveQuery,
+  uploadProgress,
   receiveOffer, // 6) Received generic offer message, currently type=storage
   sendApply, // 7) Send storage apply
 }
@@ -121,6 +122,14 @@ class ReceiveProvideParameter {
   ReceiveProvideParameter({
     required this.resources,
   });
+}
+
+class UploadProgressParameter {
+  final int transferId;
+  final int sent;
+  final int total;
+  final bool finished;
+  const UploadProgressParameter(this.transferId, this.sent, this.total, this.finished);
 }
 
 class ReceiveQueryParameter {

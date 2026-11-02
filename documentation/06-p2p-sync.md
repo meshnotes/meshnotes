@@ -10,6 +10,20 @@ Mesh Notes uses a Version Chain-based P2P sync mechanism that supports offline e
 - **Eventual consistency**: all peers converge
 - **Encrypted transport**: end-to-end encryption and signatures
 
+## Query diagnostics
+
+`lib/net/net_isolate.dart` logs authenticated incoming queries at info level as `Received query version hashes`, with the sender public key and complete `versions` list. Compare these hashes with the relay's `Query version hashes` log to detect repeated requests or a gap between relay send invocation and App receipt. App receipt does not imply a completed response or relay persistence.
+
+`lib/net/net_isolate.dart` also logs `Sending version hashes` with the upload transfer ID, complete version hash list, and object count; immediately before each version provide send invocation it logs `Sending provide version hash` with the same transfer ID and complete version hash. Dependency object hashes are not logged. These outgoing logs allow comparison with incoming queries and identify repeated version submissions; they do not indicate ACK or remote persistence.
+
+## Sync progress
+
+`lib/mindeditor/document/collaborate/merge_task.dart` reports download progress by unique missing object hashes, not completed versions. The denominator includes objects needed during this acquisition; received objects remain counted, cached objects and duplicate responses do not increase it. Dependencies are discovered from version/document content, so the denominator can grow and the percentage can decrease. Progress refreshes on each received object, not only on the periodic check. In-flight hashes are not re-requested on every partial response; the existing two-minute retry check releases them for retry.
+
+`lib/net/net_isolate.dart` deduplicates each outgoing response by object hash and sends individual objects using the existing signed `provide` envelope. Upload progress counts objects after the local `Village.sendVersions` call returns, without waiting for remote ACKs. Finishing the local loop (or leaving it on error) clears the upload indicator. This is local submission progress, not proof of actual network delivery, remote database persistence or merge. The existing transport ACK/retry mechanism remains unchanged; no delivery callbacks or upload timeout are added to Peer, Overlay or Village.
+
+`lib/tasks/event_tasks.dart` forwards active state, integer percentage and `SyncDirection` to the navigator and small-screen title bar. Idle download checks do not hide ongoing uploads. Only one direction is rendered; if activities overlap internally, download takes display priority. `lib/page/sync_progress_widget.dart` retains the circular indicator and puts an up/down arrow below the percentage inside the circle. No byte-based percentage or new wire message type is introduced (the upload-progress command is local isolate communication only).
+
 ## Version Chain Protocol
 
 ### Relay conflicts and merge-before-resolve

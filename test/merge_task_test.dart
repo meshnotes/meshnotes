@@ -5,10 +5,66 @@ import 'package:mesh_note/mindeditor/document/dal/db_helper.dart';
 import 'package:my_log/my_log.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
+import 'package:mesh_note/mindeditor/controller/controller.dart';
+import 'package:mesh_note/tasks/event_tasks.dart';
 
 void main() {
   setUpAll(() {
     MyLogger.initForConsoleTest(name: 'test');
+  });
+
+  test('download counts unique missing objects rather than complete versions', () {
+    final database = sqlite3.openInMemory();
+    addTearDown(database.dispose);
+    final updates = <int>[];
+    void onSync(bool active, int progress, SyncDirection direction) {
+      if(active && direction == SyncDirection.download) updates.add(progress);
+    }
+    final events = Controller().eventTasksManager;
+    events.addSyncingTask(onSync);
+    addTearDown(() => events.removeSyncingTask(onSync));
+    final task = MergeTask(db: DbHelper(database: database), sendRequireVersions: (_) {}, mergeVersionTree: () => false);
+    task.addVersionTree([VersionNode(versionHash: 'v', createdAt: 1, parents: [])]);
+    task.addResources([UnsignedResource(key: 'v', subKey: '', timestamp: 1,
+      data: '{"doc_table":[{"doc_id":"d","doc_hash":"d","updated_at":1}],"timestamp":1,"parents":[]}')]);
+    expect(updates.last, 50); // One received version object, one missing document.
+    task.addResources([UnsignedResource(key: 'v', subKey: '', timestamp: 1, data: '{}')]);
+    expect(updates.last, 50, reason: 'duplicate objects do not increase progress');
+    task.addResources([UnsignedResource(key: 'd', subKey: '', timestamp: 1, data: '{"contents":[]}')]);
+    expect(updates.last, 100);
+    task.clearSyncingTasks();
+  });
+
+  test('object-by-object responses do not request objects already in flight', () {
+    final database = sqlite3.openInMemory();
+    addTearDown(database.dispose);
+    final requests = <List<String>>[];
+    var now = 1000;
+    final task = MergeTask(db: DbHelper(database: database), now: () => now, sendRequireVersions: requests.add, mergeVersionTree: () => false);
+    task.addVersionTree([VersionNode(versionHash: 'v', createdAt: 1, parents: [])]);
+    task.addResources([UnsignedResource(key: 'v', subKey: '', timestamp: 1,
+      data: '{"doc_table":[{"doc_id":"a","doc_hash":"a","updated_at":1},{"doc_id":"b","doc_hash":"b","updated_at":1}],"timestamp":1,"parents":[]}')]);
+    expect(requests.last, ['a', 'b']);
+    final count = requests.length;
+    task.addResources([UnsignedResource(key: 'a', subKey: '', timestamp: 1, data: '{"contents":[]}')]);
+    expect(requests.length, count, reason: 'b is still in flight, not a new request');
+    now += 120000;
+    task.check();
+    expect(requests.length, count + 1, reason: 'the existing retry check retries lost objects');
+    expect(requests.last, ['b']);
+    task.clearSyncingTasks();
+  });
+
+  test('upload count updates survive idle download checks and finish independently', () {
+    final events = EvenTasksManager();
+    final updates = <(bool, int, SyncDirection)>[];
+    events.addSyncingTask((active, progress, direction) => updates.add((active, progress, direction)));
+    events.triggerUpdateUploading(1, 10, 100, false);
+    expect(updates.last, (true, 10, SyncDirection.upload));
+    events.triggerUpdateSyncing(false, 0);
+    expect(updates.last, (true, 10, SyncDirection.upload));
+    events.triggerUpdateUploading(1, 100, 100, true);
+    expect(updates.last.$1, false);
   });
 
   test('tree acquisition expires without progress; duplicates do not renew it', () {
