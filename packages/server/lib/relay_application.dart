@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:keygen/keygen.dart';
 import 'package:libp2p/application/application_api.dart';
 import 'package:libp2p/overlay/overlay_controller.dart';
@@ -10,6 +11,22 @@ import 'package:libp2p/utils.dart';
 import 'package:my_log/my_log.dart';
 import 'package:server/server_db.dart';
 import 'package:libp2p/application/version_chain_api.dart';
+
+class _QueryFlow {
+  final String user;
+  final String appName;
+  final Object? peer;
+  final List<String> pending = [];
+  List<String> keys = [];
+  String? id;
+  int attempts = 0;
+  final Set<String> received = {};
+  int? expected;
+  bool failed = false;
+  Timer? timer;
+  
+  _QueryFlow(this.user, this.appName, this.peer);
+}
 
 class RelayApplication implements ApplicationController {
   static const logPrefix = '[RelayApplication]';
@@ -27,7 +44,10 @@ class RelayApplication implements ApplicationController {
   final int publishIntervalSeconds;
   final int pendingTimeoutMs;
   final int maxPendingQueries;
-  final Map<String, List<String>> _pendingMissingVersionsByUser = {};
+  static const queryTimeout = Duration(seconds: 60 * 5);
+  static const maxQueryAttempts = 3;
+  final Map<VillagerNode, _QueryFlow> _queryFlows = {};
+  final Map<String, Set<String>> _incompleteVersionsByUser = {};
   final Map<String, String> _lastForwardedLatestVersionByUser = {};
   Timer? _publishTimer;
   final Map<String, AppMessageType> _mapOfAppMessageType = {};
@@ -89,21 +109,40 @@ class RelayApplication implements ApplicationController {
   void _handleProvide(String data, VillagerNode node, String appName) {
     MyLogger.info('$logPrefix Received provideAppType data. Storing/Handling...');
     try {
-      final decoded = jsonDecode(data);
-      final cipherMessages = CipherMessages.fromJson(decoded);
+      final decoded = jsonDecode(data) as Map<String, dynamic>;
+      final transaction = TransactionMessage.isTransaction(decoded) ? TransactionMessage.fromJson(decoded) : null;
+      if(transaction != null && (transaction.status == TransactionStatus.request || transaction.userPublicId != node.publicKey ||
+          !_verifyTextWithSenderPublicKey(transaction.toSignableString(), transaction.signature, node.publicKey))) {
+        MyLogger.warn('$logPrefix Drop incorrect query: transaction=$transaction, publicKey=$node.publicKey');
+        return;
+      }
+      if(transaction?.status == TransactionStatus.completed && transaction?.objectCount == null) {
+        MyLogger.warn('$logPrefix Drop completed sync response without object count');
+        return;
+      }
+      final cipherMessages = transaction == null ? CipherMessages.fromJson(decoded) : transaction.parseCipher();
       final userPublicKey = cipherMessages.userPublicId;
       if(userPublicKey != node.publicKey) {
         MyLogger.warn('$logPrefix Drop provide because its user does not match the connected node: message_user=$userPublicKey, ${_nodeLabel(node)}');
         return;
       }
-      if(!_verifyUncipherMessageWithSenderPublicKey(CipherMessages.getFeature(cipherMessages.resources), cipherMessages.signature, userPublicKey)) {
+      if(!_verifyTextWithSenderPublicKey(cipherMessages.getSignableFeature(), cipherMessages.signature, userPublicKey)) {
         MyLogger.warn('$logPrefix Drop provide because the batch signature failed: message_user=$userPublicKey, resource_count=${cipherMessages.resources.length}, ${_nodeLabel(node)}');
         return;
       }
     
+      final flow = _queryFlows[node];
+      final tracked = transaction != null;
+      if(tracked && (flow == null || flow.id != transaction.transactionId || flow.user != userPublicKey ||
+          flow.appName != appName || !identical(flow.peer, node.getPeer()) || flow.failed)) {
+        MyLogger.warn('$logPrefix Incorrect query flow for node ${_nodeLabel(node)}');
+        return;
+      }
+      final savedResources = <String>{};
       for(var resource in cipherMessages.resources) {
         final feature = UnsignedResource(key: resource.key, subKey: resource.subKey, timestamp: resource.timestamp, data: resource.data).getFeature();
-        if(!_verifyUncipherMessageWithSenderPublicKey(feature, resource.signature, userPublicKey)) {
+        if(!_verifyTextWithSenderPublicKey(feature, resource.signature, userPublicKey)) {
+          if(tracked) flow!.failed = true;
           continue;
         }
         if(resource.key == resourceKeyVersionTree) {
@@ -126,51 +165,85 @@ class RelayApplication implements ApplicationController {
             signature: resource.signature,
           );
         }
+        savedResources.add(resource.key);
       }
-      _forwardStoredLatestPublishIfReady(userPublicKey, sourceNode: node);
-      _sendNextMissingVersionQuery(userPublicKey, appName, node);
+      if(tracked) {
+        final active = flow!;
+        final before = active.received.length;
+        active.received.addAll(savedResources);
+        if(transaction.status == TransactionStatus.failed) {
+          active.failed = true;
+        }
+        if(transaction.status == TransactionStatus.completed) {
+          if(active.expected != null && active.expected != transaction.objectCount) {
+            active.failed = true;
+          }
+          active.expected = transaction.objectCount;
+        }
+        if(active.expected != null && active.received.length > active.expected!) {
+          active.failed = true;
+        }
+        if(!active.failed && active.expected == active.received.length && active.keys.every(active.received.contains)) {
+          active.timer?.cancel();
+          MyLogger.info('$logPrefix Query batch saved: user=$userPublicKey, transaction=${active.id}, unique_objects=${active.received.length}');
+          _incompleteVersionsByUser[userPublicKey]?.removeAll(active.keys);
+          active.keys = [];
+          active.id = null;
+          _forwardStoredLatestPublishIfReady(userPublicKey, sourceNode: node);
+          _sendNextMissingVersionQuery(userPublicKey, appName, node);
+        } else if(active.received.length > before && !active.failed) {
+          _armQueryTimeout(node, active);
+        }
+      } else {
+        _forwardStoredLatestPublishIfReady(userPublicKey, sourceNode: node);
+      }
     } catch(e) {
-      MyLogger.warn('$logPrefix Failed to parse provideAppType data: $e');
+      MyLogger.warn('$logPrefix Failed to parse/save provideAppType data: $e');
     }
   }
 
   void _handleQuery(String data, VillagerNode node, String appName) {
     MyLogger.info('$logPrefix Received queryAppType data.');
+    String? transactionId;
     try {
-      final decoded = jsonDecode(data);
-      final uncipherMessage = UncipherMessage.fromJson(decoded);
+      final decoded = jsonDecode(data) as Map<String, dynamic>;
+      final transaction = TransactionMessage.isTransaction(decoded) ? TransactionMessage.fromJson(decoded) : null;
+      if(transaction != null && (transaction.status != TransactionStatus.request || transaction.userPublicId != node.publicKey ||
+          !_verifyTextWithSenderPublicKey(transaction.toSignableString(), transaction.signature, node.publicKey))) {
+        return;
+      }
+      final uncipherMessage = transaction == null ? UncipherMessage.fromJson(decoded) : transaction.parseUncipher();
       final userPublicKey = uncipherMessage.userPublicId;
       final requireVersions = RequireVersions.fromJson(jsonDecode(uncipherMessage.data));
       if(userPublicKey != node.publicKey || !_verifyUncipherMessage(uncipherMessage)) {
         return;
       }
+      transactionId = transaction?.transactionId;
       final keys = requireVersions.requiredVersions;
-      final requestsVersionTree = keys.contains(resourceKeyVersionTree);
-      if(requestsVersionTree) {
-        final versionTreeObject = _serverDb.getVersionTree(userPublicKey);
-        MyLogger.info('$logPrefix Received version_tree special query: user=$userPublicKey, requester=${_nodeLabel(node)}, has_stored_version_tree=${versionTreeObject != null}');
-        if(versionTreeObject == null) {
-          MyLogger.info('$logPrefix Cannot answer version_tree query yet: user=$userPublicKey, no stored version_tree. It will be requested from the publish source when the next publish arrives.');
-        } else {
-          _overlay.sendData(appName, this, node, AppMessageType.provideAppType.value, _buildProvidePayload([versionTreeObject]));
+      final resources = <CipherMessage>[];
+      if(keys.contains(resourceKeyVersionTree)) {
+        final tree = _serverDb.getVersionTree(userPublicKey);
+        if(tree != null) {
+          resources.add(tree);
         }
       }
-    
-      final objectKeys = keys.where((key) => key != resourceKeyVersionTree).toList();
-      if(objectKeys.isEmpty) {
-        MyLogger.info('$logPrefix Query only contains version_tree special request; handled by version_tree cache.');
-        return;
-      }
-    
-      final objects = _serverDb.getObjects(userPublicKey, objectKeys);
-      MyLogger.info('$logPrefix Found ${objects.length} stored objects for user $userPublicKey');
-      if(objects.isEmpty) {
-        MyLogger.info('$logPrefix No objects found for query: user=$userPublicKey, required_versions_count=${objectKeys.length}, required_versions=$objectKeys');
-      } else {
-        _overlay.sendData(appName, this, node, AppMessageType.provideAppType.value, _buildProvidePayload(objects));
+      final objectKeys = keys.where((key) => key != resourceKeyVersionTree).toSet().toList();
+      resources.addAll(_serverDb.getObjects(userPublicKey, objectKeys));
+      MyLogger.info('$logPrefix Found ${resources.length} stored objects for user $userPublicKey');
+      if(resources.isNotEmpty || transactionId != null) {
+        final dataToSend = _buildProvidePayload(resources, transactionId, false);
+        _overlay.sendData(appName, this, node, AppMessageType.provideAppType.value, dataToSend);
       }
     } catch(e) {
       MyLogger.warn('$logPrefix Failed to handle queryAppType: $e');
+      if(transactionId != null) {
+        final dataToSend = _buildProvidePayload([], transactionId, true);
+        try {
+          _overlay.sendData(appName, this, node, AppMessageType.provideAppType.value, dataToSend);
+        } catch(sendError) {
+          MyLogger.warn('$logPrefix Failed to report query error: transaction=$transactionId, error=$sendError');
+        }
+      }
     }
   }
 
@@ -178,7 +251,10 @@ class RelayApplication implements ApplicationController {
   ({String payload, Map<String, dynamic> broadcast, String? resolvedVersion})? _readVersionPublish(String data) {
     final body = jsonDecode(data) as Map<String, dynamic>;
     if(body['type'] == versionChainBroadcastType) {
-      if(body.containsKey(resolvedVersionKey)) return null;
+      // resolved_version belongs to the version_tree_resolve envelope, not the original signed version_chain.
+      if(body.containsKey(resolvedVersionKey)) {
+        return null;
+      }
       return (payload: data, broadcast: body, resolvedVersion: null);
     }
     if(body['type'] != versionTreeResolveType) return null;
@@ -200,7 +276,7 @@ class RelayApplication implements ApplicationController {
         MyLogger.warn('$logPrefix Publish received from unexpected sender: sender_key=$senderKey, expected_sender_key=$senderPublicKey');
         return;
       }
-      if(!_verifyUncipherMessageWithSenderPublicKey(uncipherMessage.data, uncipherMessage.signature, senderPublicKey)) {
+      if(!_verifyTextWithSenderPublicKey(uncipherMessage.data, uncipherMessage.signature, senderPublicKey)) {
         MyLogger.warn('$logPrefix Failed to verify publishAppType signature for sender $senderPublicKey');
         return;
       }
@@ -211,7 +287,7 @@ class RelayApplication implements ApplicationController {
       final brdMsg = BroadcastMessages.fromJson(parsed.broadcast);
       final ownerPublicKey = brdMsg.userPublicId;
       if(ownerPublicKey != senderPublicKey) return;
-      if(!_verifyUncipherMessageWithSenderPublicKey(brdMsg.toSignableString(), brdMsg.signature, ownerPublicKey)) {
+      if(!_verifyTextWithSenderPublicKey(brdMsg.toSignableString(), brdMsg.signature, ownerPublicKey)) {
         MyLogger.warn('$logPrefix Failed to verify publishAppType signature for owner $ownerPublicKey');
         return;
       }
@@ -224,7 +300,7 @@ class RelayApplication implements ApplicationController {
           // The publish timestamp is only a hint that says which version_tree timestamp the peer has.
           // Do not store it as the relay cache timestamp; compare it with the stored version_tree resource timestamp instead.
           final versionTreeTimestamp = _serverDb.getVersionTreeTimestamp(ownerPublicKey);
-          final hasLatestVersionObject = _serverDb.hasObject(ownerPublicKey, latestVersion);
+          final hasLatestVersionObject = _hasCompleteVersion(ownerPublicKey, latestVersion);
           final samePublishVersion = oldLatestVersion == latestVersion && (latestVersionTimestamp == null || oldLatestPublishVersionTimestamp == latestVersionTimestamp);
           MyLogger.info('$logPrefix Publish latest_version received: user=$ownerPublicKey, node=${_nodeLabel(node)}, latest_version=$latestVersion, publish_timestamp=$latestVersionTimestamp, old_latest_version=$oldLatestVersion, old_publish_timestamp=$oldLatestPublishVersionTimestamp, same_publish_version=$samePublishVersion, stored_version_tree_timestamp=$versionTreeTimestamp, has_latest_version_object=$hasLatestVersionObject');
           final admission = _serverDb.tryAdmitPublish(ownerPublicKey, latestVersion, latestVersionTimestamp, uncipherData, resolvedVersion, timeoutMs: pendingTimeoutMs, maxQueries: maxPendingQueries);
@@ -294,13 +370,16 @@ class RelayApplication implements ApplicationController {
       }
       final versionHashes = _stringListFromApplyData(applyObj.data[applyTypeVersionsKey]);
     
-      final List<String> missingVersions = [];
-      for(final version in versionHashes) {
-        if(!_serverDb.hasObject(userPublicKey, version)) {
-          missingVersions.add(version);
+      final missingVersions = versionHashes.toSet().where((version) => !_hasCompleteVersion(userPublicKey, version)).toList();
+      final flow = _flowFor(userPublicKey, appName, node);
+      for(final version in missingVersions) {
+        if(!flow.keys.contains(version) && !flow.pending.contains(version)) {
+          flow.pending.add(version);
+          if(version != resourceKeyVersionTree) {
+            _incompleteVersionsByUser.putIfAbsent(userPublicKey, () => <String>{}).add(version);
+          }
         }
       }
-      _pendingMissingVersionsByUser[userPublicKey] = missingVersions;
       MyLogger.info('$logPrefix Total versions in apply: ${versionHashes.length}, missing: ${missingVersions.length}');
       _sendNextMissingVersionQuery(userPublicKey, appName, node);
     } catch(e) {
@@ -308,7 +387,7 @@ class RelayApplication implements ApplicationController {
     }
   }
 
-  String _buildQueryPayload(List<String> keys) {
+  String _buildQueryPayload(List<String> keys, String transactionId) {
     final requireVersions = RequireVersions(requiredVersions: keys);
     final data = jsonEncode(requireVersions);
     final uncipherMessage = UncipherMessage(
@@ -316,17 +395,37 @@ class RelayApplication implements ApplicationController {
       data: data,
       signature: _signing.sign(HashUtil.hashText(data)),
     );
-    return jsonEncode(uncipherMessage);
+    final transaction = TransactionMessage(
+      transactionId: transactionId,
+      status: TransactionStatus.request,
+      contentType: TransactionContentType.uncipher,
+      data: jsonEncode(uncipherMessage),
+      userPublicId: _signing.getCompressedPublicKey(),
+      signature: ''
+    );
+    transaction.signature = _signing.sign(HashUtil.hashText(transaction.toSignableString()));
+    return jsonEncode(transaction);
   }
 
-  String _buildProvidePayload(List<CipherMessage> resources) {
-    final feature = CipherMessages.getFeature(resources);
+  String _buildProvidePayload(List<CipherMessage> resources, String? transactionId, bool failed) {
     final cipherMessages = CipherMessages(
       userPublicId: _signing.getCompressedPublicKey(),
       resources: resources,
-      signature: _signing.sign(HashUtil.hashText(feature)),
+      signature: '',
     );
-    return jsonEncode(cipherMessages);
+    cipherMessages.signature = _signing.sign(HashUtil.hashText(cipherMessages.getSignableFeature()));
+    if(transactionId == null) return jsonEncode(cipherMessages);
+    final transaction = TransactionMessage(
+      transactionId: transactionId,
+      status: failed ? TransactionStatus.failed : TransactionStatus.completed,
+      contentType: TransactionContentType.cipher,
+      data: jsonEncode(cipherMessages),
+      objectCount: resources.length,
+      userPublicId: _signing.getCompressedPublicKey(),
+      signature: ''
+    );
+    transaction.signature = _signing.sign(HashUtil.hashText(transaction.toSignableString()));
+    return jsonEncode(transaction);
   }
 
   bool _shouldRequestVersionTree(int? publishTimestamp, int? storedVersionTreeTimestamp) {
@@ -363,34 +462,73 @@ class RelayApplication implements ApplicationController {
 
   void _sendVersionTreeQuery(String appName, VillagerNode node, String userPublicKey, int? publishTimestamp, int? storedVersionTreeTimestamp) {
     MyLogger.info('$logPrefix Query version_tree from publish source: user=$userPublicKey, node=${_nodeLabel(node)}, publish_timestamp=$publishTimestamp, stored_version_tree_timestamp=$storedVersionTreeTimestamp');
-    final queryPayload = _buildQueryPayload([resourceKeyVersionTree]);
-    _overlay.sendData(appName, this, node, AppMessageType.queryAppType.value, queryPayload);
+    final flow = _flowFor(userPublicKey, appName, node);
+    if(!flow.keys.contains(resourceKeyVersionTree) && !flow.pending.contains(resourceKeyVersionTree)) {
+      flow.pending.insert(0, resourceKeyVersionTree);
+    }
+    _sendNextMissingVersionQuery(userPublicKey, appName, node);
+  }
+
+  _QueryFlow _flowFor(String user, String appName, VillagerNode node) {
+    final previous = _queryFlows[node];
+    if(previous != null && previous.user == user && previous.appName == appName && identical(previous.peer, node.getPeer())) {
+      return previous;
+    }
+    previous?.timer?.cancel();
+    return _queryFlows[node] = _QueryFlow(user, appName, node.getPeer());
   }
 
   void _sendNextMissingVersionQuery(String userPublicKey, String appName, VillagerNode node) {
-    final pending = _pendingMissingVersionsByUser[userPublicKey];
-    if(pending == null || pending.isEmpty) {
-      _pendingMissingVersionsByUser.remove(userPublicKey);
+    final flow = _queryFlows[node];
+    if(flow == null || flow.id != null) return;
+    flow.pending.removeWhere((key) => key != resourceKeyVersionTree && _serverDb.hasObject(userPublicKey, key) &&
+      !(_incompleteVersionsByUser[userPublicKey]?.contains(key) ?? false));
+    if(flow.pending.isEmpty) {
+      _queryFlows.remove(node);
       return;
     }
-    pending.removeWhere((version) => _serverDb.hasObject(userPublicKey, version));
-    if(pending.isEmpty) {
-      _pendingMissingVersionsByUser.remove(userPublicKey);
-      MyLogger.info('$logPrefix All pending versions cached for user $userPublicKey.');
-      return;
-    }
-    final batchSize = pending.length < maxQueryVersionsPerApply? pending.length : maxQueryVersionsPerApply;
-    final queryVersions = pending.sublist(0, batchSize);
-    pending.removeRange(0, batchSize);
-    if(pending.isEmpty) {
-      _pendingMissingVersionsByUser.remove(userPublicKey);
-    }
-    final pendingTotalAfterSend = _pendingMissingVersionsByUser.values.fold<int>(0, (total, versions) => total + versions.length);
-    MyLogger.info('$logPrefix Query missing versions for user $userPublicKey: query_now=${queryVersions.length}, pending_for_user_after_send=${pending.length}, pending_total_after_send=$pendingTotalAfterSend, pending_users=${_pendingMissingVersionsByUser.length}');
+    // Tree requests share the same connection slot but are answered independently of version bundles.
+    final batchSize = flow.pending.first == resourceKeyVersionTree ? 1 : min(flow.pending.takeWhile((key) => key != resourceKeyVersionTree).length, maxQueryVersionsPerApply);
+    flow.keys = flow.pending.sublist(0, batchSize);
+    flow.pending.removeRange(0, batchSize);
+    flow.attempts = 0;
+    _sendQueryAttempt(node, flow);
+  }
+
+  void _sendQueryAttempt(VillagerNode node, _QueryFlow flow) {
+    flow.id = TransactionUtil.generateTransactionId();
+    flow.attempts++;
+    flow.received.clear();
+    flow.expected = null;
+    flow.failed = false;
+    MyLogger.info('$logPrefix Query missing versions for user ${flow.user}: query_now=${flow.keys.length}, pending_for_connection=${flow.pending.length}, attempt=${flow.attempts}, transaction=${flow.id}');
     // TEMPORARY LOG: Full hashes for sync diagnosis; remove after investigation.
-    MyLogger.info('$logPrefix Query version hashes: user=$userPublicKey, target=${_nodeLabel(node)}, versions=${jsonEncode(queryVersions)}');
-    final queryPayload = _buildQueryPayload(queryVersions);
-    _overlay.sendData(appName, this, node, AppMessageType.queryAppType.value, queryPayload);
+    MyLogger.info('$logPrefix Query version hashes: user=${flow.user}, target=${_nodeLabel(node)}, transaction=${flow.id}, versions=${jsonEncode(flow.keys)}');
+    _armQueryTimeout(node, flow);
+    try {
+      _overlay.sendData(flow.appName, this, node, AppMessageType.queryAppType.value, _buildQueryPayload(flow.keys, flow.id!));
+    } catch(e) {
+      flow.failed = true;
+      MyLogger.warn('$logPrefix Query send failed: transaction=${flow.id}, error=$e');
+    }
+  }
+
+  void _armQueryTimeout(VillagerNode node, _QueryFlow flow) {
+    flow.timer?.cancel();
+    flow.timer = Timer(queryTimeout, () {
+      if(!identical(_queryFlows[node], flow)) return;
+      if(node.getStatus() != VillagerStatus.keepInTouch || !identical(flow.peer, node.getPeer()) || node.publicKey != flow.user || flow.attempts >= maxQueryAttempts) {
+        MyLogger.warn('$logPrefix Query failed: user=${flow.user}, transaction=${flow.id}, attempts=${flow.attempts}; waiting for a fresh publish/apply');
+        _queryFlows.remove(node);
+        return;
+      }
+      MyLogger.warn('$logPrefix Query timeout/retry: user=${flow.user}, transaction=${flow.id}, saved=${flow.received.length}, expected=${flow.expected}, failed=${flow.failed}');
+      _sendQueryAttempt(node, flow);
+    });
+  }
+
+  bool _hasCompleteVersion(String user, String version) {
+    return _serverDb.hasObject(user, version) && !(_incompleteVersionsByUser[user]?.contains(version) ?? false);
   }
 
   void _forwardStoredLatestPublishIfReady(String userPublicKey, {VillagerNode? sourceNode}) {
@@ -399,7 +537,7 @@ class RelayApplication implements ApplicationController {
       MyLogger.info('$logPrefix Skip forwarding stored publish for user $userPublicKey: no latest_version cached.');
       return;
     }
-    if(!_serverDb.hasObject(userPublicKey, latestVersion)) {
+    if(!_hasCompleteVersion(userPublicKey, latestVersion)) {
       MyLogger.info('$logPrefix Skip forwarding stored publish for user $userPublicKey: latest_version=$latestVersion is not cached yet.');
       return;
     }
@@ -439,7 +577,7 @@ class RelayApplication implements ApplicationController {
     final records = _serverDb.getLatestPublishPayloads();
     MyLogger.info('$logPrefix Periodic publish forwarding tick: cached_publish_users=${records.length}, interval=${publishIntervalSeconds}s');
     for(final record in records) {
-      if(!_serverDb.hasObject(record.userPublicKey, record.latestVersion)) {
+      if(!_hasCompleteVersion(record.userPublicKey, record.latestVersion)) {
         MyLogger.info('$logPrefix Periodic publish skip user ${record.userPublicKey}: latest_version=${record.latestVersion} is not cached yet.');
         continue;
       }
@@ -516,7 +654,7 @@ class RelayApplication implements ApplicationController {
     }
   }
 
-  bool _verifyUncipherMessageWithSenderPublicKey(String message, String signature, String senderPublicKey) {
+  bool _verifyTextWithSenderPublicKey(String message, String signature, String senderPublicKey) {
     try {
       final verifier = VerifyingWrapper.loadKey(senderPublicKey);
       return verifier.ver(HashUtil.hashText(message), signature);

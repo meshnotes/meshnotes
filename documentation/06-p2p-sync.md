@@ -10,17 +10,31 @@ Mesh Notes uses a Version Chain-based P2P sync mechanism that supports offline e
 - **Eventual consistency**: all peers converge
 - **Encrypted transport**: end-to-end encryption and signatures
 
+## Receive window indexing
+
+`packages/libp2p/lib/network/buffer_and_queue.dart` maps every logical receive-window offset to `(head + offset) % size` for writes and state checks. Completed-prefix removal wraps at the same boundary and keeps `head` within the buffer; `minObjectId` advances by the removed count. This prevents array overflow and object-slot mismatches during long transfers without changing the window size, duplicate ACK handling, or out-of-order delivery. Regression coverage is in `packages/libp2p/test/network_test/receive_queue_test.dart`.
+
+## Relay query flow control
+
+`packages/server/lib/relay_application.dart` serializes version batches and tree queries per connection. Query/provide transaction metadata lives in a signed `TransactionMessage` outside the cipher/uncipher content. Its `status` is `request`, `partial`, `completed` or `failed`, and `content_type` selects the inner structure. It waits for verified `completed` status plus the expected unique persisted-resource count before requesting another batch. An individual version/object provide never starts the next batch. See [wire fields, completion and retries](03-network-protocol.md#query-transaction-completion).
+
+App query replies target only the original connection. If that connection is unavailable, `packages/libp2p/lib/application/application_layer.dart` logs and drops the reply without throwing or falling back to another peer.
+
+A partial batch remains incomplete even if its version object is already saved: retry the full bundle, and do not forward its publish as ready. This incompleteness state is currently in memory; persisting it across relay process restarts is a separate recovery task. Old cached version rows do not prove dependency completeness.
+
+Regression coverage: `packages/server/test/server_test.dart` covers completion ordering, duplicates, failure/empty responses, persistence failure, per-connection isolation, retry IDs, retry exhaustion and response splitting/signatures; `packages/libp2p/test/public_server_send_test.dart` covers targeted delivery; `test/version_tree_conflict_test.dart` covers App query context through the controller/isolate commands.
+
 ## Query diagnostics
 
-`lib/net/net_isolate.dart` logs authenticated incoming queries at info level as `Received query version hashes`, with the sender public key and complete `versions` list. Compare these hashes with the relay's `Query version hashes` log to detect repeated requests or a gap between relay send invocation and App receipt. App receipt does not imply a completed response or relay persistence.
+`lib/net/net_isolate.dart` logs authenticated incoming queries at info level as `Received query version hashes`, with the sender public key, transaction ID and complete `versions` list. Compare these hashes with the relay's `Query version hashes` log to detect repeated requests or a gap between relay send invocation and App receipt. App receipt does not imply a completed response or relay persistence.
 
-`lib/net/net_isolate.dart` also logs `Sending version hashes` with the upload transfer ID, complete version hash list, and object count; immediately before each version provide send invocation it logs `Sending provide version hash` with the same transfer ID and complete version hash. Dependency object hashes are not logged. These outgoing logs allow comparison with incoming queries and identify repeated version submissions; they do not indicate ACK or remote persistence.
+`lib/net/net_isolate.dart` also logs `Sending version hashes` with the upload transfer ID, query transaction ID, complete version hash list, and object count; immediately before the batch provide send invocation it logs each included version as `Sending provide version hash` with the same transfer ID and complete version hash. Dependency object hashes are not logged. These outgoing logs allow comparison with incoming queries and identify repeated version submissions; they do not indicate ACK or remote persistence.
 
 ## Sync progress
 
 `lib/mindeditor/document/collaborate/merge_task.dart` reports download progress by unique missing object hashes, not completed versions. The denominator includes objects needed during this acquisition; received objects remain counted, cached objects and duplicate responses do not increase it. Dependencies are discovered from version/document content, so the denominator can grow and the percentage can decrease. Progress refreshes on each received object, not only on the periodic check. In-flight hashes are not re-requested on every partial response; the existing two-minute retry check releases them for retry.
 
-`lib/net/net_isolate.dart` deduplicates each outgoing response by object hash and sends individual objects using the existing signed `provide` envelope. Upload progress counts objects after the local `Village.sendVersions` call returns, without waiting for remote ACKs. Finishing the local loop (or leaving it on error) clears the upload indicator. This is local submission progress, not proof of actual network delivery, remote database persistence or merge. The existing transport ACK/retry mechanism remains unchanged; no delivery callbacks or upload timeout are added to Peer, Overlay or Village.
+`lib/net/net_isolate.dart` uses the single `CipherMessages` returned by `CipherMessages.queryResponse()`, putting all objects deduplicated by hash into its `resources` array and submitting one signed `provide` per response. Empty responses without a transaction are not sent. Upload progress counts the whole batch after the local `Village.sendVersions` call returns, without waiting for remote ACKs. Finishing the submission (or leaving it on error) clears the upload indicator. This is local submission progress, not proof of actual network delivery, remote database persistence or merge. The existing transport ACK/retry mechanism remains unchanged; no delivery callbacks or upload timeout are added to Peer, Overlay or Village.
 
 `lib/tasks/event_tasks.dart` forwards active state, integer percentage and `SyncDirection` to the navigator and small-screen title bar. Idle download checks do not hide ongoing uploads. Only one direction is rendered; if activities overlap internally, download takes display priority. `lib/page/sync_progress_widget.dart` retains the circular indicator and puts an up/down arrow below the percentage inside the circle. No byte-based percentage or new wire message type is introduced (the upload-progress command is local isolate communication only).
 

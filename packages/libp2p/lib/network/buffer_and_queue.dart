@@ -251,6 +251,8 @@ class CycledQueue<T extends Updatable> {
   List<T?> queue = [];
   List<int> map = [];
   int size;
+  // Physical slot for logical offset 0 (ReceiveQueue.minObjectId). All offset-based
+  // reads and writes must use this origin; otherwise advancing the window mixes objects.
   int head = 0;
 
   CycledQueue({
@@ -274,7 +276,7 @@ class CycledQueue<T extends Updatable> {
   }
   bool _isInState(int index, int state) {
     if(index >= 0 && index < size) {
-      return map[index] == state;
+      return map[(head + index) % size] == state;
     }
     return false;
   }
@@ -285,6 +287,7 @@ class CycledQueue<T extends Updatable> {
     // 3. If data slot is not null, then update it with obj
     // 4. If data is complete, then set the status to _ready
     if(index < 0 || index >= size) return;
+    index = (head + index) % size;
     if(map[index] == _done || map[index] == _ready) return;
     if(queue[index] != null) {
       queue[index]!.update(obj);
@@ -312,13 +315,14 @@ class CycledQueue<T extends Updatable> {
   int popHeadingDone() {
     int count = 0;
     for(var i = 0; i < size; i++) {
-      int idx = head + i;
+      // The completed prefix may cross the physical end, even within one pop.
+      int idx = (head + i) % size;
       if(map[idx] != _done) break;
       count++;
       map[idx] = _none;
       queue[idx] = null;
     }
-    head += count;
+    head = (head + count) % size;
     return count;
   }
 }

@@ -85,11 +85,13 @@ class SendVersionTreeParameter {
   VersionChain versionChain;
   int timestamp;
   String latestVersion;
+  final String? transactionId;
 
   SendVersionTreeParameter({
     required this.versionChain,
     required this.timestamp,
     this.latestVersion = '',
+    this.transactionId,
   });
 }
 
@@ -110,9 +112,13 @@ class SendRequireVersionsParameter {
 
 class SendVersionsParameter {
   List<SendVersions> versions;
+  final String? transactionId;
+  final bool failed;
 
   SendVersionsParameter({
     required this.versions,
+    this.transactionId,
+    this.failed = false,
   });
 }
 
@@ -134,8 +140,10 @@ class UploadProgressParameter {
 
 class ReceiveQueryParameter {
   List<String> requiredObjects;
+  final String? transactionId;
 
   ReceiveQueryParameter({
     required this.requiredObjects,
+    this.transactionId,
   });
 }

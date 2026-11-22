@@ -114,7 +114,7 @@ class NetworkController {
   }
 
   /// Pack versionData in VersionChain, encrypt it, and sign it
-  void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp, TimeCostStatistics stats, String latestVersion) {
+  void sendNewVersionTree(List<VersionDataModel> versionData, int timestamp, TimeCostStatistics stats, String latestVersion, [String? transactionId]) {
     if(!isStarted()) return;
     var dag = _buildDag(versionData);
     VersionChain versionChain = VersionChain(
@@ -128,6 +128,7 @@ class NetworkController {
           versionChain: versionChain,
           timestamp: timestamp,
           latestVersion: latestVersion,
+          transactionId: transactionId,
         ),
         stats: stats,
       )
@@ -153,7 +154,7 @@ class NetworkController {
     sendRequireVersions([latestVersion], stats);
   }
 
-  void sendVersions(List<SendVersions> versions, TimeCostStatistics stats) {
+  void sendVersions(List<SendVersions> versions, TimeCostStatistics stats, {String? transactionId, bool failed = false}) {
     if(!isStarted()) return;
     stats.transportTime = Util.getTimeStamp();
     _sendPort?.send(
@@ -161,6 +162,8 @@ class NetworkController {
         cmd: Command.sendVersions,
         parameter: SendVersionsParameter(
           versions: versions,
+          transactionId: transactionId,
+          failed: failed,
         ),
         stats: stats,
       )
@@ -283,7 +286,7 @@ class NetworkController {
         final param = msg.parameter as ReceiveQueryParameter;
         final processingTimer = Stopwatch()..start();
         msg.stats.receiveTime = Util.getTimeStamp();
-        controller.receiveRequireVersions(param.requiredObjects, msg.stats);
+        controller.receiveRequireVersions(param.requiredObjects, msg.stats, param.transactionId);
         processingTimer.stop();
         msg.stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
         break;

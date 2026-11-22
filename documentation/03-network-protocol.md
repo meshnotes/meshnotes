@@ -446,7 +446,8 @@ bool verify(UncipherMessage msg) {
 class CipherMessages {
   String userPublicId;
   List<CipherMessage> resources;
-  String signature;         // signature = sign(hash(resources))
+  String signature;         // sign(hash(getSignableFeature()))
+
 }
 
 class CipherMessage {
@@ -522,12 +523,28 @@ class Apply {
 Upon receiving the `Apply` message, the server checks which version hashes are missing from its database, and requests them from the client using `query` (not encrypted):
 ```dart
 class RequireVersions {
-  List<String> requiredVersions;
+  List<String> requiredVersions; // versions
 }
 ```
 
 **5. Storage Provide**:
 The client receives the query and sends back the missing encrypted versions/objects using `provide` (`CipherMessages` containing `CipherMessage` items).
+
+#### Query transaction completion
+
+Implementation: `packages/libp2p/lib/application/application_api.dart`, `lib/net/net_isolate.dart`, and `packages/server/lib/relay_application.dart`.
+
+- Transactional query/provide messages wrap their original content in a signed `TransactionMessage`, not in `AppData` headers. `RequireVersions`, `CipherMessages` and `UncipherMessage` contain no transaction fields.
+- The envelope carries `transaction_id`, `status` (`request` / `partial` / `completed` / `failed`), `content_type` (`cipher` / `uncipher`), `data` (serialized inner message), optional `object_count`, `user`, and `sign`. Unknown status/content type values are rejected. Business code selects the matching inner structure by `content_type`; current sync queries require uncipher content and provides require cipher content.
+- Query: `status: request`, `content_type: uncipher`, with a signed `UncipherMessage` whose data is `{"versions":["v1","v2"]}`. Responses echo the outer transaction ID with `content_type: cipher`. A generic completed transaction need not carry an object count; a completed sync response must carry the total unique object count.
+- `CipherMessages.queryResponse()` directly reuses the list deduplicated once by its caller (`lib/net/net_isolate.dart`). All versions and dependencies fit in one signed inner `resources` array and one outer `completed` response. Empty replies contain `resources: []` and `object_count: 0`; response errors use `status: failed`. Partial responses remain supported without advancing the next query early. Transport fragmentation/reassembly is unchanged.
+- Outer `sign` is `sign(hash(TransactionMessage.toSignableString()))`: a fixed-order JSON view of `transaction_id`, `status`, `content_type`, exact serialized `data`, optional `object_count`, and `user`, excluding `sign`. Both endpoints check the actual sender and outer signature before decoding the inner message. Inner `UncipherMessage` data signatures, `CipherMessages` resource-feature signatures and individual resource signatures remain unchanged.
+- The relay allows one active query batch per connection, including `version_tree` requests. It advances only after receiving a valid completion marker, saving the advertised number of unique resources, and receiving every requested key. An early marker waits; duplicate objects/markers never increase the count. Empty or failed replies cannot silently skip missing requested versions.
+- App replies return only to the requesting node/connection. The business-facing query handler in `application_api.dart` receives a plain `String transactionId`, preserved directly through business processing and isolate round trips; no connection context or opaque route token crosses the business boundary. `application_layer.dart` privately maps that ID to `_QueryReplyRoute` (original node/connection). Reply send APIs take the serialized payload, routing ID and a separate `bool isComplete`: `true` removes the route after final/failure submission, while `false` renews it. They send the payload unchanged without decoding its JSON. Routes are also removed after connection loss detected on reply, or five minutes without response submission. Multipart submissions renew route expiry; active duplicate IDs are rejected rather than replacing the route. Ordinary queries without an envelope receive a generated local routing ID only; `net_isolate.dart` checks the protocol-owned `isTransactionalQuery()` flag before wrapping a reply, so the requester still receives an ordinary signed content message without any encode/decode/unwrap round trip. The query receive entry in `application_layer.dart` decodes and verifies only the transaction envelope and records its reply route, then passes the exact `transaction.data` string to `net_isolate.dart` (or the original input string for an ordinary query). `_onReceivedQuery()` keeps its `String` input and alone parses the inner `UncipherMessage`, retaining inner sender/signature and authorization checks. No inner JSON decoding or re-encoding occurs in the protocol query handler. `_rememberQueryRoute()` receives only the node, transaction ID and transactional flag; it performs no JSON parsing or signature verification. Old-attempt, wrong-peer, wrong-app and replaced-connection responses cannot complete an active relay batch.
+- Relay inactivity timeout: **60 seconds**; only a newly saved unique resource renews it. At most **3 attempts** (initial + 2 retries), each with a fresh random ID and reset receipt count. Retries request the whole batch even if its version objects were partially saved. On exhaustion/disconnect, release the connection slot and wait for a fresh publish/apply.
+- Ordinary non-transactional envelopes retain their wire/signature format and remain readable, but cannot complete a new relay transaction. The former transaction fields inside `CipherMessages` / `RequireVersions` are replaced, not a supported compatibility format; App and relay must both be updated for transactional storage sync.
+
+Transport ACKs acknowledge frames, not database saves. `ReceiveQueue.popAvailableData()` can deliver a later complete object before an earlier incomplete object; therefore the final marker alone does not establish completeness. This flow control bounds concurrent relay query batches, **not** the bytes/objects queued by one unusually large version.
 
 **6. Legacy Version request (fallback)**:
 

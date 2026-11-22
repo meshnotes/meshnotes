@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-typedef OnHandleStringWithPublicKeyFunction = Function(String senderPublicKey, String data, TimeCostStatistics stats);
+typedef OnHandleStringWithPublicKeyFunction = void Function(String senderPublicKey, String data, TimeCostStatistics stats);
+typedef OnHandleStringWithPublicKeyAndTransactionIdFunction = void Function(String senderPublicKey, String data, TimeCostStatistics stats, String transactionId);
 
 enum AppMessageType {
   provideAppType('provide'), // Provider other nodes the version tree
@@ -20,7 +21,7 @@ const String applyTypeVersionsKey = 'versions';
 
 class VillageMessageHandler {
   OnHandleStringWithPublicKeyFunction? handleProvide;
-  OnHandleStringWithPublicKeyFunction? handleQuery;
+  OnHandleStringWithPublicKeyAndTransactionIdFunction? handleQueryFromNode;
   OnHandleStringWithPublicKeyFunction? handlePublish;
   OnHandleStringWithPublicKeyFunction? handleOffer;
   OnHandleStringWithPublicKeyFunction? handleApply;
@@ -49,6 +50,79 @@ class UncipherMessage {
       'sign': signature,
     };
   }
+}
+
+enum TransactionStatus { request, partial, completed, failed }
+enum TransactionContentType { cipher, uncipher }
+
+/// Signed transaction envelope. The payload keeps its own original signature contract.
+class TransactionMessage {
+  final String transactionId;
+  final TransactionStatus status;
+  final TransactionContentType contentType;
+  final String data;
+  final int? objectCount;
+  final String userPublicId;
+  String signature;
+
+  TransactionMessage({required this.transactionId, required this.status, required this.contentType,
+    required this.data, required this.userPublicId, required this.signature, this.objectCount}) {
+    if(transactionId.isEmpty || userPublicId.isEmpty || (objectCount != null && objectCount! < 0) ||
+        (status == TransactionStatus.request && objectCount != null)) {
+      throw FormatException('Invalid transaction metadata');
+    }
+  }
+
+  factory TransactionMessage.fromJson(Map<String, dynamic> map) {
+    final status = TransactionStatus.values.where((value) => value.name == map[_statusKey]).firstOrNull;
+    final contentType = TransactionContentType.values.where((value) => value.name == map[_contentTypeKey]).firstOrNull;
+    if(status == null || contentType == null) {
+      throw FormatException('Unknown transaction status/content type');
+    }
+
+    return TransactionMessage(
+      transactionId: map[_transactionIdKey] as String,
+      status: status,
+      contentType: contentType,
+      data: map[_dataKey] as String,
+      userPublicId: map[_userKey] as String,
+      signature: map[_signatureKey] as String,
+      objectCount: map[_objectCountKey] as int?,
+    );
+  }
+
+  CipherMessages parseCipher() {
+    if(contentType != TransactionContentType.cipher) throw FormatException('Expected cipher payload');
+    return CipherMessages.fromJson(jsonDecode(data));
+  }
+
+  UncipherMessage parseUncipher() {
+    if(contentType != TransactionContentType.uncipher) throw FormatException('Expected uncipher payload');
+    return UncipherMessage.fromJson(jsonDecode(data));
+  }
+
+  Map<String, dynamic> _signableJson() => {
+    _transactionIdKey: transactionId,
+    _statusKey: status.name,
+    _contentTypeKey: contentType.name,
+    _dataKey: data,
+    if(objectCount != null) _objectCountKey: objectCount,
+    _userKey: userPublicId,
+  };
+
+  String toSignableString() => jsonEncode(_signableJson());
+
+  Map<String, dynamic> toJson() => {..._signableJson(), _signatureKey: signature};
+
+  static bool isTransaction(Map<String, dynamic> m) => m.containsKey(_transactionIdKey);
+  
+  static const String _transactionIdKey = 'transaction_id';
+  static const String _statusKey = 'status';
+  static const String _contentTypeKey = 'content_type';
+  static const String _dataKey = 'data';
+  static const String _objectCountKey = 'object_count';
+  static const String _userKey = 'user';
+  static const String _signatureKey = 'sign';
 }
 
 class UnsignedResource {
@@ -125,12 +199,16 @@ class CipherMessages {
   String userPublicId;
   List<CipherMessage> resources;
   String signature;
-
   CipherMessages({
     required this.userPublicId,
     required this.resources,
     required this.signature,
   });
+
+  /// Reuses the caller-deduplicated list, without copying or changing batch granularity.
+  static CipherMessages queryResponse(String userPublicId, List<CipherMessage> resources) {
+    return CipherMessages(userPublicId: userPublicId, resources: resources, signature: '');
+  }
 
   static String getFeature(List<CipherMessage> resources) {
     String feature = '';
@@ -145,6 +223,8 @@ class CipherMessages {
         userPublicId = map['user'],
         resources = _recursiveList(map['resources']),
         signature = map['sign'];
+
+  String getSignableFeature() => getFeature(resources);
 
   Map<String, dynamic> toJson() {
     return {

@@ -413,13 +413,13 @@ class Controller {
   void clearHistoryVersions() {
     docManager.clearHistoryVersions();
   }
-  bool _sendCurrentVersionTree(TimeCostStatistics stats) {
+  bool _sendCurrentVersionTree(TimeCostStatistics stats, [String? transactionId]) {
     var (versionData, timestamp) = docManager.genCurrentVersionTree();
     if(versionData.isEmpty || timestamp == 0) {
       return false;
     }
     MyLogger.info('sendVersionTree: $versionData');
-    network.sendNewVersionTree(versionData, timestamp, stats, docManager.getLatestVersion());
+    network.sendNewVersionTree(versionData, timestamp, stats, docManager.getLatestVersion(), transactionId);
     docManager.markCurrentVersionAsSyncing();
     return true;
   }
@@ -481,15 +481,24 @@ class Controller {
     docManager.mergeVersionTree();
     return true;
   }
-  void receiveRequireVersions(List<String> requiredVersions, TimeCostStatistics stats) {
+  void receiveRequireVersions(List<String> requiredVersions, TimeCostStatistics stats, String? transactionId) {
     stats.finishTime = Util.getTimeStamp();
     _updateTimeCostStatistics(stats);
     MyLogger.info('receiveRequireVersions: receive require versions message: $requiredVersions');
     for(final item in requiredVersions) {
       //TODO Currently only send version tree if there is any resource with the key 'version_tree'.
-      //TODO Maybe should make ordinary resources and version_tree coexist
+      //     Maybe should make ordinary resources and version_tree coexist
       if(item == resourceKeyVersionTree) {
-        _sendCurrentVersionTree(TimeCostStatistics(startTime: Util.getTimeStamp()));
+        try {
+          if(!_sendCurrentVersionTree(TimeCostStatistics(startTime: Util.getTimeStamp()), transactionId) && transactionId != null) {
+            network.sendVersions([], stats, transactionId: transactionId);
+          }
+        } catch(e) {
+          if(transactionId == null) {
+            rethrow;
+          }
+          network.sendVersions([], stats, transactionId: transactionId, failed: true);
+        }
         return;
       }
     }
@@ -497,10 +506,17 @@ class Controller {
       startTime: Util.getTimeStamp(),
     );
     //TODO should make the log shorter
-    var versions = docManager.assembleRequireVersions(requiredVersions);
-    // MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length > 10? versions.sublist(0, 10) : versions}');
-    MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length} versions, ${jsonEncode(versions).length} bytes');
-    network.sendVersions(versions, newStats);
+    try {
+      var versions = docManager.assembleRequireVersions(requiredVersions);
+      MyLogger.info('receiveRequireVersions: preparing to send versions: ${versions.length} versions, ${jsonEncode(versions).length} bytes');
+      network.sendVersions(versions, newStats, transactionId: transactionId);
+    } catch(e) {
+      if(transactionId == null) {
+        rethrow;
+      }
+      MyLogger.warn('Failed to assemble query response: transaction=$transactionId, error=$e');
+      network.sendVersions([], newStats, transactionId: transactionId, failed: true);
+    }
   }
   void receiveOffer(UncipherMessage msg, TimeCostStatistics stats) {
     stats.finishTime = Util.getTimeStamp();

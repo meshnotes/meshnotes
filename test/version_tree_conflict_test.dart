@@ -136,5 +136,32 @@ void main() {
     conflict('server1', remote.getHash());
     await flush();
     expect((commands.last.parameter as SendBroadcastParameter).resolvedVersion, remote.getHash());
+
+    // The network/controller/isolate-command path preserves only transaction metadata.
+    const transactionId = 'query-1';
+    void query(List<String> keys) => incoming.sendPort.send(Message(cmd: Command.receiveQuery,
+      parameter: ReceiveQueryParameter(requiredObjects: keys, transactionId: transactionId), stats: TimeCostStatistics()));
+    query([remote.getHash()]);
+    await flush();
+    final response = commands.last.parameter as SendVersionsParameter;
+    expect(response.transactionId, transactionId);
+    expect(response.versions.single.versionHash, remote.getHash());
+    expect(response.failed, isFalse);
+    query(['missing-version']);
+    await flush();
+    final empty = commands.last.parameter as SendVersionsParameter;
+    expect(empty.versions, isEmpty);
+    expect(empty.transactionId, transactionId);
+    expect(empty.failed, isFalse);
+    query([resourceKeyVersionTree]);
+    await flush();
+    expect((commands.last.parameter as SendVersionTreeParameter).transactionId, transactionId);
+    db.execute('DROP TABLE objects');
+    query([remote.getHash()]);
+    await flush();
+    final failure = commands.last.parameter as SendVersionsParameter;
+    expect(failure.transactionId, transactionId);
+    expect(failure.failed, isTrue);
+    expect(failure.versions, isEmpty);
   });
 }

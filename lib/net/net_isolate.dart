@@ -99,7 +99,7 @@ class VersionChainVillager {
         // ..handleRequireVersions = _handleRequireVersions
         // ..handleSendVersions = _handleSendVersions
           ..handleProvide = _onReceivedProvide
-          ..handleQuery = _onReceivedQuery
+          ..handleQueryFromNode = _onReceivedQuery
           ..handlePublish = _onReceivedPublish
           ..handleOffer = _onReceivedOffer
           ..handleApply = _onReceivedApply
@@ -139,7 +139,11 @@ class VersionChainVillager {
         break;
       case Command.sendVersionTree:
         final param = msg.parameter as SendVersionTreeParameter;
-        _onSendVersionTree(param.versionChain, param.timestamp, msg.stats, param.latestVersion);
+        try {
+          _onSendVersionTree(param.versionChain, param.timestamp, msg.stats, param.latestVersion, param.transactionId);
+        } catch(e) {
+          _sendQueryFailure(param.transactionId, msg.stats, e);
+        }
         break;
       case Command.sendRequireVersions:
         final param = msg.parameter as SendRequireVersionsParameter;
@@ -147,7 +151,11 @@ class VersionChainVillager {
         break;
       case Command.sendVersions:
         final sendVersions = msg.parameter as SendVersionsParameter;
-        _onSendVersions(sendVersions.versions, msg.stats);
+        try {
+          _onSendVersions(sendVersions.versions, msg.stats, sendVersions.transactionId, sendVersions.failed);
+        } catch(e) {
+          _sendQueryFailure(sendVersions.transactionId, msg.stats, e);
+        }
         break;
       case Command.sendApply: // 7) sendApply is handled in net_isolate
         final applyDataStr = msg.parameter as String;
@@ -207,13 +215,30 @@ class VersionChainVillager {
     final processingTimer = Stopwatch()..start();
     final processStartTime = DateTime.now().microsecondsSinceEpoch;
 
-    final cipherMessages = CipherMessages.fromJson(jsonDecode(data));
+    late final CipherMessages cipherMessages;
+    try {
+      final decoded = jsonDecode(data) as Map<String, dynamic>;
+      final transaction = TransactionMessage.isTransaction(decoded) ? TransactionMessage.fromJson(decoded) : null;
+      if(transaction != null && (transaction.status == TransactionStatus.request || transaction.userPublicId != senderPublicKey ||
+          !_verifySignatureWithKey(senderPublicKey, transaction.toSignableString(), transaction.signature))) {
+        MyLogger.info('Drop malformed provide transaction');
+        return;
+      }
+      if(transaction?.status == TransactionStatus.failed) {
+        MyLogger.info('Drop failed transaction: transactionId=${transaction?.transactionId}');
+        return;
+      }
+      cipherMessages = transaction == null ? CipherMessages.fromJson(decoded) : transaction.parseCipher();
+    } catch(error) {
+      MyLogger.warn('Drop malformed provide: $error');
+      return;
+    }
     if(cipherMessages.userPublicId != senderPublicKey) {
       MyLogger.info('Receive PROVIDE message not signed by its sender');
       processingTimer.stop();
       return;
     }
-    String feature = CipherMessages.getFeature(cipherMessages.resources);
+    String feature = cipherMessages.getSignableFeature();
     final ok = _verifySignatureWithKey(senderPublicKey, feature, cipherMessages.signature);
     if(!ok) {
       MyLogger.info('Verify PROVIDE message failed');
@@ -272,12 +297,19 @@ class VersionChainVillager {
     ));
   }
 
-  void _onReceivedQuery(String senderPublicKey, String data, TimeCostStatistics stats) {
+  void _onReceivedQuery(String senderPublicKey, String data, TimeCostStatistics stats, String transactionId) {
     /// 1. Check public key is the same
     /// 2. Verify message
     /// 3. Send to port to notify upper layer
     final processingTimer = Stopwatch()..start();
-    UncipherMessage uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
+    // The protocol layer handles only the transaction envelope; decode its untouched inner payload here.
+    late final UncipherMessage uncipherMessage;
+    try {
+      uncipherMessage = UncipherMessage.fromJson(jsonDecode(data));
+    } catch(error) {
+      MyLogger.warn('Drop malformed query: $error');
+      return;
+    }
     final publicKey = uncipherMessage.userPublicId;
     if(publicKey != senderPublicKey) {
       MyLogger.info('Receive QUERY message not signed by its sender');
@@ -297,7 +329,7 @@ class VersionChainVillager {
     }
     var requiredVersions = RequireVersions.fromJson(jsonDecode(uncipherMessage.data));
     // TEMPORARY LOG: Full hashes for sync diagnosis; remove after investigation.
-    MyLogger.info('Received query version hashes: sender=$senderPublicKey, versions=${jsonEncode(requiredVersions.requiredVersions)}');
+    MyLogger.info('Received query version hashes: sender=$senderPublicKey, transaction=$transactionId, versions=${jsonEncode(requiredVersions.requiredVersions)}');
     processingTimer.stop();
     stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
     stats.transportTime = Util.getTimeStamp();
@@ -305,6 +337,7 @@ class VersionChainVillager {
       cmd: Command.receiveQuery,
       parameter: ReceiveQueryParameter(
         requiredObjects: requiredVersions.requiredVersions,
+        transactionId: transactionId,
       ),
       stats: stats,
     ));
@@ -373,7 +406,7 @@ class VersionChainVillager {
     _village?.sendPublish(uncipherMessageJson, stats, parameter.targetPublicKey);
   }
 
-  void _onSendVersionTree(VersionChain versionChain, int timestamp, TimeCostStatistics stats, String latestVersion) {
+  void _onSendVersionTree(VersionChain versionChain, int timestamp, TimeCostStatistics stats, String latestVersion, String? transactionId) {
     final processingTimer = Stopwatch()..start();
     stats.receiveTime = Util.getTimeStamp();
     String chainJson = jsonEncode(versionChain);
@@ -388,12 +421,22 @@ class VersionChainVillager {
     var cipherMessage = CipherMessage.fromRaw(rawResource, signature);
 
     List<CipherMessage> resourceList = [cipherMessage];
-    String signatureOfList = _genSignature(CipherMessages.getFeature(resourceList));
-    CipherMessages cipherMessages = CipherMessages(userPublicId: _signing!.getCompressedPublicKey(), resources: resourceList, signature: signatureOfList);
-    String cipherMessagesJson = jsonEncode(cipherMessages);
+    CipherMessages cipherMessages = CipherMessages(
+      userPublicId: _signing!.getCompressedPublicKey(),
+      resources: resourceList,
+      signature: '',
+    );
+    cipherMessages.signature = _genSignature(cipherMessages.getSignableFeature());
+    String cipherMessagesJson = _wrapTransaction(
+      jsonEncode(cipherMessages),
+      transactionId,
+      TransactionContentType.cipher,
+      TransactionStatus.completed,
+      1
+    );
     processingTimer.stop();
     stats.versionTreeCost += processingTimer.elapsedMilliseconds;
-    _village?.sendVersionTree(cipherMessagesJson, stats);
+    _village?.sendVersionTree(cipherMessagesJson, stats, transactionId, true);
   }
 
   void _onSendRequireVersions(List<String> versions, TimeCostStatistics stats) {
@@ -403,7 +446,14 @@ class VersionChainVillager {
     String json = jsonEncode(requiredVersions);
     String signature = _genSignature(json);
     UncipherMessage uncipherMessage = UncipherMessage(userPublicId: _signing!.getCompressedPublicKey(), data: json, signature: signature);
-    String uncipherMessageJson = jsonEncode(uncipherMessage);
+    final transactionId = TransactionUtil.generateTransactionId();
+    String uncipherMessageJson = _wrapTransaction(
+      jsonEncode(uncipherMessage),
+      transactionId,
+      TransactionContentType.uncipher,
+      TransactionStatus.request,
+      null
+    );
     processingTimer.stop();
     stats.requiredVersionsCost += processingTimer.elapsedMilliseconds;
     _village?.sendRequireVersions(uncipherMessageJson, stats);
@@ -411,7 +461,7 @@ class VersionChainVillager {
 
   int _nextUploadId = 0;
 
-  void _onSendVersions(List<SendVersions> versions, TimeCostStatistics stats) {
+  void _onSendVersions(List<SendVersions> versions, TimeCostStatistics stats, String? transactionId, bool failed) {
     final processingTimer = Stopwatch()..start();
     stats.receiveTime = Util.getTimeStamp();
     List<CipherMessage> resourceList = [];
@@ -448,33 +498,88 @@ class VersionChainVillager {
     final objects = {for(final resource in resourceList) resource.key: resource}.values.toList();
     processingTimer.stop();
     stats.versionCost += processingTimer.elapsedMilliseconds;
-    if(objects.isEmpty || _village == null) return;
+    if(_village == null) return;
+    final message = CipherMessages.queryResponse(_signing!.getCompressedPublicKey(), objects);
     final transferId = _nextUploadId++;
     final versionHashes = versions.map((version) => version.versionHash).toSet();
     // TEMPORARY LOG: Full hashes for sync diagnosis; remove after investigation.
-    MyLogger.info('Sending version hashes: transfer=$transferId, versions=${jsonEncode(versionHashes.toList())}, object_count=${objects.length}');
+    MyLogger.info('Sending version hashes: transfer=$transferId, transaction=$transactionId, versions=${jsonEncode(versionHashes.toList())}, object_count=${objects.length}');
     var sent = 0;
     void report(bool done) {
-      _sendPort.send(Message(cmd: Command.uploadProgress,
-        parameter: UploadProgressParameter(transferId, sent, objects.length, done), stats: TimeCostStatistics()));
+      _sendPort.send(
+        Message(
+          cmd: Command.uploadProgress,
+          parameter: UploadProgressParameter(transferId, sent, objects.length, done),
+          stats: TimeCostStatistics()
+        )
+      );
     }
     report(false);
     try {
-      for(final resource in objects) {
-        final resources = [resource];
-        final signature = _genSignature(CipherMessages.getFeature(resources));
-        final message = CipherMessages(userPublicId: _signing!.getCompressedPublicKey(), resources: resources, signature: signature);
+      if(message.resources.isEmpty && transactionId == null) return;
+      message.signature = _genSignature(message.getSignableFeature());
+      for(final resource in message.resources) {
         if(versionHashes.contains(resource.key)) {
           // TEMPORARY LOG: Full hashes for sync diagnosis; remove after investigation.
-          MyLogger.info('Sending provide version hash: transfer=$transferId, hash=${resource.key}');
+          MyLogger.info('Sending provide version hash: transfer=$transferId, transaction=$transactionId, hash=${resource.key}');
         }
-        _village!.sendVersions(jsonEncode(message), stats);
-        sent++;
-        report(false);
       }
+      _village!.sendVersions(
+        _wrapTransaction(
+          jsonEncode(message),
+          transactionId,
+          TransactionContentType.cipher,
+          failed ? TransactionStatus.failed : TransactionStatus.completed,
+          objects.length
+        ),
+        stats,
+        transactionId,
+        true
+      );
+      sent = message.resources.length;
+      report(false);
     } finally {
       report(true);
     }
+  }
+
+  void _sendQueryFailure(String? transactionId, TimeCostStatistics stats, Object error) {
+    MyLogger.warn('Failed to send query response: transaction=$transactionId, error=$error');
+    if(transactionId == null || _village == null) return;
+    try {
+      final message = CipherMessages.queryResponse(_signing!.getCompressedPublicKey(), []);
+      message.signature = _genSignature(message.getSignableFeature());
+      _village!.sendVersions(
+        _wrapTransaction(
+          jsonEncode(message),
+          transactionId,
+          TransactionContentType.cipher,
+          TransactionStatus.failed,
+          null,
+        ),
+        stats,
+        transactionId,
+        true
+      );
+    } catch(e) {
+      MyLogger.warn('Failed to report query failure: transaction=$transactionId, error=$e');
+    }
+  }
+
+  String _wrapTransaction(String data, String? transactionId, TransactionContentType contentType, TransactionStatus status, int? objectCount) {
+    if(transactionId == null) return data;
+    if(status != TransactionStatus.request && _village?.isTransactionalQuery(transactionId) != true) return data;
+    final transaction = TransactionMessage(
+      transactionId: transactionId,
+      status: status,
+      contentType: contentType,
+      data: data,
+      objectCount: objectCount,
+      userPublicId: _signing!.getCompressedPublicKey(),
+      signature: ''
+    );
+    transaction.signature = _genSignature(transaction.toSignableString());
+    return jsonEncode(transaction);
   }
 
   void _onNewNodeDiscovered(String host, int port, String deviceId) {

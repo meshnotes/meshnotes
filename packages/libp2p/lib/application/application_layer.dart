@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:keygen/keygen.dart';
 import 'package:libp2p/dal/village_db.dart';
 import 'package:libp2p/overlay/overlay_layer.dart';
 import 'package:libp2p/overlay/overlay_controller.dart';
@@ -6,6 +8,15 @@ import 'package:libp2p/overlay/villager_node.dart';
 import 'package:libp2p/utils.dart';
 import 'package:my_log/my_log.dart';
 import 'application_api.dart';
+
+// Only the protocol layer owns the original connection and route expiry.
+class _QueryReplyRoute {
+  final String nodeId;
+  final int? connectionId;
+  final bool transactional;
+  Timer? timeout;
+  _QueryReplyRoute(this.nodeId, this.connectionId, this.transactional);
+}
 
 enum VillageMode {
   loneWolf,
@@ -23,6 +34,8 @@ class Village implements ApplicationController {
   int _lastPrintStatisticsTimestamp = 0;
   static const _printStatisticsInterval = 10000; // Print statistics every 10 seconds
   _TimeCostStatistics _timeCostStatistics = _TimeCostStatistics();
+  final Map<String, _QueryReplyRoute> _queryReplyRoutes = {};
+  static const _queryReplyTimeout = Duration(minutes: 5);
 
   // Villager properties
   // String _userId; // It seems this is not necessary
@@ -70,7 +83,7 @@ class Village implements ApplicationController {
         break;
       case AppMessageType.queryAppType:
         if(upperAppName == appName) {
-          messageHandler.handleQuery?.call(senderPublicKey, data, stats);
+          _onQuery(node, data, stats);
         } else {
           _onDefaultQuery(data);
         }
@@ -116,21 +129,110 @@ class Village implements ApplicationController {
       }
     }
   }
-  void sendVersionTree(String resourceJson, TimeCostStatistics stats) {
+  void sendVersionTree(String resourceJson, TimeCostStatistics stats, String? transactionId, bool isComplete) {
     MyLogger.info('sendVersionTree: Preparing to send version tree: ${resourceJson.substring(0, 100)}');
     //TODO Optimize the code below to only send message to selected nodes
-    _sendToAllNodesOfUser(AppMessageType.provideAppType, resourceJson, stats);
+    if(transactionId == null) {
+      _sendToAllNodesOfUser(AppMessageType.provideAppType, resourceJson, stats);
+    } else {
+      _sendQueryResponse(resourceJson, stats, transactionId, isComplete);
+    }
   }
   void sendRequireVersions(String requiredVersions, TimeCostStatistics stats) {
     MyLogger.info('sendRequireVersions: Preparing to send require_versions: ${requiredVersions.substring(0, 100)}');
     //TODO Optimize the code below to only send message to selected nodes
     _sendToAllNodesOfUser(AppMessageType.queryAppType, requiredVersions, stats);
   }
-  void sendVersions(String sendVersions, TimeCostStatistics stats) {
+  void sendVersions(String sendVersions, TimeCostStatistics stats, String? transactionId, bool isComplete) {
     MyLogger.info('sendVersions: Preparing to send versions: ${sendVersions.substring(0, 100)}');
     //TODO Optimize the code below to only send message to selected nodes
-    _sendToAllNodesOfUser(AppMessageType.provideAppType, sendVersions, stats);
+    if(transactionId == null) {
+      _sendToAllNodesOfUser(AppMessageType.provideAppType, sendVersions, stats);
+    } else {
+      _sendQueryResponse(sendVersions, stats, transactionId, isComplete);
+    }
   }
+
+  void _onQuery(VillagerNode node, String data, TimeCostStatistics stats) {
+    if(messageHandler.handleQueryFromNode == null) return;
+    late final TransactionMessage? transaction;
+    try {
+      final decoded = jsonDecode(data) as Map<String, dynamic>;
+      transaction = TransactionMessage.isTransaction(decoded) ? TransactionMessage.fromJson(decoded) : null;
+      if(transaction != null && !isTransactionQueryCorrect(transaction, node.publicKey)) {
+        MyLogger.warn('Skip incorrect query: transaction=$transaction, publicKey=$node.publicKey');
+        return;
+      }
+    } catch(error) {
+      MyLogger.warn('Skip malformed query: $error');
+      return;
+    }
+    final transactionId = _rememberQueryRoute(node, transaction?.transactionId, transaction != null);
+    if(transactionId != null) {
+      messageHandler.handleQueryFromNode!(node.publicKey, transaction?.data ?? data, stats, transactionId);
+    }
+  }
+
+  bool isTransactionQueryCorrect(TransactionMessage transaction, String publicKey) {
+    if(transaction.status != TransactionStatus.request) return false;
+    if(transaction.contentType != TransactionContentType.uncipher) return false;
+    if(transaction.userPublicId != publicKey) return false;
+    if(!VerifyingWrapper.loadKey(publicKey).ver(HashUtil.hashText(transaction.toSignableString()), transaction.signature)) return false;
+    return true;
+  }
+
+  String? _rememberQueryRoute(VillagerNode node, String? transactionId, bool transactional) {
+    // Ordinary queries need only a local ID for targeting their asynchronous reply.
+    transactionId ??= 'local-${networkNow()}-${randomId()}';
+    if(_queryReplyRoutes.containsKey(transactionId)) {
+      MyLogger.warn('Skip duplicate query transaction: $transactionId');
+      return null;
+    }
+    final route = _QueryReplyRoute(node.nodeId, node.getPeer()?.getSourceId(), transactional);
+    _queryReplyRoutes[transactionId] = route;
+    _renewQueryRoute(transactionId, route);
+    return transactionId;
+  }
+
+  void _renewQueryRoute(String transactionId, _QueryReplyRoute route) {
+    route.timeout?.cancel();
+    route.timeout = Timer(_queryReplyTimeout, () {
+      _queryReplyRoutes.remove(transactionId);
+      MyLogger.info('Expired query response route: transaction=$transactionId');
+    });
+  }
+
+  void _removeQueryRoute(String transactionId) {
+    _queryReplyRoutes.remove(transactionId)?.timeout?.cancel();
+  }
+
+  // The producer selects the wire format before serializing the reply.
+  bool isTransactionalQuery(String transactionId) => _queryReplyRoutes[transactionId]?.transactional == true;
+
+  void _sendQueryResponse(String data, TimeCostStatistics stats, String transactionId, bool isComplete) {
+    final route = _queryReplyRoutes[transactionId];
+    if(route == null) {
+      MyLogger.info('Skip query response: no active route, transaction=$transactionId');
+      return;
+    }
+    for(final node in _overlay.getAllNodes()) {
+      if(node.nodeId == route.nodeId && node.getPeer()?.getSourceId() == route.connectionId && node.getStatus() == VillagerStatus.keepInTouch) {
+        _overlay.sendData(upperAppName, this, node, AppMessageType.provideAppType.value, data);
+        if(isComplete) {
+          _removeQueryRoute(transactionId);
+        } else {
+          _renewQueryRoute(transactionId, route);
+        }
+        stats.finishTime = networkNow();
+        _updateTimeCostStatistics(stats);
+        return;
+      }
+    }
+    _removeQueryRoute(transactionId);
+    // A reply belongs to the original connection; disconnects must not reroute it or fail the caller.
+    MyLogger.info('Skip query response: requesting connection is no longer available, node=${route.nodeId}, connection=${route.connectionId}');
+  }
+
   void sendOffer(String offerJson, TimeCostStatistics stats) {
     MyLogger.info('sendOffer: Preparing to send offer: ${offerJson.substring(0, offerJson.length > 100? 100 : offerJson.length)}');
     _sendToAllNodesOfUser(AppMessageType.offerAppType, offerJson, stats);
